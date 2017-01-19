@@ -93,6 +93,11 @@ TYPELIB binlog_checksum_typelib=
 
 #define FLAGSTR(V,F) ((V)&(F)?#F" ":"")
 
+#ifndef EMBEDDED_LIBRARY
+// Uses the THD to update the global stats by user name and client IP
+void update_global_user_stats(THD* thd, bool create_user, time_t now);
+#endif
+
 /*
   Size of buffer for printing a double in format %.<PREC>g
 
@@ -11554,6 +11559,9 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
 
       error= (this->*do_apply_row_ptr)(rli);
 
+      if (!error)
+        thd->updated_row_count++;
+
       if (handle_idempotent_and_ignored_errors(rli, &error))
         break;
 
@@ -11561,6 +11569,14 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       do_post_row_operations(rli, error);
 
     } while (!error && (m_curr_row != m_rows_end));
+
+    if (unlikely(opt_userstat))
+    {
+      thd->update_stats(false);
+#ifndef EMBEDDED_LIBRARY
+      update_global_user_stats(thd, true, time(NULL));
+#endif
+    }
 
 AFTER_MAIN_EXEC_ROW_LOOP:
 
