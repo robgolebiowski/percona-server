@@ -59,6 +59,9 @@ slave_ignored_err_throttle(window_size,
 #include "rpl_utility.h"
 
 #include "sql_digest.h"
+#ifndef EMBEDDED_LIBRARY
+#include "sql_connect.h" //update_global_user_stats
+#endif
 
 using std::min;
 using std::max;
@@ -92,11 +95,6 @@ TYPELIB binlog_checksum_typelib=
 #define log_cs	&my_charset_latin1
 
 #define FLAGSTR(V,F) ((V)&(F)?#F" ":"")
-
-#ifndef EMBEDDED_LIBRARY
-// Uses the THD to update the global stats by user name and client IP
-void update_global_user_stats(THD* thd, bool create_user, time_t now);
-#endif
 
 /*
   Size of buffer for printing a double in format %.<PREC>g
