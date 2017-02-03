@@ -1,0 +1,50 @@
+--source include/master-slave.inc
+
+--echo #
+--echo # Bug #84415 slave don't report Seconds_Behind_Master when
+--echo # running slave_parallel_workers > 0 
+--echo #
+
+--connection slave
+--source include/stop_slave.inc
+SET @save.slave_parallel_workers=@@global.slave_parallel_workers;
+SET @@global.slave_parallel_workers=4;
+--source include/start_slave.inc
+
+--connection master
+
+CREATE TABLE t1(a BIGINT AUTO_INCREMENT PRIMARY KEY, b INT DEFAULT NULL) ENGINE=InnoDB;
+INSERT INTO t1 (b) VALUES (1);
+
+--source include/sync_slave_sql_with_master.inc
+
+LOCK TABLE t1 WRITE;
+
+--connection master
+let $start= `SELECT UNIX_TIMESTAMP()`;
+DELETE FROM t1 WHERE b=1;
+
+--source include/sync_slave_io_with_master.inc
+real_sleep 3;
+
+# Seconds_Behind_Master = NOW - the event timestamp set by the master
+# Thus Seconds_Behind_Master must be greater 3 sec - as this is the time we
+# sleep on slave and statement "delete from t1 where b=1" could not be completed
+# due to write lock on t1. Seconds_Behind_Master must be less than $upper_bound.
+# $upper_bound = "timestamp on slave after reading Seconds_Behind_Master" - 
+# "timestamp on master defore the delete statement"
+
+let $sbm= query_get_value("SHOW SLAVE STATUS", Seconds_Behind_Master, 1);
+let $stop= `SELECT UNIX_TIMESTAMP()`;
+let $upper_bound= `SELECT $stop - $start`;
+let $assert_text= Seconds_Behind_Master must be between 3 and 'upper_bound';
+let $assert_cond= 3 <= $sbm AND $sbm <= $upper_bound;
+source include/assert.inc;
+
+unlock tables;
+set @@global.slave_parallel_workers= @save.slave_parallel_workers;
+
+--connection master
+DROP TABLE t1;
+
+--source include/rpl_end.inc

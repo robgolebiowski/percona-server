@@ -1,0 +1,26 @@
+include/master-slave.inc
+Warnings:
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
+[connection master]
+#
+# Bug #84415 slave don't report Seconds_Behind_Master when
+# running slave_parallel_workers > 0 
+#
+include/stop_slave.inc
+SET @save.slave_parallel_workers=@@global.slave_parallel_workers;
+SET @@global.slave_parallel_workers=4;
+include/start_slave.inc
+Warnings:
+Note	1753	slave_transaction_retries is not supported in multi-threaded slave mode. In the event of a transient failure, the slave will not retry the transaction and will stop.
+CREATE TABLE t1(a BIGINT AUTO_INCREMENT PRIMARY KEY, b INT DEFAULT NULL) ENGINE=InnoDB;
+INSERT INTO t1 (b) VALUES (1);
+include/sync_slave_sql_with_master.inc
+LOCK TABLE t1 WRITE;
+DELETE FROM t1 WHERE b=1;
+include/sync_slave_io_with_master.inc
+include/assert.inc [Seconds_Behind_Master must be between 3 and 'upper_bound']
+unlock tables;
+set @@global.slave_parallel_workers= @save.slave_parallel_workers;
+DROP TABLE t1;
+include/rpl_end.inc
