@@ -1779,7 +1779,7 @@ int wait_for_workers_to_finish(Relay_log_info const *rli, Slave_worker *ignore)
 
 
 // returns the next available! (TODO: incompatible to circurla_buff method!!!)
-static int en_queue(Slave_jobs_queue *jobs, Slave_job_item *item)
+static int en_queue(Slave_jobs_queue *jobs, Slave_job_item *item, Relay_log_info *rli)
 {
   if (jobs->avail == jobs->size)
   {
@@ -1797,6 +1797,12 @@ static int en_queue(Slave_jobs_queue *jobs, Slave_job_item *item)
 
   jobs->avail= (jobs->avail + 1) % jobs->size;
   jobs->len++;
+
+  Log_event *ev= static_cast<Log_event*>(item->data);
+  time_t master_timestamp=
+    (!ev->when.tv_sec) ? my_time(0)
+                       : ev->when.tv_sec + static_cast<time_t>(ev->exec_time);
+  rli->add_master_timestamp(master_timestamp);
 
   // post-boundary cond
   if (jobs->avail == jobs->entry)
@@ -1829,7 +1835,7 @@ void * head_queue(Slave_jobs_queue *jobs, Slave_job_item *ret)
 /**
    return a job item through a struct which point is supplied via argument.
 */
-Slave_job_item * de_queue(Slave_jobs_queue *jobs, Slave_job_item *ret)
+Slave_job_item * de_queue(Slave_jobs_queue *jobs, Slave_job_item *ret, Relay_log_info *rli)
 {
   if (jobs->entry == jobs->size)
   {
@@ -1838,6 +1844,10 @@ Slave_job_item * de_queue(Slave_jobs_queue *jobs, Slave_job_item *ret)
   }
   get_dynamic(&jobs->Q, (uchar*) ret, jobs->entry);
   jobs->len--;
+
+  Log_event *ev= static_cast<Log_event*>(ret->data);
+  time_t master_timestamp= ev->when.tv_sec + static_cast<time_t>(ev->exec_time);
+  rli->remove_master_timestamp(master_timestamp);
 
   // pre boundary cond
   if (jobs->avail == jobs->size)
@@ -1954,7 +1964,7 @@ bool append_item_to_jobs(slave_job_item *job_item,
 
   // possible WQ overfill
   while (worker->running_status == Slave_worker::RUNNING && !thd->killed &&
-         (ret= en_queue(&worker->jobs, job_item)) == -1)
+         (ret= en_queue(&worker->jobs, job_item, rli)) == -1)
   {
     thd->ENTER_COND(&worker->jobs_cond, &worker->jobs_lock,
                     &stage_slave_waiting_worker_queue, &old_stage);
@@ -2150,7 +2160,7 @@ int slave_worker_exec_job(Slave_worker *worker, Relay_log_info *rli)
   }
 
   mysql_mutex_lock(&worker->jobs_lock);
-  de_queue(&worker->jobs, job_item);
+  de_queue(&worker->jobs, job_item, rli);
 
   /* possible overfill */
   if (worker->jobs.len == worker->jobs.size - 1 && worker->jobs.overfill == TRUE)

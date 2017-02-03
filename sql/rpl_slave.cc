@@ -120,7 +120,7 @@ const ulong mts_coordinator_basic_nap= 5;
 */
 const ulong mts_worker_underrun_level= 10;
 
-Slave_job_item * de_queue(Slave_jobs_queue *jobs, Slave_job_item *ret);
+Slave_job_item * de_queue(Slave_jobs_queue *jobs, Slave_job_item *ret, Relay_log_info *rli);
 bool append_item_to_jobs(slave_job_item *job_item,
                          Slave_worker *w, Relay_log_info *rli);
 
@@ -5308,7 +5308,7 @@ pthread_handler_t handle_slave_worker(void *arg)
 
   mysql_mutex_lock(&w->jobs_lock);
 
-  while(de_queue(&w->jobs, job_item))
+  while(de_queue(&w->jobs, job_item, rli))
   {
     purge_cnt++;
     purge_size += ((Log_event*) (job_item->data))->data_written;
@@ -5861,7 +5861,7 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period,
     cnt is zero. This value means that the checkpoint information
     will be completely reset.
   */
-  rli->reset_notified_checkpoint(cnt, rli->gaq->lwm.ts, need_data_lock);
+  rli->reset_notified_checkpoint(cnt, need_data_lock);
 
   /* end-of "Coordinator::"commit_positions" */
 
@@ -8078,9 +8078,6 @@ static Log_event* next_event(Relay_log_info* rli)
             */
             (void) mts_checkpoint_routine(rli, period, false, true/*need_data_lock=true*/); // TODO: ALFRANIO ERROR
             mysql_mutex_lock(log_lock);
-            // More to the empty relay-log all assigned events done so reset it.
-            if (rli->gaq->empty())
-              rli->last_master_timestamp= 0;
 
             if (DBUG_EVALUATE_IF("check_slave_debug_group", 1, 0))
               period= 10000000ULL;

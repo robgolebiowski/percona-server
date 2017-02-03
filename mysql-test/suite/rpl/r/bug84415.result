@@ -1,0 +1,71 @@
+include/master-slave.inc
+Warnings:
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
+[connection master]
+#
+# Bug #84415: slave don't report Seconds_Behind_Master when
+# running slave_parallel_workers > 0
+#
+include/stop_slave.inc
+SET @save.slave_parallel_workers= @@global.slave_parallel_workers;
+SET @@global.slave_parallel_workers= 4;
+include/start_slave.inc
+CREATE USER test;
+GRANT ALL ON *.* TO test;
+CREATE TABLE t1 (f1 INT) ENGINE=INNODB;
+CREATE DATABASE test2;
+USE test2;
+CREATE TABLE t2 (f1 INT) ENGINE=INNODB;
+include/sync_slave_sql_with_master.inc
+LOCK TABLE test.t1 WRITE;
+LOCK TABLE test2.t2 WRITE;
+USE test;
+INSERT INTO t1 VALUES (1);
+USE test2;
+INSERT INTO t2 VALUES (1);
+include/sync_slave_io_with_master.inc
+include/start_slave_sql.inc
+Warnings:
+Note	1254	Slave is already running
+include/assert.inc [Seconds_Behind_Master must be between 5 and 'upper_bound']
+UNLOCK TABLES;
+include/assert.inc [Seconds_Behind_Master must be between 2 and 'upper_bound']
+UNLOCK TABLES;
+include/sync_slave_sql_with_master.inc
+include/assert.inc [Seconds_Behind_Master must be 0]
+LOCK TABLE test2.t2 WRITE;
+USE test;
+INSERT INTO t1 VALUES (1);
+USE test2;
+INSERT INTO t2 VALUES (1);
+include/sync_slave_io_with_master.inc
+include/assert.inc [Seconds_Behind_Master must be between 2 and 'upper_bound']
+UNLOCK TABLES;
+include/sync_slave_sql_with_master.inc
+include/assert.inc [Seconds_Behind_Master must be 0]
+CREATE DATABASE test3;
+USE test3;
+CREATE TABLE t3 (f1 INT) ENGINE=INNODB;
+include/sync_slave_sql_with_master.inc
+LOCK TABLE test.t1 WRITE;
+LOCK TABLE test3.t3 WRITE;
+USE test;
+INSERT INTO t1 VALUES (1);
+use test2;
+INSERT INTO t2 VALUES (1);
+USE test3;
+INSERT INTO t3 VALUES (1);
+include/sync_slave_io_with_master.inc
+include/assert.inc [Seconds_Behind_Master must be between 7 and 'upper_bound']
+UNLOCK TABLES;
+UNLOCK TABLES;
+include/sync_slave_sql_with_master.inc
+include/assert.inc [Seconds_Behind_Master must be 0]
+DROP TABLE test.t1;
+DROP DATABASE test2;
+DROP DATABASE test3;
+include/sync_slave_sql_with_master.inc
+DROP USER test;
+SET @@global.slave_parallel_workers= @save.slave_parallel_workers;
+include/rpl_end.inc

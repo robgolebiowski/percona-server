@@ -221,12 +221,9 @@ void Relay_log_info::reset_notified_relay_log_change()
 
    @param shift          number of bits to shift by Worker due to the
                          current checkpoint change.
-   @param new_ts         new seconds_behind_master timestamp value
-                         unless zero. Zero could be due to FD event.
    @param need_data_lock False if caller has locked @c data_lock
 */
-void Relay_log_info::reset_notified_checkpoint(ulong shift, time_t new_ts,
-                                               bool need_data_lock)
+void Relay_log_info::reset_notified_checkpoint(ulong shift, bool need_data_lock)
 {
   /*
     If this is not a parallel execution we return immediately.
@@ -271,16 +268,32 @@ void Relay_log_info::reset_notified_checkpoint(ulong shift, time_t new_ts,
   DBUG_PRINT("mts", ("reset_notified_checkpoint shift --> %lu, "
              "checkpoint_seqno --> %u.", shift, checkpoint_seqno));  
 
-  if (new_ts)
+}
+
+void Relay_log_info::add_master_timestamp(time_t master_timestamp)
+{
+  master_timestamps.insert(master_timestamp);
+  last_master_timestamp= *(master_timestamps.begin());
+}
+
+void Relay_log_info::remove_master_timestamp(time_t master_timestamp)
+{
+  std::multiset<time_t>::iterator master_timestamps_it=
+    master_timestamps.find(master_timestamp);
+  DBUG_ASSERT(master_timestamps_it != master_timestamps.end());
+
+  if (master_timestamps_it == master_timestamps.end())
   {
-    if (need_data_lock)
-      mysql_mutex_lock(&data_lock);
-    else
-      mysql_mutex_assert_owner(&data_lock);
-    last_master_timestamp= new_ts;
-    if (need_data_lock)
-      mysql_mutex_unlock(&data_lock);
+    //Should never happen
+    sql_print_warning("Seconds_Behind_Master seems corrupted,"
+                      "reseting it to 0");
+    master_timestamps.clear();
   }
+  else
+    master_timestamps.erase(master_timestamps_it);
+
+  last_master_timestamp=
+    master_timestamps.empty() ? 0 : *(master_timestamps.begin());
 }
 
 /**

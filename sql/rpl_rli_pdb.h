@@ -178,7 +178,6 @@ typedef struct st_slave_job_group
   char*    checkpoint_relay_log_name;
   volatile uchar done;  // Flag raised by W,  read and reset by Coordinator
   ulong    shifted;     // shift the last CP bitmap at receiving a new CP
-  time_t   ts;          // Group's timestampt to update Seconds_behind_master
 #ifndef DBUG_OFF
   bool     notified;    // to debug group_master_log_name change notification
 #endif

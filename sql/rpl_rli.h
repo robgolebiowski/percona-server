@@ -25,6 +25,7 @@
 #include "log.h"                         /* LOG_INFO */
 #include "binlog.h"                      /* MYSQL_BIN_LOG */
 #include "sql_class.h"                   /* THD */
+#include <set>
 
 struct RPL_TABLE_LIST;
 class Master_info;
@@ -285,6 +286,18 @@ public:
     disk space.
    */
   bool sql_force_rotate_relay;
+
+  /*
+    Add master_timestamp to the set of master_timestamps and assign
+    the "youngest" one to last_master_timestamp
+  */
+  void add_master_timestamp(time_t master_timestamp);
+
+  /*
+    Remove master_timestamp from the set of master_timestamps and
+    assign the "youngest" timestamp to last_master_timestamp
+  */
+  void remove_master_timestamp(time_t master_timestamp);
 
   time_t last_master_timestamp;
 
@@ -650,7 +663,7 @@ public:
      Coordinator notifies Workers about this event. Coordinator and Workers
      maintain a bitmap of executed group that is reset with a new checkpoint. 
   */
-  void reset_notified_checkpoint(ulong, time_t, bool);
+  void reset_notified_checkpoint(ulong, bool);
 
   /**
      Called when gaps execution is ended so it is crash-safe
@@ -992,6 +1005,11 @@ private:
   time_t row_stmt_start_timestamp;
   bool long_find_row_note_printed;
 
+  /*
+    Set of master timestamps of jobs being currently processed
+    in parallel mode.
+  */
+  std::multiset<time_t> master_timestamps;
 };
 
 bool mysql_show_relaylog_events(THD* thd);
