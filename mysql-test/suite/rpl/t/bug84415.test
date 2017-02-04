@@ -2,7 +2,7 @@
 
 --echo #
 --echo # Bug #84415 slave don't report Seconds_Behind_Master when
---echo # running slave_parallel_workers > 0 
+--echo # running slave_parallel_workers > 0
 --echo #
 
 --connection slave
@@ -14,11 +14,13 @@ SET @@global.slave_parallel_workers=4;
 --connection master
 
 CREATE TABLE t1(a BIGINT AUTO_INCREMENT PRIMARY KEY, b INT DEFAULT NULL) ENGINE=InnoDB;
+CREATE TABLE t2(a BIGINT AUTO_INCREMENT PRIMARY KEY, b INT DEFAULT NULL) ENGINE=InnoDB;
 INSERT INTO t1 (b) VALUES (1);
+INSERT INTO t2 (b) VALUES (2);
 
 --source include/sync_slave_sql_with_master.inc
-
-LOCK TABLE t1 WRITE;
+--connection slave
+LOCK TABLES t1 WRITE;
 
 --connection master
 let $start= `SELECT UNIX_TIMESTAMP()`;
@@ -27,24 +29,45 @@ DELETE FROM t1 WHERE b=1;
 --source include/sync_slave_io_with_master.inc
 real_sleep 3;
 
+--connection master
+DELETE FROM t2 WHERE b=2;
+
+--source include/sync_slave_io_with_master.inc
+real_sleep 2;
+
+SHOW PROCESSLIST;
+query_vertical SHOW SLAVE STATUS;
+
 # Seconds_Behind_Master = NOW - the event timestamp set by the master
-# Thus Seconds_Behind_Master must be greater 3 sec - as this is the time we
-# sleep on slave and statement "delete from t1 where b=1" could not be completed
-# due to write lock on t1. Seconds_Behind_Master must be less than $upper_bound.
-# $upper_bound = "timestamp on slave after reading Seconds_Behind_Master" - 
+# Thus Seconds_Behind_Master must be >= 5 sec - as this is the time we
+# sleep on slave and statement "DELETE FROM t1 WHERE b=1" could not be completed
+# due to write lock on t1. Seconds_Behind_Master must be <= $upper_bound.
+# $upper_bound = "timestamp on slave after reading Seconds_Behind_Master" -
 # "timestamp on master defore the delete statement"
+
+# The statement "DELETE FROM t2 WHERE b=2" should be read from relay log by SQL IO THREAD.
+# Although, this is the last event in relay log it should not affect Seconds_Behind_Master
+# as SLAVE is still executing "DELETE FROM t1 WHERE b=1".
 
 let $sbm= query_get_value("SHOW SLAVE STATUS", Seconds_Behind_Master, 1);
 let $stop= `SELECT UNIX_TIMESTAMP()`;
 let $upper_bound= `SELECT $stop - $start`;
-let $assert_text= Seconds_Behind_Master must be between 3 and 'upper_bound';
-let $assert_cond= 3 <= $sbm AND $sbm <= $upper_bound;
+let $assert_text= Seconds_Behind_Master must be between 5 and 'upper_bound';
+let $assert_cond= 5 <= $sbm AND $sbm <= $upper_bound;
 source include/assert.inc;
 
 unlock tables;
+
+--connection master
+--source include/sync_slave_sql_with_master.inc
+
+SHOW PROCESSLIST;
+query_vertical SHOW SLAVE STATUS;
+
 set @@global.slave_parallel_workers= @save.slave_parallel_workers;
 
 --connection master
 DROP TABLE t1;
+DROP TABLE t2;
 
 --source include/rpl_end.inc

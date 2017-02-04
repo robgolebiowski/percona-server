@@ -4403,8 +4403,13 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
       If it is an artificial event, or a relay log event (IO thread generated
       event) or ev->when is set to 0, or a FD from master, or a heartbeat
       event with server_id '0' then  we don't update the last_master_timestamp.
+
+      We also do not update last_master_timestamp here if it is not equal 0.
+      last_master_timestamp != 0 means we have not yet catched up with master
+      and there is a worker still applying event from master.
     */
-    if (!(ev->is_artificial_event() || ev->is_relay_log_event() ||
+    if (!(rli->last_master_timestamp != 0 ||
+	  ev->is_artificial_event() || ev->is_relay_log_event() ||
           ev->when.tv_sec == 0 || ev->get_type_code() == FORMAT_DESCRIPTION_EVENT ||
           ev->server_id == 0))
     {
