@@ -291,7 +291,7 @@ class Slave_jobs_queue : public circular_buffer_queue
 {
 public:
 
-  /* 
+  /* te
      Coordinator marks with true, Worker signals back at queue back to
      available
   */

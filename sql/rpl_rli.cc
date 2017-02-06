@@ -277,7 +277,7 @@ void Relay_log_info::reset_notified_checkpoint(ulong shift, time_t new_ts,
       mysql_mutex_lock(&data_lock);
     else
       mysql_mutex_assert_owner(&data_lock);
-    last_master_timestamp= new_ts;
+//   last_master_timestamp= new_ts;
     if (need_data_lock)
       mysql_mutex_unlock(&data_lock);
   }

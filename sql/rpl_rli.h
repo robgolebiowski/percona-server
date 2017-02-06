@@ -26,6 +26,8 @@
 #include "binlog.h"                      /* MYSQL_BIN_LOG */
 #include "sql_class.h"                   /* THD */
 
+#include <set>
+
 struct RPL_TABLE_LIST;
 class Master_info;
 extern uint sql_slave_skip_counter;
@@ -286,6 +288,8 @@ public:
    */
   bool sql_force_rotate_relay;
 
+  //std::multiset<time_t, std::greater<time_t> > master_timestamps;
+  std::multiset<time_t> master_timestamps;
   time_t last_master_timestamp;
 
   void clear_until_condition();
