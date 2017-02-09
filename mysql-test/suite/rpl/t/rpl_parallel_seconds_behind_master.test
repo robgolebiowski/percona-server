@@ -10,7 +10,7 @@
 #
 
 -- source include/master-slave.inc
--- source include/have_debug.inc
+#-- source include/have_debug.inc
 
 # make the test only run once (STMT is actually needed because we rely
 # on SHOW PROCESS LIST output in some of the tests)
@@ -74,10 +74,14 @@ commit;
 source include/sync_slave_io_with_master.inc;
 
 connection slave1;
-lock table t2 write;  # to block 2nd trans
+lock table t1 write, t2 write;  # to block 2nd trans
 
 connection slave;
 --source include/start_slave_sql.inc
+
+SHOW PROCESSLIST;
+query_vertical SHOW SLAVE STATUS;
+
 let $count= 1;
 let $table= t1;
 source include/wait_until_rows_count.inc;
@@ -92,6 +96,9 @@ let $slave_param= Seconds_Behind_Master;
 let $slave_param_comparison= >=; 
 let $slave_param_value= $idle;
 source include/wait_for_slave_param.inc;
+
+SHOW PROCESSLIST;
+query_vertical SHOW SLAVE STATUS;
 
 --echo Seconds_Behind_Master after first transaction is as expected.
 

@@ -3262,17 +3262,17 @@ bool show_slave_status(THD* thd, Master_info* mi)
     if (mi->rli->slave_running)
     {
       /* Check if SQL thread is at the end of relay log
-           Checking should be done using two conditions
-           condition1: compare the log positions and
-           condition2: compare the file names (to handle rotation case)
+	   Checking should be done using two conditions
+	   condition1: compare the log positions and
+	   condition2: compare the file names (to handle rotation case)
       */
       if ((mi->get_master_log_pos() == mi->rli->get_group_master_log_pos()) &&
-           (!strcmp(mi->get_master_log_name(), mi->rli->get_group_master_log_name())))
+	   (!strcmp(mi->get_master_log_name(), mi->rli->get_group_master_log_name())))
       {
-        if (mi->slave_running == MYSQL_SLAVE_RUN_CONNECT)
-          protocol->store(0LL);
-        else
-          protocol->store_null();
+	if (mi->slave_running == MYSQL_SLAVE_RUN_CONNECT)
+	  protocol->store(0LL);
+	else
+	  protocol->store_null();
      }
       else
       {
@@ -4394,6 +4394,12 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
   if (ev)
   {
     enum enum_slave_apply_event_and_update_pos_retval exec_res;
+
+    //  Log_event *ev= static_cast<Log_event*>(item->data);
+//  rli->master_timestamps.insert(((!ev->when.tv_sec)
+//				? my_time(0) : ev->when.tv_sec) + (time_t) ev->exec_time);
+//  rli->last_master_timestamp= *(rli->master_timestamps.begin());
+
 
     ptr_ev= &ev;
     /*
@@ -5870,8 +5876,8 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period,
     cnt is zero. This value means that the checkpoint information
     will be completely reset.
   */
-//  rli->reset_notified_checkpoint(cnt, rli->gaq->lwm.ts, need_data_lock);
-  rli->reset_notified_checkpoint(cnt, 0, need_data_lock);
+  rli->reset_notified_checkpoint(cnt, rli->gaq->lwm.ts, need_data_lock);
+//  rli->reset_notified_checkpoint(cnt, 0, need_data_lock);
 
   /* end-of "Coordinator::"commit_positions" */
 
@@ -7969,8 +7975,8 @@ static Log_event* next_event(Relay_log_info* rli)
            SBM when notices no more groups left neither to read from
            Relay-log nor to process by Workers.
         */
-        if (!rli->is_parallel_exec())
-          rli->last_master_timestamp= 0;
+//        if (!rli->is_parallel_exec())
+//          rli->last_master_timestamp= 0;
 
         DBUG_ASSERT(rli->relay_log.get_open_count() ==
                     rli->cur_log_old_open_count);

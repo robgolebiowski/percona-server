@@ -1800,7 +1800,7 @@ static int en_queue(Slave_jobs_queue *jobs, Slave_job_item *item, Relay_log_info
 
   Log_event *ev= static_cast<Log_event*>(item->data);
   rli->master_timestamps.insert(((!ev->when.tv_sec)
-                                ? my_time(0) : ev->when.tv_sec) + (time_t) ev->exec_time);
+				? my_time(0) : ev->when.tv_sec) + (time_t) ev->exec_time);
   rli->last_master_timestamp= *(rli->master_timestamps.begin());
 
   // post-boundary cond
