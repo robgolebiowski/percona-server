@@ -4,6 +4,8 @@
 #include <my_global.h>
 #include <logger.h>
 #include "i_keyring_io.h"
+#include "vault_keys_list.h"
+#include "vault_parser.h"
 
 namespace keyring {
 
@@ -28,10 +30,7 @@ public:
   {
     return FALSE; //not implemented yet
   }
-  virtual my_bool get_serialized_object(ISerialized_object **serialized_object)
-  {
-    return FALSE; //not implemented yet
-  }
+  virtual my_bool get_serialized_object(ISerialized_object **serialized_object);
   virtual my_bool has_next_serialized_object()
   {
     return FALSE; //not implemented yet
@@ -39,6 +38,12 @@ public:
 
 private:
   ILogger *logger;
+  Vault_parser vault_parser;
+  Vault_keys_list keys;
+  std::string json_response;
+//  typedef std::list<IKey*> Keys_list;
+//  Keys_list keys;
+//  size_t keys_pod_size;
 };
 
 } //namespace keyring

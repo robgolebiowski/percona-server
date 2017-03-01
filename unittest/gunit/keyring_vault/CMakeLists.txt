@@ -45,6 +45,7 @@ SET(TESTS
 #        buffered_file_io
 #        file_io
         vault_io
+        vault_parser
         )
 
 #IF (MERGE_UNITTESTS)
@@ -92,12 +93,13 @@ SET(TESTS
 
     FOREACH(test ${TESTS})
         SET(SRC_FILES ${test}-t.cc
-#                ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
+                ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
+                ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_key.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_io.cc
                 )
         IF(WIN32)
