@@ -24,7 +24,7 @@ public:
      * We need to retrieve keys signatures from it
      */
     std::size_t keys_pos = payload->find("keys");
-    std::size_t closing_bracket = payload->find('}');
+    std::size_t closing_bracket = payload->find('}', keys_pos);
     if (keys_pos == std::string::npos || closing_bracket == std::string::npos) //no keys
       return TRUE; //change to something else? Probably add logger
 
@@ -41,17 +41,12 @@ public:
                                                  keysignature_end-keysignature_start-1);
       std::string key_parameters[2];
       if (parse_key_signature(&key_signature, key_parameters))
-      {
-        for (std::list<IKey*>::iterator iter = keys->begin(); iter != keys->end();
-             iter++)
-          delete *iter;
-        keys->clear();
         return TRUE;
-      }
+
       IKey *vault_key= new Vault_key(key_parameters[0].c_str(), NULL,
                                      key_parameters[1].c_str(), NULL, 0);
 
-      keys->push_back(vault_key);
+      keys->push_back(vault_key); //TODO: compact new and this call
     }
   }
 
@@ -68,6 +63,27 @@ public:
       key_parameters[i] = key_signature->substr(key_id_pos, key_l);
       next_pos_to_start_from= key_id_pos+key_l;
     }
+    return FALSE; //TODO always returns FALSE
+  }
+
+  my_bool parse_key_data(std::string *payload, IKey *key)
+  {
+    std::size_t data_pos = payload->find("data");
+    std::size_t closing_bracket = payload->find('}', data_pos);
+    if (data_pos == std::string::npos || closing_bracket == std::string::npos) //no keys
+      return TRUE; //change to something else? Probably add logger
+
+    size_t type_end = payload->find('\"', data_pos+15);
+    std::string type = payload->substr(data_pos+15, (type_end-(data_pos+15)));
+    size_t value_end = payload->find('\"', type_end+11);
+    std::string value = payload->substr(type_end+11, (value_end-(type_end+11)));
+    uchar *data= new uchar[value.length()];
+    memcpy(data, value.c_str(), value.length());
+
+    key->set_key_data(data, value.length());
+    key->set_key_type(&type);
+
+    return FALSE;
   }
 
 };
@@ -76,3 +92,27 @@ public:
 
 
 #endif //MYSQL_VAULT_PARSER_H
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

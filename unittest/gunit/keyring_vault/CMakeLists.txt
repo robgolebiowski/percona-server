@@ -99,6 +99,7 @@ SET(TESTS
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
+                ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_keys_list.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_key.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_io.cc
                 )

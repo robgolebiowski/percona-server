@@ -1,6 +1,5 @@
 #include <my_global.h>
 #include "vault_io.h"
-#include "buffer.h"
 #include <curl/curl.h>
 #include <sstream>
 
@@ -38,10 +37,6 @@ my_bool Vault_io::init(std::string *keyring_storage_url)
 {
   CURL *curl= curl_easy_init();
   CURLcode res= CURLE_OK;
-//  struct MemoryStruct chunk;
-
-//  chunk.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */
-//  chunk.size = 0;    /* no data at this point */
 
   std::stringstream read_data_ss;
 
@@ -53,7 +48,7 @@ my_bool Vault_io::init(std::string *keyring_storage_url)
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&read_data_ss);
     list = curl_slist_append(list,
-                             "X-Vault-Token:b243f84b-ce4e-f912-6739-88bd7f61fa8b"); //Czy nie powinno być spacji po : ?
+                             "X-Vault-Token:5993b8c7-bf11-972e-a501-6a021e489255"); //Czy nie powinno być spacji po : ?
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
     res= curl_easy_perform(curl);
   }
@@ -63,8 +58,8 @@ my_bool Vault_io::init(std::string *keyring_storage_url)
 
   if (res == CURLE_OK)
   {
-    printf("%lu bytes retrieved\n", (long)read_data.size());
-    printf("%s\n", read_data.c_str());
+    printf("%lu bytes retrieved\n", (long)json_response.size());
+    printf("%s\n", json_response.c_str());
   }
   //TODO: init powinno tylko sprawdzić czy połączenie z vaultem jest możliwe używająć danych, czy też od razu ściągnąć
   //listę kluczy ?
@@ -96,5 +91,108 @@ my_bool Vault_io::get_serialized_object(ISerialized_object **serialized_object)
   return FALSE;
 }
 
+my_bool Vault_io::retrieve_key_type_and_value(Vault_key *key)
+{
+  CURL *curl= curl_easy_init();
+  CURLcode res= CURLE_OK;
+
+  std::stringstream read_data_ss;
+
+  struct curl_slist *list = NULL;
+  if(curl)
+  {
+    std::string request = "http://127.0.0.1:8200/v1/secret/";
+    request += *key->get_key_signature();
+
+    curl_easy_setopt(curl, CURLOPT_URL, request.c_str());
+//    curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:8200/v1/secret/hello?list");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&read_data_ss);
+    list = curl_slist_append(list,
+                             "X-Vault-Token:5993b8c7-bf11-972e-a501-6a021e489255"); //Czy nie powinno być spacji po : ?
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+    res= curl_easy_perform(curl);
+  }
+
+//  std::string read_data= read_data_ss.str();
+  json_response = read_data_ss.str();
+
+  return vault_parser.parse_key_data(&json_response, key);
+}
+
+ISerializer* Vault_io::get_serializer()
+{
+  return &vault_key_serializer;
+}
+
+my_bool Vault_io::flush_to_storage(ISerialized_object *serialized_object)
+{
+  Vault_key *vault_key = dynamic_cast<Vault_key*>(serialized_object);
+
+  if (vault_key == NULL)
+    return TRUE;
+
+  CURL *curl= curl_easy_init();
+  CURLcode res= CURLE_OK;
+
+  std::stringstream read_data_ss;
+
+  struct curl_slist *list = NULL;
+  if(curl)
+  {
+    std::string request = "http://127.0.0.1:8200/v1/secret/";
+    request += *vault_key->get_key_signature();
+
+    curl_easy_setopt(curl, CURLOPT_URL, request.c_str());
+//    curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:8200/v1/secret/hello?list");
+    std::string postdata="{\"type\":\"" + *vault_key->get_key_type() + "\",\"";
+    postdata += "value\":\"" + std::string((const char*)vault_key->get_key_data(), vault_key->get_key_data_size());
+    postdata += "\"}";
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&read_data_ss);
+    list = curl_slist_append(list,
+                             "X-Vault-Token:5993b8c7-bf11-972e-a501-6a021e489255"); //Czy nie powinno być spacji po : ?
+    list = curl_slist_append(list,
+                             "Content-Type: application/json"); //Czy nie powinno być spacji po : ?
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+    res= curl_easy_perform(curl);
+  }
+
+//  std::string read_data= read_data_ss.str();
+  json_response = read_data_ss.str();
+  return FALSE;
+//  return vault_parser.parse_key_data(&json_response, key);
+}
+
 } //namespace keyring
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

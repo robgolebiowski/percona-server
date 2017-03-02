@@ -19,7 +19,6 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/plugin/keyring/common
-  ${CMAKE_SOURCE_DIR}/plugin/keyring
   /home/rob/curl/include)
 
 MYSQL_ADD_PLUGIN(keyring_vault
