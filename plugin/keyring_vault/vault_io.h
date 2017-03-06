@@ -6,6 +6,7 @@
 #include "i_keyring_io.h"
 #include "vault_keys_list.h"
 #include "vault_parser.h"
+#include "vault_curl.h"
 #include "vault_key_serializer.h"
 
 namespace keyring {
@@ -15,9 +16,10 @@ class Vault_io : public IKeyring_io
 public:
   Vault_io(ILogger *logger)
     : logger(logger)
+    , vault_curl(logger)
   {}
 
-  my_bool retrieve_key_type_and_value(Vault_key *key);
+  my_bool retrieve_key_type_and_value(IKey *key);
 
   virtual my_bool init(std::string *keyring_storage_url);
   virtual my_bool flush_to_backup(ISerialized_object *serialized_object)
@@ -31,14 +33,19 @@ public:
   virtual my_bool get_serialized_object(ISerialized_object **serialized_object);
   virtual my_bool has_next_serialized_object()
   {
-    return FALSE; //not implemented yet
+    return FALSE; //move to implementation
   }
 
-private:
+protected:
+  my_bool write_key(IKey *key);
+  my_bool delete_key(IKey *key);
+
   ILogger *logger;
   Vault_parser vault_parser;
-  std::string json_response;
+  Vault_curl vault_curl;
+  std::string json_response; //TODO: Move it to the methods
   Vault_key_serializer vault_key_serializer;
+
 //  typedef std::list<IKey*> Keys_list;
 //  Keys_list keys;
 //  size_t keys_pod_size;

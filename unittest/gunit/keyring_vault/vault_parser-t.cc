@@ -47,15 +47,16 @@ namespace keyring__vault_parser_unittest
     vault_parser.parse_key_signature(&key_signature, key_parameters);
     EXPECT_STREQ(key_parameters[0].c_str(), "key1");
     EXPECT_STREQ(key_parameters[1].c_str(), "rob");
-//    remove(file_name.c_str());
-//    EXPECT_EQ(buffered_io.init(&file_name),0);
-//    ISerialized_object *serialized_object= NULL;
-//
-//    EXPECT_EQ(buffered_io.get_serialized_object(&serialized_object), 0);
-    //The keyring file is new so no keys should be available
-//    ASSERT_TRUE(serialized_object == NULL);
+  }
 
-//    remove(file_name.c_str());
+  TEST_F(Vault_parser_test, ParseKeySignature2)
+  {
+    std::string key_signature("4key16Robert");
+    Vault_parser vault_parser;
+    std::string key_parameters[2];
+    vault_parser.parse_key_signature(&key_signature, key_parameters);
+    EXPECT_STREQ(key_parameters[0].c_str(), "key1");
+    EXPECT_STREQ(key_parameters[1].c_str(), "Robert");
   }
 
   TEST_F(Vault_parser_test, ParseVaultPayload)
@@ -64,13 +65,10 @@ namespace keyring__vault_parser_unittest
                         "\"lease_id\":\"\",\"renewable\":false,\"lease_duration\":0,"
                         "\"data\":{\"keys\":[\"4key13rob\",\"4key23rob\"]},\"wrap_info"
                         "\":null,\"warnings\":null,\"auth\":null}");
-//    std::list<IKey*> keys;
     Vault_keys_list keys;
     Vault_parser vault_parser;
-//my_bool parse_keys(std::string *payload, std::list<IKey*> *keys, size_t *keys_pod_size)
     EXPECT_EQ(vault_parser.parse_keys(&payload, &keys), FALSE);
     EXPECT_EQ(keys.size(), 2);
-//    std::list<IKey*>::iterator keys_iter = keys.begin();
     EXPECT_EQ(keys.has_next_key(), TRUE);
     IKey *key_loaded= NULL;
     EXPECT_EQ(keys.get_next_key(&key_loaded), FALSE);
@@ -81,18 +79,6 @@ namespace keyring__vault_parser_unittest
     EXPECT_EQ(keys.get_next_key(&key_loaded), FALSE);
     EXPECT_STREQ(key_loaded->get_key_signature()->c_str(), "4key23rob");
     EXPECT_EQ(keys.has_next_key(), FALSE);
-
-//    EXPECT_STREQ(key_parameters[0].c_str(), "key1");
-//    EXPECT_STREQ(key_parameters[1].c_str(), "rob");
-//    remove(file_name.c_str());
-//    EXPECT_EQ(buffered_io.init(&file_name),0);
-//    ISerialized_object *serialized_object= NULL;
-//
-//    EXPECT_EQ(buffered_io.get_serialized_object(&serialized_object), 0);
-    //The keyring file is new so no keys should be available
-//    ASSERT_TRUE(serialized_object == NULL);
-
-//    remove(file_name.c_str());
   }
 
   TEST_F(Vault_parser_test, ParseKeyData)
@@ -102,12 +88,9 @@ namespace keyring__vault_parser_unittest
                         ":2764800,\"data\":{\"type\":\"AES\",\"value\":\"Robi\"},"
                         "\"wrap_info\":null,\"warnings\":null,\"auth\":null}");
 
-//Key(const char *a_key_id, const char *a_key_type, const char *a_user_id,
-//    const void *a_key, size_t a_key_len);
     Vault_parser vault_parser;
     Vault_key key("key1", NULL, "rob", NULL, 0);
     EXPECT_EQ(vault_parser.parse_key_data(&payload, &key), FALSE);
-//    std::list<IKey*>::iterator keys_iter = keys.begin();
     EXPECT_STREQ(key.get_key_signature()->c_str(), "4key13rob");
     ASSERT_TRUE(memcmp(key.get_key_data(), "Robi", key.get_key_data_size()) == 0);
     EXPECT_STREQ("AES", key.get_key_type()->c_str());

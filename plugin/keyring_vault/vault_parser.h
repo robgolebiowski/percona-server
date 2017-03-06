@@ -26,7 +26,7 @@ public:
     std::size_t keys_pos = payload->find("keys");
     std::size_t closing_bracket = payload->find('}', keys_pos);
     if (keys_pos == std::string::npos || closing_bracket == std::string::npos) //no keys
-      return TRUE; //change to something else? Probably add logger
+      return FALSE; //change to something else? Probably add logger
 
     std::size_t keysignature_start = 0;
     std::size_t keysignature_end = keys_pos+5; //move after "keys"
@@ -40,6 +40,12 @@ public:
       std::string key_signature= payload->substr(keysignature_start+1,
                                                  keysignature_end-keysignature_start-1);
       std::string key_parameters[2];
+
+//      if(parse_key_disable_status()
+//      {
+//
+//      }
+
       if (parse_key_signature(&key_signature, key_parameters))
         return TRUE;
 
@@ -58,7 +64,7 @@ public:
     for (int i= 0; i < 2; ++i)
     {
       std::size_t key_id_pos = key_signature->find_first_not_of(digits, next_pos_to_start_from);
-      std::string key_id_length = key_signature->substr(0, key_id_pos);
+      std::string key_id_length = key_signature->substr(next_pos_to_start_from, key_id_pos);
       int key_l = atoi(key_id_length.c_str());
       key_parameters[i] = key_signature->substr(key_id_pos, key_l);
       next_pos_to_start_from= key_id_pos+key_l;

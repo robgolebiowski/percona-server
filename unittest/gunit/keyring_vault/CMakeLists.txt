@@ -102,6 +102,7 @@ SET(TESTS
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_keys_list.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_key.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_io.cc
+                ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_curl.cc
                 )
         IF(WIN32)
             LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
