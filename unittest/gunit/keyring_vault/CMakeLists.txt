@@ -46,6 +46,8 @@ SET(TESTS
 #        file_io
         vault_io
         vault_parser
+        vault_credentials_parser
+        vault_keys_container
         )
 
 #IF (MERGE_UNITTESTS)
@@ -94,7 +96,7 @@ SET(TESTS
     FOREACH(test ${TESTS})
         SET(SRC_FILES ${test}-t.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
-#                ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
+                ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
 #                ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
@@ -103,6 +105,8 @@ SET(TESTS
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_key.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_io.cc
                 ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_curl.cc
+                ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_credentials_parser.cc
+                ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_keys_container.cc
                 )
         IF(WIN32)
             LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)

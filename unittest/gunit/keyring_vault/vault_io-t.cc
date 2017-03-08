@@ -1,5 +1,6 @@
 #include <my_global.h>
 #include <gtest/gtest.h>
+#include <fstream>
 #include "mock_logger.h"
 #include "vault_io.h"
 #include <string.h>
@@ -17,6 +18,8 @@ namespace keyring__vault_io_unittest
 {
   using namespace keyring;
 
+  using ::testing::StrEq;
+
   class Vault_io_test : public ::testing::Test
   {
   protected:
@@ -24,43 +27,72 @@ namespace keyring__vault_io_unittest
     {
 //      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
 //      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
+      correct_token = "f12cb573-7994-19f4-18d5-ce2fb30712ea"; //maybe this could be passed as a parameter to unit test ?
+      credential_file_url = "./credentials";
+      credential_file_was_created = false;
       logger= new Logger(logger);
     }
 
     virtual void TearDown()
     {
+      if (credential_file_was_created)
+        std::remove(credential_file_url.c_str());
 //      fake_mysql_plugin.name.str= const_cast<char*>("FakeKeyringPlugin");
 //      fake_mysql_plugin.name.length= strlen("FakeKeyringPlugin");
       delete logger;
     }
 
   protected:
+    void create_credentials_file_with_correct_token();
+
 //    st_plugin_int fake_mysql_plugin;
     ILogger *logger;
+    std::string correct_token;
+    std::string credential_file_url;
+    bool credential_file_was_created;
   };
 
-  TEST_F(Vault_io_test, InitWithNotExisitingKeyringFile)
+  void Vault_io_test::create_credentials_file_with_correct_token()
   {
-    std::string file_name("./some_funny_name");
-    Vault_io vault_io(logger);
-    std::string sasa="sasa";
-    EXPECT_EQ(vault_io.init(&sasa), FALSE);
-//    remove(file_name.c_str());
-//    EXPECT_EQ(buffered_io.init(&file_name),0);
-//    ISerialized_object *serialized_object= NULL;
-//
-//    EXPECT_EQ(buffered_io.get_serialized_object(&serialized_object), 0);
-    //The keyring file is new so no keys should be available
-//    ASSERT_TRUE(serialized_object == NULL);
+    std::remove(credential_file_url.c_str());
+    std::ofstream myfile;
+    myfile.open(credential_file_url.c_str());
+    myfile << correct_token;
+    myfile.close();
+    credential_file_was_created = true;
+  }
 
-//    remove(file_name.c_str());
+  TEST_F(Vault_io_test, InitWithInvalidToken)
+  {
+    ILogger *logger= new Mock_logger();
+    Vault_io vault_io(logger);
+
+    std::string token_in_file("What-a-pretty-token");
+
+    std::remove(credential_file_url.c_str());
+    std::ofstream myfile;
+    myfile.open(credential_file_url.c_str());
+    myfile << token_in_file;
+    myfile.close();
+    //***
+
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Vault has returned the following errors: [\"permission denied\"]")));
+    ISerialized_object *serialized_keys= NULL;
+    EXPECT_EQ(vault_io.get_serialized_object(&serialized_keys), TRUE);
+
+    std::remove(credential_file_url.c_str());
+    delete logger;
   }
 
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeys)
   {
     Vault_io vault_io_for_storing(logger);
-    std::string sasa="sasa";
-    EXPECT_EQ(vault_io_for_storing.init(&sasa), FALSE);
+    create_credentials_file_with_correct_token();
+
+    EXPECT_EQ(vault_io_for_storing.init(&credential_file_url), FALSE);
 
 
     //First Add Two keys into Vault
@@ -76,7 +108,7 @@ namespace keyring__vault_io_unittest
 
     //Now fetch two keys with separate Vault_io
     Vault_io vault_io_for_fetching(logger);
-    EXPECT_EQ(vault_io_for_fetching.init(&sasa), FALSE);
+    EXPECT_EQ(vault_io_for_fetching.init(&credential_file_url), FALSE);
 
     ISerialized_object *serialized_keys= NULL;
     EXPECT_EQ(vault_io_for_fetching.get_serialized_object(&serialized_keys), FALSE);
@@ -95,25 +127,17 @@ namespace keyring__vault_io_unittest
     EXPECT_EQ(vault_io_for_storing.flush_to_storage(&key1), FALSE);
     key2.set_key_operation(REMOVE_KEY);
     EXPECT_EQ(vault_io_for_storing.flush_to_storage(&key2), FALSE);
-
-    //    remove(file_name.c_str());
-    //    EXPECT_EQ(buffered_io.init(&file_name),0);
-    //    ISerialized_object *serialized_object= NULL;
-    //
-    //    EXPECT_EQ(buffered_io.get_serialized_object(&serialized_object), 0);
-    //The keyring file is new so no keys should be available
-    //    ASSERT_TRUE(serialized_object == NULL);
-
-    //    remove(file_name.c_str());
   }
 
   TEST_F(Vault_io_test, RetrieveKeyTypeAndValue)
   {
     Vault_io vault_io(logger);
-    std::string sasa="sasa";
-    EXPECT_EQ(vault_io.init(&sasa), FALSE);
+    create_credentials_file_with_correct_token();
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+
     Vault_key key_to_store("key1", "AES", "rob", "Robi", 4);
     key_to_store.set_key_operation(STORE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_store), FALSE);
 
     Vault_key key("key1", NULL, "rob", NULL, 0);
     EXPECT_EQ(vault_io.retrieve_key_type_and_value(&key), FALSE);
@@ -122,23 +146,26 @@ namespace keyring__vault_io_unittest
     EXPECT_STREQ("AES", key.get_key_type()->c_str());
 
     key_to_store.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io_for_storing.flush_to_storage(&key_to_store), FALSE);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_store), FALSE);
   }
 
-  TEST_F(Vault_io_test, FlushSingleKey)
+  TEST_F(Vault_io_test, FlushAndRemoveSingleKey)
   {
     Vault_io vault_io(logger);
-    std::string sasa="sasa";
-    EXPECT_EQ(vault_io.init(&sasa), FALSE);
+    create_credentials_file_with_correct_token();
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
     Vault_key key("key1", "AES", "rob", "Robi", 4);
+    key.set_key_operation(STORE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
+    key.set_key_operation(REMOVE_KEY);
     EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
   }
 
   TEST_F(Vault_io_test, FlushKeyRetrieveDeleteInit)
   {
     Vault_io vault_io(logger);
-    std::string sasa="sasa";
-    EXPECT_EQ(vault_io.init(&sasa), FALSE);
+    create_credentials_file_with_correct_token();
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
     Vault_key key("key1", "AES", "rob", "Robi", 4);
     key.set_key_operation(STORE_KEY);
     EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
@@ -150,7 +177,7 @@ namespace keyring__vault_io_unittest
     key.set_key_operation(REMOVE_KEY);
     EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
     Vault_io vault_io2(logger); //do I need this ?
-    vault_io2.init(&sasa);
+    EXPECT_EQ(vault_io2.init(&credential_file_url), FALSE);
     ISerialized_object *serialized_keys= NULL;
     EXPECT_EQ(vault_io2.get_serialized_object(&serialized_keys), FALSE);
     ASSERT_TRUE(serialized_keys == NULL); //no keys

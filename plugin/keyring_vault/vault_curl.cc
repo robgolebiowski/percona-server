@@ -48,8 +48,6 @@ my_bool Vault_curl::reset_curl_session()
     //TODO: Log error
     return TRUE;
   }
-
-//  curl_slist_free_all(list);
   return FALSE;
 }
 
@@ -68,7 +66,8 @@ my_bool Vault_curl::list_keys(std::string *response)
 
   if (http_code == 404)
     *response=""; //no keys found
-  *response = read_data_ss.str();
+  else
+    *response = read_data_ss.str();
 
   return FALSE;
 }
@@ -76,7 +75,8 @@ my_bool Vault_curl::list_keys(std::string *response)
 my_bool Vault_curl::write_key(IKey *key, std::string *response)
 {
   std::string postdata="{\"type\":\"" + *key->get_key_type() + "\",\"";
-  postdata += "value\":\"" + std::string((const char*)key->get_key_data(), key->get_key_data_size());
+  postdata += "value\":\"";
+  postdata.append((const char*)key->get_key_data(), key->get_key_data_size());
   postdata += "\"}";
 
   if (reset_curl_session() ||
@@ -102,7 +102,6 @@ my_bool Vault_curl::read_key(IKey *key, std::string *response)
   }
   *response = read_data_ss.str();
   return FALSE;
-
 }
 
 my_bool Vault_curl::delete_key(IKey *key, std::string *response)

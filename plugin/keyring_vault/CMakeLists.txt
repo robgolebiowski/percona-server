@@ -28,6 +28,7 @@ MYSQL_ADD_PLUGIN(keyring_vault
                  vault_keys_list.cc
                  vault_keys_container.cc
                  vault_curl.cc
+                 vault_credentials_parser.cc
                  MODULE_ONLY
                  MODULE_OUTPUT_NAME "keyring_vault")
 

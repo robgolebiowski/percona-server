@@ -19,6 +19,7 @@ public:
     Vault_key* vault_key = dynamic_cast<Vault_key*>(key);
     if (vault_key == NULL)
       return NULL;
+    Vault_key* vault_key_copy = new Vault_key()
     vault_key->set_key_operation(operation);
     return vault_key;
   }

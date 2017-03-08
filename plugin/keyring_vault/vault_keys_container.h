@@ -20,6 +20,12 @@ public:
 
   virtual IKey* fetch_key(IKey *key);
 protected:
+  virtual my_bool flush_to_backup()
+  {
+    return FALSE;
+  }
+
+
   Vault_io *vault_io;
 };
 
