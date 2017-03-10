@@ -7,6 +7,8 @@
 namespace keyring
 {
 
+//The caller takes ownership of the key, thus it is
+//his resposibility to free the key	
 my_bool Vault_keys_list::get_next_key(IKey **key)
 {
   *key= NULL;

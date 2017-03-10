@@ -18,6 +18,7 @@ class Vault_curl
 public:
   Vault_curl(ILogger *logger)
     : logger(logger)
+    , curl(NULL)	
     , list(NULL)
   {}
 
@@ -25,6 +26,7 @@ public:
   {
     if (list != NULL)
       curl_slist_free_all(list);
+    curl_easy_cleanup(curl);
   }
 
   my_bool init(std::string *vault_url, std::string *auth_token);

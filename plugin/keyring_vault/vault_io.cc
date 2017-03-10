@@ -88,12 +88,16 @@ my_bool Vault_io::delete_key(IKey *key)
 
 my_bool Vault_io::flush_to_storage(ISerialized_object *serialized_object)
 {
-  Vault_key *vault_key = dynamic_cast<Vault_key*>(serialized_object);
+  DBUG_ASSERT(serialized_object->has_next_key() == TRUE);
+  IKey *vault_key;
 
-  return vault_key == NULL ||
-         serialized_object->get_key_operation() == STORE_KEY
-           ? write_key(vault_key)
-           : delete_key(vault_key);
+  my_bool was_error= serialized_object->get_next_key(&vault_key) ||
+                     vault_key == NULL ||
+                     serialized_object->get_key_operation() == STORE_KEY
+                       ? write_key(vault_key)
+                       : delete_key(vault_key);
+  delete vault_key;
+  return was_error;
 }
 
 } //namespace keyring

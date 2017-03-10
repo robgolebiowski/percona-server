@@ -41,7 +41,7 @@ namespace keyring__vault_parser_unittest
 
   TEST_F(Vault_parser_test, ParseKeySignature)
   {
-    std::string key_signature("4key13rob");
+    std::string key_signature("4_key13_rob");
     Vault_parser vault_parser;
     std::string key_parameters[2];
     vault_parser.parse_key_signature(&key_signature, key_parameters);
@@ -51,7 +51,7 @@ namespace keyring__vault_parser_unittest
 
   TEST_F(Vault_parser_test, ParseKeySignature2)
   {
-    std::string key_signature("4key16Robert");
+    std::string key_signature("4_key16_Robert");
     Vault_parser vault_parser;
     std::string key_parameters[2];
     vault_parser.parse_key_signature(&key_signature, key_parameters);
@@ -59,11 +59,31 @@ namespace keyring__vault_parser_unittest
     EXPECT_STREQ(key_parameters[1].c_str(), "Robert");
   }
 
+  TEST_F(Vault_parser_test, ParseKeySignature3)
+  {
+    std::string key_signature("7__key1238_Robert33");
+    Vault_parser vault_parser;
+    std::string key_parameters[2];
+    vault_parser.parse_key_signature(&key_signature, key_parameters);
+    EXPECT_STREQ(key_parameters[0].c_str(), "_key123");
+    EXPECT_STREQ(key_parameters[1].c_str(), "Robert33");
+  }
+
+  TEST_F(Vault_parser_test, ParseKeySignature4)
+  {
+    std::string key_signature("9_123key12310_12Robert33");
+    Vault_parser vault_parser;
+    std::string key_parameters[2];
+    vault_parser.parse_key_signature(&key_signature, key_parameters);
+    EXPECT_STREQ(key_parameters[0].c_str(), "123key123");
+    EXPECT_STREQ(key_parameters[1].c_str(), "12Robert33");
+  }
+
   TEST_F(Vault_parser_test, ParseVaultPayload)
   {
     std::string payload("{\"request_id\":\"724a5ad6-7ee3-7950-879a-488a261a03ec\","
                         "\"lease_id\":\"\",\"renewable\":false,\"lease_duration\":0,"
-                        "\"data\":{\"keys\":[\"4key13rob\",\"4key23rob\"]},\"wrap_info"
+                        "\"data\":{\"keys\":[\"4_key13_rob\",\"4_key23_rob\"]},\"wrap_info"
                         "\":null,\"warnings\":null,\"auth\":null}");
     Vault_keys_list keys;
     Vault_parser vault_parser;
@@ -72,12 +92,12 @@ namespace keyring__vault_parser_unittest
     EXPECT_EQ(keys.has_next_key(), TRUE);
     IKey *key_loaded= NULL;
     EXPECT_EQ(keys.get_next_key(&key_loaded), FALSE);
-    EXPECT_STREQ(key_loaded->get_key_signature()->c_str(), "4key13rob");
+    EXPECT_STREQ(key_loaded->get_key_signature()->c_str(), "4_key13_rob");
     EXPECT_EQ(keys.has_next_key(), TRUE);
     delete key_loaded;
     key_loaded = NULL;
     EXPECT_EQ(keys.get_next_key(&key_loaded), FALSE);
-    EXPECT_STREQ(key_loaded->get_key_signature()->c_str(), "4key23rob");
+    EXPECT_STREQ(key_loaded->get_key_signature()->c_str(), "4_key23_rob");
     EXPECT_EQ(keys.has_next_key(), FALSE);
   }
 
@@ -91,7 +111,7 @@ namespace keyring__vault_parser_unittest
     Vault_parser vault_parser;
     Vault_key key("key1", NULL, "rob", NULL, 0);
     EXPECT_EQ(vault_parser.parse_key_data(&payload, &key), FALSE);
-    EXPECT_STREQ(key.get_key_signature()->c_str(), "4key13rob");
+    EXPECT_STREQ(key.get_key_signature()->c_str(), "4_key13_rob");
     ASSERT_TRUE(memcmp(key.get_key_data(), "Robi", key.get_key_data_size()) == 0);
     EXPECT_STREQ("AES", key.get_key_type()->c_str());
   }

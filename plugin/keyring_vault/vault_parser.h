@@ -18,33 +18,6 @@ namespace keyring
 class Vault_parser
 {
 public:
-//    std::string unescape(const std::string& s)
-//    {
-//      std::string res;
-//      std::string::const_iterator it = s.begin();
-//      while (it != s.end())
-//      {
-//        char c = *it++;
-//        if (c == '\\' && it != s.end())
-//        {
-//          switch (*it++) {
-//            case '\\': c = ''; break;
-//            case 'n': c = '\n'; break;
-//            case 't': c = '\t'; break;
-//              // all other escapes
-//            default:
-//              // invalid escape sequence - skip it. alternatively you can copy it as is, throw an exception...
-//              continue;
-//          }
-//        }
-//        res += c;
-//      }
-//
-//      return res;
-//    }
-
-
-
   my_bool retrieve_list(std::string *payload, std::string list_name, std::string *list)
   {
     std::size_t list_pos = payload->find(list_name);
@@ -162,6 +135,9 @@ public:
     for (int i= 0; i < 2; ++i)
     {
       std::size_t key_id_pos = key_signature->find_first_not_of(digits, next_pos_to_start_from);
+      if ((*key_signature)[key_id_pos] != '_')
+        return TRUE;
+      ++key_id_pos;
       std::string key_id_length = key_signature->substr(next_pos_to_start_from, key_id_pos);
       int key_l = atoi(key_id_length.c_str());
       key_parameters[i] = key_signature->substr(key_id_pos, key_l);

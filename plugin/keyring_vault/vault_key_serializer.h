@@ -3,6 +3,7 @@
 //
 
 #include "i_serializer.h"
+#include "vault_key.h"
 
 #ifndef MYSQL_VAULT_KEY_SERIALIZER_H
 #define MYSQL_VAULT_KEY_SERIALIZER_H
@@ -17,11 +18,16 @@ public:
                                 const Key_operation operation)
   {
     Vault_key* vault_key = dynamic_cast<Vault_key*>(key);
-    if (vault_key == NULL)
-      return NULL;
-    Vault_key* vault_key_copy = new Vault_key()
-    vault_key->set_key_operation(operation);
-    return vault_key;
+    DBUG_ASSERT(vault_key != NULL);
+
+    return new Vault_key(*vault_key);
+
+    /*
+    Vault_keys_list *keys_list = new Vault_keys_list();
+    Vault_key* vault_key_copy = new Vault_key(*vault_key);
+    vault_key_copy->set_key_operation(operation);
+    keys_list->push_back(vault_key_copy);
+    return vault_key_copy;*/
   }
 };
 

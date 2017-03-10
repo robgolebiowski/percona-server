@@ -14,6 +14,9 @@ namespace keyring
 
     IKey *fetched_key= get_key_from_hash(key);
 
+    if (fetched_key == NULL)
+      return NULL;
+
     if(fetched_key->get_key_type() == NULL &&
        vault_io->retrieve_key_type_and_value(fetched_key)) //key is fetched for the first time
       return NULL; //add a logger - or better error will be comming from vault_io
