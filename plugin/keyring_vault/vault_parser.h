@@ -36,7 +36,7 @@ public:
     }
     *list = payload->substr(opening_bracket_pos,
                             closing_bracket_pos - opening_bracket_pos +1);
-    std::remove(list->begin(), list->end(), '\n');
+    list->erase(std::remove(list->begin(), list->end(), '\n'), list->end());
     return FALSE;
   }
 
@@ -110,6 +110,7 @@ public:
     std::vector<std::string> key_tokens;
     std::string keys_list;
     if (retrieve_list(payload, "keys", &keys_list) ||
+        keys_list.empty() ||
         retrieve_tokens_from_list(&keys_list, &key_tokens))
       return TRUE;
 

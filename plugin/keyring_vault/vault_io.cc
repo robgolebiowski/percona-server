@@ -14,44 +14,48 @@ my_bool Vault_io::init(std::string *keyring_storage_url)
   if (vault_credentials_parser.parse(keyring_storage_url, &token))
     return TRUE;
 
-  return vault_curl.init(&url, &token);
+  return vault_curl->init(&url, &token);
 }
 
-my_bool Vault_io::check_for_errors_in_response_and_log(std::string *json_response)
+std::string Vault_io::get_errors_from_response(std::string *json_response)
 {
-  std::string errors;
+  if (json_response->empty())
+    return "";
 
-  if(vault_parser.parse_errors(json_response, &errors))
-  {
-    logger->log(MY_ERROR_LEVEL, "Error while parsing error messages");
-    return TRUE;
-  }
-  if (errors.size()) //we found error in response
-  {
-    logger->log(MY_ERROR_LEVEL, ("Vault has returned the following errors: "
-                                + errors).c_str());
-    return TRUE;
-  }
-  return FALSE;
+  std::string errors_from_response, err_msg;
+  if(vault_parser.parse_errors(json_response, &errors_from_response))
+    err_msg = " Error while parsing error messages";
+  else if (errors_from_response.size()) //we found error in response
+    err_msg = " Vault has returned the following error(s): " +
+              errors_from_response;
+  return err_msg;
 }
 
 my_bool Vault_io::get_serialized_object(ISerialized_object **serialized_object)
 {
+  static std::string err_msg("Could not retrieve list of keys from Vault.");
   *serialized_object= NULL;
   std::string json_response;
 
-  if(vault_curl.list_keys(&json_response))
-    return TRUE;
-
-  Vault_keys_list *keys = new Vault_keys_list();
-
-  if (vault_parser.parse_keys(&json_response, keys) ||
-      check_for_errors_in_response_and_log(&json_response))
+  if(vault_curl->list_keys(&json_response))
   {
-    delete keys;
+    logger->log(MY_ERROR_LEVEL, err_msg.c_str());
     return TRUE;
   }
 
+  if (json_response.empty()) //no keys
+  {
+    *serialized_object = NULL;
+    return FALSE;
+  }
+  Vault_keys_list *keys = new Vault_keys_list();
+  if (vault_parser.parse_keys(&json_response, keys))
+  {
+    logger->log(MY_ERROR_LEVEL, (err_msg +
+                get_errors_from_response(&json_response)).c_str());
+    delete keys;
+    return TRUE;
+  }
   if (keys->size() == 0)
   {
     delete keys;
@@ -65,8 +69,14 @@ my_bool Vault_io::get_serialized_object(ISerialized_object **serialized_object)
 my_bool Vault_io::retrieve_key_type_and_value(IKey *key) //TODO:Change value to data
 {
   std::string json_response;
-  return vault_curl.read_key(key, &json_response) ||
-         vault_parser.parse_key_data(&json_response, key);
+  if(vault_curl->read_key(key, &json_response) ||
+     vault_parser.parse_key_data(&json_response, key))
+  {
+    logger->log(MY_ERROR_LEVEL, ("Could not read key from Vault" +
+                get_errors_from_response(&json_response)).c_str());
+    return TRUE;
+  }
+  return FALSE;
 }
 
 ISerializer* Vault_io::get_serializer()
@@ -76,14 +86,31 @@ ISerializer* Vault_io::get_serializer()
 
 my_bool Vault_io::write_key(IKey *key)
 {
-  std::string json_response;
-  return vault_curl.write_key(key, &json_response);
+  std::string json_response, errors_from_response;
+  if(vault_curl->write_key(key, &json_response) ||
+     !((errors_from_response =
+      get_errors_from_response(&json_response)).empty()))
+ {
+    logger->log(MY_ERROR_LEVEL, ("Could not write key to Vault" +
+                errors_from_response).c_str());
+    return TRUE;
+  }
+  return FALSE;
+
 }
 
 my_bool Vault_io::delete_key(IKey *key)
 {
-  std::string json_response;
-  return vault_curl.delete_key(key, &json_response);
+  std::string json_response, errors_from_response;
+  if(vault_curl->delete_key(key, &json_response) ||
+     !((errors_from_response =
+      get_errors_from_response(&json_response)).empty()))
+  {
+    logger->log(MY_ERROR_LEVEL, ("Could not delete key from Vault" +
+                errors_from_response).c_str());
+    return TRUE;
+  }
+  return FALSE;
 }
 
 my_bool Vault_io::flush_to_storage(ISerialized_object *serialized_object)

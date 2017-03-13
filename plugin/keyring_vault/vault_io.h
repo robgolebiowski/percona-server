@@ -15,9 +15,9 @@ namespace keyring {
 class Vault_io : public IKeyring_io
 {
 public:
-  Vault_io(ILogger *logger)
+  Vault_io(ILogger *logger, IVault_curl *vault_curl)
     : logger(logger)
-    , vault_curl(logger)
+    , vault_curl(vault_curl)
   {}
 
   my_bool retrieve_key_type_and_value(IKey *key);
@@ -39,11 +39,12 @@ public:
 protected:
   my_bool write_key(IKey *key);
   my_bool delete_key(IKey *key);
-  my_bool check_for_errors_in_response_and_log(std::string *json_response);
+  std::string get_errors_from_response(std::string *json_response);
+  //my_bool check_for_errors_in_response_and_log(std::string *json_response);
 
   ILogger *logger;
   Vault_parser vault_parser;
-  Vault_curl vault_curl;
+  IVault_curl *vault_curl;
   Vault_key_serializer vault_key_serializer;
 };
 

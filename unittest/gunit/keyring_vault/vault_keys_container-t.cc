@@ -46,6 +46,7 @@ namespace keyring__vault_keys_container_unittest
       credential_file_was_created = false;
       logger= new Mock_logger();
       vault_keys_container= new Vault_keys_container(logger);
+      vault_curl = new Vault_curl(logger);
     }
     virtual void TearDown()
     {
@@ -53,6 +54,7 @@ namespace keyring__vault_keys_container_unittest
         remove(credential_file_url.c_str());
       delete vault_keys_container;
       delete logger;
+      delete vault_curl;
     }
 
     void create_credentials_file_with_correct_token();
@@ -64,6 +66,7 @@ namespace keyring__vault_keys_container_unittest
   protected:
     Vault_keys_container *vault_keys_container;
     ILogger *logger;
+    IVault_curl *vault_curl;
     std::string correct_token;
     std::string credential_file_url;
     bool credential_file_was_created;
@@ -113,7 +116,7 @@ namespace keyring__vault_keys_container_unittest
   TEST_F(Vault_keys_container_test, InitWithCorrectCredential)
   {
     create_credentials_file_with_correct_token();
-    IKeyring_io *vault_io= new Vault_io(logger);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
     delete sample_key; //unused in this test
   }
@@ -128,7 +131,7 @@ namespace keyring__vault_keys_container_unittest
     myfile << token_in_file;
     myfile.close();
 
-    IKeyring_io *vault_io= new Vault_io(logger);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
 
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Vault has returned the following errors: [\"permission denied\"]")));
@@ -147,7 +150,7 @@ namespace keyring__vault_keys_container_unittest
     myfile.open(credential_file_url.c_str());
     myfile.close();
 
-    IKeyring_io *vault_io= new Vault_io(logger);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
 
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read token from credential file.")));
@@ -175,7 +178,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *vault_io= new Vault_io(logger);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -203,7 +206,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     Key key_id("Roberts_key", NULL, "Robert",NULL,0);
     IKey* fetched_key= vault_keys_container->fetch_key(&key_id);
@@ -215,7 +218,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     Key key_id("Roberts_key", "AES", "Robert",NULL,0);
     ASSERT_TRUE(vault_keys_container->remove_key(&key_id) == TRUE);
@@ -226,7 +229,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -243,7 +246,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -261,7 +264,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), FALSE);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -309,7 +312,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
