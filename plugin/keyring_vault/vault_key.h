@@ -38,7 +38,8 @@ struct Vault_key : public Key, public ISerialized_object
       *key = NULL;
       return TRUE;
     }
-    *key = new Vault_key(*this);	  
+    *key = new Vault_key(*this);
+    was_key_retrieved = TRUE;
     return FALSE;
   }
   virtual my_bool has_next_key()

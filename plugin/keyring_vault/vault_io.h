@@ -3,7 +3,7 @@
 
 #include <my_global.h>
 #include <logger.h>
-#include "i_keyring_io.h"
+#include "i_vault_io.h"
 #include "vault_keys_list.h"
 #include "vault_parser.h"
 #include "vault_credentials_parser.h"
@@ -12,7 +12,7 @@
 
 namespace keyring {
 
-class Vault_io : public IKeyring_io
+class Vault_io : public IVault_io
 {
 public:
   Vault_io(ILogger *logger, IVault_curl *vault_curl)
@@ -20,7 +20,7 @@ public:
     , vault_curl(vault_curl)
   {}
 
-  my_bool retrieve_key_type_and_value(IKey *key);
+  virtual my_bool retrieve_key_type_and_value(IKey *key);
 
   virtual my_bool init(std::string *keyring_storage_url);
   virtual my_bool flush_to_backup(ISerialized_object *serialized_object)

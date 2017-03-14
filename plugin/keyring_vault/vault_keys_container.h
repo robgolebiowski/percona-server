@@ -18,15 +18,21 @@ public:
     : Keys_container(logger)
   {}
 
+  my_bool init(IKeyring_io* keyring_io, std::string keyring_storage_url)
+  {
+    vault_io = dynamic_cast<IVault_io*>(keyring_io);
+    DBUG_ASSERT(vault_io != NULL);
+    return Keys_container::init(keyring_io, keyring_storage_url);
+  }
+
   virtual IKey* fetch_key(IKey *key);
+
 protected:
   virtual my_bool flush_to_backup()
   {
     return FALSE;
   }
-
-
-  Vault_io *vault_io;
+  IVault_io *vault_io;
 };
 
 
