@@ -23,7 +23,7 @@ struct Vault_key : public Key, public ISerialized_object
           vault_key.user_id.c_str(), vault_key.key.get(), vault_key.key_len)
   {
     this->key_operation = vault_key.key_operation;
-    this->was_key_retrieved = vault_key.was_key_retrieved;
+    this->was_key_retrieved = FALSE;
   }
 
   Vault_key()

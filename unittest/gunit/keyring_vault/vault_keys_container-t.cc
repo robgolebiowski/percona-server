@@ -43,7 +43,7 @@ namespace keyring__vault_keys_container_unittest
 //      remove(file_name.c_str());
 //      remove("./keyring.backup");
 
-      correct_token = "a974abd1-ac3f-f7c9-4b81-2629500ad99f"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "8d774695-81b8-8307-83e4-2877476cffbb"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -56,7 +56,6 @@ namespace keyring__vault_keys_container_unittest
         remove(credential_file_url.c_str());
       delete vault_keys_container;
       delete logger;
-      delete vault_curl;
     }
 
     void create_credentials_file_with_correct_token();

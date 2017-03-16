@@ -30,7 +30,7 @@ namespace keyring__vault_io_unittest
     {
 //      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
 //      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
-      correct_token = "2e1dbcac-588c-cd48-c19a-51fd88026ac0"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "8d774695-81b8-8307-83e4-2877476cffbb"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -44,7 +44,7 @@ namespace keyring__vault_io_unittest
 //      fake_mysql_plugin.name.str= const_cast<char*>("FakeKeyringPlugin");
 //      fake_mysql_plugin.name.length= strlen("FakeKeyringPlugin");
       delete logger;
-      delete vault_curl;
+      //delete vault_curl;
     }
 
   protected:
@@ -140,12 +140,13 @@ namespace keyring__vault_io_unittest
     delete serialized_keys;
 
     //Now remove the keys
-    key1.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io.flush_to_storage(&key1), FALSE);
-    key2.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io.flush_to_storage(&key2), FALSE);
+    Vault_key key1_to_remove(key1);
+    key1_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key1_to_remove), FALSE);
+    Vault_key key2_to_remove(key2);
+    key2_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key2_to_remove), FALSE);
   }
-
 
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeysWithDifferentVaultIO)
   {
@@ -166,7 +167,8 @@ namespace keyring__vault_io_unittest
     //*****
 
     //Now fetch two keys with separate Vault_io
-    Vault_io vault_io_for_fetching(logger, vault_curl);
+    Vault_curl *vault_curl2 = new Vault_curl(logger);
+    Vault_io vault_io_for_fetching(logger, vault_curl2);
     EXPECT_EQ(vault_io_for_fetching.init(&credential_file_url), FALSE);
 
     ISerialized_object *serialized_keys= NULL;
@@ -186,10 +188,12 @@ namespace keyring__vault_io_unittest
     delete serialized_keys;
 
     //Now remove the keys
-    key1.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io_for_storing.flush_to_storage(&key1), FALSE);
-    key2.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io_for_storing.flush_to_storage(&key2), FALSE);
+    Vault_key key1_to_remove(key1);
+    key1_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io_for_storing.flush_to_storage(&key1_to_remove), FALSE);
+    Vault_key key2_to_remove(key2);
+    key2_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io_for_storing.flush_to_storage(&key2_to_remove), FALSE);
   }
 
   TEST_F(Vault_io_test, RetrieveKeyTypeAndValue)
@@ -208,8 +212,9 @@ namespace keyring__vault_io_unittest
     ASSERT_TRUE(memcmp(key.get_key_data(), "Robi", key.get_key_data_size()) == 0);
     EXPECT_STREQ("AES", key.get_key_type()->c_str());
 
-    key_to_store.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io.flush_to_storage(&key_to_store), FALSE);
+    Vault_key key_to_remove("key1", NULL, "rob", NULL, 0);
+    key_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_remove), FALSE);
   }
 
   TEST_F(Vault_io_test, FlushAndRemoveSingleKey)
@@ -220,8 +225,9 @@ namespace keyring__vault_io_unittest
     Vault_key key("key1", "AES", "rob", "Robi", 4);
     key.set_key_operation(STORE_KEY);
     EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
-    key.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
+    Vault_key key_to_remove(key);
+    key_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_remove), FALSE);
   }
 
   TEST_F(Vault_io_test, FlushKeyRetrieveDeleteInit)
@@ -237,9 +243,13 @@ namespace keyring__vault_io_unittest
     EXPECT_STREQ(key1_id.get_key_signature()->c_str(), "4_key13_rob");
     ASSERT_TRUE(memcmp(key1_id.get_key_data(), "Robi", key1_id.get_key_data_size()) == 0);
     EXPECT_STREQ("AES", key1_id.get_key_type()->c_str());
-    key.set_key_operation(REMOVE_KEY);
-    EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
-    Vault_io vault_io2(logger, vault_curl); //do I need this ?
+
+    Vault_key key_to_remove(key);
+    key_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_remove), FALSE);
+
+    Vault_curl *vault_curl2 = new Vault_curl(logger);
+    Vault_io vault_io2(logger, vault_curl2); //do I need this ?
     EXPECT_EQ(vault_io2.init(&credential_file_url), FALSE);
     ISerialized_object *serialized_keys= NULL;
     EXPECT_EQ(vault_io2.get_serialized_object(&serialized_keys), FALSE);
@@ -267,8 +277,6 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
       .WillOnce(Return(TRUE)); // init unsuccessfull
     EXPECT_EQ(vault_io.init(&credential_file_url), TRUE);
- 
-    delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorFromVaultCurlOnListKeys)
@@ -292,8 +300,6 @@ namespace keyring__vault_io_unittest
 
     EXPECT_EQ(vault_io.get_serialized_object(&serialized_object), TRUE);
     EXPECT_EQ(serialized_object, reinterpret_cast<ISerialized_object*>(NULL));
- 
-    delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsResponseOnListKeys)
@@ -342,7 +348,7 @@ namespace keyring__vault_io_unittest
     EXPECT_EQ(vault_io.get_serialized_object(&serialized_object), TRUE);
     EXPECT_EQ(serialized_object, reinterpret_cast<ISerialized_object*>(NULL));
  
-    delete mock_curl;
+    //delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnReadKey)
@@ -365,7 +371,7 @@ namespace keyring__vault_io_unittest
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault")));
     EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
 
-    delete mock_curl;
+    //delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnReadKey)
@@ -390,7 +396,7 @@ namespace keyring__vault_io_unittest
                                 " [\"Cannot read this stuff\"]")));
     EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
 
-    delete mock_curl;
+    //delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnDeleteKey)
@@ -414,7 +420,7 @@ namespace keyring__vault_io_unittest
       log(MY_ERROR_LEVEL, StrEq("Could not delete key from Vault")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
 
-    delete mock_curl;
+    //delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnDeleteKey)
@@ -439,8 +445,6 @@ namespace keyring__vault_io_unittest
       log(MY_ERROR_LEVEL, StrEq("Could not delete key from Vault Vault has returned the following error(s):"
                                 " [\"Cannot delete this stuff\"]")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
-
-    delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnWriteKey)
@@ -463,8 +467,6 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not write key to Vault")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
-
-    delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnWriteKey)
@@ -485,12 +487,11 @@ namespace keyring__vault_io_unittest
 
     EXPECT_CALL(*mock_curl, write_key(_, _))
       .WillOnce(DoAll(SetArgPointee<1>(vault_response), Return(FALSE)));
+    //TODO: Add dot after Vault (before 2nd Vault)
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not write key to Vault Vault has returned the following error(s):"
                                 " [\"Cannot write this stuff\"]")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
-
-    delete mock_curl;
   }
 
 } //namespace keyring__file_io_unittest

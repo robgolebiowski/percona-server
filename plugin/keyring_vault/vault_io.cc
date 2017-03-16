@@ -17,6 +17,12 @@ my_bool Vault_io::init(std::string *keyring_storage_url)
   return vault_curl->init(&url, &token);
 }
 
+Vault_io::~Vault_io()
+{
+  if(vault_curl != NULL)
+    delete vault_curl;
+}
+
 std::string Vault_io::get_errors_from_response(std::string *json_response)
 {
   if (json_response->empty())
@@ -91,8 +97,11 @@ my_bool Vault_io::write_key(IKey *key)
      !((errors_from_response =
       get_errors_from_response(&json_response)).empty()))
  {
-    logger->log(MY_ERROR_LEVEL, ("Could not write key to Vault" +
-                errors_from_response).c_str());
+    errors_from_response.insert(0, "Could not write key to Vault");
+    logger->log(MY_ERROR_LEVEL, errors_from_response.c_str());
+    //logger->log(MY_ERROR_LEVEL, "lalala");
+
+                //errors_from_response.insert(0, "Could not write key to Vault").c_str());
     return TRUE;
   }
   return FALSE;

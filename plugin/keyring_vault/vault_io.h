@@ -20,6 +20,8 @@ public:
     , vault_curl(vault_curl)
   {}
 
+  ~Vault_io();
+
   virtual my_bool retrieve_key_type_and_value(IKey *key);
 
   virtual my_bool init(std::string *keyring_storage_url);

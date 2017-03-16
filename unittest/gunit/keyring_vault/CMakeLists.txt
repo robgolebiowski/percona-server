@@ -48,6 +48,7 @@ SET(TESTS
         vault_parser
         vault_credentials_parser
         vault_keys_container
+        vault_keyring-api
         )
 
 #IF (MERGE_UNITTESTS)

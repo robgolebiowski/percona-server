@@ -2,7 +2,9 @@
 // Created by rob on 03.03.17.
 //
 
+#include <algorithm>
 #include "vault_curl.h"
+#include "base64.h"
 
 namespace keyring
 {
@@ -99,11 +101,25 @@ my_bool Vault_curl::list_keys(std::string *response)
 
 my_bool Vault_curl::write_key(IKey *key, std::string *response)
 {
+  //base64 encoding
+  uint64 memory_needed = base64_needed_encoded_length(key->get_key_data_size());
+  char *base64_encoded_key_data = new char[memory_needed];
+  if (base64_encode((const char*)key->get_key_data(), key->get_key_data_size(), base64_encoded_key_data) != 0)
+  {
+    delete[] base64_encoded_key_data;
+    return TRUE; //TODO:Add logging
+  }
+  char* new_end = std::remove(base64_encoded_key_data, base64_encoded_key_data + memory_needed, '\n');
+  memory_needed = new_end - base64_encoded_key_data;
+  //base64 end of encoding
+  
+
   CURLcode curl_res = CURLE_OK;
   std::string postdata="{\"type\":\"" + *key->get_key_type() + "\",\"";
   postdata += "value\":\"";
-  postdata.append((const char*)key->get_key_data(), key->get_key_data_size());
+  postdata.append(base64_encoded_key_data, memory_needed-1); //base64 encode returns data with NULL terminating string - which we do not care about
   postdata += "\"}";
+  delete[] base64_encoded_key_data; //no longer needed
 
   if (reset_curl_session() ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,

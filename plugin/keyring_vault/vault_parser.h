@@ -10,6 +10,7 @@
 #include "vault_keys_list.h"
 #include <vector>
 #include <algorithm>
+#include "base64.h"
 
 namespace keyring
 {
@@ -158,10 +159,27 @@ public:
     std::string type = payload->substr(data_pos+15, (type_end-(data_pos+15)));
     size_t value_end = payload->find('\"', type_end+11);
     std::string value = payload->substr(type_end+11, (value_end-(type_end+11)));
-    uchar *data= new uchar[value.length()];
-    memcpy(data, value.c_str(), value.length());
 
-    key->set_key_data(data, value.length());
+    uint64 base64_length_of_memory_needed_for_decod = base64_needed_decoded_length(value.length());
+    uchar *data = new uchar[base64_length_of_memory_needed_for_decod]; //should this memory be copied into decoded_lenght (actual memory needed)
+
+//base64_decode(const char *src_base, size_t len,
+              //void *dst, const char **end_ptr, int flags)
+    int64 decoded_length = base64_decode(value.c_str(), value.length(), data, NULL, 0);
+    if (decoded_length < 0)
+    {
+      delete[] data;
+      return TRUE; //Add logging
+    }
+    //I am not sure do I need this
+    else if (static_cast<uint64>(decoded_length) < base64_length_of_memory_needed_for_decod)//decoded key data can be fit into smaller amount of memory
+    {
+      uchar *tmp_data = data;
+      data = new uchar[decoded_length];
+      memcpy(data, tmp_data, decoded_length);
+      delete[] tmp_data; 
+    }
+    key->set_key_data(data, decoded_length);
     key->set_key_type(&type);
 
     return FALSE;
