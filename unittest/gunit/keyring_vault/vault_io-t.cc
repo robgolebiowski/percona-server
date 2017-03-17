@@ -259,7 +259,7 @@ namespace keyring__vault_io_unittest
   class Mock_vault_curl : public IVault_curl
   {
   public:
-    MOCK_METHOD2(init, my_bool(std::string *vault_url, std::string *auth_token));
+    MOCK_METHOD1(init, my_bool(Vault_credentials *vault_credentials));
     MOCK_METHOD1(list_keys, my_bool(std::string *response));
     MOCK_METHOD2(write_key, my_bool(IKey *key, std::string *response));
     MOCK_METHOD2(read_key, my_bool(IKey *key, std::string *response));

@@ -7,14 +7,15 @@ namespace keyring {
 
 my_bool Vault_io::init(std::string *keyring_storage_url)
 {
-  std::string url = "http://127.0.0.1:8200";
+  //std::string url = "http://127.0.0.1:8200";
   std::string token;
 
   Vault_credentials_parser vault_credentials_parser(logger);
-  if (vault_credentials_parser.parse(keyring_storage_url, &token))
+  Vault_credentials vault_credentials;
+  if (vault_credentials_parser.parse(keyring_storage_url, &vault_credentials))
     return TRUE;
 
-  return vault_curl->init(&url, &token);
+  return vault_curl->init(&vault_credentials);
 }
 
 Vault_io::~Vault_io()

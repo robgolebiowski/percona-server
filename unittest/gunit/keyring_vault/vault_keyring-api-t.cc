@@ -257,8 +257,79 @@ namespace keyring__api_unittest
     my_free(key_type);
     EXPECT_EQ(mysql_key_remove("Robert_key", "Robert"), FALSE);
   }
-
+//ten test powinien być z poziomu MTRa
+/*
   TEST_F(Keyring_vault_api_test, KeyringFileChange)
+  {
+    EXPECT_EQ(mysql_key_store("Robert_key", "AES", "Robert", sample_key_data.c_str(),
+                              sample_key_data.length() + 1), 0);
+    char *key_type;
+    size_t key_len;
+    void *key;
+    EXPECT_EQ(mysql_key_fetch("Robert_key", &key_type, "Robert", &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, sample_key_data.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);
+    memset(key_type, 0, strlen(key_type));
+    my_free(key_type);
+    key_type= NULL;
+    memset(key, 0, key_len);
+    my_free(key);
+    key= NULL;
+    delete[] keyring_filename;
+    keyring_filename= new char[strlen("./credentials2")+1];
+    strcpy(keyring_filename, "./credentials2");
+    keyring_vault_cred_file= keyring_filename;
+    keyring_deinit_with_mock_logger();
+    keyring_init_with_mock_logger();
+    
+    EXPECT_EQ(mysql_key_fetch("Robert_key", &key_type, "Robert", &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, sample_key_data.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);
+
+    ASSERT_TRUE(key == NULL);
+    EXPECT_EQ(mysql_key_store("Robert_key_new", "AES", "Robert", sample_key_data.c_str(),
+                              sample_key_data.length() + 1), 0);
+    delete[] keyring_filename;
+    keyring_filename= new char[strlen("./keyring")+1];
+    strcpy(keyring_filename, "./keyring");
+    keyring_file_data_value= keyring_filename;
+    keyring_deinit_with_mock_logger();
+    keyring_init_with_mock_logger();
+    EXPECT_EQ(mysql_key_fetch("Robert_key_new", &key_type, "Robert", &key,
+                              &key_len), 0);
+    ASSERT_TRUE(key == NULL);
+    EXPECT_EQ(mysql_key_fetch("Robert_key", &key_type, "Robert", &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, sample_key_data.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+    delete[] keyring_filename;
+    keyring_filename= new char[strlen("./new_keyring")+1];
+    strcpy(keyring_filename, "./new_keyring");
+    keyring_file_data_value= keyring_filename;
+    keyring_deinit_with_mock_logger();
+    keyring_init_with_mock_logger();
+    EXPECT_EQ(mysql_key_fetch("Robert_key_new", &key_type, "Robert", &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, sample_key_data.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+    remove("./new_keyring");
+  }
+*/
+  /*TEST_F(Keyring_vault_api_test, KeyringFileChange)
   {
     EXPECT_EQ(mysql_key_store("Robert_key", "AES", "Robert", sample_key_data.c_str(),
                               sample_key_data.length() + 1), 0);
@@ -319,7 +390,7 @@ namespace keyring__api_unittest
     my_free(key);
     key= NULL;
     remove("./new_keyring");
-  }
+  }*/
 
   TEST_F(Keyring_vault_api_test, NullUser)
   {

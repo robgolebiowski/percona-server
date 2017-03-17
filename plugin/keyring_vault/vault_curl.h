@@ -9,6 +9,7 @@
 #include <curl/curl.h>
 #include "i_vault_curl.h"
 #include "logger.h"
+#include "vault_credentials.h"
 #include "i_keyring_key.h"
 
 namespace keyring
@@ -30,7 +31,8 @@ public:
     curl_easy_cleanup(curl);
   }
 
-  my_bool init(std::string *vault_url, std::string *auth_token);
+  my_bool init(Vault_credentials *vault_credentials);
+  //my_bool init(std::string *vault_url, Vault_credentials *vault_credentials);
   my_bool list_keys(std::string *response);
   my_bool write_key(IKey *key, std::string *response);
   my_bool read_key(IKey *key, std::string *response);
@@ -41,8 +43,8 @@ protected:
   std::string get_error_from_curl(CURLcode curl_code);
 
   ILogger *logger;
-  std::string token_header;
-  std::string vault_url;
+  SecureString token_header;
+  SecureString vault_url;
   CURL *curl;
   char curl_errbuf[CURL_ERROR_SIZE]; //error from CURL
   std::stringstream read_data_ss;

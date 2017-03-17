@@ -3,13 +3,14 @@
 
 #include "i_keyring_key.h"
 #include "i_keyring_io.h"
+#include "vault_credentials.h"
 
 namespace keyring {
 
 class IVault_curl : public Keyring_alloc
 {
 public:
-  virtual my_bool init(std::string *vault_url, std::string *auth_token) = 0;
+  virtual my_bool init(Vault_credentials *vault_credentials) = 0;
   virtual my_bool list_keys(std::string *response) = 0;
   virtual my_bool write_key(IKey *key, std::string *response) = 0;
   virtual my_bool read_key(IKey *key, std::string *response) = 0;

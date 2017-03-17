@@ -36,7 +36,8 @@ std::string Vault_curl::get_error_from_curl(CURLcode curl_code)
   return ss.str();
 }
 
-my_bool Vault_curl::init(std::string *vault_url, std::string *auth_token)
+my_bool Vault_curl::init(Vault_credentials *vault_credentials)
+//my_bool Vault_curl::init(std::string *vault_url, std::string *auth_token)
 {
   curl = curl_easy_init();
   if (curl == NULL)
@@ -44,8 +45,8 @@ my_bool Vault_curl::init(std::string *vault_url, std::string *auth_token)
     logger->log(MY_ERROR_LEVEL, "Could not create CURL session");
     return TRUE; //Add logger
   }
-  this->token_header = "X-Vault-Token:" + *auth_token;
-  this->vault_url = *vault_url + "/v1/secret"; //TODO:Change me - secrete should be separate option
+  this->token_header = "X-Vault-Token:" + vault_credentials->token;
+  this->vault_url = vault_credentials->vault_url + "/v1/" + vault_credentials->secret_mount_point;
   return FALSE;
 }
 
@@ -123,7 +124,7 @@ my_bool Vault_curl::write_key(IKey *key, std::string *response)
 
   if (reset_curl_session() ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,
-                                   (vault_url + '/' + *key->get_key_signature()).c_str())) != CURLE_OK ||
+                                   (vault_url + '/' + key->get_key_signature()->c_str()).c_str())) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata.c_str())) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
@@ -138,7 +139,7 @@ my_bool Vault_curl::read_key(IKey *key, std::string *response)
 {
   CURLcode curl_res = CURLE_OK;
   if (reset_curl_session() ||
-      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + '/' + *key->get_key_signature()).c_str())) !=
+      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + '/' + key->get_key_signature()->c_str()).c_str())) !=
       CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
@@ -153,7 +154,7 @@ my_bool Vault_curl::delete_key(IKey *key, std::string *response)
 {
   CURLcode curl_res = CURLE_OK;
   if (reset_curl_session() ||
-      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + '/' + *key->get_key_signature()).c_str())) !=
+      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + '/' + key->get_key_signature()->c_str()).c_str())) !=
       CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE")) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)

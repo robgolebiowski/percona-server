@@ -7,6 +7,7 @@
 
 #include <my_global.h>
 #include <string>
+#include "vault_credentials.h"
 #include "logger.h"
 
 namespace keyring
@@ -18,9 +19,15 @@ namespace keyring
       : logger(logger)
     {}
 
-    my_bool parse(std::string *file_url, std::string *token);
+    my_bool parse(std::string *file_url, Vault_credentials *vault_credentials);
 
   protected:
+    //TODO: Make sure that secrets are only stored SecureStrings, maybe by changing all strings into SecureString ?
+
+    my_bool parse_line(uint line_number, SecureString *line, Vault_credentials *vault_credentials);
+    //my_bool parse_line(std::string *line, Vault_credentials *vault_credentials);
+    SecureString* get_value_for_option(SecureString *option, Vault_credentials *vault_credentials);
+
     ILogger *logger;
 
   };
