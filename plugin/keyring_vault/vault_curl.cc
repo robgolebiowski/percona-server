@@ -45,8 +45,8 @@ my_bool Vault_curl::init(Vault_credentials *vault_credentials)
     logger->log(MY_ERROR_LEVEL, "Could not create CURL session");
     return TRUE; //Add logger
   }
-  this->token_header = "X-Vault-Token:" + vault_credentials->token;
-  this->vault_url = vault_credentials->vault_url + "/v1/" + vault_credentials->secret_mount_point;
+  this->token_header = "X-Vault-Token:" + (*vault_credentials)["token"];
+  this->vault_url = (*vault_credentials)["vault_url"] + "/v1/" + (*vault_credentials)["secret_mount_point"];
   return FALSE;
 }
 

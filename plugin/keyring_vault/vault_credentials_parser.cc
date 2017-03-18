@@ -10,23 +10,42 @@
 
 namespace keyring
 {
-  struct Is_space
+  struct Is_not_space
   {
     my_bool operator()(char c)
     {
-      return std::isspace(c);
+      return !std::isspace(c);
     }
   };
 
-  SecureString* Vault_credentials_parser::get_value_for_option(SecureString *option, Vault_credentials *vault_credentials)
+  static inline SecureString* ltrim(SecureString *s) {
+      s->erase(s->begin(), std::find_if(s->begin(), s->end(),
+              Is_not_space()));
+      return s;
+  }
+
+  // trim from end
+  static inline SecureString* rtrim(SecureString *s) {
+      s->erase(std::find_if(s->rbegin(), s->rend(),
+               Is_not_space()).base(), s->end());
+      return s;
+  }
+
+  // trim from both ends
+  static inline SecureString* trim(SecureString *s) {
+      return ltrim(rtrim(s));
+  }
+
+  void Vault_credentials_parser::reset_vault_credentials(Vault_credentials *vault_credentials)
   {
-    if (*option == "vault_url")
-      return &vault_credentials->vault_url;
-    else if (*option == "secret_mount_point")
-      return &vault_credentials->secret_mount_point;
-    else if (*option == "token")
-      return &vault_credentials->token;
-    return NULL;
+    for(Vault_credentials::iterator iter = vault_credentials->begin();
+        iter != vault_credentials->end(); ++iter)
+      iter->second.clear();
+  }
+
+  my_bool Vault_credentials_parser::is_valid_option(SecureString *option)
+  {
+    return vault_credentials_in_progress.count(*option);
   }
 
   my_bool Vault_credentials_parser::parse_line(uint line_number, SecureString *line, Vault_credentials *vault_credentials)
@@ -46,16 +65,15 @@ namespace keyring
       return TRUE;
     }
     SecureString option = line->substr(0, eq_sign_pos); //TODO:Should not SecureString be called Secure_string
-    option.erase(std::remove_if(option.begin(), option.end(), Is_space()), option.end());
+    trim(&option); 
 
-    SecureString *value = get_value_for_option(&option, vault_credentials);
-
-    if (value == NULL)
+    if (is_valid_option(&option) == false)
     {
       err_ss <<  "Could not parse credential file. Unknown option \"" << option << "\" in line: ";
       err_ss << line_number << '.';
       return TRUE;
     }
+    SecureString *value = &(*vault_credentials)[option];
 
     if (value->empty() == false) //repeated option in file
     {
@@ -65,7 +83,8 @@ namespace keyring
       logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
       return TRUE;
     }
-    value->erase(std::remove_if(value->begin(), value->end(), Is_space()), value->end());
+    *value = line->substr(eq_sign_pos + 1, line->size() - (eq_sign_pos + 1)); 
+    trim(value);
 
     if (value->empty())
     {
@@ -80,12 +99,12 @@ namespace keyring
 
   my_bool Vault_credentials_parser::parse(std::string *file_url, Vault_credentials *vault_credentials)
   {
-    Vault_credentials vault_credentials_in_progress;
+    reset_vault_credentials(&vault_credentials_in_progress);
+
     std::ifstream credentials_file(file_url->c_str());
     if (!credentials_file)
     {
       logger->log(MY_ERROR_LEVEL, "Could not open file with credentials.");
-      //token->clear();
       return TRUE;
     }
     uint line_number = 1;
@@ -97,32 +116,17 @@ namespace keyring
         return TRUE;
       }
 
-    //TODO: Refactor this ?
-    if (vault_credentials_in_progress.vault_url.empty())
+    for(Vault_credentials::const_iterator iter = vault_credentials_in_progress.begin();
+        iter != vault_credentials_in_progress.end(); ++iter)
     {
-      logger->log(MY_ERROR_LEVEL, "Could not read vault_url from the configuration file");
-      return TRUE;
+      if (iter->second.empty())
+      {
+        std::stringstream err_ss;
+        err_ss << "Could not read " << iter->first << " from the configuration file.";
+        logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+        return TRUE;
+      }
     }
-    if (vault_credentials_in_progress.secret_mount_point.empty())
-    {
-      logger->log(MY_ERROR_LEVEL, "Could not read secret_mount_point from the configuration file"); //TODO: Should I change secret_mount_point to generic_mount_point?
-      return TRUE;
-    }
-    if (vault_credentials_in_progress.token.empty())
-    {
-      logger->log(MY_ERROR_LEVEL, "Could not read token from the configuration file");
-      return TRUE;
-    }
-   
-
-    /*
-    if(getline(credentials_file, *token).fail() || token->empty() ||
-       token->find_first_of(" \t") != std::string::npos)
-    {
-      logger->log(MY_ERROR_LEVEL, "Could not read token from credential file.");
-      token->clear();
-      return TRUE;
-    }*/
     *vault_credentials = vault_credentials_in_progress;
     return FALSE;
   }

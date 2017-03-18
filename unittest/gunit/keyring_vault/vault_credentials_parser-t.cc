@@ -53,9 +53,9 @@ namespace keyring__vault_credentials_parser_unittest
     std::string file_url = "/.there_no_such_file";
     Vault_credentials vault_credentials;
     EXPECT_EQ(vault_credentials_parser.parse(&file_url, &vault_credentials), TRUE);
-    EXPECT_EQ(vault_credentials.vault_url.empty(), TRUE);
-    EXPECT_EQ(vault_credentials.token.empty(), TRUE);
-    EXPECT_EQ(vault_credentials.secret_mount_point.empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
 
     ASSERT_TRUE(token.empty());
   }
@@ -72,14 +72,14 @@ namespace keyring__vault_credentials_parser_unittest
     myfile.close();
 
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not read token from credential file.")));
+      log(MY_ERROR_LEVEL, StrEq("Could not read secret_mount_point from the configuration file.")));
     std::string file_url = "./credentials";
 
     Vault_credentials vault_credentials;
     EXPECT_EQ(vault_credentials_parser.parse(&file_url, &vault_credentials), TRUE);
-    EXPECT_EQ(vault_credentials.vault_url.empty(), TRUE);
-    EXPECT_EQ(vault_credentials.token.empty(), TRUE);
-    EXPECT_EQ(vault_credentials.secret_mount_point.empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
     std::remove("./credentials");
   }
 /*

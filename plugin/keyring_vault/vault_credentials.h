@@ -2,6 +2,7 @@
 #define MYSQL_VAULT_CREDENTIALS
 
 #include <my_global.h>
+#include <map>
 #include <string>
 
 namespace keyring
@@ -25,13 +26,7 @@ namespace keyring
   };
 
   typedef std::basic_string<char, std::char_traits<char>, Secure_allocator<char> > SecureString;
-
-  struct Vault_credentials
-  {
-    SecureString vault_url;
-    SecureString secret_mount_point; //should it be called point?
-    SecureString token;
-  };
+  typedef std::map<SecureString, SecureString> Vault_credentials;
 } //namespace keyring
 
 #endif //MYSQL_VAULT_CREDENTIALS
