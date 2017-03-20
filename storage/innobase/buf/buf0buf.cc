@@ -3079,7 +3079,7 @@ err_exit:
 			goto lookup;
 		}
 
-		buf_block_buf_fix_inc((buf_block_t*) bpage,
+		buf_block_buf_fix_inc(reinterpret_cast<buf_block_t*>(bpage),
 				      __FILE__, __LINE__);
 
 		block_mutex = &((buf_block_t*) bpage)->mutex;
@@ -4009,7 +4009,6 @@ buf_page_optimistic_get(
 	mtr_t*		mtr)	/*!< in: mini-transaction */
 {
 	buf_pool_t*	buf_pool;
-	unsigned	access_time;
 	ibool		success;
 
 	ut_ad(block);
@@ -4076,7 +4075,7 @@ buf_page_optimistic_get(
 
 	buf_page_mutex_enter(block);
 
-	access_time = buf_page_is_accessed(&block->page);
+	const auto access_time = buf_page_is_accessed(&block->page);
 
 	buf_page_set_accessed(&block->page);
 
