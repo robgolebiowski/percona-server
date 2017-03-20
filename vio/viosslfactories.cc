@@ -653,7 +653,7 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
 
 #ifndef HAVE_YASSL
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
-  EC_KEY *ecdh= EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+  const auto ecdh= EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
   if (!ecdh)
   {
     *error= SSL_INITERR_DHFAIL;
@@ -661,7 +661,7 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
     report_errors();
     SSL_CTX_free(ssl_fd->ssl_context);
     my_free(ssl_fd);
-    DBUG_RETURN(0);
+    DBUG_RETURN(nullptr);
   }
 
   if (SSL_CTX_set_tmp_ecdh(ssl_fd->ssl_context, ecdh) != 1)
@@ -672,7 +672,7 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
     EC_KEY_free(ecdh);
     SSL_CTX_free(ssl_fd->ssl_context);
     my_free(ssl_fd);
-    DBUG_RETURN(0);
+    DBUG_RETURN(nullptr);
   }
   EC_KEY_free(ecdh);
 
@@ -685,7 +685,7 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
     report_errors();
     SSL_CTX_free(ssl_fd->ssl_context);
     my_free(ssl_fd);
-    DBUG_RETURN(0);
+    DBUG_RETURN(nullptr);
   }
 #endif /* OPENSSL_VERSION_NUMBER < 0x10002000L */
 #endif /* !HAVE_YASSL */
