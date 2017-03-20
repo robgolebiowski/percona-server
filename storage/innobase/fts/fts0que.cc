@@ -947,10 +947,10 @@ Free the query intersection
 static
 void
 fts_query_free_intersection(
-	fts_query_t*	query)
+	fts_query_t*	query) noexcept
 {
 	fts_query_free_doc_ids(query, query->intersection);
-	query->intersection = NULL;
+	query->intersection = nullptr;
 }
 
 /*******************************************************************//**
@@ -1568,7 +1568,7 @@ fts_merge_doc_ids(
 				query, ranking->doc_id, ranking->rank);
 
 		if (query->error != DB_SUCCESS) {
-			if (query->intersection != NULL)
+			if (query->intersection != nullptr)
 			{
 				ut_a(query->oper == FTS_EXIST);
 				fts_query_free_intersection(query);
