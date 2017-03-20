@@ -2263,7 +2263,7 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, my_bool if_exists,
   */
   if (thd->decide_logging_format(tables))
   {
-    DBUG_RETURN(TRUE);
+    DBUG_RETURN(true);
   }
 
   /* Disable drop of enabled log tables, must be done before name locking */

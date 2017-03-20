@@ -10277,7 +10277,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     // With transactional data dictionary, CREATE TABLE runs as one statement
     // in a multi-statement transaction internally. Revert this for the
     // purposes of determining mixed statement safety.
-    bool multi_stmt_trans= lex->sql_command != SQLCOM_CREATE_TABLE
+    const auto multi_stmt_trans= lex->sql_command != SQLCOM_CREATE_TABLE
         && in_multi_stmt_transaction_mode();
     bool trans_table= trans_has_updated_trans_table(this);
     bool binlog_direct= variables.binlog_direct_non_trans_update;
