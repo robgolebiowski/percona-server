@@ -200,7 +200,8 @@ bool Gtid_table_access_context::deinit(THD *thd, TABLE *table,
 {
   DBUG_ENTER("Gtid_table_access_context::deinit");
 
-  bool res= this->close_table(thd, table, &m_backup, 0 != error, need_commit);
+  const auto res= this->close_table(thd, table, &m_backup, 0 != error,
+                                    need_commit);
 
   /*
     If Gtid is inserted through Attachable_trx_rw its has been done
@@ -448,7 +449,7 @@ int Gtid_table_persistor::save(const Gtid_set *gtid_set)
   ret= error= save(table, gtid_set);
 
 end:
-  const int deinit_ret= table_access_ctx.deinit(thd, table, 0 != error, true);
+  const auto deinit_ret= table_access_ctx.deinit(thd, table, 0 != error, true);
   if (!ret)
     ret= deinit_ret;
 
