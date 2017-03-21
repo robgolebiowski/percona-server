@@ -43,7 +43,7 @@ namespace keyring__vault_keys_container_unittest
 //      remove(file_name.c_str());
 //      remove("./keyring.backup");
 
-      correct_token = "8d774695-81b8-8307-83e4-2877476cffbb"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -79,10 +79,14 @@ namespace keyring__vault_keys_container_unittest
   void Vault_keys_container_test::create_credentials_file_with_correct_token()
   {
     std::remove(credential_file_url.c_str());
-    std::ofstream myfile;
-    myfile.open(credential_file_url.c_str());
-    myfile << correct_token;
-    myfile.close();
+    std::ofstream my_file;
+    my_file.open(credential_file_url.c_str());
+
+    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "token = " << correct_token;
+    my_file.close();
+
     credential_file_was_created = true;
   }
 
@@ -129,7 +133,9 @@ namespace keyring__vault_keys_container_unittest
     std::remove(credential_file_url.c_str());
     std::ofstream myfile;
     myfile.open(credential_file_url.c_str());
-    myfile << token_in_file;
+    myfile << "vault_url = http://127.0.0.1:8200" << std::endl;
+    myfile << "secret_mount_point = secret" << std::endl;
+    myfile << "token = What-a-pretty-token";
     myfile.close();
 
     IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
@@ -155,7 +161,7 @@ namespace keyring__vault_keys_container_unittest
     IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
 
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not read token from credential file.")));
+      log(MY_ERROR_LEVEL, StrEq("Could not read secret_mount_point from the configuration file.")));
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), TRUE);
     delete sample_key; //unused in this test
 

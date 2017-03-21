@@ -44,7 +44,7 @@ SET(TESTS
 #        keys_container
 #        buffered_file_io
 #        file_io
-        #vault_io
+        vault_io
         vault_parser
         vault_credentials_parser
         vault_keys_container

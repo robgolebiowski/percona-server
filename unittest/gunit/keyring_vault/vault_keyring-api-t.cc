@@ -30,8 +30,8 @@ namespace keyring__api_unittest
       keyring_filename= new char[strlen("./credentials")+1];
       strcpy(keyring_filename, "./credentials");
 
-      correct_token = "8d774695-81b8-8307-83e4-2877476cffbb"; //maybe this could be passed as a parameter to unit test ?
-      correct_token2 = "ff0ae2fe-ae20-933e-3589-c1e7d018e107";
+      correct_token = "a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
+      //correct_token2 = "8c1f44f6-626b-d078-8ec5-f1e1eb940379";
 
       plugin_info.name.str= plugin_name;
       plugin_info.name.length= strlen(plugin_name);
@@ -65,7 +65,7 @@ namespace keyring__api_unittest
     bool credential_file_was_created;
     std::string sample_key_data;
     std::string correct_token;
-    std::string correct_token2;
+    //std::string correct_token2;
     char *plugin_name;
     char *keyring_filename;
     st_plugin_int plugin_info; //for Logger initialization
@@ -74,10 +74,14 @@ namespace keyring__api_unittest
   void Keyring_vault_api_test::create_credentials_file_with_correct_token()
   {
     std::remove(keyring_filename);
-    std::ofstream myfile;
-    myfile.open(keyring_filename);
-    myfile << correct_token;
-    myfile.close();
+    std::ofstream my_file;
+    my_file.open(keyring_filename);
+
+    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "token = " << correct_token;
+    my_file.close();
+
     credential_file_was_created = true;
   }
 

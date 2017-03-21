@@ -30,7 +30,7 @@ namespace keyring__vault_io_unittest
     {
 //      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
 //      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
-      correct_token = "8d774695-81b8-8307-83e4-2877476cffbb"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -61,10 +61,14 @@ namespace keyring__vault_io_unittest
   void Vault_io_test::create_credentials_file_with_correct_token()
   {
     std::remove(credential_file_url.c_str());
-    std::ofstream myfile;
-    myfile.open(credential_file_url.c_str());
-    myfile << correct_token;
-    myfile.close();
+    std::ofstream my_file;
+    my_file.open(credential_file_url.c_str());
+
+    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "token = " << correct_token;
+    my_file.close();
+
     credential_file_was_created = true;
   }
 
@@ -84,14 +88,13 @@ namespace keyring__vault_io_unittest
   {
     Vault_io vault_io(logger, vault_curl);
 
-    std::string token_in_file("What-a-pretty-token");
-
     std::remove(credential_file_url.c_str());
-    std::ofstream myfile;
-    myfile.open(credential_file_url.c_str());
-    myfile << token_in_file;
-    myfile.close();
-    //***
+    std::ofstream my_file;
+    my_file.open(credential_file_url.c_str());
+    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "token = 123-123-123";
+    my_file.close();
 
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -272,9 +275,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(TRUE)); // init unsuccessfull
     EXPECT_EQ(vault_io.init(&credential_file_url), TRUE);
   }
@@ -285,9 +286,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -308,9 +307,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -347,8 +344,6 @@ namespace keyring__vault_io_unittest
 
     EXPECT_EQ(vault_io.get_serialized_object(&serialized_object), TRUE);
     EXPECT_EQ(serialized_object, reinterpret_cast<ISerialized_object*>(NULL));
- 
-    //delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnReadKey)
@@ -357,9 +352,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -370,8 +363,6 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault")));
     EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
-
-    //delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnReadKey)
@@ -380,9 +371,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -395,8 +384,6 @@ namespace keyring__vault_io_unittest
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault Vault has returned the following error(s):"
                                 " [\"Cannot read this stuff\"]")));
     EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
-
-    //delete mock_curl;
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnDeleteKey)
@@ -405,9 +392,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -429,9 +414,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -453,9 +436,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -475,9 +456,7 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, mock_curl);
     create_credentials_file_with_correct_token();
 
-    std::string url = "http://127.0.0.1:8200";
-
-    EXPECT_CALL(*mock_curl, init(Pointee(StrEq(url)), Pointee(StrEq(correct_token))))
+    EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
