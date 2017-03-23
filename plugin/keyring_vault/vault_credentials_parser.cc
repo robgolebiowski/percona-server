@@ -119,7 +119,7 @@ namespace keyring
     for(Vault_credentials::const_iterator iter = vault_credentials_in_progress.begin();
         iter != vault_credentials_in_progress.end(); ++iter)
     {
-      if (iter->second.empty())
+      if (iter->second.empty() && optional_value.count(iter->first) == 0)
       {
         std::stringstream err_ss;
         err_ss << "Could not read " << iter->first << " from the configuration file.";

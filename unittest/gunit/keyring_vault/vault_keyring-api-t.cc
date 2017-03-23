@@ -30,7 +30,7 @@ namespace keyring__api_unittest
       keyring_filename= new char[strlen("./credentials")+1];
       strcpy(keyring_filename, "./credentials");
 
-      correct_token = "b71548a2-470f-d576-2de0-f5e04b669535";//  a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "474dbfc2-c687-2b35-e386-19c371b48e99";//  a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
       //correct_token2 = "8c1f44f6-626b-d078-8ec5-f1e1eb940379";
 
       plugin_info.name.str= plugin_name;
@@ -80,7 +80,7 @@ namespace keyring__api_unittest
     my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
     my_file << "token = " << correct_token << std::endl;
-    my_file << "vault_ca = ./vault_ca.crt";
+    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
     my_file.close();
 
     credential_file_was_created = true;

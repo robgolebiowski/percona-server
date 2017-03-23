@@ -13,6 +13,7 @@
 
 namespace keyring
 {
+
   class Vault_credentials_parser
   {
   public:
@@ -23,6 +24,8 @@ namespace keyring
       vault_credentials_in_progress.insert(std::make_pair("secret_mount_point", ""));
       vault_credentials_in_progress.insert(std::make_pair("vault_ca", ""));
       vault_credentials_in_progress.insert(std::make_pair("token", ""));
+
+      optional_value.insert("vault_ca");
     }
 
     my_bool parse(std::string *file_url, Vault_credentials *vault_credentials);
@@ -36,6 +39,7 @@ namespace keyring
 
     my_bool is_valid_option(SecureString *option);
     Vault_credentials vault_credentials_in_progress;
+    std::set<SecureString> optional_value;
 
     ILogger *logger;
 

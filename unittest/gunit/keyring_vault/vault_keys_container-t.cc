@@ -43,7 +43,7 @@ namespace keyring__vault_keys_container_unittest
 //      remove(file_name.c_str());
 //      remove("./keyring.backup");
 
-      correct_token = "b71548a2-470f-d576-2de0-f5e04b669535"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "474dbfc2-c687-2b35-e386-19c371b48e99"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -85,7 +85,7 @@ namespace keyring__vault_keys_container_unittest
     my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
     my_file << "token = " << correct_token << std::endl;
-    my_file << "vault_ca = ./vault_ca.crt";
+    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
     my_file.close();
 
     credential_file_was_created = true;

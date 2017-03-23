@@ -1,5 +1,7 @@
 #include <my_global.h>
 #include <mysql/plugin_keyring.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 #include "keyring.h"
 //#include "buffered_file_io.h"
 #include "vault_keys_container.h"
@@ -87,9 +89,10 @@ int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
   return(0);
 }
 
+//TODO: Change name of this variable
 static char *keyring_vault_cred_file= NULL;
 static MYSQL_SYSVAR_STR(
-  data,                                                        /* name       */
+  config,                                                      /* name       */
   keyring_vault_cred_file,                                     /* value      */
   PLUGIN_VAR_RQCMDARG,                                         /* flags      */
   "The path to the keyring file. Must be specified",           /* comment    */
@@ -99,7 +102,7 @@ static MYSQL_SYSVAR_STR(
 );
 
 static struct st_mysql_sys_var *keyring_vault_system_variables[]= {
-  MYSQL_SYSVAR(data),
+  MYSQL_SYSVAR(config),
   NULL
 };
 
@@ -110,6 +113,13 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
 #ifdef HAVE_PSI_INTERFACE
     keyring_init_psi_keys();
 #endif
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+    curl_global_init(CURL_GLOBAL_NOTHING);
+//  CURL_GLOBAL_DEFAULT);
+    //SSL_load_error_strings();                [> readable error messages <]
+    //SSL_library_init();                      [> initialize library <]
 
     if (init_keyring_locks())
       return TRUE;
@@ -152,10 +162,20 @@ int keyring_deinit(void *arg MY_ATTRIBUTE((unused)))
 {
   //not taking a lock here as the calls to keyring_deinit are serialized by
   //the plugin framework
+  ERR_remove_thread_state(NULL);
+  ERR_remove_state(0);
+  ERR_free_strings();
+  EVP_cleanup();
+
   keys.reset();
   logger.reset();
   keyring_file_data.reset();
   mysql_rwlock_destroy(&LOCK_keyring);
+
+
+
+
+  curl_global_cleanup();
   return 0;
 }
 
@@ -212,11 +232,11 @@ static struct st_mysql_keyring keyring_descriptor=
   mysql_key_generate
 };
 
-mysql_declare_plugin(keyring_file)
+mysql_declare_plugin(keyring_vault)
 {
   MYSQL_KEYRING_PLUGIN,                                   /*   type                            */
   &keyring_descriptor,                                    /*   descriptor                      */
-  "keyring_file",                                         /*   name                            */
+  "keyring_vault",                                         /*   name                            */
   "Oracle Corporation",                                   /*   author                          */
   "store/fetch authentication data to/from a flat file",  /*   description                     */
   PLUGIN_LICENSE_GPL,

@@ -45,6 +45,7 @@ INCLUDE_DIRECTORIES(
         ${CMAKE_SOURCE_DIR}/plugin/keyring_vault
         ${CMAKE_SOURCE_DIR}/unittest/gunit
         ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring
+        ${OPENSSL_INCLUDE_DIR}
         ${WITH_CURL_INCLUDE}
 )
 

@@ -30,7 +30,7 @@ namespace keyring__vault_io_unittest
     {
 //      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
 //      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
-      correct_token = "b71548a2-470f-d576-2de0-f5e04b669535"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "474dbfc2-c687-2b35-e386-19c371b48e99"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -110,7 +110,11 @@ namespace keyring__vault_io_unittest
     std::remove(credential_file_url.c_str());
   }
 
-  TEST_F(Vault_io_test, InitWithInvalidVaultCA)
+  //TODO: Add intialization with invalid CA cert
+  //TODO: Add testcase without CA cert, but CA cert will be trusted by the machine
+   
+
+  TEST_F(Vault_io_test, InitWithNotExisitingVaultCA)
   {
     Vault_io vault_io(logger, vault_curl);
 
@@ -138,6 +142,38 @@ namespace keyring__vault_io_unittest
     std::remove(credential_file_url.c_str());
   }
 
+  TEST_F(Vault_io_test, InitWithOutVaultCA)
+  {
+    Vault_io vault_io(logger, vault_curl);
+
+    std::remove(credential_file_url.c_str());
+    std::ofstream my_file;
+    my_file.open(credential_file_url.c_str());
+    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
+    my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "token = " << correct_token << std::endl;
+    my_file.close();
+
+
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_WARNING_LEVEL, StrEq("There is no vault_ca specified in keyring_vault's configuration file. "
+                                  "Please make sure that Vault's CA certificate is trusted by the "
+                                  "machine from which you intend to connect to Vault.")));
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault.")));
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Curl returned this error code: 60 with error message : "
+                                "SSL certificate problem: unable to get local "
+                                "issuer certificate")));
+
+
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+
+    ISerialized_object *serialized_keys= NULL;
+    EXPECT_EQ(vault_io.get_serialized_object(&serialized_keys), TRUE);
+
+    std::remove(credential_file_url.c_str());
+  }
 
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeys)
   {

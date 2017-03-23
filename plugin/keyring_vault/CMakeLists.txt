@@ -13,15 +13,39 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+IF (NOT WITH_CURL_INCLUDE)
+    message("Not building keyring_vault, WITH_CURL_INCLUDE not specified")
+    RETURN()
+ENDIF()
+
+#IF (NOT WITH_CURL_LIB)
+    #message("Not building keyring_vault, WITH_CURL_LIB not specified")
+    #RETURN()
+#ENDIF()
+
+FIND_LIBRARY(CURL_LIBRARY
+        NAMES curl
+        HINTS ${WITH_CURL_LIB})
+
+IF (NOT CURL_LIBRARY)
+    message("Not building keyring_vault, could not find curl library")
+    RETURN()
+ENDIF()
+
+CHECK_INCLUDE_FILE_CXX(${WITH_CURL_INCLUDE}/curl.h HAVE_CURL_HEADERS)
+
 INCLUDE_DIRECTORIES(${BOOST_PATCHES_DIR})
 INCLUDE_DIRECTORIES(SYSTEM ${BOOST_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/plugin/keyring/common
-  /home/rob/curl/include)
+  ${WITH_CURL_INCLUDE})
 
 MYSQL_ADD_PLUGIN(keyring_vault
+                 ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
+                 ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
+                 ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_impl.cc
                  vault_io.cc
                  vault_key.cc
                  vault_parser.cc
@@ -30,6 +54,7 @@ MYSQL_ADD_PLUGIN(keyring_vault
                  vault_curl.cc
                  vault_credentials_parser.cc
                  vault_keyring.cc
+                 LINK_LIBRARIES  ${CURL_LIBRARY} ${SSL_LIBRARIES}
                  MODULE_ONLY
                  MODULE_OUTPUT_NAME "keyring_vault")
 

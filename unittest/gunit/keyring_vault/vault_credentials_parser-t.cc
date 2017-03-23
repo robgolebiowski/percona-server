@@ -185,16 +185,13 @@ namespace keyring__vault_credentials_parser_unittest
     my_file << "token = 123-123-123";
     my_file.close();
 
-    EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not read vault_ca from the configuration file.")));
     std::string file_url = "./credentials";
-
     Vault_credentials vault_credentials;
-    EXPECT_EQ(vault_credentials_parser.parse(&file_url, &vault_credentials), TRUE);
+    EXPECT_EQ(vault_credentials_parser.parse(&file_url, &vault_credentials), FALSE);
 
-    EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
-    EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
-    EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
+    EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
+    EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
+    EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
     EXPECT_EQ(vault_credentials["vault_ca"].empty(), TRUE);
 
     std::remove("./credentials");
