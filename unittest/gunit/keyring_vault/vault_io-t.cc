@@ -30,7 +30,7 @@ namespace keyring__vault_io_unittest
     {
 //      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
 //      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
-      correct_token = "a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "b71548a2-470f-d576-2de0-f5e04b669535"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -64,9 +64,10 @@ namespace keyring__vault_io_unittest
     std::ofstream my_file;
     my_file.open(credential_file_url.c_str());
 
-    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
-    my_file << "token = " << correct_token;
+    my_file << "token = " << correct_token << std::endl;
+    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
     my_file.close();
 
     credential_file_was_created = true;
@@ -91,9 +92,11 @@ namespace keyring__vault_io_unittest
     std::remove(credential_file_url.c_str());
     std::ofstream my_file;
     my_file.open(credential_file_url.c_str());
-    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
-    my_file << "token = 123-123-123";
+    my_file << "token = 123-123-123" << std::endl;
+    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
+    //my_file << "vault_ca = /home/rob/vault_certs";
     my_file.close();
 
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
@@ -106,6 +109,35 @@ namespace keyring__vault_io_unittest
 
     std::remove(credential_file_url.c_str());
   }
+
+  TEST_F(Vault_io_test, InitWithInvalidVaultCA)
+  {
+    Vault_io vault_io(logger, vault_curl);
+
+    std::remove(credential_file_url.c_str());
+    std::ofstream my_file;
+    my_file.open(credential_file_url.c_str());
+    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
+    my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "token = " << correct_token << std::endl;
+    my_file << "vault_ca = ./no_ca.crt";
+    my_file.close();
+
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault.")));
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Curl returned this error code: 77 with error message "
+                                ": error setting certificate verify locations:\n  CAfile: "
+                                "./no_ca.crt\n  CApath: none")));
+
+    ISerialized_object *serialized_keys= NULL;
+    EXPECT_EQ(vault_io.get_serialized_object(&serialized_keys), TRUE);
+
+    std::remove(credential_file_url.c_str());
+  }
+
 
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeys)
   {
@@ -132,12 +164,12 @@ namespace keyring__vault_io_unittest
     ASSERT_TRUE(serialized_keys != NULL);
     EXPECT_EQ(serialized_keys->has_next_key(), TRUE);
     serialized_keys->get_next_key(&key1_loaded);
-    EXPECT_STREQ(key1_loaded->get_key_signature()->c_str(), "4_key15_Arczi");
+    EXPECT_STREQ(key1_loaded->get_key_signature()->c_str(), "4_key25_Kamil");
     IKey *key2_loaded= NULL;
     delete key1_loaded;
     EXPECT_EQ(serialized_keys->has_next_key(), TRUE);
     serialized_keys->get_next_key(&key2_loaded);
-    EXPECT_STREQ(key2_loaded->get_key_signature()->c_str(), "4_key25_Kamil");
+    EXPECT_STREQ(key2_loaded->get_key_signature()->c_str(), "4_key15_Arczi");
     delete key2_loaded;
     EXPECT_EQ(serialized_keys->has_next_key(), FALSE);
     delete serialized_keys;

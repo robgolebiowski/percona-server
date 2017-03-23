@@ -2,21 +2,31 @@ IF(NOT GMOCK_FOUND)
     RETURN()
 ENDIF()
 
-IF (NOT WITH_CURL)
-    message("Not building keyring_vault, WITH_CURL not specified")
+IF (NOT WITH_CURL_INCLUDE)
+    message("Not building keyring_vault, WITH_CURL_INCLUDE not specified")
     RETURN()
 ENDIF()
 
+#IF (NOT WITH_CURL_LIB)
+    #message("Not building keyring_vault, WITH_CURL_LIB not specified")
+    #RETURN()
+#ENDIF()
+
+
 FIND_LIBRARY(CURL_LIBRARY
         NAMES curl
-        HINTS ${WITH_CURL}/lib)
+        HINTS ${WITH_CURL_LIB})
+
+FIND_LIBRARY(RTMP_LIBRARY
+        NAMES rtmp
+        HINTS ${WITH_CURL_LIB})
 
 IF (NOT CURL_LIBRARY)
     message("Not building keyring_vault, could not find curl library")
     RETURN()
 ENDIF()
 
-CHECK_INCLUDE_FILE_CXX(${WITH_CURL}/include/curl/curl.h HAVE_CURL_HEADERS)
+CHECK_INCLUDE_FILE_CXX(${WITH_CURL_INCLUDE}/curl.h HAVE_CURL_HEADERS)
 
 IF (NOT HAVE_CURL_HEADERS)
     message("Not building keyring_vault, could not find curl headers")
@@ -35,7 +45,7 @@ INCLUDE_DIRECTORIES(
         ${CMAKE_SOURCE_DIR}/plugin/keyring_vault
         ${CMAKE_SOURCE_DIR}/unittest/gunit
         ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring
-        ${WITH_CURL}/include
+        ${WITH_CURL_INCLUDE}
 )
 
 
@@ -115,7 +125,7 @@ SET(TESTS
         ADD_EXECUTABLE(${test}-t ${SRC_FILES})
 
         TARGET_LINK_LIBRARIES(${test}-t gunit_large strings dbug regex mysys sql)
-        TARGET_LINK_LIBRARIES(${test}-t sql binlog rpl master slave sql ${CURL_LIBRARY})
+        TARGET_LINK_LIBRARIES(${test}-t sql binlog rpl master slave sql ${CURL_LIBRARY} ${SSL_LIBRARIES})
 
         IF(WITH_PERFSCHEMA_STORAGE_ENGINE)
             TARGET_LINK_LIBRARIES(${test}-t perfschema)

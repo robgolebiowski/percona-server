@@ -21,6 +21,7 @@ namespace keyring
     {
       vault_credentials_in_progress.insert(std::make_pair("vault_url", ""));
       vault_credentials_in_progress.insert(std::make_pair("secret_mount_point", ""));
+      vault_credentials_in_progress.insert(std::make_pair("vault_ca", ""));
       vault_credentials_in_progress.insert(std::make_pair("token", ""));
     }
 

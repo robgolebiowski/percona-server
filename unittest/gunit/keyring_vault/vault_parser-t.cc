@@ -88,7 +88,7 @@ namespace keyring__vault_parser_unittest
     Vault_keys_list keys;
     Vault_parser vault_parser;
     EXPECT_EQ(vault_parser.parse_keys(&payload, &keys), FALSE);
-    EXPECT_EQ(keys.size(), 2);
+    EXPECT_EQ(keys.size(), static_cast<uint>(2));
     EXPECT_EQ(keys.has_next_key(), TRUE);
     IKey *key_loaded= NULL;
     EXPECT_EQ(keys.get_next_key(&key_loaded), FALSE);
@@ -99,13 +99,17 @@ namespace keyring__vault_parser_unittest
     EXPECT_EQ(keys.get_next_key(&key_loaded), FALSE);
     EXPECT_STREQ(key_loaded->get_key_signature()->c_str(), "4_key23_rob");
     EXPECT_EQ(keys.has_next_key(), FALSE);
+    delete key_loaded;
+    key_loaded = NULL;
   }
 
   TEST_F(Vault_parser_test, ParseKeyData)
   {
+    //Robi - encoded base64 = Um9iaQ==  
+
     std::string payload("{\"request_id\":\"77626d44-edbd-c82f-8220-c3c6b13ef2e1\","
                         "\"lease_id\":\"\",\"renewable\":false,\"lease_duration\""
-                        ":2764800,\"data\":{\"type\":\"AES\",\"value\":\"Robi\"},"
+                        ":2764800,\"data\":{\"type\":\"AES\",\"value\":\"Um9iaQ==\"},"
                         "\"wrap_info\":null,\"warnings\":null,\"auth\":null}");
 
     Vault_parser vault_parser;

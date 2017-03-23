@@ -26,7 +26,7 @@ std::string Vault_curl::get_error_from_curl(CURLcode curl_code)
   std::stringstream ss;
   if (curl_code != CURLE_OK)
   {
-    ss << " Curl returned this error code: " << curl_code;
+    ss << "Curl returned this error code: " << curl_code;
     ss << " with error message : ";
     if(len)
       ss << curl_errbuf;
@@ -47,6 +47,7 @@ my_bool Vault_curl::init(Vault_credentials *vault_credentials)
   }
   this->token_header = "X-Vault-Token:" + (*vault_credentials)["token"];
   this->vault_url = (*vault_credentials)["vault_url"] + "/v1/" + (*vault_credentials)["secret_mount_point"];
+  this->vault_ca = (*vault_credentials)["vault_ca"];
   return FALSE;
 }
 
@@ -68,7 +69,11 @@ my_bool Vault_curl::reset_curl_session()
       (curl_res = curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_response_memory)) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&read_data_ss)) != CURLE_OK ||
-      (curl_res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list)) != CURLE_OK)
+      (curl_res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_CAINFO, vault_ca.c_str())) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
     return TRUE;

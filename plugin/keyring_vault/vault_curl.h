@@ -49,6 +49,7 @@ protected:
   char curl_errbuf[CURL_ERROR_SIZE]; //error from CURL
   std::stringstream read_data_ss;
   struct curl_slist *list;
+  SecureString vault_ca;
 };
 
 }

@@ -43,7 +43,7 @@ namespace keyring__vault_keys_container_unittest
 //      remove(file_name.c_str());
 //      remove("./keyring.backup");
 
-      correct_token = "a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "b71548a2-470f-d576-2de0-f5e04b669535"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
@@ -82,9 +82,10 @@ namespace keyring__vault_keys_container_unittest
     std::ofstream my_file;
     my_file.open(credential_file_url.c_str());
 
-    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
-    my_file << "token = " << correct_token;
+    my_file << "token = " << correct_token << std::endl;
+    my_file << "vault_ca = ./vault_ca.crt";
     my_file.close();
 
     credential_file_was_created = true;
@@ -133,9 +134,10 @@ namespace keyring__vault_keys_container_unittest
     std::remove(credential_file_url.c_str());
     std::ofstream myfile;
     myfile.open(credential_file_url.c_str());
-    myfile << "vault_url = http://127.0.0.1:8200" << std::endl;
+    myfile << "vault_url = https://127.0.0.1:8200" << std::endl;
     myfile << "secret_mount_point = secret" << std::endl;
-    myfile << "token = What-a-pretty-token";
+    myfile << "token = What-a-pretty-token" << std::endl;
+    myfile << "vault_ca = ./vault_ca.crt";
     myfile.close();
 
     IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
@@ -866,7 +868,7 @@ namespace keyring__vault_keys_container_unittest
     EXPECT_CALL(*logger, log(MY_ERROR_LEVEL, StrEq("Error while loading keyring content. The keyring might be malformed")));
 
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), TRUE);
-    EXPECT_EQ(vault_keys_container->get_number_of_keys(), 0);
+    EXPECT_EQ(vault_keys_container->get_number_of_keys(), (unsigned int)0);
     delete logger;
     delete sample_key; //unused in this test
   }
@@ -897,7 +899,7 @@ namespace keyring__vault_keys_container_unittest
    }
 
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), TRUE);
-    EXPECT_EQ(vault_keys_container->get_number_of_keys(), 0);
+    EXPECT_EQ(vault_keys_container->get_number_of_keys(), static_cast<uint>(0));
     delete logger;
   }
 
@@ -922,7 +924,7 @@ namespace keyring__vault_keys_container_unittest
       EXPECT_CALL(*logger, log(MY_ERROR_LEVEL, StrEq("Error while loading keyring content. The keyring might be malformed")));
     }
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), TRUE);
-    EXPECT_EQ(vault_keys_container->get_number_of_keys(), 0);
+    EXPECT_EQ(vault_keys_container->get_number_of_keys(), static_cast<uint>(0));
     delete logger;
 //    delete invalid_key;
     delete sample_key; //unused in this test
@@ -964,7 +966,7 @@ namespace keyring__vault_keys_container_unittest
     vault_keys_container= new Vault_keys_container(logger);
     expect_calls_on_init();
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
-    EXPECT_EQ(vault_keys_container->get_number_of_keys(), 0);
+    EXPECT_EQ(vault_keys_container->get_number_of_keys(), static_cast<uint>(0));
     Mock_serializer *mock_serializer= new Mock_serializer;
 
 //    ISerialized_object *empty_serialized_object= new Vault_keys_list();
@@ -1288,7 +1290,7 @@ namespace keyring__vault_keys_container_unittest
     EXPECT_CALL(*vault_io, has_next_serialized_object()).WillOnce(Return(FALSE)); //just one key
 
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
-    EXPECT_EQ(vault_keys_container->get_number_of_keys(),1);
+    EXPECT_EQ(vault_keys_container->get_number_of_keys(), static_cast<uint>(1));
 
     Vault_key key_fetched("key1", NULL, "Robert", NULL, 0);
     ASSERT_TRUE(key_fetched.get_key_data() == NULL);
@@ -1328,7 +1330,7 @@ namespace keyring__vault_keys_container_unittest
     EXPECT_CALL(*vault_io, has_next_serialized_object()).WillOnce(Return(FALSE)); //just one key
 
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
-    EXPECT_EQ(vault_keys_container->get_number_of_keys(),1);
+    EXPECT_EQ(vault_keys_container->get_number_of_keys(), static_cast<uint>(1));
 
     Vault_key key_to_fetch("key1", NULL, "Robert", NULL, 0);
     ASSERT_TRUE(key_to_fetch.get_key_data() == NULL);
@@ -1348,12 +1350,18 @@ namespace keyring__vault_keys_container_unittest
     
     //When we call fetch_key for the 2nd time - key's data and type should be already cached
     //thus the second call should not call retrieve_key_type_and_value
-    Vault_key key_to_fetch2("key2", NULL, "Robert", NULL, 0);
+    Vault_key key_to_re_fetch("key1", NULL, "Robert", NULL, 0);
     EXPECT_CALL(*vault_io, retrieve_key_type_and_value(_)).Times(0);
-    key_fetched_from_keyring = vault_keys_container->fetch_key(&key_to_fetch2);
+    key_fetched_from_keyring = vault_keys_container->fetch_key(&key_to_re_fetch);
+
+    ASSERT_TRUE(key_fetched_from_keyring != NULL);
+    std::string expected_key_signature= "4_key16_Robert";
+    EXPECT_STREQ(key_fetched_from_keyring->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(memcmp("ab", reinterpret_cast<const char*>(key_fetched_from_keyring->get_key_data()),
+                     key_fetched_from_keyring->get_key_data_size()), 0);
 
     my_free(key_to_fetch.release_key_data());
-    my_free(key_to_fetch2.release_key_data());
+    my_free(key_to_re_fetch.release_key_data());
     delete logger;
     delete sample_key; //unused in this test
   }

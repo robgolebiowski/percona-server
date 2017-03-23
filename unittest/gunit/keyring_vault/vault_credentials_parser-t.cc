@@ -52,6 +52,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_ca"].empty(), TRUE);
 
     ASSERT_TRUE(token.empty());
   }
@@ -76,6 +77,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_ca"].empty(), TRUE);
     std::remove("./credentials");
   }
 
@@ -90,7 +92,8 @@ namespace keyring__vault_credentials_parser_unittest
     my_file.open("./credentials");
     my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
     //my_file << "secret_mount_point = secret";
-    my_file << "token = 123-123-123";
+    my_file << "token = 123-123-123" << std::endl;
+    my_file << "vault_ca = /some/path";
     my_file.close();
 
     EXPECT_CALL(*((Mock_logger *)logger),
@@ -103,6 +106,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_ca"].empty(), TRUE);
 
     std::remove("./credentials");
   }
@@ -118,7 +122,8 @@ namespace keyring__vault_credentials_parser_unittest
     my_file.open("./credentials");
     //my_file << "vault_url = http://127.0.0.1:8200";
     my_file << "secret_mount_point = secret" << std::endl;
-    my_file << "token = 123-123-123";
+    my_file << "token = 123-123-123" << std::endl;
+    my_file << "vault_ca = /some/path";
     my_file.close();
 
     EXPECT_CALL(*((Mock_logger *)logger),
@@ -131,6 +136,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_ca"].empty(), TRUE);
 
     std::remove("./credentials");
   }
@@ -146,6 +152,7 @@ namespace keyring__vault_credentials_parser_unittest
     my_file.open("./credentials");
     my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "vault_ca = /some/path";
     //my_file << "token = 123-123-123";
     my_file.close();
 
@@ -159,11 +166,12 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
     EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_ca"].empty(), TRUE);
 
     std::remove("./credentials");
   }
 
-  TEST_F(Vault_credentials_parser_test, ParseFileWithCorrectCredentials)
+  TEST_F(Vault_credentials_parser_test, ParseFileWithoutVaultCA)
   {
     Vault_credentials_parser vault_credentials_parser(logger);
     std::string token;
@@ -177,6 +185,37 @@ namespace keyring__vault_credentials_parser_unittest
     my_file << "token = 123-123-123";
     my_file.close();
 
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Could not read vault_ca from the configuration file.")));
+    std::string file_url = "./credentials";
+
+    Vault_credentials vault_credentials;
+    EXPECT_EQ(vault_credentials_parser.parse(&file_url, &vault_credentials), TRUE);
+
+    EXPECT_EQ(vault_credentials["vault_url"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["token"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["secret_mount_point"].empty(), TRUE);
+    EXPECT_EQ(vault_credentials["vault_ca"].empty(), TRUE);
+
+    std::remove("./credentials");
+  }
+
+
+  TEST_F(Vault_credentials_parser_test, ParseFileWithCorrectCredentials)
+  {
+    Vault_credentials_parser vault_credentials_parser(logger);
+    std::string token;
+
+    //create empty credentials file
+    std::remove("./credentials");
+    std::ofstream my_file;
+    my_file.open("./credentials");
+    my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
+    my_file << "secret_mount_point = secret" << std::endl;
+    my_file << "token = 123-123-123" << std::endl;
+    my_file << "vault_ca = /some/path";
+    my_file.close();
+
     std::string file_url = "./credentials";
     Vault_credentials vault_credentials;
     EXPECT_EQ(vault_credentials_parser.parse(&file_url, &vault_credentials), FALSE);
@@ -184,6 +223,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
     EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
     EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
+    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/path");
 
     std::remove("./credentials");
   }
@@ -199,7 +239,8 @@ namespace keyring__vault_credentials_parser_unittest
     my_file.open("./credentials");
     my_file << "vault_url =http://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point=secret" << std::endl;
-    my_file << "token = 123-123-123";
+    my_file << "token = 123-123-123" << std::endl;
+    my_file << "vault_ca = /some/path";
     my_file.close();
 
     std::string file_url = "./credentials";
@@ -209,6 +250,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
     EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
     EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
+    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/path");
 
     std::remove("./credentials");
   }
@@ -224,7 +266,8 @@ namespace keyring__vault_credentials_parser_unittest
     my_file.open("./credentials");
     my_file << "vault_url =http://127.0.0.1:8200 " << std::endl;
     my_file << "secret_mount_point=secret " << std::endl;
-    my_file << "token = 123-123-123 ";
+    my_file << "token = 123-123-123 " << std::endl;
+    my_file << "vault_ca = /some/path ";
     my_file.close();
 
     std::string file_url = "./credentials";
@@ -234,6 +277,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
     EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
     EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
+    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/path");
 
     std::remove("./credentials");
   }
@@ -249,7 +293,8 @@ namespace keyring__vault_credentials_parser_unittest
     my_file.open("./credentials");
     my_file << "vault_url =http: //127 .0.0.1: 8200 " << std::endl;
     my_file << "secret_mount_point= s-e c-r -e t " << std::endl;
-    my_file << "token = 12000 3-10  23- 123 ";
+    my_file << "token = 12000 3-10  23- 123 " << std::endl;
+    my_file << "vault_ca = /some/  path";
     my_file.close();
 
     std::string file_url = "./credentials";
@@ -259,6 +304,7 @@ namespace keyring__vault_credentials_parser_unittest
     EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http: //127 .0.0.1: 8200");
     EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "s-e c-r -e t");
     EXPECT_STREQ(vault_credentials["token"].c_str(), "12000 3-10  23- 123");
+    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/  path");
 
     std::remove("./credentials");
   }

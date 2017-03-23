@@ -14,7 +14,8 @@ namespace keyring
     template<class U> struct rebind { typedef Secure_allocator<U> other; };
     Secure_allocator() throw() {}
     //TODO: Add alocating memory with keyring malloc
-    Secure_allocator(const Secure_allocator&) throw() {}
+    Secure_allocator(const Secure_allocator& secure_allocator) : std::allocator<T>(secure_allocator)
+       {}
     template <class U> Secure_allocator(const Secure_allocator<U>&) throw() {}
 
     void deallocate(T *p, size_t n)
