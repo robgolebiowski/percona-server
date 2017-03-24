@@ -144,7 +144,7 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
         " can be created in the specified location. "
         "The keyring_file will stay unusable until correct path to the keyring file "
         "gets provided");
-      return TRUE; //TODO: is this correct ? I have changed it to TRUE
+      return FALSE; //TODO: is this correct ? I have changed it to TRUE
     }
     is_keys_container_initialized = TRUE;
     return FALSE;
@@ -158,7 +158,7 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
   }
 }
 
-int keyring_deinit(void *arg MY_ATTRIBUTE((unused)))
+int keyring_vault_deinit(void *arg MY_ATTRIBUTE((unused)))
 {
   //not taking a lock here as the calls to keyring_deinit are serialized by
   //the plugin framework
@@ -241,7 +241,7 @@ mysql_declare_plugin(keyring_vault)
   "store/fetch authentication data to/from a flat file",  /*   description                     */
   PLUGIN_LICENSE_GPL,
   keyring_vault_init,                                     /*   init function (when loaded)     */
-  keyring_deinit,                                         /*   deinit function (when unloaded) */
+  keyring_vault_deinit,                                         /*   deinit function (when unloaded) */
   0x0100,                                                 /*   version                         */
   NULL,                                                   /*   status variables                */
   keyring_vault_system_variables,                         /*   system variables                */

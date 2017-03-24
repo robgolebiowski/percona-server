@@ -95,7 +95,7 @@ namespace keyring__api_unittest
 
   void Keyring_vault_api_test::keyring_deinit_with_mock_logger()
   {
-    keyring_deinit(NULL);
+    keyring_vault_deinit(NULL);
   }
 
   TEST_F(Keyring_vault_api_test, StoreFetchRemove)

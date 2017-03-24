@@ -1,0 +1,71 @@
+# WL5769
+# Keyring_file plugin and keyring_vault_config variable testing.
+
+--disable_ps_protocol
+--disable_warnings
+--source include/not_embedded.inc
+
+call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'Could not open file with credentials.'");
+call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'Could not read secret_mount_point from the configuration file.'");
+#TODO: Should not keyring_vault also reported that a given file is missing ?
+call mtr.add_suppression("\\[Error\\] Function 'keyring_vault' already exists");
+call mtr.add_suppression("\\[Error\\] Couldn't load plugin named 'keyring_vault' with soname 'keyring_vault.so'.");
+call mtr.add_suppression("keyring_vault_config cannot be set to new value as the keyring file cannot be created/accessed in the provided path");
+call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'keyring_file initialization failure.");
+call mtr.add_suppression("Plugin keyring_vault reported: 'Could not create keyring directory The keyring_vault will stay unusable until correct path to the keyring directory gets provided");
+call mtr.add_suppression("Error while loading keyring content. The keyring might be malformed");
+call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File .*/keyring' not found .*");
+call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File 'MYSQL_test_invalid/dir/' not found .*");
+call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File '/' not found .*");
+
+# Installing keyring plugin.
+--replace_regex /\.dll/.so/
+eval INSTALL PLUGIN keyring_vault SONAME '$KEYRING_VAULT_PLUGIN';
+# Check keyring plugin
+query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
+FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
+--echo
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+eval SET @@global.keyring_vault_config= '/home/rob/vault/keyring_vault.conf';
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+SELECT @@global.keyring_vault_config;
+# Creating table with encryption.
+CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="Y" ENGINE = InnoDB;
+
+# Setting keyring_vault_config value to file.
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+eval SET @@global.keyring_vault_config= '/home/rob/vault/keyring_vault2.conf';
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+SELECT @@global.keyring_vault_config;
+
+# Invalid values
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.keyring_vault_config='';
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.keyring_vault_config='#^$^@E&(';
+--error ER_WRONG_TYPE_FOR_VAR
+SET @@global.keyring_vault_config=1;
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.keyring_vault_config='/';
+--error ER_WRONG_VALUE_FOR_VAR
+--error ER_GLOBAL_VARIABLE
+SET @@session.keyring_vault_config= '$MYSQL_TMP_DIR/new_keyring_vault_config';
+--error ER_GLOBAL_VARIABLE
+SET @@local.keyring_vault_config= '$MYSQL_TMP_DIR/new_keyring_vault_config';
+
+# Setting keyring_vault_config value to dir.
+--Error ER_WRONG_VALUE_FOR_VAR
+SET @@global.keyring_vault_config= 'MYSQL_test_invalid/dir/';
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+SELECT @@global.keyring_vault_config;
+--echo
+
+UNINSTALL PLUGIN keyring_vault;
+# Check keyring plugin
+query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
+FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
+
+# Cleanup
+DROP TABLE t1;
+--echo
+--echo #End:
