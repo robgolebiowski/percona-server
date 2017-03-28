@@ -43,12 +43,13 @@ namespace keyring__vault_keys_container_unittest
 //      remove(file_name.c_str());
 //      remove("./keyring.backup");
 
-      correct_token = "474dbfc2-c687-2b35-e386-19c371b48e99"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "013c9463-2dac-f71c-b29b-2f285a33cac7"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
       vault_keys_container= new Vault_keys_container(logger);
       vault_curl = new Vault_curl(logger);
+      vault_parser = new Vault_parser(logger);
     }
     virtual void TearDown()
     {
@@ -68,6 +69,7 @@ namespace keyring__vault_keys_container_unittest
     Vault_keys_container *vault_keys_container;
     ILogger *logger;
     IVault_curl *vault_curl;
+    IVault_parser *vault_parser;
     std::string correct_token;
     std::string credential_file_url;
     bool credential_file_was_created;
@@ -122,7 +124,7 @@ namespace keyring__vault_keys_container_unittest
   TEST_F(Vault_keys_container_test, InitWithCorrectCredential)
   {
     create_credentials_file_with_correct_token();
-    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
     delete sample_key; //unused in this test
   }
@@ -140,7 +142,7 @@ namespace keyring__vault_keys_container_unittest
     myfile << "vault_ca = ./vault_ca.crt";
     myfile.close();
 
-    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl, vault_parser);
 
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault. "
@@ -160,7 +162,7 @@ namespace keyring__vault_keys_container_unittest
     myfile.open(credential_file_url.c_str());
     myfile.close();
 
-    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl, vault_parser);
 
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read secret_mount_point from the configuration file.")));
@@ -188,7 +190,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *vault_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *vault_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -216,7 +218,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     Key key_id("Roberts_key", NULL, "Robert",NULL,0);
     IKey* fetched_key= vault_keys_container->fetch_key(&key_id);
@@ -228,7 +230,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     Key key_id("Roberts_key", "AES", "Robert",NULL,0);
     ASSERT_TRUE(vault_keys_container->remove_key(&key_id) == TRUE);
@@ -239,7 +241,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -256,7 +258,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -274,7 +276,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), FALSE);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -322,7 +324,7 @@ namespace keyring__vault_keys_container_unittest
   {
     create_credentials_file_with_correct_token();
 
-    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl);
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
@@ -1366,7 +1368,16 @@ namespace keyring__vault_keys_container_unittest
     delete sample_key; //unused in this test
   }
 
+  class Mock_vault_parser : public IVault_parser
+  {
+  public:
+    MOCK_METHOD2(parse_keys, my_bool(std::string *payload, Vault_keys_list *keys));
+    MOCK_METHOD2(parse_key_data, my_bool(std::string *payload, IKey *key));
+    MOCK_METHOD2(parse_key_signature, my_bool(const std::string *key_signature, std::string key_parameters[2]));
+    MOCK_METHOD2(parse_errors, my_bool(std::string *payload, std::string *errors));
+  };
 
+ 
 /*  int main(int argc, char **argv) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     ::testing::InitGoogleTest(&argc, argv);

@@ -104,13 +104,13 @@ my_bool Vault_curl::list_keys(std::string *response)
                 get_error_from_curl(curl_res).c_str());
     return TRUE;
   }
-
   if (http_code == 404)
+  {
     *response=""; //no keys found
-  else
-    *response = read_data_ss.str();
-
-  return FALSE;
+    return FALSE; 
+  }
+  *response = read_data_ss.str();
+  return http_code != 200 && http_code != 202; //200 and 202 are success return code
 }
 
 my_bool Vault_curl::write_key(IKey *key, std::string *response)

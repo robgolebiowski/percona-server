@@ -22,6 +22,8 @@ Vault_io::~Vault_io()
 {
   if(vault_curl != NULL)
     delete vault_curl;
+  if(vault_parser != NULL)
+    delete vault_parser;
 }
 
 std::string Vault_io::get_errors_from_response(std::string *json_response)
@@ -30,7 +32,7 @@ std::string Vault_io::get_errors_from_response(std::string *json_response)
     return "";
 
   std::string errors_from_response, err_msg;
-  if(vault_parser.parse_errors(json_response, &errors_from_response))
+  if(vault_parser->parse_errors(json_response, &errors_from_response))
     err_msg = " Error while parsing error messages";
   else if (errors_from_response.size()) //we found error in response
     err_msg = " Vault has returned the following error(s): " +
@@ -46,7 +48,8 @@ my_bool Vault_io::get_serialized_object(ISerialized_object **serialized_object)
 
   if(vault_curl->list_keys(&json_response))
   {
-    logger->log(MY_ERROR_LEVEL, err_msg.c_str());
+    logger->log(MY_ERROR_LEVEL, (err_msg +
+                get_errors_from_response(&json_response)).c_str());
     return TRUE;
   }
 
@@ -56,10 +59,9 @@ my_bool Vault_io::get_serialized_object(ISerialized_object **serialized_object)
     return FALSE;
   }
   Vault_keys_list *keys = new Vault_keys_list();
-  if (vault_parser.parse_keys(&json_response, keys))
+  if (vault_parser->parse_keys(&json_response, keys))
   {
-    logger->log(MY_ERROR_LEVEL, (err_msg +
-                get_errors_from_response(&json_response)).c_str());
+    logger->log(MY_ERROR_LEVEL, err_msg.c_str());
     delete keys;
     return TRUE;
   }
@@ -77,9 +79,9 @@ my_bool Vault_io::retrieve_key_type_and_value(IKey *key) //TODO:Change value to 
 {
   std::string json_response;
   if(vault_curl->read_key(key, &json_response) ||
-     vault_parser.parse_key_data(&json_response, key))
+     vault_parser->parse_key_data(&json_response, key))
   {
-    logger->log(MY_ERROR_LEVEL, ("Could not read key from Vault" +
+    logger->log(MY_ERROR_LEVEL, ("Could not read key from Vault." +
                 get_errors_from_response(&json_response)).c_str());
     return TRUE;
   }
@@ -98,7 +100,7 @@ my_bool Vault_io::write_key(IKey *key)
      !((errors_from_response =
       get_errors_from_response(&json_response)).empty()))
  {
-    errors_from_response.insert(0, "Could not write key to Vault");
+    errors_from_response.insert(0, "Could not write key to Vault.");
     logger->log(MY_ERROR_LEVEL, errors_from_response.c_str());
     //logger->log(MY_ERROR_LEVEL, "lalala");
 
@@ -116,7 +118,7 @@ my_bool Vault_io::delete_key(IKey *key)
      !((errors_from_response =
       get_errors_from_response(&json_response)).empty()))
   {
-    logger->log(MY_ERROR_LEVEL, ("Could not delete key from Vault" +
+    logger->log(MY_ERROR_LEVEL, ("Could not delete key from Vault." +
                 errors_from_response).c_str());
     return TRUE;
   }

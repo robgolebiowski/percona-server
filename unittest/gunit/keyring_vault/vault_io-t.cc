@@ -30,11 +30,12 @@ namespace keyring__vault_io_unittest
     {
 //      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
 //      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
-      correct_token = "474dbfc2-c687-2b35-e386-19c371b48e99"; //maybe this could be passed as a parameter to unit test ?
+      correct_token = "013c9463-2dac-f71c-b29b-2f285a33cac7"; //maybe this could be passed as a parameter to unit test ?
       credential_file_url = "./credentials";
       credential_file_was_created = false;
       logger= new Mock_logger();
       vault_curl = new Vault_curl(logger);
+      vault_parser = new Vault_parser(logger);
     }
 
     virtual void TearDown()
@@ -53,6 +54,7 @@ namespace keyring__vault_io_unittest
 //    st_plugin_int fake_mysql_plugin;
     ILogger *logger;
     IVault_curl *vault_curl;
+    IVault_parser *vault_parser;
     std::string correct_token;
     std::string credential_file_url;
     bool credential_file_was_created;
@@ -76,7 +78,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, InitWithNotExisitingCredentialFile)
   {
     std::string credential_file_name("./some_funny_name");
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
     remove(credential_file_name.c_str());
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not open file with credentials.")));
@@ -87,7 +89,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, InitWithInvalidToken)
   {
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
 
     std::remove(credential_file_url.c_str());
     std::ofstream my_file;
@@ -113,10 +115,10 @@ namespace keyring__vault_io_unittest
   //TODO: Add intialization with invalid CA cert
   //TODO: Add testcase without CA cert, but CA cert will be trusted by the machine
    
-
+/*
   TEST_F(Vault_io_test, InitWithNotExisitingVaultCA)
   {
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
 
     std::remove(credential_file_url.c_str());
     std::ofstream my_file;
@@ -144,7 +146,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, InitWithOutVaultCA)
   {
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
 
     std::remove(credential_file_url.c_str());
     std::ofstream my_file;
@@ -173,11 +175,11 @@ namespace keyring__vault_io_unittest
     EXPECT_EQ(vault_io.get_serialized_object(&serialized_keys), TRUE);
 
     std::remove(credential_file_url.c_str());
-  }
+  }*/
 
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeys)
   {
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
@@ -221,7 +223,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeysWithDifferentVaultIO)
   {
-    Vault_io vault_io_for_storing(logger, vault_curl);
+    Vault_io vault_io_for_storing(logger, vault_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_EQ(vault_io_for_storing.init(&credential_file_url), FALSE);
@@ -239,7 +241,8 @@ namespace keyring__vault_io_unittest
 
     //Now fetch two keys with separate Vault_io
     Vault_curl *vault_curl2 = new Vault_curl(logger);
-    Vault_io vault_io_for_fetching(logger, vault_curl2);
+    Vault_parser *vault_parser2 = new Vault_parser(logger);
+    Vault_io vault_io_for_fetching(logger, vault_curl2, vault_parser2);
     EXPECT_EQ(vault_io_for_fetching.init(&credential_file_url), FALSE);
 
     ISerialized_object *serialized_keys= NULL;
@@ -269,7 +272,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, RetrieveKeyTypeAndValue)
   {
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
     create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -290,7 +293,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, FlushAndRemoveSingleKey)
   {
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
     create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
     Vault_key key("key1", "AES", "rob", "Robi", 4);
@@ -303,7 +306,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, FlushKeyRetrieveDeleteInit)
   {
-    Vault_io vault_io(logger, vault_curl);
+    Vault_io vault_io(logger, vault_curl, vault_parser);
     create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
     Vault_key key("key1", "AES", "rob", "Robi", 4);
@@ -320,7 +323,8 @@ namespace keyring__vault_io_unittest
     EXPECT_EQ(vault_io.flush_to_storage(&key_to_remove), FALSE);
 
     Vault_curl *vault_curl2 = new Vault_curl(logger);
-    Vault_io vault_io2(logger, vault_curl2); //do I need this ?
+    Vault_parser *vault_parser2 = new Vault_parser(logger);
+    Vault_io vault_io2(logger, vault_curl2, vault_parser2);
     EXPECT_EQ(vault_io2.init(&credential_file_url), FALSE);
     ISerialized_object *serialized_keys= NULL;
     EXPECT_EQ(vault_io2.get_serialized_object(&serialized_keys), FALSE);
@@ -340,7 +344,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorFromVaultCurlOnVaultIOInit)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -351,7 +355,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorFromVaultCurlOnListKeys)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -372,7 +376,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsResponseOnListKeys)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -383,7 +387,7 @@ namespace keyring__vault_io_unittest
     std::string vault_response("{ errors: [\"list is broken\"] }"); 
 
     EXPECT_CALL(*mock_curl, list_keys(_))
-      .WillOnce(DoAll(SetArgPointee<0>(vault_response), Return(FALSE)));
+      .WillOnce(DoAll(SetArgPointee<0>(vault_response), Return(TRUE)));
       
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault. Vault has returned the following error(s): [\"list is broken\"]")));
@@ -394,7 +398,7 @@ namespace keyring__vault_io_unittest
     vault_response = "{errors: [\"list is broken\", \"and some other error\"]}"; 
 
     EXPECT_CALL(*mock_curl, list_keys(_))
-      .WillOnce(DoAll(SetArgPointee<0>(vault_response), Return(FALSE)));
+      .WillOnce(DoAll(SetArgPointee<0>(vault_response), Return(TRUE)));
       
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault. Vault has returned the following error(s): [\"list is broken\", \"and some other error\"]")));
@@ -405,7 +409,7 @@ namespace keyring__vault_io_unittest
     vault_response = "{ errors: [\"list is broken\",\n\"and some other error\"\n] }"; 
 
     EXPECT_CALL(*mock_curl, list_keys(_))
-      .WillOnce(DoAll(SetArgPointee<0>(vault_response), Return(FALSE)));
+      .WillOnce(DoAll(SetArgPointee<0>(vault_response), Return(TRUE)));
       
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault. Vault has returned the following error(s): [\"list is broken\",\"and some other error\"]")));
@@ -417,7 +421,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnReadKey)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -429,14 +433,14 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*mock_curl, read_key(key, _))
       .WillOnce(Return(TRUE));
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault")));
+      log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault.")));
     EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnReadKey)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -447,9 +451,9 @@ namespace keyring__vault_io_unittest
     std::string vault_response("{ errors: [\"Cannot read this stuff\"] }"); 
 
     EXPECT_CALL(*mock_curl, read_key(key, _))
-      .WillOnce(DoAll(SetArgPointee<1>(vault_response), Return(FALSE)));
+      .WillOnce(DoAll(SetArgPointee<1>(vault_response), Return(TRUE)));
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault Vault has returned the following error(s):"
+      log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault. Vault has returned the following error(s):"
                                 " [\"Cannot read this stuff\"]")));
     EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
   }
@@ -457,7 +461,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnDeleteKey)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -470,7 +474,7 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*mock_curl, delete_key(_,_))
       .WillOnce(Return(TRUE));
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not delete key from Vault")));
+      log(MY_ERROR_LEVEL, StrEq("Could not delete key from Vault.")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
 
     //delete mock_curl;
@@ -479,7 +483,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnDeleteKey)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -493,7 +497,7 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*mock_curl, delete_key(_, _))
       .WillOnce(DoAll(SetArgPointee<1>(vault_response), Return(FALSE)));
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not delete key from Vault Vault has returned the following error(s):"
+      log(MY_ERROR_LEVEL, StrEq("Could not delete key from Vault. Vault has returned the following error(s):"
                                 " [\"Cannot delete this stuff\"]")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
   }
@@ -501,7 +505,7 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnWriteKey)
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -514,14 +518,14 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*mock_curl, write_key(_,_))
       .WillOnce(Return(TRUE));
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not write key to Vault")));
+      log(MY_ERROR_LEVEL, StrEq("Could not write key to Vault.")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
   }
 
-  TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnWriteKey)
+  TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnWriteKey) //TODO: I think I should add delete vault_curl at the beginning
   {
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
-    Vault_io vault_io(logger, mock_curl);
+    Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
@@ -536,10 +540,113 @@ namespace keyring__vault_io_unittest
       .WillOnce(DoAll(SetArgPointee<1>(vault_response), Return(FALSE)));
     //TODO: Add dot after Vault (before 2nd Vault)
     EXPECT_CALL(*((Mock_logger *)logger),
-      log(MY_ERROR_LEVEL, StrEq("Could not write key to Vault Vault has returned the following error(s):"
+      log(MY_ERROR_LEVEL, StrEq("Could not write key to Vault. Vault has returned the following error(s):"
                                 " [\"Cannot write this stuff\"]")));
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
   }
+
+  class Mock_vault_parser : public IVault_parser
+  {
+  public:
+    MOCK_METHOD2(parse_keys, my_bool(std::string *payload, Vault_keys_list *keys));
+    MOCK_METHOD2(parse_key_data, my_bool(std::string *payload, IKey *key));
+    MOCK_METHOD2(parse_key_signature, my_bool(const std::string *key_signature, std::string key_parameters[2]));
+    MOCK_METHOD2(parse_errors, my_bool(std::string *payload, std::string *errors));
+  };
+
+  TEST_F(Vault_io_test, ErrorFromParseKeysOnGetSerializedObject)
+  {
+    delete vault_parser;
+    Mock_vault_parser *mock_vault_parser = new Mock_vault_parser;
+  
+    Vault_io vault_io(logger, vault_curl, mock_vault_parser);
+    create_credentials_file_with_correct_token();
+
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+
+    //First Add Two keys into Vault
+    Vault_key key1("key1", "AES", "Arczi", "Artur", 5);
+    EXPECT_STREQ(key1.get_key_signature()->c_str(), "4_key15_Arczi");
+    key1.set_key_operation(STORE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key1), FALSE);
+    Vault_key key2("key2", "AES", "Kamil", "Kami", 4);
+    EXPECT_STREQ(key2.get_key_signature()->c_str(), "4_key25_Kamil");
+    key2.set_key_operation(STORE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key2), FALSE);
+    //*****
+
+    EXPECT_CALL(*mock_vault_parser, parse_keys(_, _))
+      .WillOnce(Return(TRUE));
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault.")));
+
+    ISerialized_object *serialized_keys= NULL;
+    EXPECT_EQ(vault_io.get_serialized_object(&serialized_keys), TRUE);
+
+    ASSERT_TRUE(serialized_keys == NULL);
+
+    //Now remove the keys
+    Vault_key key1_to_remove(key1);
+    key1_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key1_to_remove), FALSE);
+    Vault_key key2_to_remove(key2);
+    key2_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key2_to_remove), FALSE);
+  }
+
+  TEST_F(Vault_io_test, ErrorFromParseKeyDataOnRetrieveKeyTypeAndValue)
+  {
+    delete vault_parser;
+    Mock_vault_parser *mock_vault_parser = new Mock_vault_parser;
+    Vault_io vault_io(logger, vault_curl, mock_vault_parser);
+    create_credentials_file_with_correct_token();
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+
+    Vault_key key_to_store("key1", "AES", "rob", "Robi", 4);
+    key_to_store.set_key_operation(STORE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_store), FALSE);
+
+    Vault_key key("key1", NULL, "rob", NULL, 0);
+    EXPECT_CALL(*mock_vault_parser, parse_key_data(_, &key))
+      .WillOnce(Return(TRUE));
+    EXPECT_CALL(*mock_vault_parser, parse_errors(_, _))
+      .WillOnce(Return(FALSE));
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault.")));
+    EXPECT_EQ(vault_io.retrieve_key_type_and_value(&key), TRUE);
+
+    Vault_key key_to_remove("key1", NULL, "rob", NULL, 0);
+    key_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_remove), FALSE);
+  }
+
+  TEST_F(Vault_io_test, ErrorFromParseKeyDataAndParseErrorsOnRetrieveKeyTypeAndValue)
+  {
+    delete vault_parser;
+    Mock_vault_parser *mock_vault_parser = new Mock_vault_parser;
+    Vault_io vault_io(logger, vault_curl, mock_vault_parser);
+    create_credentials_file_with_correct_token();
+    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+
+    Vault_key key_to_store("key1", "AES", "rob", "Robi", 4);
+    key_to_store.set_key_operation(STORE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_store), FALSE);
+
+    Vault_key key("key1", NULL, "rob", NULL, 0);
+    EXPECT_CALL(*mock_vault_parser, parse_key_data(_, &key))
+      .WillOnce(Return(TRUE));
+    EXPECT_CALL(*mock_vault_parser, parse_errors(_, _))
+      .WillOnce(Return(TRUE));
+    EXPECT_CALL(*((Mock_logger *)logger),
+      log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault. Error while parsing error messages")));
+    EXPECT_EQ(vault_io.retrieve_key_type_and_value(&key), TRUE);
+
+    Vault_key key_to_remove("key1", NULL, "rob", NULL, 0);
+    key_to_remove.set_key_operation(REMOVE_KEY);
+    EXPECT_EQ(vault_io.flush_to_storage(&key_to_remove), FALSE);
+  }
+
+
 
 } //namespace keyring__file_io_unittest
 

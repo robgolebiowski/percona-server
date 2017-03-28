@@ -5,6 +5,7 @@
 #include "keyring.h"
 //#include "buffered_file_io.h"
 #include "vault_keys_container.h"
+#include "vault_parser.h"
 #include "vault_io.h"
 
 #ifdef _WIN32
@@ -16,6 +17,8 @@
 //using keyring::Buffered_file_io;
 //using keyring::Keys_container;
 using keyring::IVault_curl;
+using keyring::IVault_parser;
+using keyring::Vault_parser;
 using keyring::Vault_io;
 using keyring::Vault_keys_container;
 using keyring::Vault_curl;
@@ -71,7 +74,8 @@ int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
   try
   {
     IVault_curl *vault_curl = new Vault_curl(logger.get());
-    IKeyring_io *keyring_io(new Vault_io(logger.get(), vault_curl));
+    IVault_parser *vault_parser = new Vault_parser(logger.get());
+    IKeyring_io *keyring_io(new Vault_io(logger.get(), vault_curl, vault_parser));
     if (new_keys->init(keyring_io, keyring_filename))
     {
       mysql_rwlock_unlock(&LOCK_keyring);
@@ -134,7 +138,8 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
     }*/
     keys.reset(new Vault_keys_container(logger.get()));
     IVault_curl *vault_curl = new Vault_curl(logger.get());
-    IKeyring_io *keyring_io= new Vault_io(logger.get(), vault_curl);
+    IVault_parser *vault_parser = new Vault_parser(logger.get());
+    IKeyring_io *keyring_io= new Vault_io(logger.get(), vault_curl, vault_parser);
     if (keys->init(keyring_io, keyring_vault_cred_file))
     {
       is_keys_container_initialized = FALSE;

@@ -15,9 +15,11 @@ namespace keyring {
 class Vault_io : public IVault_io
 {
 public:
-  Vault_io(ILogger *logger, IVault_curl *vault_curl)
+  Vault_io(ILogger *logger, IVault_curl *vault_curl,
+           IVault_parser *vault_parser)
     : logger(logger)
     , vault_curl(vault_curl)
+    , vault_parser(vault_parser)
   {}
 
   ~Vault_io();
@@ -45,8 +47,8 @@ protected:
   //my_bool check_for_errors_in_response_and_log(std::string *json_response);
 
   ILogger *logger;
-  Vault_parser vault_parser;
   IVault_curl *vault_curl;
+  IVault_parser *vault_parser;
   Vault_key_serializer vault_key_serializer;
 };
 
