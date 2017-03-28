@@ -1,7 +1,8 @@
 call mtr.add_suppression("Skip re-populating collations and character sets tables in InnoDB read-only mode.");
 CREATE TABLE t1 (a INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
-# restart:--innodb-read-only
+SET GLOBAL innodb_fast_shutdown = 0;
+# restart: --innodb-read-only
 ANALYZE TABLE t1;
 Table	Op	Msg_type	Msg_text
 test.t1	analyze	Warning	InnoDB: Running in read-only mode
