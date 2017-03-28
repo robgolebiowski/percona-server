@@ -7,7 +7,27 @@
 
 namespace keyring {
 
+my_bool Vault_key::get_next_key(IKey **key)
+{
+  if (was_key_retrieved)
+  {
+    *key = NULL;
+    return TRUE;
+  }
+  *key = new Vault_key(*this);
+  was_key_retrieved = TRUE;
+  return FALSE;
+}
 
+my_bool Vault_key::has_next_key()
+{
+  return !was_key_retrieved;	  
+}
+
+void Vault_key::xor_data()
+{
+  /*We do not xor data in keyring_vault */
+}
 
 void Vault_key::create_key_signature() const
 {

@@ -37,13 +37,12 @@ std::string Vault_curl::get_error_from_curl(CURLcode curl_code)
 }
 
 my_bool Vault_curl::init(Vault_credentials *vault_credentials)
-//my_bool Vault_curl::init(std::string *vault_url, std::string *auth_token)
 {
   curl = curl_easy_init();
   if (curl == NULL)
   {
     logger->log(MY_ERROR_LEVEL, "Could not create CURL session");
-    return TRUE; //Add logger
+    return TRUE;
   }
   this->token_header = "X-Vault-Token:" + (*vault_credentials)["token"];
   this->vault_url = (*vault_credentials)["vault_url"] + "/v1/" + (*vault_credentials)["secret_mount_point"];
@@ -120,8 +119,10 @@ my_bool Vault_curl::write_key(IKey *key, std::string *response)
   char *base64_encoded_key_data = new char[memory_needed];
   if (base64_encode((const char*)key->get_key_data(), key->get_key_data_size(), base64_encoded_key_data) != 0)
   {
+    memset(base64_encoded_key_data, memory_needed, 0);
     delete[] base64_encoded_key_data;
-    return TRUE; //TODO:Add logging
+    logger->log(MY_ERROR_LEVEL, "Could not encode a key in base64");
+    return TRUE;
   }
   char* new_end = std::remove(base64_encoded_key_data, base64_encoded_key_data + memory_needed, '\n');
   memory_needed = new_end - base64_encoded_key_data;
@@ -133,7 +134,8 @@ my_bool Vault_curl::write_key(IKey *key, std::string *response)
   postdata += "value\":\"";
   postdata.append(base64_encoded_key_data, memory_needed-1); //base64 encode returns data with NULL terminating string - which we do not care about
   postdata += "\"}";
-  delete[] base64_encoded_key_data; //no longer needed
+  memset(base64_encoded_key_data, memory_needed, 0);
+  delete[] base64_encoded_key_data;
 
   if (reset_curl_session() ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,

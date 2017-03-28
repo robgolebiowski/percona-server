@@ -25,35 +25,16 @@ struct Vault_key : public Key, public ISerialized_object
     this->key_operation = vault_key.key_operation;
     this->was_key_retrieved = FALSE;
   }
-
   Vault_key()
   {}
 
-  //Vault_key is itself a serialized_object but we will not need
-  //get_next_key, has_next_key so making them no-ops;
-  virtual my_bool get_next_key(IKey **key)
-  {
-    if (was_key_retrieved)
-    {
-      *key = NULL;
-      return TRUE;
-    }
-    *key = new Vault_key(*this);
-    was_key_retrieved = TRUE;
-    return FALSE;
-  }
-  virtual my_bool has_next_key()
-  {
-    return !was_key_retrieved;	  
-  }
+  virtual my_bool get_next_key(IKey **key);
+  virtual my_bool has_next_key();
   virtual void create_key_signature() const;
-  void xor_data()
-  {
-      /*We do not xor data in keyring_vault */
-  }
-  protected:
-  my_bool was_key_retrieved;
+  void xor_data();
 
+protected:
+  my_bool was_key_retrieved;
 };
 
 } //namespace keyring

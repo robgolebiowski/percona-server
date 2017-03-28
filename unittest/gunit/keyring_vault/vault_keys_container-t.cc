@@ -1368,15 +1368,6 @@ namespace keyring__vault_keys_container_unittest
     delete sample_key; //unused in this test
   }
 
-  class Mock_vault_parser : public IVault_parser
-  {
-  public:
-    MOCK_METHOD2(parse_keys, my_bool(std::string *payload, Vault_keys_list *keys));
-    MOCK_METHOD2(parse_key_data, my_bool(std::string *payload, IKey *key));
-    MOCK_METHOD2(parse_key_signature, my_bool(const std::string *key_signature, std::string key_parameters[2]));
-    MOCK_METHOD2(parse_errors, my_bool(std::string *payload, std::string *errors));
-  };
-
  
 /*  int main(int argc, char **argv) {
     curl_global_init(CURL_GLOBAL_DEFAULT);

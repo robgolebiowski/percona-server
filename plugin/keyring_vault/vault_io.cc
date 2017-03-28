@@ -7,15 +7,10 @@ namespace keyring {
 
 my_bool Vault_io::init(std::string *keyring_storage_url)
 {
-  //std::string url = "http://127.0.0.1:8200";
-  std::string token;
-
   Vault_credentials_parser vault_credentials_parser(logger);
   Vault_credentials vault_credentials;
-  if (vault_credentials_parser.parse(keyring_storage_url, &vault_credentials))
-    return TRUE;
-
-  return vault_curl->init(&vault_credentials);
+  return vault_credentials_parser.parse(keyring_storage_url, &vault_credentials) ||
+         vault_curl->init(&vault_credentials);
 }
 
 Vault_io::~Vault_io()
@@ -52,12 +47,12 @@ my_bool Vault_io::get_serialized_object(ISerialized_object **serialized_object)
                 get_errors_from_response(&json_response)).c_str());
     return TRUE;
   }
-
   if (json_response.empty()) //no keys
   {
     *serialized_object = NULL;
     return FALSE;
   }
+
   Vault_keys_list *keys = new Vault_keys_list();
   if (vault_parser->parse_keys(&json_response, keys))
   {
@@ -102,9 +97,6 @@ my_bool Vault_io::write_key(IKey *key)
  {
     errors_from_response.insert(0, "Could not write key to Vault.");
     logger->log(MY_ERROR_LEVEL, errors_from_response.c_str());
-    //logger->log(MY_ERROR_LEVEL, "lalala");
-
-                //errors_from_response.insert(0, "Could not write key to Vault").c_str());
     return TRUE;
   }
   return FALSE;

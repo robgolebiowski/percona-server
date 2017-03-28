@@ -60,7 +60,6 @@ namespace keyring
     {
       err_ss << "Could not parse credential file. Cannot find equal sign (=) in line: ";
       err_ss << line_number << '.';
-
       logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
       return TRUE;
     }
@@ -69,7 +68,7 @@ namespace keyring
 
     if (is_valid_option(&option) == false)
     {
-      err_ss <<  "Could not parse credential file. Unknown option \"" << option << "\" in line: ";
+      err_ss << "Could not parse credential file. Unknown option \"" << option << "\" in line: ";
       err_ss << line_number << '.';
       return TRUE;
     }
@@ -79,7 +78,6 @@ namespace keyring
     {
       err_ss << "Could not parse credential file. Seems that value for option " << option;
       err_ss << " has been specified more than once in line: " << line_number << '.';
-
       logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
       return TRUE;
     }

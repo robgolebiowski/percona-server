@@ -22,13 +22,6 @@ public:
     vault_key->set_key_operation(operation);
 
     return new Vault_key(*vault_key);
-
-    /*
-    Vault_keys_list *keys_list = new Vault_keys_list();
-    Vault_key* vault_key_copy = new Vault_key(*vault_key);
-    vault_key_copy->set_key_operation(operation);
-    keys_list->push_back(vault_key_copy);
-    return vault_key_copy;*/
   }
 };
 

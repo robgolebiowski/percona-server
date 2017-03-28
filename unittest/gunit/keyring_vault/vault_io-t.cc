@@ -343,6 +343,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorFromVaultCurlOnVaultIOInit)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -354,6 +355,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorFromVaultCurlOnListKeys)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -375,6 +377,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsResponseOnListKeys)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -420,6 +423,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnReadKey)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -439,6 +443,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnReadKey)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -460,6 +465,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnDeleteKey)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -482,6 +488,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnDeleteKey)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -504,6 +511,7 @@ namespace keyring__vault_io_unittest
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnWriteKey)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -522,8 +530,9 @@ namespace keyring__vault_io_unittest
     EXPECT_EQ(vault_io.flush_to_storage(&key), TRUE);
   }
 
-  TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnWriteKey) //TODO: I think I should add delete vault_curl at the beginning
+  TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnWriteKey)
   {
+    delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
     create_credentials_file_with_correct_token();
@@ -538,7 +547,6 @@ namespace keyring__vault_io_unittest
 
     EXPECT_CALL(*mock_curl, write_key(_, _))
       .WillOnce(DoAll(SetArgPointee<1>(vault_response), Return(FALSE)));
-    //TODO: Add dot after Vault (before 2nd Vault)
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not write key to Vault. Vault has returned the following error(s):"
                                 " [\"Cannot write this stuff\"]")));
@@ -557,8 +565,8 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, ErrorFromParseKeysOnGetSerializedObject)
   {
     delete vault_parser;
+
     Mock_vault_parser *mock_vault_parser = new Mock_vault_parser;
-  
     Vault_io vault_io(logger, vault_curl, mock_vault_parser);
     create_credentials_file_with_correct_token();
 
