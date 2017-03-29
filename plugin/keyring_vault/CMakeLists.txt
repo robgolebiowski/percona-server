@@ -13,6 +13,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+
+CHECK_CXX_COMPILER_FLAG(-std=c++11 HAVE_STDCXX11)
+
 IF (NOT WITH_CURL_INCLUDE)
     message("Not building keyring_vault, WITH_CURL_INCLUDE not specified")
     RETURN()

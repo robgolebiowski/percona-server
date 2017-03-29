@@ -119,7 +119,7 @@ my_bool Vault_curl::write_key(IKey *key, std::string *response)
   char *base64_encoded_key_data = new char[memory_needed];
   if (base64_encode((const char*)key->get_key_data(), key->get_key_data_size(), base64_encoded_key_data) != 0)
   {
-    memset(base64_encoded_key_data, memory_needed, 0);
+    //memset(base64_encoded_key_data, memory_needed, 0);
     delete[] base64_encoded_key_data;
     logger->log(MY_ERROR_LEVEL, "Could not encode a key in base64");
     return TRUE;
@@ -134,7 +134,7 @@ my_bool Vault_curl::write_key(IKey *key, std::string *response)
   postdata += "value\":\"";
   postdata.append(base64_encoded_key_data, memory_needed-1); //base64 encode returns data with NULL terminating string - which we do not care about
   postdata += "\"}";
-  memset(base64_encoded_key_data, memory_needed, 0);
+  //memset(base64_encoded_key_data, memory_needed, 0);
   delete[] base64_encoded_key_data;
 
   if (reset_curl_session() ||

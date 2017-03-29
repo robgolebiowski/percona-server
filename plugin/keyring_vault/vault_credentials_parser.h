@@ -1,7 +1,3 @@
-//
-// Created by rob on 08.03.17.
-//
-
 #ifndef MYSQL_VAULT_CREDENTIALS_PARSER_H
 #define MYSQL_VAULT_CREDENTIALS_PARSER_H
 
@@ -13,7 +9,6 @@
 
 namespace keyring
 {
-
   class Vault_credentials_parser
   {
   public:
@@ -31,18 +26,17 @@ namespace keyring
     my_bool parse(std::string *file_url, Vault_credentials *vault_credentials);
 
   protected:
-    //TODO: Make sure that secrets are only stored SecureStrings, maybe by changing all strings into SecureString ?
+    //TODO: Make sure that secrets are only stored Secure_strings, maybe by changing all strings into Secure_string ?
     void reset_vault_credentials(Vault_credentials *vault_credentials);
 
-    my_bool parse_line(uint line_number, SecureString *line, Vault_credentials *vault_credentials);
-    SecureString* get_value_for_option(SecureString *option, Vault_credentials *vault_credentials);
+    my_bool parse_line(uint line_number, Secure_string *line, Vault_credentials *vault_credentials);
+    Secure_string* get_value_for_option(Secure_string *option, Vault_credentials *vault_credentials);
 
-    my_bool is_valid_option(SecureString *option);
+    my_bool is_valid_option(Secure_string *option);
     Vault_credentials vault_credentials_in_progress;
-    std::set<SecureString> optional_value;
+    std::set<Secure_string> optional_value;
 
     ILogger *logger;
-
   };
 
 } //namespace keyring

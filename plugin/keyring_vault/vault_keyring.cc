@@ -3,7 +3,6 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include "keyring.h"
-//#include "buffered_file_io.h"
 #include "vault_keys_container.h"
 #include "vault_parser.h"
 #include "vault_io.h"

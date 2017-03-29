@@ -43,13 +43,13 @@ protected:
   std::string get_error_from_curl(CURLcode curl_code);
 
   ILogger *logger;
-  SecureString token_header;
-  SecureString vault_url;
+  Secure_string token_header;
+  Secure_string vault_url;
   CURL *curl;
   char curl_errbuf[CURL_ERROR_SIZE]; //error from CURL
   std::stringstream read_data_ss;
   struct curl_slist *list;
-  SecureString vault_ca;
+  Secure_string vault_ca;
 };
 
 }
