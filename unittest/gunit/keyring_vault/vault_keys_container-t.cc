@@ -7,7 +7,7 @@
 #include <fstream>
 #include "i_serialized_object.h"
 
-#if !defined(MERGE_UNITTESTS) //TODO: Look into merging
+//#if !defined(MERGE_UNITTESTS) //TODO: Look into merging
 #ifdef HAVE_PSI_INTERFACE
 namespace keyring
 {
@@ -16,7 +16,7 @@ namespace keyring
 }
 #endif
 mysql_rwlock_t LOCK_keyring;
-#endif
+//#endif
 
 namespace keyring__vault_keys_container_unittest
 {

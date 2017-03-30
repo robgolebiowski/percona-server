@@ -6,11 +6,11 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#if defined(HAVE_PSI_INTERFACE) && !defined(MERGE_UNITTESTS)
+#if defined(HAVE_PSI_INTERFACE)
 namespace keyring
 {
   PSI_memory_key key_memory_KEYRING = PSI_NOT_INSTRUMENTED;
-  PSI_memory_key key_LOCK_keyring = PSI_NOT_INSTRUMENTED;
+//  PSI_memory_key key_LOCK_keyring = PSI_NOT_INSTRUMENTED;
 }
 #endif
 

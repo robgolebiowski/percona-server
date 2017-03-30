@@ -7,11 +7,11 @@
 #include "vault_parser.h"
 #include "vault_io.h"
 
-#ifdef _WIN32
-#define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"\\keyring"
-#else
-#define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"/keyring"
-#endif
+//#ifdef _WIN32
+//#define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"\\keyring"
+//#else
+//#define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"/keyring"
+//#endif
 
 using keyring::IVault_curl;
 using keyring::IVault_parser;
@@ -33,14 +33,7 @@ int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
   (*(const char **) save)= NULL;
   keyring_filename= value->val_str(value, buff, &len);
   mysql_rwlock_wrlock(&LOCK_keyring);
-  /*
-  if (create_keyring_dir_if_does_not_exist(keyring_filename))
-  {
-    mysql_rwlock_unlock(&LOCK_keyring);
-    logger->log(MY_ERROR_LEVEL, "keyring_file_data cannot be set to new value"
-      " as the keyring file cannot be created/accessed in the provided path");
-    return 1;
-  }*/
+
   try
   {
     IVault_curl *vault_curl = new Vault_curl(logger.get());
@@ -72,7 +65,7 @@ static MYSQL_SYSVAR_STR(
   "The path to the keyring file. Must be specified",           /* comment    */
   check_keyring_file_data,                                     /* check()    */
   update_keyring_file_data,                                    /* update()   */
-  MYSQL_DEFAULT_KEYRINGFILE                                    /* default    */
+  ""                                                           /* default    */
 );
 
 static struct st_mysql_sys_var *keyring_vault_system_variables[]= {
@@ -96,13 +89,6 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
       return TRUE;
 
     logger.reset(new Logger(plugin_info));
-    /*if (create_keyring_dir_if_does_not_exist(keyring_file_data_value))
-    {
-      logger->log(MY_ERROR_LEVEL, "Could not create keyring directory "
-        "The keyring_file will stay unusable until correct path to the keyring "
-        "directory gets provided");
-      return FALSE;
-    }*/
     keys.reset(new Vault_keys_container(logger.get()));
     IVault_curl *vault_curl = new Vault_curl(logger.get());
     IVault_parser *vault_parser = new Vault_parser(logger.get());
@@ -123,7 +109,7 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
   catch (...)
   {
     if (logger != NULL)
-      logger->log(MY_ERROR_LEVEL, "keyring_file initialization failure due to internal"
+      logger->log(MY_ERROR_LEVEL, "keyring_vault initialization failure due to internal"
                                   " exception inside the plugin");
     return TRUE;
   }
@@ -142,9 +128,6 @@ int keyring_vault_deinit(void *arg MY_ATTRIBUTE((unused)))
   logger.reset();
   keyring_file_data.reset();
   mysql_rwlock_destroy(&LOCK_keyring);
-
-
-
 
   curl_global_cleanup();
   return 0;

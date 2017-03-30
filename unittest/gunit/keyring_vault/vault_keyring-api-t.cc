@@ -471,18 +471,18 @@ namespace keyring__api_unittest
     EXPECT_EQ(mysql_key_generate("", "AES", NULL, 128), 1);
   }
 
-  int main(int argc, char **argv) {
-    if (mysql_rwlock_init(key_LOCK_keyring, &LOCK_keyring))
-      return TRUE;
-    ::testing::InitGoogleTest(&argc, argv);
+  //int main(int argc, char **argv) {
+    //if (mysql_rwlock_init(key_LOCK_keyring, &LOCK_keyring))
+      //return TRUE;
+    //::testing::InitGoogleTest(&argc, argv);
 
-    if (argc == 2) //token was passed as argument
-      Keyring_vault_api_test::correct_token = argv[1];
-    else
-    {
-      std::cout << "You must specify Vault's token to run this test suite";
-      return -1;
-    }
-    return RUN_ALL_TESTS();
-  }
+    //if (argc == 2) //token was passed as argument
+      //Keyring_vault_api_test::correct_token = argv[1];
+    //else
+    //{
+      //std::cout << "You must specify Vault's token to run this test suite";
+      //return -1;
+    //}
+    //return RUN_ALL_TESTS();
+  //}
 }
