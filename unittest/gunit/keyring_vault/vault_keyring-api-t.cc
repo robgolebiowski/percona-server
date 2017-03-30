@@ -22,26 +22,20 @@ namespace keyring__api_unittest
       delete[] plugin_name;
       delete[] keyring_filename;
     }
+
+    static std::string correct_token;
+
   protected:
     virtual void SetUp()
     {
       plugin_name= new char[strlen("FakeKeyring")+1];
       strcpy(plugin_name, "FakeKeyring");
-      keyring_filename= new char[strlen("./credentials")+1];
-      strcpy(keyring_filename, "./credentials");
-
-      correct_token = "474dbfc2-c687-2b35-e386-19c371b48e99";//  a1293c98-254b-2206-67c5-a9457ca36281"; //maybe this could be passed as a parameter to unit test ?
-      //correct_token2 = "8c1f44f6-626b-d078-8ec5-f1e1eb940379";
+      keyring_filename= new char[strlen("./keyring_vault.conf")+1];
+      strcpy(keyring_filename, "./keyring_vault.conf");
 
       plugin_info.name.str= plugin_name;
       plugin_info.name.length= strlen(plugin_name);
       keyring_vault_cred_file= keyring_filename;
-      //credential_file_url = "./credentials";
-      credential_file_was_created = false;
-
-      remove(keyring_vault_cred_file);
-      //remove("./keyring.backup");
-      create_credentials_file_with_correct_token();
 
       keyring_init_with_mock_logger();
 
@@ -51,40 +45,19 @@ namespace keyring__api_unittest
     }
     virtual void TearDown()
     {
-      if(credential_file_was_created)
-        remove(keyring_filename);
       keyring_deinit_with_mock_logger();
-      remove(keyring_vault_cred_file);
-      remove("./keyring.backup");
     }
   protected:
     void keyring_init_with_mock_logger();
     void keyring_deinit_with_mock_logger();
-    void create_credentials_file_with_correct_token();
 
-    bool credential_file_was_created;
     std::string sample_key_data;
-    std::string correct_token;
-    //std::string correct_token2;
     char *plugin_name;
     char *keyring_filename;
     st_plugin_int plugin_info; //for Logger initialization
   };
 
-  void Keyring_vault_api_test::create_credentials_file_with_correct_token()
-  {
-    std::remove(keyring_filename);
-    std::ofstream my_file;
-    my_file.open(keyring_filename);
-
-    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
-    my_file << "secret_mount_point = secret" << std::endl;
-    my_file << "token = " << correct_token << std::endl;
-    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
-    my_file.close();
-
-    credential_file_was_created = true;
-  }
+  std::string Keyring_vault_api_test::correct_token;
 
   void Keyring_vault_api_test::keyring_init_with_mock_logger()
   {
@@ -100,8 +73,6 @@ namespace keyring__api_unittest
 
   TEST_F(Keyring_vault_api_test, StoreFetchRemove)
   {
-    //create_credentials_file_with_correct_token();
-
     EXPECT_EQ(mysql_key_store("Robert_key", "AES", "Robert", sample_key_data.c_str(),
                               sample_key_data.length()), FALSE);
     char *key_type;
@@ -504,6 +475,14 @@ namespace keyring__api_unittest
     if (mysql_rwlock_init(key_LOCK_keyring, &LOCK_keyring))
       return TRUE;
     ::testing::InitGoogleTest(&argc, argv);
+
+    if (argc == 2) //token was passed as argument
+      Keyring_vault_api_test::correct_token = argv[1];
+    else
+    {
+      std::cout << "You must specify Vault's token to run this test suite";
+      return -1;
+    }
     return RUN_ALL_TESTS();
   }
 }

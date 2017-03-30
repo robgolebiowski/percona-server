@@ -26,7 +26,6 @@ namespace keyring
     my_bool parse(std::string *file_url, Vault_credentials *vault_credentials);
 
   protected:
-    //TODO: Make sure that secrets are only stored Secure_strings, maybe by changing all strings into Secure_string ?
     void reset_vault_credentials(Vault_credentials *vault_credentials);
 
     my_bool parse_line(uint line_number, Secure_string *line, Vault_credentials *vault_credentials);

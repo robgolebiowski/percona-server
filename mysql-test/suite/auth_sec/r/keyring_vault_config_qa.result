@@ -2,13 +2,7 @@ call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'Could not 
 call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'Could not read secret_mount_point from the configuration file.'");
 call mtr.add_suppression("\\[Error\\] Function 'keyring_vault' already exists");
 call mtr.add_suppression("\\[Error\\] Couldn't load plugin named 'keyring_vault' with soname 'keyring_vault.so'.");
-call mtr.add_suppression("keyring_vault_config cannot be set to new value as the keyring file cannot be created/accessed in the provided path");
-call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'keyring_file initialization failure.");
-call mtr.add_suppression("Plugin keyring_vault reported: 'Could not create keyring directory The keyring_vault will stay unusable until correct path to the keyring directory gets provided");
-call mtr.add_suppression("Error while loading keyring content. The keyring might be malformed");
-call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File .*/keyring' not found .*");
-call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File 'MYSQL_test_invalid/dir/' not found .*");
-call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File '/' not found .*");
+call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'keyring_vault initialization failure.");
 INSTALL PLUGIN keyring_vault SONAME 'keyring_vault.so';
 SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
 FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';

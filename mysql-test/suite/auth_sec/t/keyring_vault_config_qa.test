@@ -1,5 +1,4 @@
-# WL5769
-# Keyring_file plugin and keyring_vault_config variable testing.
+# Keyring_vault plugin and keyring_vault_config variable testing.
 
 --disable_ps_protocol
 --disable_warnings
@@ -7,16 +6,10 @@
 
 call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'Could not open file with credentials.'");
 call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'Could not read secret_mount_point from the configuration file.'");
-#TODO: Should not keyring_vault also reported that a given file is missing ?
 call mtr.add_suppression("\\[Error\\] Function 'keyring_vault' already exists");
 call mtr.add_suppression("\\[Error\\] Couldn't load plugin named 'keyring_vault' with soname 'keyring_vault.so'.");
-call mtr.add_suppression("keyring_vault_config cannot be set to new value as the keyring file cannot be created/accessed in the provided path");
-call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'keyring_file initialization failure.");
-call mtr.add_suppression("Plugin keyring_vault reported: 'Could not create keyring directory The keyring_vault will stay unusable until correct path to the keyring directory gets provided");
-call mtr.add_suppression("Error while loading keyring content. The keyring might be malformed");
-call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File .*/keyring' not found .*");
-call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File 'MYSQL_test_invalid/dir/' not found .*");
-call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File '/' not found .*");
+
+call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'keyring_vault initialization failure.");
 
 # Installing keyring plugin.
 --replace_regex /\.dll/.so/
@@ -45,6 +38,8 @@ SET @@global.keyring_vault_config='';
 SET @@global.keyring_vault_config='#^$^@E&(';
 --error ER_WRONG_TYPE_FOR_VAR
 SET @@global.keyring_vault_config=1;
+#This statement generates Could not read secret_mount_point error
+#As location can be opened for reading
 --error ER_WRONG_VALUE_FOR_VAR
 SET @@global.keyring_vault_config='/';
 --error ER_WRONG_VALUE_FOR_VAR

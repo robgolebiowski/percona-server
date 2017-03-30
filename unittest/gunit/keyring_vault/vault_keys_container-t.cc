@@ -33,19 +33,15 @@ namespace keyring__vault_keys_container_unittest
   class Vault_keys_container_test : public ::testing::Test
   {
   public:
-    Vault_keys_container_test() : file_name("./keyring") {}
+    Vault_keys_container_test()
+    {}
   protected:
     virtual void SetUp()
     {
       sample_key_data= "Robi";
       sample_key= new Vault_key("Roberts_key", "AES", "Robert", sample_key_data.c_str(), sample_key_data.length());
 
-//      remove(file_name.c_str());
-//      remove("./keyring.backup");
-
-      correct_token = "013c9463-2dac-f71c-b29b-2f285a33cac7"; //maybe this could be passed as a parameter to unit test ?
-      credential_file_url = "./credentials";
-      credential_file_was_created = false;
+      credential_file_url = "./keyring_vault.conf";
       logger= new Mock_logger();
       vault_keys_container= new Vault_keys_container(logger);
       vault_curl = new Vault_curl(logger);
@@ -53,18 +49,10 @@ namespace keyring__vault_keys_container_unittest
     }
     virtual void TearDown()
     {
-      if(credential_file_was_created)
-        remove(credential_file_url.c_str());
       delete vault_keys_container;
       delete logger;
     }
 
-    void create_credentials_file_with_correct_token();
-
-//    void create_keyring_file(const char *file_name, const char *keyring_buffer);
-//    void generate_keyring_file_with_correct_structure(const char *file_name);
-//    void generate_keyring_file_with_incorrect_file_version(const char *file_name);
-//    void generate_keyring_file_with_incorrect_TAG(const char *file_name);
   protected:
     Vault_keys_container *vault_keys_container;
     ILogger *logger;
@@ -75,23 +63,7 @@ namespace keyring__vault_keys_container_unittest
     bool credential_file_was_created;
     Vault_key *sample_key;
     std::string sample_key_data;
-    std::string file_name;
   };
-
-  void Vault_keys_container_test::create_credentials_file_with_correct_token()
-  {
-    std::remove(credential_file_url.c_str());
-    std::ofstream my_file;
-    my_file.open(credential_file_url.c_str());
-
-    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
-    my_file << "secret_mount_point = secret" << std::endl;
-    my_file << "token = " << correct_token << std::endl;
-    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
-    my_file.close();
-
-    credential_file_was_created = true;
-  }
 
 /*  void Keys_container_test::create_keyring_file(const char *file_name, const char *keyring_buffer)
   {
@@ -123,7 +95,6 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, InitWithCorrectCredential)
   {
-    create_credentials_file_with_correct_token();
     IKeyring_io *vault_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
     delete sample_key; //unused in this test
@@ -131,11 +102,9 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, InitWithFileWithInvalidToken)
   {
-    std::string token_in_file("What-a-pretty-token");
-
-    std::remove(credential_file_url.c_str());
+    std::remove("invalid_token.conf");
     std::ofstream myfile;
-    myfile.open(credential_file_url.c_str());
+    myfile.open("invalid_token.conf");
     myfile << "vault_url = https://127.0.0.1:8200" << std::endl;
     myfile << "secret_mount_point = secret" << std::endl;
     myfile << "token = What-a-pretty-token" << std::endl;
@@ -149,47 +118,31 @@ namespace keyring__vault_keys_container_unittest
                                 "Vault has returned the following error(s): [\"permission denied\"]")));
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Error while loading keyring content. The keyring might be malformed")));
-    EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), TRUE);
+    EXPECT_EQ(vault_keys_container->init(vault_io, "invalid_token.conf"), TRUE);
     delete sample_key; //unused in this test
 
-    std::remove(credential_file_url.c_str());
+    std::remove("invalid_token.conf");
   }
 
   TEST_F(Vault_keys_container_test, InitWithEmptyCredentialFile)
   {
-    std::remove(credential_file_url.c_str());
+    std::remove("empty_credential.conf");
     std::ofstream myfile;
-    myfile.open(credential_file_url.c_str());
+    myfile.open("empty_credential.conf");
     myfile.close();
 
     IKeyring_io *vault_io= new Vault_io(logger, vault_curl, vault_parser);
 
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read secret_mount_point from the configuration file.")));
-    EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), TRUE);
+    EXPECT_EQ(vault_keys_container->init(vault_io, "empty_credential.conf"), TRUE);
     delete sample_key; //unused in this test
 
-    std::remove(credential_file_url.c_str());
+    std::remove("empty_credential.conf");
   }
 
-/*
-  TEST_F(Keys_container_test, InitWithFileWithIncorrectTAG)
-  {
-    const char *keyring_incorrect_tag= "./keyring_incorrect_tag";
-    remove(keyring_incorrect_tag);
-    generate_keyring_file_with_incorrect_TAG(keyring_incorrect_tag);
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    EXPECT_CALL(*((Mock_logger *)logger),
-                log(MY_ERROR_LEVEL, StrEq("Error while loading keyring content. The keyring might be malformed")));
-    EXPECT_EQ(keys_container->init(keyring_io, keyring_incorrect_tag), 1);
-    remove(keyring_incorrect_tag);
-    delete sample_key; //unused in this test
-  }
-*/
   TEST_F(Vault_keys_container_test, StoreFetchRemove)
   {
-    create_credentials_file_with_correct_token();
-
     IKeyring_io *vault_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), FALSE);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
@@ -216,8 +169,6 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, FetchNotExisting)
   {
-    create_credentials_file_with_correct_token();
-
     IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     Key key_id("Roberts_key", NULL, "Robert",NULL,0);
@@ -228,8 +179,6 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, RemoveNotExisting)
   {
-    create_credentials_file_with_correct_token();
-
     IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     Key key_id("Roberts_key", "AES", "Robert",NULL,0);
@@ -239,8 +188,6 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, StoreFetchNotExistingDelete)
   {
-    create_credentials_file_with_correct_token();
-
     IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
@@ -256,8 +203,6 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, StoreRemoveNotExisting)
   {
-    create_credentials_file_with_correct_token();
-
     IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
@@ -274,8 +219,6 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, StoreStoreStoreFetchRemove)
   {
-    create_credentials_file_with_correct_token();
-
     IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), FALSE);
@@ -322,8 +265,6 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, StoreTwiceTheSame)
   {
-    create_credentials_file_with_correct_token();
-
     IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
     EXPECT_EQ(vault_keys_container->store_key(sample_key), 0);
@@ -814,25 +755,9 @@ namespace keyring__vault_keys_container_unittest
       std::string sample_key_data= "Robi";
       sample_key= new Vault_key("Roberts_key", "AES", "Robert", sample_key_data.c_str(), sample_key_data.length());
       credential_file_url = "./credentials";
-
-//      remove(file_name.c_str());
-//      remove("./keyring.backup");
-/*
-      correct_token = "8143069d-a3c0-9d72-b8a4-dcb29aab7de3"; //maybe this could be passed as a parameter to unit test ?
-      credential_file_url = "./credentials";
-      credential_file_was_created = false;
-      logger= new Mock_logger();
-      vault_keys_container= new Vault_keys_container(logger);
-
-
-      std::string sample_key_data("Robi");
-      sample_key= new Key("Roberts_key", "AES", "Robert", sample_key_data.c_str(), sample_key_data.length()+1);
-
-      file_name= "/home/rob/write_key";*/
     }
     virtual void TearDown()
     {
-//      remove(file_name.c_str());
       delete vault_keys_container;
     }
   protected:
@@ -1336,20 +1261,14 @@ namespace keyring__vault_keys_container_unittest
 
     Vault_key key_to_fetch("key1", NULL, "Robert", NULL, 0);
     ASSERT_TRUE(key_to_fetch.get_key_data() == NULL);
-    //IKey *key_fetched_from_vault = new Vault_key("key1", "AES", "Robert", "01234", 5);
     IKey *key_fetched_from_keyring;
-    //IKey *key_fetched_from_hash = NULL;
 
     EXPECT_CALL(*vault_io, retrieve_key_type_and_value(_))
-      //.WillOnce(DoAll(testing::SaveArg<0>(key_fetched_from_hash), Return(FALSE)));
       .WillOnce(DoAll(WithArgs<0>(Invoke(set_data)), Return(FALSE)));
     //retrieving key for the first time - key's data and type is kept only in Vault
     //need to fetch them on container's fetch operation
     key_fetched_from_keyring = vault_keys_container->fetch_key(&key_to_fetch);
-    //TODO: check key's signature
-    //key_fetched_from_hash->set_key_type(key_fetched_from_keyring->get_key_type());
-    //key_fetched_from_hash->set_key_data(key_fetched_from_keyring->get_key_data(), key_fetched_from_keyring->get_key_data_size());
-    
+      
     //When we call fetch_key for the 2nd time - key's data and type should be already cached
     //thus the second call should not call retrieve_key_type_and_value
     Vault_key key_to_re_fetch("key1", NULL, "Robert", NULL, 0);

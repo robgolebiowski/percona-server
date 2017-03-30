@@ -21,10 +21,10 @@ IF (NOT WITH_CURL_INCLUDE)
     RETURN()
 ENDIF()
 
-#IF (NOT WITH_CURL_LIB)
-    #message("Not building keyring_vault, WITH_CURL_LIB not specified")
-    #RETURN()
-#ENDIF()
+IF (NOT WITH_CURL_LIB)
+    message("Not building keyring_vault, WITH_CURL_LIB not specified")
+    RETURN()
+ENDIF()
 
 FIND_LIBRARY(CURL_LIBRARY
         NAMES curl
@@ -61,10 +61,6 @@ MYSQL_ADD_PLUGIN(keyring_vault
                  MODULE_ONLY
                  MODULE_OUTPUT_NAME "keyring_vault")
 
-#IF(SSL_DEFINES)
-#  ADD_DEFINITIONS(${SSL_DEFINES})
-#ENDIF()
-#
 #IF(WITH_KEYRING_TEST)
 #  ADD_SUBDIRECTORY(keyring-test)
 #ENDIF()

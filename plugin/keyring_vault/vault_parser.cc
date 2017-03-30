@@ -134,7 +134,7 @@ my_bool Vault_parser::parse_key_signature(const std::string *key_signature, std:
     ++key_id_pos;
     std::string key_id_length = key_signature->substr(next_pos_to_start_from, key_id_pos);
     int key_l = atoi(key_id_length.c_str());
-    if (key_l == 0)
+    if (key_l < 0)
       return TRUE;
     key_parameters[i] = key_signature->substr(key_id_pos, key_l);
     next_pos_to_start_from= key_id_pos+key_l;

@@ -13,8 +13,6 @@
 #define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"/keyring"
 #endif
 
-//using keyring::Buffered_file_io;
-//using keyring::Keys_container;
 using keyring::IVault_curl;
 using keyring::IVault_parser;
 using keyring::Vault_parser;
@@ -22,33 +20,6 @@ using keyring::Vault_io;
 using keyring::Vault_keys_container;
 using keyring::Vault_curl;
 using keyring::Logger;
-
-/*my_bool create_keyring_dir_if_does_not_exist(const char *keyring_file_path)*/
-//{
-  //if (!keyring_file_path || strlen(keyring_file_path) == 0)
-    //return TRUE;
-  //char keyring_dir[FN_REFLEN];
-  //size_t keyring_dir_length;
-  //dirname_part(keyring_dir, keyring_file_path, &keyring_dir_length);
-  //if (keyring_dir_length > 1 &&
-      //is_directory_separator(keyring_dir[keyring_dir_length-1]))
-  //{
-    //keyring_dir[keyring_dir_length-1]= '\0';
-    //--keyring_dir_length;
-  //}
-  //int flags=
-//#ifdef _WIN32
-    //0
-//#else
-    //S_IRWXU | S_IRGRP | S_IXGRP
-//#endif
-    //;
-  //if (strlen(keyring_dir) == 0)
-    //return TRUE;
-  //my_mkdir(keyring_dir, flags, MYF(0));
-  //return FALSE;
-/*}*/
-
 
 int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
                             struct st_mysql_sys_var *var  MY_ATTRIBUTE((unused)),
@@ -120,9 +91,6 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
     curl_global_init(CURL_GLOBAL_NOTHING);
-//  CURL_GLOBAL_DEFAULT);
-    //SSL_load_error_strings();                [> readable error messages <]
-    //SSL_library_init();                      [> initialize library <]
 
     if (init_keyring_locks())
       return TRUE;
@@ -142,13 +110,12 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
     if (keys->init(keyring_io, keyring_vault_cred_file))
     {
       is_keys_container_initialized = FALSE;
-      //TODO: Change the error log
-      logger->log(MY_ERROR_LEVEL, "keyring_file initialization failure. Please check"
-        " if the keyring_file_data points to readable keyring file or keyring file"
-        " can be created in the specified location. "
-        "The keyring_file will stay unusable until correct path to the keyring file "
-        "gets provided");
-      return FALSE; //TODO: is this correct ? I have changed it to TRUE
+      logger->log(MY_ERROR_LEVEL, "keyring_vault initialization failure. Please check that"
+        " the keyring_vault_cred_file points to readable keyring_vault configuration"
+        " file. Please also make sure Vault is running and accessible."
+        " The keyring_vault will stay unusable until correct configuration file gets"
+        " provided.");
+      return FALSE;
     }
     is_keys_container_initialized = TRUE;
     return FALSE;

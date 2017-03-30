@@ -6,11 +6,11 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#if defined(HAVE_PSI_INTERFACE)
+#if defined(HAVE_PSI_INTERFACE) && !defined(MERGE_UNITTESTS)
 namespace keyring
 {
   PSI_memory_key key_memory_KEYRING = PSI_NOT_INSTRUMENTED;
-//  PSI_memory_key key_LOCK_keyring = PSI_NOT_INSTRUMENTED;
+  PSI_memory_key key_LOCK_keyring = PSI_NOT_INSTRUMENTED;
 }
 #endif
 
@@ -28,11 +28,7 @@ namespace keyring__vault_io_unittest
   protected:
     virtual void SetUp()
     {
-//      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
-//      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
-      correct_token = "013c9463-2dac-f71c-b29b-2f285a33cac7"; //maybe this could be passed as a parameter to unit test ?
-      credential_file_url = "./credentials";
-      credential_file_was_created = false;
+      credential_file_url = "./keyring_vault.conf";
       logger= new Mock_logger();
       vault_curl = new Vault_curl(logger);
       vault_parser = new Vault_parser(logger);
@@ -40,40 +36,15 @@ namespace keyring__vault_io_unittest
 
     virtual void TearDown()
     {
-      if (credential_file_was_created)
-        std::remove(credential_file_url.c_str());
-//      fake_mysql_plugin.name.str= const_cast<char*>("FakeKeyringPlugin");
-//      fake_mysql_plugin.name.length= strlen("FakeKeyringPlugin");
       delete logger;
-      //delete vault_curl;
     }
 
   protected:
-    void create_credentials_file_with_correct_token();
-
-//    st_plugin_int fake_mysql_plugin;
     ILogger *logger;
     IVault_curl *vault_curl;
     IVault_parser *vault_parser;
-    std::string correct_token;
     std::string credential_file_url;
-    bool credential_file_was_created;
   };
-
-  void Vault_io_test::create_credentials_file_with_correct_token()
-  {
-    std::remove(credential_file_url.c_str());
-    std::ofstream my_file;
-    my_file.open(credential_file_url.c_str());
-
-    my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
-    my_file << "secret_mount_point = secret" << std::endl;
-    my_file << "token = " << correct_token << std::endl;
-    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
-    my_file.close();
-
-    credential_file_was_created = true;
-  }
 
   TEST_F(Vault_io_test, InitWithNotExisitingCredentialFile)
   {
@@ -90,18 +61,18 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, InitWithInvalidToken)
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
+    std::string conf_with_invalid_token("invalid_token.conf");
 
-    std::remove(credential_file_url.c_str());
+    std::remove(conf_with_invalid_token.c_str());
     std::ofstream my_file;
-    my_file.open(credential_file_url.c_str());
+    my_file.open(conf_with_invalid_token.c_str());
     my_file << "vault_url = https://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
     my_file << "token = 123-123-123" << std::endl;
-    my_file << "vault_ca = /home/rob/vault_certs/root.cer";
-    //my_file << "vault_ca = /home/rob/vault_certs";
+    my_file << "vault_ca = ./vault_ca.crt";
     my_file.close();
 
-    EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
+    EXPECT_EQ(vault_io.init(&conf_with_invalid_token), FALSE);
 
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not retrieve list of keys from Vault. "
@@ -109,7 +80,7 @@ namespace keyring__vault_io_unittest
     ISerialized_object *serialized_keys= NULL;
     EXPECT_EQ(vault_io.get_serialized_object(&serialized_keys), TRUE);
 
-    std::remove(credential_file_url.c_str());
+    std::remove(conf_with_invalid_token.c_str());
   }
 
   //TODO: Add intialization with invalid CA cert
@@ -180,7 +151,6 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeys)
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -224,7 +194,6 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, GetSerializedObjectWithTwoKeysWithDifferentVaultIO)
   {
     Vault_io vault_io_for_storing(logger, vault_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_EQ(vault_io_for_storing.init(&credential_file_url), FALSE);
 
@@ -273,7 +242,6 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, RetrieveKeyTypeAndValue)
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
-    create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
     Vault_key key_to_store("key1", "AES", "rob", "Robi", 4);
@@ -294,7 +262,6 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, FlushAndRemoveSingleKey)
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
-    create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
     Vault_key key("key1", "AES", "rob", "Robi", 4);
     key.set_key_operation(STORE_KEY);
@@ -307,7 +274,6 @@ namespace keyring__vault_io_unittest
   TEST_F(Vault_io_test, FlushKeyRetrieveDeleteInit)
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
-    create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
     Vault_key key("key1", "AES", "rob", "Robi", 4);
     key.set_key_operation(STORE_KEY);
@@ -346,7 +312,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(TRUE)); // init unsuccessfull
@@ -358,7 +323,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -380,7 +344,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -426,7 +389,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -446,7 +408,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -468,7 +429,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -491,7 +451,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -514,7 +473,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -535,7 +493,6 @@ namespace keyring__vault_io_unittest
     delete vault_curl;
     Mock_vault_curl *mock_curl = new Mock_vault_curl();
     Vault_io vault_io(logger, mock_curl, vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_CALL(*mock_curl, init(_))
       .WillOnce(Return(FALSE)); // init successfull
@@ -568,7 +525,6 @@ namespace keyring__vault_io_unittest
 
     Mock_vault_parser *mock_vault_parser = new Mock_vault_parser;
     Vault_io vault_io(logger, vault_curl, mock_vault_parser);
-    create_credentials_file_with_correct_token();
 
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
@@ -607,7 +563,6 @@ namespace keyring__vault_io_unittest
     delete vault_parser;
     Mock_vault_parser *mock_vault_parser = new Mock_vault_parser;
     Vault_io vault_io(logger, vault_curl, mock_vault_parser);
-    create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
     Vault_key key_to_store("key1", "AES", "rob", "Robi", 4);
@@ -633,7 +588,6 @@ namespace keyring__vault_io_unittest
     delete vault_parser;
     Mock_vault_parser *mock_vault_parser = new Mock_vault_parser;
     Vault_io vault_io(logger, vault_curl, mock_vault_parser);
-    create_credentials_file_with_correct_token();
     EXPECT_EQ(vault_io.init(&credential_file_url), FALSE);
 
     Vault_key key_to_store("key1", "AES", "rob", "Robi", 4);
@@ -653,9 +607,6 @@ namespace keyring__vault_io_unittest
     key_to_remove.set_key_operation(REMOVE_KEY);
     EXPECT_EQ(vault_io.flush_to_storage(&key_to_remove), FALSE);
   }
-
-
-
 } //namespace keyring__file_io_unittest
 
 int main(int argc, char **argv) {

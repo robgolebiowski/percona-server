@@ -9,7 +9,6 @@
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Encryption can't find master key, please check the keyring plugin is loaded.");
 call mtr.add_suppression("Can't generate new master key for tablespace encryption, please check the keyring plugin is loaded.");
 call mtr.add_suppression("InnoDB: The error means that another program is using InnoDB's files");
-call mtr.add_suppression("InnoDB: The error means that another program is using InnoDB's files");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Operating system error number 32 in a file operation.");
 let $innodb_file_per_table = `SELECT @@innodb_file_per_table`;
 
@@ -302,9 +301,6 @@ SELECT c2,c4,c5,c6,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
 SELECT COUNT(*) FROM tde_db.t_encrypt;
 INSERT INTO tde_db.t_encrypt(c3,c4,c7) SELECT c3,c4,c7 FROM tde_db.t_encrypt;
 SELECT COUNT(*) FROM tde_db.t_encrypt;
-
-#call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPRESSED  KEY_BLOCK_SIZE=8 ");
-#call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPRESSED  KEY_BLOCK_SIZE=16 ");
 
 --echo # Create partition table
 DROP TABLE tde_db.t_encrypt;
@@ -766,4 +762,3 @@ let $restart_parameters = restart:;
 --source include/restart_mysqld.inc
 ## Cleanup
 eval SET GLOBAL innodb_file_per_table=$innodb_file_per_table;
-#--remove_file $MYSQL_TMP_DIR/mysecret_keyring

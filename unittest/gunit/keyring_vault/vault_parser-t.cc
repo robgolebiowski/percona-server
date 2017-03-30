@@ -45,7 +45,7 @@ namespace keyring__vault_parser_unittest
     std::string key_signature("4_key13_rob");
     Vault_parser vault_parser(logger);
     std::string key_parameters[2];
-    vault_parser.parse_key_signature(&key_signature, key_parameters);
+    EXPECT_EQ(vault_parser.parse_key_signature(&key_signature, key_parameters), FALSE);
     EXPECT_STREQ(key_parameters[0].c_str(), "key1");
     EXPECT_STREQ(key_parameters[1].c_str(), "rob");
   }
@@ -55,7 +55,7 @@ namespace keyring__vault_parser_unittest
     std::string key_signature("4_key16_Robert");
     Vault_parser vault_parser(logger);
     std::string key_parameters[2];
-    vault_parser.parse_key_signature(&key_signature, key_parameters);
+    EXPECT_EQ(vault_parser.parse_key_signature(&key_signature, key_parameters), FALSE);
     EXPECT_STREQ(key_parameters[0].c_str(), "key1");
     EXPECT_STREQ(key_parameters[1].c_str(), "Robert");
   }
@@ -65,7 +65,7 @@ namespace keyring__vault_parser_unittest
     std::string key_signature("7__key1238_Robert33");
     Vault_parser vault_parser(logger);
     std::string key_parameters[2];
-    vault_parser.parse_key_signature(&key_signature, key_parameters);
+    EXPECT_EQ(vault_parser.parse_key_signature(&key_signature, key_parameters), FALSE);
     EXPECT_STREQ(key_parameters[0].c_str(), "_key123");
     EXPECT_STREQ(key_parameters[1].c_str(), "Robert33");
   }
@@ -75,9 +75,19 @@ namespace keyring__vault_parser_unittest
     std::string key_signature("9_123key12310_12Robert33");
     Vault_parser vault_parser(logger);
     std::string key_parameters[2];
-    vault_parser.parse_key_signature(&key_signature, key_parameters);
+    EXPECT_EQ(vault_parser.parse_key_signature(&key_signature, key_parameters), FALSE);
     EXPECT_STREQ(key_parameters[0].c_str(), "123key123");
     EXPECT_STREQ(key_parameters[1].c_str(), "12Robert33");
+  }
+
+  TEST_F(Vault_parser_test, ParseKeySignature5)
+  {
+    std::string key_signature("48_INNODBKey-3c40d1ab-1475-11e7-ae1c-9cb6d0d5dc99-10_");
+    Vault_parser vault_parser(logger);
+    std::string key_parameters[2];
+    EXPECT_EQ(vault_parser.parse_key_signature(&key_signature, key_parameters), FALSE);
+    EXPECT_STREQ(key_parameters[0].c_str(), "INNODBKey-3c40d1ab-1475-11e7-ae1c-9cb6d0d5dc99-1");
+    EXPECT_STREQ(key_parameters[1].c_str(), "");
   }
 
   TEST_F(Vault_parser_test, ParseVaultPayload)
@@ -177,25 +187,6 @@ namespace keyring__vault_parser_unittest
 
 
 } //namespace keyring__file_io_unittest
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 int main(int argc, char **argv) {
 //  if (mysql_rwlock_init(key_LOCK_keyring, &LOCK_keyring))

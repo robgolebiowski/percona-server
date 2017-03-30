@@ -5,12 +5,6 @@
 --source include/have_innodb.inc
 --source include/not_embedded.inc
 
-call mtr.add_suppression("\\[Error\\] InnoDB: Can't generate new master key for tablespace encryption, please check the keyring plugin is loaded.");
-call mtr.add_suppression("\\[Error\\] InnoDB: Encryption can't find master key, please check the keyring plugin is loaded.");
-call mtr.add_suppression("\\[ERROR\\] Function 'keyring_file' already exists");
-call mtr.add_suppression("\\[ERROR\\] Couldn't load plugin named 'keyring_file' with soname 'keyring_file.*'.");
-call mtr.add_suppression("Plugin keyring_file reported");
-
 # Restart the server with keyring loaded
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 -- send_shutdown
@@ -108,7 +102,6 @@ INSERT INTO t1 VALUES(9, "jjjjj");
 SELECT * FROM t1 LIMIT 10;
 DROP TABLE t1;
 
-
 let $restart_parameters = restart: --early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=/home/rob/vault/keyring_vault.conf --general-log --log-output=FILE --general_log_file=$MYSQL_TMP_DIR/keyring_query_log $KEYRING_VAULT_PLUGIN_OPT ;
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_VAULT_PLUGIN_OPT --plugin-dir=KEYRING_VAULT_PLUGIN_PATH
 --replace_regex /\.dll/.so/
@@ -116,7 +109,7 @@ let $restart_parameters = restart: --early-plugin-load="keyring_vault=$KEYRING_V
 #
 # Check no effect of block_encryption_mode = 'aes-256-cbc' variable on table encryption
 SET block_encryption_mode = 'aes-256-cbc';
-# Test encryption .
+# Test encryption.
 --disable_warnings
 DROP DATABASE IF EXISTS tde_db;
 CREATE DATABASE tde_db;
@@ -146,11 +139,8 @@ SELECT * FROM tde_db.t1 LIMIT 10;
 INSERT INTO tde_db.t1 VALUES(4, null);
 SELECT * FROM tde_db.t1 LIMIT 10;
 DROP DATABASE tde_db;
-#
 
 # Cleanup
 --remove_file $MYSQL_TMP_DIR/keyring_query_log
-#--remove_file $MYSQL_TMP_DIR/mysecret_keyring
-#--remove_file $MYSQL_TMP_DIR/mysecret_keyring2
 --remove_file $MYSQL_TMP_DIR/mysqlpump_encrypt.sql
 eval SET GLOBAL innodb_file_per_table=$innodb_file_per_table;
