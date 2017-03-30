@@ -61,10 +61,10 @@ MYSQL_ADD_PLUGIN(keyring_vault
                  MODULE_ONLY
                  MODULE_OUTPUT_NAME "keyring_vault")
 
-#IF(WITH_KEYRING_TEST)
-#  ADD_SUBDIRECTORY(keyring-test)
-#ENDIF()
-#
+IF(WITH_KEYRING_VAULT_TEST)
+  ADD_SUBDIRECTORY(keyring_vault-test)
+ENDIF()
+
 IF(HAVE_DLOPEN)
     SET(DYNLIB_EXTENSION "so")
     SET_TARGET_PROPERTIES(keyring_vault
