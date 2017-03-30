@@ -18,17 +18,17 @@ eval INSTALL PLUGIN keyring_vault SONAME '$KEYRING_VAULT_PLUGIN';
 query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
 FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
 --echo
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
-eval SET @@global.keyring_vault_config= '/home/rob/vault/keyring_vault.conf';
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
+eval SET @@global.keyring_vault_config= '$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf';
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
 SELECT @@global.keyring_vault_config;
 # Creating table with encryption.
 CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="Y" ENGINE = InnoDB;
 
 # Setting keyring_vault_config value to file.
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
-eval SET @@global.keyring_vault_config= '/home/rob/vault/keyring_vault2.conf';
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
+eval SET @@global.keyring_vault_config= '$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault2.conf';
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
 SELECT @@global.keyring_vault_config;
 
 # Invalid values
@@ -51,7 +51,7 @@ SET @@local.keyring_vault_config= '$MYSQL_TMP_DIR/new_keyring_vault_config';
 # Setting keyring_vault_config value to dir.
 --Error ER_WRONG_VALUE_FOR_VAR
 SET @@global.keyring_vault_config= 'MYSQL_test_invalid/dir/';
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
 SELECT @@global.keyring_vault_config;
 --echo
 

@@ -6,7 +6,6 @@
 --source include/not_embedded.inc
 --source include/have_innodb_max_16k.inc
 --source include/have_debug.inc
-#let $KEYRING_VAULT_PLUGIN = 'keyring_file.so';
 
 # Create a table with encryption, should fail since keyring is not
 # loaded
@@ -29,7 +28,7 @@ ALTER TABLE t1 ENCRYPTION="Y", algorithm=copy;
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 -- send_shutdown
 -- source include/wait_until_disconnected.inc
---exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=/home/rob/vault/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --enable_reconnect
 --source include/wait_until_connected_again.inc
 --disable_reconnect
@@ -107,7 +106,7 @@ SELECT * FROM t1 ORDER BY c1 LIMIT 10;
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 -- send_shutdown
 -- source include/wait_until_disconnected.inc
---exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=/home/rob/vault/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --enable_reconnect
 --source include/wait_until_connected_again.inc
 --disable_reconnect
@@ -136,7 +135,7 @@ INSERT INTO t1 VALUES(9, "jjjjj");
 
 # Restart to confirm the encryption info can be retrieved properly.
 --source include/kill_mysqld.inc
---exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=/home/rob/vault/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --enable_reconnect
 --source include/wait_until_connected_again.inc
 --disable_reconnect
@@ -190,7 +189,7 @@ SELECT * FROM t1 ORDER BY c1 LIMIT 10;
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 -- send_shutdown
 -- source include/wait_until_disconnected.inc
---exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=/home/rob/vault/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --enable_reconnect
 --source include/wait_until_connected_again.inc
 --disable_reconnect
@@ -215,7 +214,7 @@ SELECT * FROM t1 ORDER BY c1 LIMIT 10;
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 -- send_shutdown
 -- source include/wait_until_disconnected.inc
---exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=/home/rob/vault/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart:--early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --enable_reconnect
 --source include/wait_until_connected_again.inc
 --disable_reconnect
@@ -251,7 +250,7 @@ SELECT c1, ST_AsText(g) FROM t1 ORDER BY c1 LIMIT 10;
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 -- send_shutdown
 -- source include/wait_until_disconnected.inc
---exec echo "restart: --innodb_strict_mode=OFF --early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=/home/rob/vault/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart: --innodb_strict_mode=OFF --early-plugin-load="keyring_vault=$KEYRING_VAULT_PLUGIN" --loose-keyring_vault_config=$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf $KEYRING_VAULT_PLUGIN_OPT" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --enable_reconnect
 --source include/wait_until_connected_again.inc
 --disable_reconnect

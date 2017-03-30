@@ -10,15 +10,15 @@ PLUGIN_NAME	keyring_vault
 PLUGIN_VERSION	1.0
 PLUGIN_STATUS	ACTIVE
 
-SET @@global.keyring_vault_config= '/home/rob/vault/keyring_vault.conf';
+SET @@global.keyring_vault_config= 'MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf';
 SELECT @@global.keyring_vault_config;
 @@global.keyring_vault_config
-/home/rob/vault/keyring_vault.conf
+MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf
 CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="Y" ENGINE = InnoDB;
-SET @@global.keyring_vault_config= '/home/rob/vault/keyring_vault2.conf';
+SET @@global.keyring_vault_config= 'MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault2.conf';
 SELECT @@global.keyring_vault_config;
 @@global.keyring_vault_config
-/home/rob/vault/keyring_vault2.conf
+MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault2.conf
 SET @@global.keyring_vault_config='';
 ERROR 42000: Variable 'keyring_vault_config' can't be set to the value of ''
 SET @@global.keyring_vault_config='#^$^@E&(';
@@ -35,7 +35,7 @@ SET @@global.keyring_vault_config= 'MYSQL_test_invalid/dir/';
 ERROR 42000: Variable 'keyring_vault_config' can't be set to the value of 'MYSQL_test_invalid/dir/'
 SELECT @@global.keyring_vault_config;
 @@global.keyring_vault_config
-/home/rob/vault/keyring_vault2.conf
+MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault2.conf
 
 UNINSTALL PLUGIN keyring_vault;
 SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
