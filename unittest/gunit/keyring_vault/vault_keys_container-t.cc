@@ -275,6 +275,62 @@ namespace keyring__vault_keys_container_unittest
     vault_keys_container->remove_key(sample_key);
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 0);
   }
+
+  TEST_F(Vault_keys_container_test, StoreStoreStoreFetchRemoveWithSleeps)
+  {
+    IKeyring_io *keyring_io= new Vault_io(logger, vault_curl, vault_parser);
+    EXPECT_EQ(vault_keys_container->init(keyring_io, credential_file_url), 0);
+    EXPECT_EQ(vault_keys_container->store_key(sample_key), FALSE);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
+
+    my_sleep(20000000);
+
+    std::string key_data1("Robi1");
+    Vault_key *key1= new Vault_key("Roberts_key1", "AES", "Robert", key_data1.c_str(), key_data1.length());
+
+    EXPECT_EQ(vault_keys_container->store_key(key1), FALSE);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 2);
+
+    my_sleep(10000000);
+
+    std::string key_data2("Robi2");
+    Vault_key *key2= new Vault_key("Roberts_key2", "AES", "Robert", key_data2.c_str(), key_data2.length());
+    EXPECT_EQ(vault_keys_container->store_key(key2), 0);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 3);
+
+    my_sleep(5000000);
+
+    std::string key_data3("Robi3");
+    Vault_key *key3= new Vault_key("Roberts_key3", "AES", "Robert", key_data3.c_str(), key_data3.length());
+
+    EXPECT_EQ(vault_keys_container->store_key(key3), 0);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 4);
+
+    Vault_key key2_id("Roberts_key2", NULL, "Robert",NULL,0);
+    IKey* fetched_key= vault_keys_container->fetch_key(&key2_id);
+
+    my_sleep(5000000);
+
+    ASSERT_TRUE(fetched_key != NULL);
+    std::string expected_key_signature= "12_Roberts_key26_Robert";
+    EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
+    uchar *key_data_fetched= fetched_key->get_key_data();
+    size_t key_data_fetched_size= fetched_key->get_key_data_size();
+    EXPECT_EQ(memcmp(key_data_fetched, key_data2.c_str(), key_data_fetched_size), 0); 
+    ASSERT_TRUE(key_data2.length() == key_data_fetched_size);
+
+    Vault_key key3_id("Roberts_key3", NULL, "Robert",NULL,0);
+    vault_keys_container->remove_key(&key3_id);
+    vault_keys_container->remove_key(key2);
+    my_sleep(5000000);
+    vault_keys_container->remove_key(key1);
+    vault_keys_container->remove_key(sample_key);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 0);
+
+    my_free(fetched_key->release_key_data());
+  }
+
 /*
   class Buffered_file_io_dont_remove_backup : public Buffered_file_io
   {

@@ -16,7 +16,7 @@ static size_t write_response_memory(void *contents, size_t size, size_t nmemb, v
 
   read_data->write((char*)contents, realsize);
   if (!read_data->good())
-    return 0; //TODO:is this correct or error should be signalised somehow different ?
+    return 0;
   return realsize;
 }
 
