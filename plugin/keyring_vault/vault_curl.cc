@@ -1,7 +1,3 @@
-//
-// Created by rob on 03.03.17.
-//
-
 #include <algorithm>
 #include "vault_curl.h"
 #include "base64.h"
@@ -119,7 +115,6 @@ my_bool Vault_curl::write_key(IKey *key, std::string *response)
   char *base64_encoded_key_data = new char[memory_needed];
   if (base64_encode((const char*)key->get_key_data(), key->get_key_data_size(), base64_encoded_key_data) != 0)
   {
-    //memset(base64_encoded_key_data, memory_needed, 0);
     delete[] base64_encoded_key_data;
     logger->log(MY_ERROR_LEVEL, "Could not encode a key in base64");
     return TRUE;
@@ -128,13 +123,11 @@ my_bool Vault_curl::write_key(IKey *key, std::string *response)
   memory_needed = new_end - base64_encoded_key_data;
   //base64 end of encoding
   
-
   CURLcode curl_res = CURLE_OK;
   std::string postdata="{\"type\":\"" + *key->get_key_type() + "\",\"";
   postdata += "value\":\"";
   postdata.append(base64_encoded_key_data, memory_needed-1); //base64 encode returns data with NULL terminating string - which we do not care about
   postdata += "\"}";
-  //memset(base64_encoded_key_data, memory_needed, 0);
   delete[] base64_encoded_key_data;
 
   if (reset_curl_session() ||
@@ -181,27 +174,4 @@ my_bool Vault_curl::delete_key(IKey *key, std::string *response)
   return FALSE;
 }
 
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+} //namespace keyring

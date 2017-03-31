@@ -1,7 +1,3 @@
-//
-// Created by rob on 03.03.17.
-//
-
 #ifndef MYSQL_VAULT_KEYS_CONTAINER_H
 #define MYSQL_VAULT_KEYS_CONTAINER_H
 
@@ -27,7 +23,5 @@ protected:
 };
 
 } //namespace keyring
-
-
 
 #endif //MYSQL_VAULT_KEYS_CONTAINER_H

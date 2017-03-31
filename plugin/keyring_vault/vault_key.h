@@ -1,12 +1,8 @@
-//
-// Created by rob on 24.02.17.
-//
+#ifndef MYSQL_VAULT_KEY_H
+#define MYSQL_VAULT_KEY_H
 
 #include "keyring_key.h"
 #include "i_serialized_object.h"
-
-#ifndef MYSQL_VAULT_KEY_H
-#define MYSQL_VAULT_KEY_H
 
 namespace keyring {
 
@@ -38,6 +34,5 @@ protected:
 };
 
 } //namespace keyring
-
 
 #endif //MYSQL_VAULT_KEY_H

@@ -7,12 +7,6 @@
 #include "vault_parser.h"
 #include "vault_io.h"
 
-//#ifdef _WIN32
-//#define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"\\keyring"
-//#else
-//#define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"/keyring"
-//#endif
-
 using keyring::IVault_curl;
 using keyring::IVault_parser;
 using keyring::Vault_parser;
@@ -56,13 +50,12 @@ int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
   return(0);
 }
 
-//TODO: Change name of this variable
-static char *keyring_vault_cred_file= NULL;
+static char *keyring_vault_config_file= NULL;
 static MYSQL_SYSVAR_STR(
   config,                                                      /* name       */
-  keyring_vault_cred_file,                                     /* value      */
+  keyring_vault_config_file,                                   /* value      */
   PLUGIN_VAR_RQCMDARG,                                         /* flags      */
-  "The path to the keyring file. Must be specified",           /* comment    */
+  "The path to the keyring_vault configuration file",          /* comment    */
   check_keyring_file_data,                                     /* check()    */
   update_keyring_file_data,                                    /* update()   */
   ""                                                           /* default    */
@@ -93,11 +86,11 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
     IVault_curl *vault_curl = new Vault_curl(logger.get());
     IVault_parser *vault_parser = new Vault_parser(logger.get());
     IKeyring_io *keyring_io= new Vault_io(logger.get(), vault_curl, vault_parser);
-    if (keys->init(keyring_io, keyring_vault_cred_file))
+    if (keys->init(keyring_io, keyring_vault_config_file))
     {
       is_keys_container_initialized = FALSE;
       logger->log(MY_ERROR_LEVEL, "keyring_vault initialization failure. Please check that"
-        " the keyring_vault_cred_file points to readable keyring_vault configuration"
+        " the keyring_vault_config_file points to readable keyring_vault configuration"
         " file. Please also make sure Vault is running and accessible."
         " The keyring_vault will stay unusable until correct configuration file gets"
         " provided.");
@@ -190,12 +183,12 @@ mysql_declare_plugin(keyring_vault)
 {
   MYSQL_KEYRING_PLUGIN,                                   /*   type                            */
   &keyring_descriptor,                                    /*   descriptor                      */
-  "keyring_vault",                                         /*   name                            */
+  "keyring_vault",                                        /*   name                            */
   "Oracle Corporation",                                   /*   author                          */
   "store/fetch authentication data to/from a flat file",  /*   description                     */
   PLUGIN_LICENSE_GPL,
   keyring_vault_init,                                     /*   init function (when loaded)     */
-  keyring_vault_deinit,                                         /*   deinit function (when unloaded) */
+  keyring_vault_deinit,                                   /*   deinit function (when unloaded) */
   0x0100,                                                 /*   version                         */
   NULL,                                                   /*   status variables                */
   keyring_vault_system_variables,                         /*   system variables                */

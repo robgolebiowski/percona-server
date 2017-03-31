@@ -23,20 +23,15 @@ namespace keyring__vault_parser_unittest
   protected:
     virtual void SetUp()
     {
-//      keyring_file_data_key = PSI_NOT_INSTRUMENTED;
-//      keyring_backup_file_data_key = PSI_NOT_INSTRUMENTED;
       logger= new Mock_logger();
     }
 
     virtual void TearDown()
     {
-//      fake_mysql_plugin.name.str= const_cast<char*>("FakeKeyringPlugin");
-//      fake_mysql_plugin.name.length= strlen("FakeKeyringPlugin");
       delete logger;
     }
 
   protected:
-//    st_plugin_int fake_mysql_plugin;
     ILogger *logger;
   };
 
@@ -189,11 +184,7 @@ namespace keyring__vault_parser_unittest
 } //namespace keyring__file_io_unittest
 
 int main(int argc, char **argv) {
-//  if (mysql_rwlock_init(key_LOCK_keyring, &LOCK_keyring))
-//    return TRUE;
-//  curl_global_init(CURL_GLOBAL_DEFAULT);
   ::testing::InitGoogleTest(&argc, argv);
   int ret= RUN_ALL_TESTS();
-//  curl_global_cleanup();
   return ret;
 }

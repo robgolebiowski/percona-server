@@ -1,6 +1,3 @@
-//
-// Created by rob on 08.03.17.
-//
 #include <my_global.h>
 #include <gtest/gtest.h>
 #include "mock_logger.h"
@@ -11,7 +8,6 @@
 namespace keyring
 {
   PSI_memory_key key_memory_KEYRING = PSI_NOT_INSTRUMENTED;
-//  PSI_memory_key key_LOCK_keyring = PSI_NOT_INSTRUMENTED;
 }
 #endif
 
@@ -35,7 +31,6 @@ namespace keyring__vault_credentials_parser_unittest
     }
 
   protected:
-//    st_plugin_int fake_mysql_plugin;
     ILogger *logger;
   };
 
@@ -91,7 +86,6 @@ namespace keyring__vault_credentials_parser_unittest
     std::ofstream my_file;
     my_file.open("./credentials");
     my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
-    //my_file << "secret_mount_point = secret";
     my_file << "token = 123-123-123" << std::endl;
     my_file << "vault_ca = /some/path";
     my_file.close();
@@ -120,7 +114,6 @@ namespace keyring__vault_credentials_parser_unittest
     std::remove("./credentials");
     std::ofstream my_file;
     my_file.open("./credentials");
-    //my_file << "vault_url = http://127.0.0.1:8200";
     my_file << "secret_mount_point = secret" << std::endl;
     my_file << "token = 123-123-123" << std::endl;
     my_file << "vault_ca = /some/path";
@@ -153,7 +146,6 @@ namespace keyring__vault_credentials_parser_unittest
     my_file << "vault_url = http://127.0.0.1:8200" << std::endl;
     my_file << "secret_mount_point = secret" << std::endl;
     my_file << "vault_ca = /some/path";
-    //my_file << "token = 123-123-123";
     my_file.close();
 
     EXPECT_CALL(*((Mock_logger *)logger),
@@ -311,49 +303,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

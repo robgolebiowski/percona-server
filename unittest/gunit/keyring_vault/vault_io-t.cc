@@ -10,7 +10,6 @@
 namespace keyring
 {
   PSI_memory_key key_memory_KEYRING = PSI_NOT_INSTRUMENTED;
-//  PSI_memory_key key_LOCK_keyring = PSI_NOT_INSTRUMENTED;
 }
 #endif
 
@@ -83,10 +82,10 @@ namespace keyring__vault_io_unittest
     std::remove(conf_with_invalid_token.c_str());
   }
 
-  //TODO: Add intialization with invalid CA cert
-  //TODO: Add testcase without CA cert, but CA cert will be trusted by the machine
-   
 /*
+  //Tests InitWithNotExisitingVaultCA and InitWithOutVaultCA need Vault's CA cert to not
+  //be trusted by machine.
+ 
   TEST_F(Vault_io_test, InitWithNotExisitingVaultCA)
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
@@ -249,7 +248,7 @@ namespace keyring__vault_io_unittest
     EXPECT_EQ(vault_io.flush_to_storage(&key_to_store), FALSE);
 
     Vault_key key("key1", NULL, "rob", NULL, 0);
-    EXPECT_EQ(vault_io.retrieve_key_type_and_value(&key), FALSE);
+    EXPECT_EQ(vault_io.retrieve_key_type_and_data(&key), FALSE);
     EXPECT_STREQ(key.get_key_signature()->c_str(), "4_key13_rob");
     ASSERT_TRUE(memcmp(key.get_key_data(), "Robi", key.get_key_data_size()) == 0);
     EXPECT_STREQ("AES", key.get_key_type()->c_str());
@@ -279,7 +278,7 @@ namespace keyring__vault_io_unittest
     key.set_key_operation(STORE_KEY);
     EXPECT_EQ(vault_io.flush_to_storage(&key), FALSE);
     Vault_key key1_id("key1", NULL, "rob", NULL, 0);
-    EXPECT_EQ(vault_io.retrieve_key_type_and_value(&key1_id), FALSE);
+    EXPECT_EQ(vault_io.retrieve_key_type_and_data(&key1_id), FALSE);
     EXPECT_STREQ(key1_id.get_key_signature()->c_str(), "4_key13_rob");
     ASSERT_TRUE(memcmp(key1_id.get_key_data(), "Robi", key1_id.get_key_data_size()) == 0);
     EXPECT_STREQ("AES", key1_id.get_key_type()->c_str());
@@ -400,7 +399,7 @@ namespace keyring__vault_io_unittest
       .WillOnce(Return(TRUE));
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault.")));
-    EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
+    EXPECT_EQ(vault_io.retrieve_key_type_and_data(key), TRUE);
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultInVaultsCurlResponseOnReadKey)
@@ -421,7 +420,7 @@ namespace keyring__vault_io_unittest
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault. Vault has returned the following error(s):"
                                 " [\"Cannot read this stuff\"]")));
-    EXPECT_EQ(vault_io.retrieve_key_type_and_value(key), TRUE);
+    EXPECT_EQ(vault_io.retrieve_key_type_and_data(key), TRUE);
   }
 
   TEST_F(Vault_io_test, ErrorsFromVaultCurlOnDeleteKey)
@@ -576,7 +575,7 @@ namespace keyring__vault_io_unittest
       .WillOnce(Return(FALSE));
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault.")));
-    EXPECT_EQ(vault_io.retrieve_key_type_and_value(&key), TRUE);
+    EXPECT_EQ(vault_io.retrieve_key_type_and_data(&key), TRUE);
 
     Vault_key key_to_remove("key1", NULL, "rob", NULL, 0);
     key_to_remove.set_key_operation(REMOVE_KEY);
@@ -601,7 +600,7 @@ namespace keyring__vault_io_unittest
       .WillOnce(Return(TRUE));
     EXPECT_CALL(*((Mock_logger *)logger),
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault. Error while parsing error messages")));
-    EXPECT_EQ(vault_io.retrieve_key_type_and_value(&key), TRUE);
+    EXPECT_EQ(vault_io.retrieve_key_type_and_data(&key), TRUE);
 
     Vault_key key_to_remove("key1", NULL, "rob", NULL, 0);
     key_to_remove.set_key_operation(REMOVE_KEY);
@@ -610,8 +609,6 @@ namespace keyring__vault_io_unittest
 } //namespace keyring__file_io_unittest
 
 int main(int argc, char **argv) {
-//  if (mysql_rwlock_init(key_LOCK_keyring, &LOCK_keyring))
-//    return TRUE;
   curl_global_init(CURL_GLOBAL_DEFAULT);
   ::testing::InitGoogleTest(&argc, argv);
   int ret= RUN_ALL_TESTS();

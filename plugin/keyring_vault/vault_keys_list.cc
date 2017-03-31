@@ -1,7 +1,3 @@
-//
-// Created by rob on 01.03.17.
-//
-
 #include "vault_keys_list.h"
 
 namespace keyring

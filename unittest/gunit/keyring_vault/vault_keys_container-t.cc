@@ -7,7 +7,6 @@
 #include <fstream>
 #include "i_serialized_object.h"
 
-//#if !defined(MERGE_UNITTESTS) //TODO: Look into merging
 #ifdef HAVE_PSI_INTERFACE
 namespace keyring
 {
@@ -16,7 +15,6 @@ namespace keyring
 }
 #endif
 mysql_rwlock_t LOCK_keyring;
-//#endif
 
 namespace keyring__vault_keys_container_unittest
 {
@@ -64,34 +62,6 @@ namespace keyring__vault_keys_container_unittest
     Vault_key *sample_key;
     std::string sample_key_data;
   };
-
-/*  void Keys_container_test::create_keyring_file(const char *file_name, const char *keyring_buffer)
-  {
-    std::fstream file;
-    file.open(file_name,
-              std::fstream::out | std::fstream::binary | std::fstream::trunc);
-    ASSERT_TRUE(file.is_open());
-    file.write(keyring_buffer, strlen(keyring_buffer));
-    file.close();
-  }
-
-  void Keys_container_test::generate_keyring_file_with_correct_structure(const char *file_name)
-  {
-    static const char *keyring_buffer= "Keyring file version:1.0EOF";
-    create_keyring_file(file_name, keyring_buffer);
-  }
-
-  void Keys_container_test::generate_keyring_file_with_incorrect_file_version(const char *file_name)
-  {
-    static const char *keyring_buffer= "Keyring file version:2.0EOF";
-    create_keyring_file(file_name, keyring_buffer);
-  }
-
-  void Keys_container_test::generate_keyring_file_with_incorrect_TAG(const char *file_name)
-  {
-    static const char *keyring_buffer= "Keyring file version:2.0EF";
-    create_keyring_file(file_name, keyring_buffer);
-  }*/
 
   TEST_F(Vault_keys_container_test, InitWithCorrectCredential)
   {
@@ -331,455 +301,10 @@ namespace keyring__vault_keys_container_unittest
     my_free(fetched_key->release_key_data());
   }
 
-/*
-  class Buffered_file_io_dont_remove_backup : public Buffered_file_io
+  class Mock_vault_io : public IVault_io
   {
   public:
-    Buffered_file_io_dont_remove_backup(ILogger *logger)
-      : Buffered_file_io(logger) {}
-
-    my_bool remove_backup(myf myFlags)
-    {
-      return FALSE;
-    }
-  };
-
-  class Keys_container_test_dont_close : public ::testing::Test
-  {
-  public:
-    Keys_container_test_dont_close() : file_name("./keyring") {}
-  protected:
-    virtual void SetUp()
-    {
-      sample_key_data= "Robi";
-      sample_key= new Key("Roberts_key", "AES", "Robert", sample_key_data.c_str(), sample_key_data.length()+1);
-      std::string sample_key_data2="xobi2";
-      sample_key2= new Key("Roberts_key2", "AES", "Robert", sample_key_data2.c_str(), sample_key_data2.length()+1);
-
-      //Remove Keyring files just to be save
-      remove(file_name.c_str());
-      remove("./keyring.backup");
-      remove("./keyring.backup.backup");
-    }
-    virtual void TearDown()
-    {
-      remove(file_name.c_str());
-    }
-    void generate_malformed_keyring_file_without_tag(const char *file_name);
-  protected:
-    Key *sample_key;
-    Key *sample_key2;
-    std::string sample_key_data;
-    std::string file_name;
-  };
-
-  void Keys_container_test_dont_close::generate_malformed_keyring_file_without_tag(const char *file_name)
-  {
-    static const char *malformed_keyring_buffer= "Key1AESRobertKEYDATA"
-      "Key2AESZibiDATAKey3DATA...crashing";
-
-    std::fstream file;
-    file.open(file_name, std::fstream::out | std::fstream::binary | std::fstream::trunc);
-    ASSERT_TRUE(file.is_open());
-    file.write(malformed_keyring_buffer, strlen(malformed_keyring_buffer));
-    file.close();
-  }
-
-  TEST_F(Keys_container_test_dont_close, CheckIfCorrectBackupFileIsCreatedAfterStoringOneKey)
-  {
-    ILogger *logger= new Mock_logger();
-    IKeyring_io *keyring_io_dont_remove_backup= new Buffered_file_io_dont_remove_backup(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io_dont_remove_backup, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), TRUE);
-
-    //Check if backup file is empty
-    delete keys_container;
-    delete logger;
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    keys_container= new Keys_container(logger);
-    ASSERT_TRUE(keys_container->init(keyring_io, "./keyring.backup") == 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 0);
-
-    remove("./keyring.backup");
-    remove("./keyring.backup.backup"); //leftover from initializing keyring with backup file
-    remove(file_name.c_str());
-    delete keys_container;
-    delete logger;
-    delete sample_key2; //unused in this test
-  }
-
-  TEST_F(Keys_container_test_dont_close, CheckIfCorrectBackupFileIsCreatedAfterStoringTwoKeys)
-  {
-    ILogger *logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    //successfully stored the key - backup file does not exist
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-    delete keys_container;
-    delete logger;
-
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_dont_remove_backup= new Buffered_file_io_dont_remove_backup(logger);
-    keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io_dont_remove_backup, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key2), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), TRUE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), TRUE);
-
-    delete keys_container;
-    delete logger;
-    //Check that backup file contains sample_key only
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_2= new Buffered_file_io(logger);
-    keys_container= new Keys_container(logger);
-    EXPECT_EQ(keys_container->init(keyring_io_2, file_name), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    Key sample_key_id("Roberts_key", NULL, "Robert", NULL, 0);
-    IKey *fetchedKey= keys_container->fetch_key(&sample_key_id);
-    ASSERT_TRUE(fetchedKey != NULL);
-
-    ASSERT_TRUE(*fetchedKey->get_key_signature() == "Roberts_keyRobert");
-    ASSERT_TRUE(memcmp(fetchedKey->get_key_data(), "Robi", fetchedKey->get_key_data_size()) == 0);
-
-    remove("./keyring.backup");
-    remove("./keyring.backup.backup"); //leftover from initializing keyring with backup file
-    remove(file_name.c_str());
-    delete keys_container;
-    delete logger;
-    my_free(fetchedKey->release_key_data());
-  }
-
-  TEST_F(Keys_container_test_dont_close, CheckIfCorrectBackupFileIsCreatedBeforeRemovingKey)
-  {
-    ILogger *logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    //successfully stored the key - backup file does not exist
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-    EXPECT_EQ(keys_container->store_key(sample_key2), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-
-    delete keys_container;
-    delete logger;
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_dont_remove_backup= new Buffered_file_io_dont_remove_backup(logger);
-    keys_container= new Keys_container(logger);
-
-    ASSERT_TRUE(keys_container->init(keyring_io_dont_remove_backup, file_name) == 0);
-    Key sample_key_id("Roberts_key", "AES", "Robert", NULL, 0);
-    EXPECT_EQ(keys_container->remove_key(&sample_key_id), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), TRUE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), TRUE);
-
-    delete keys_container;
-    delete logger;
-    //Check that backup file contains sample_key and sample_key2
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_2= new Buffered_file_io(logger);
-    keys_container= new Keys_container(logger);
-    EXPECT_EQ(keys_container->init(keyring_io_2, "./keyring.backup"), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    Key sample_key2_id("Roberts_key2", NULL, "Robert", NULL, 0);
-    IKey *fetchedKey= keys_container->fetch_key(&sample_key2_id);
-    ASSERT_TRUE(fetchedKey != NULL);
-    ASSERT_TRUE(*fetchedKey->get_key_signature() == "Roberts_key2Robert");
-    ASSERT_TRUE(memcmp(fetchedKey->get_key_data(), "xobi2", fetchedKey->get_key_data_size()) == 0);
-
-    remove("./keyring.backup");
-    remove("./keyring.backup.backup"); //leftover from initializing keyring with backup file
-    remove(file_name.c_str());
-    delete keys_container;
-    delete logger;
-    my_free(fetchedKey->release_key_data());
-  }
-
-  TEST_F(Keys_container_test_dont_close, CheckIfBackupFileIsNotCreatedForFetching)
-  {
-    ILogger *logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    //successfully stored the key - backup file does not exist
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-    EXPECT_EQ(keys_container->store_key(sample_key2), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-
-    delete keys_container;
-    delete logger;
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_dont_remove_backup= new Buffered_file_io_dont_remove_backup(logger);
-    keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io_dont_remove_backup, file_name), 0);
-    Key sample_key_id("Roberts_key", NULL, "Robert", NULL, 0);
-    IKey *fetchedKey= keys_container->fetch_key(&sample_key_id);
-    ASSERT_TRUE(fetchedKey != NULL);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    //check if the backup file was not created
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), TRUE);
-
-    remove("./keyring.backup");
-    remove(file_name.c_str());
-    delete keys_container;
-    delete logger;
-    my_free(fetchedKey->release_key_data());
-  }
-
-  TEST_F(Keys_container_test_dont_close, KeyringfileIsMalformedCheckIfBackupIsLoaded)
-  {
-    ILogger *logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    //successfully stored the key - backup file does not exist
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-    EXPECT_EQ(keys_container->store_key(sample_key2), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    //Now we have correct backup file
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-
-    delete keys_container;
-    delete logger;
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_dont_remove_backup= new Buffered_file_io_dont_remove_backup(logger);
-    keys_container= new Keys_container(logger);
-
-    //this key will not be in backup file thus we do not care about it
-    Key *sample_key3= new Key("Roberts_key3", "ZZZZ", "MaybeRobert", (void*)("DATA"), strlen("DATA"));
-
-    EXPECT_EQ(keys_container->init(keyring_io_dont_remove_backup, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key3), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
-    //Now we have correct backup file
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), TRUE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-
-    delete keys_container;
-    delete logger;
-    remove("./keyring");
-    generate_malformed_keyring_file_without_tag("./keyring");
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_2= new Buffered_file_io(logger);
-    keys_container= new Keys_container(logger);
-
-    ASSERT_TRUE(keys_container->init(keyring_io_2, file_name) == 0);
-    //Check that keyring from backup was loaded as the keyring file is corrupted
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    Key sample_key_id("Roberts_key", NULL, "Robert", NULL, 0);
-    Key sample_key2_id("Roberts_key2", NULL, "Robert", NULL, 0);
-    IKey *fetchedKey= keys_container->fetch_key(&sample_key2_id);
-    ASSERT_TRUE(fetchedKey != NULL);
-    ASSERT_TRUE(*fetchedKey->get_key_signature() == "Roberts_key2Robert");
-    ASSERT_TRUE(memcmp(fetchedKey->get_key_data(), "xobi2", fetchedKey->get_key_data_size()) == 0);
-    IKey *fetchedKey2= keys_container->fetch_key(&sample_key_id);
-    ASSERT_TRUE(fetchedKey2 != NULL);
-    ASSERT_TRUE(*fetchedKey2->get_key_signature() == "Roberts_keyRobert");
-    ASSERT_TRUE(memcmp(fetchedKey2->get_key_data(), "Robi", fetchedKey2->get_key_data_size()) == 0);
-
-    //check if the backup file was removed
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), TRUE);
-
-    remove("./keyring.backup");
-    remove(file_name.c_str());
-    delete keys_container;
-    delete logger;
-    my_free(fetchedKey->release_key_data());
-    my_free(fetchedKey2->release_key_data());
-  }
-
-  TEST_F(Keys_container_test_dont_close, BackupfileIsMalformedCheckItIsIgnoredAndDeleted)
-  {
-    ILogger *logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    //successfully stored the key - backup file does not exist
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-    EXPECT_EQ(keys_container->store_key(sample_key2), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    //Now we have correct backup file
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-
-    delete keys_container;
-    delete logger;
-    generate_malformed_keyring_file_without_tag("./keyring.backup");
-    logger= new Mock_logger();
-    IKeyring_io *keyring_io_2= new Buffered_file_io(logger);
-    keys_container= new Keys_container(logger);
-
-    //Check that backup file was ignored (as backup file is malformed)
-    EXPECT_CALL(*((Mock_logger *)logger), log(MY_WARNING_LEVEL, StrEq("Found malformed keyring backup file - removing it")));
-    EXPECT_EQ(keys_container->init(keyring_io_2, file_name), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-    Key sample_key_id("Roberts_key", NULL, "Robert", NULL, 0);
-    Key sample_key2_id("Roberts_key2", NULL, "Robert", NULL, 0);
-    IKey *fetchedKey= keys_container->fetch_key(&sample_key2_id);
-    ASSERT_TRUE(fetchedKey != NULL);
-    ASSERT_TRUE(*fetchedKey->get_key_signature() == "Roberts_key2Robert");
-    ASSERT_TRUE(memcmp(fetchedKey->get_key_data(), "xobi2", fetchedKey->get_key_data_size()) == 0);
-    IKey *fetchedKey2= keys_container->fetch_key(&sample_key_id);
-    ASSERT_TRUE(fetchedKey2 != NULL);
-    ASSERT_TRUE(*fetchedKey2->get_key_signature() == "Roberts_keyRobert");
-    ASSERT_TRUE(memcmp(fetchedKey2->get_key_data(), "Robi", fetchedKey2->get_key_data_size()) == 0);
-
-    //check if the backup file was removed
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), TRUE);
-
-    delete keys_container;
-    delete logger;
-    my_free(fetchedKey->release_key_data());
-    my_free(fetchedKey2->release_key_data());
-  }
-
-  TEST_F(Keys_container_test_dont_close, CheckIfKeyringIsNotRecreatedWhenKeyringfileDoesnotExist)
-  {
-    Mock_logger *logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io_dont_remove_backup(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), TRUE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-
-    remove("./keyring");
-    remove("./keyring.backup");
-    EXPECT_CALL(*logger,
-                 log(MY_ERROR_LEVEL, StrEq("Could not flush keys to keyring's backup")));
-    EXPECT_EQ(keys_container->store_key(sample_key2), 1);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), FALSE);
-
-    Key sample_key_id("Roberts_key", NULL, "Robert", NULL, 0);
-    IKey *fetchedKey= keys_container->fetch_key(&sample_key_id);
-    ASSERT_TRUE(fetchedKey != NULL);
-
-    ASSERT_TRUE(*fetchedKey->get_key_signature() == "Roberts_keyRobert");
-    ASSERT_TRUE(memcmp(fetchedKey->get_key_data(), "Robi", fetchedKey->get_key_data_size()) == 0);
-
-    remove(file_name.c_str());
-    delete keys_container;
-    delete logger;
-    delete sample_key2;
-    my_free(fetchedKey->release_key_data());
-  }
-
-  TEST_F(Keys_container_test_dont_close, CheckIfKeyringIsNotRecreatedWhenBackupFileExistsAndKeyringFileDoesnot)
-  {
-    Mock_logger *logger= new Mock_logger();
-    IKeyring_io *keyring_io= new Buffered_file_io_dont_remove_backup(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), TRUE);
-    ASSERT_TRUE(check_if_file_exists_and_TAG_is_correct("./keyring") == TRUE);
-
-    remove("./keyring");
-    EXPECT_CALL(*logger,
-                 log(MY_ERROR_LEVEL, StrEq("Could not flush keys to keyring's backup")));
-    EXPECT_EQ(keys_container->store_key(sample_key2), 1);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    //as the keyring file was removed keyring.backup file should have been truncated
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), FALSE);
-
-    Key sample_key_id("Roberts_key", NULL, "Robert", NULL, 0);
-    IKey *fetchedKey= keys_container->fetch_key(&sample_key_id);
-    ASSERT_TRUE(fetchedKey != NULL);
-
-    ASSERT_TRUE(*fetchedKey->get_key_signature() == "Roberts_keyRobert");
-    ASSERT_TRUE(memcmp(fetchedKey->get_key_data(), "Robi", fetchedKey->get_key_data_size()) == 0);
-
-    remove("./keyring.backup");
-    remove(file_name.c_str());
-    delete keys_container;
-    delete logger;
-    delete sample_key2;
-    my_free(fetchedKey->release_key_data());
-  }
-
-  TEST_F(Keys_container_test_dont_close, CheckIfKeyIsNotDumpedIntoKeyringFileIfKeyringFileHasBeenChanged)
-  {
-    Mock_logger *logger= new Mock_logger();
-    IKeyring_io *keyring_io_dont_remove_backup= new Buffered_file_io_dont_remove_backup(logger);
-    Keys_container *keys_container= new Keys_container(logger);
-
-    EXPECT_EQ(keys_container->init(keyring_io_dont_remove_backup, file_name), 0);
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), TRUE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), TRUE);
-    remove("./keyring");
-    rename("keyring.backup","keyring");
-
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring"), TRUE);
-
-    EXPECT_CALL(*logger,
-                log(MY_ERROR_LEVEL, StrEq("Keyring file has been changed outside the server.")));
-    EXPECT_CALL(*logger,
-                log(MY_ERROR_LEVEL, StrEq("Could not flush keys to keyring's backup")));
-    EXPECT_EQ(keys_container->store_key(sample_key2), 1);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    //check if backup file was not created
-    EXPECT_EQ(check_if_file_exists_and_TAG_is_correct("./keyring.backup"), FALSE);
-    delete keys_container;
-    delete logger;
-    delete sample_key2;
-    remove("./keyring");
-  }*/
-
-  class Mock_vault_io : public IVault_io //TODO:Change it to Mock_vault_io
-  {
-  public:
-    MOCK_METHOD1(retrieve_key_type_and_value, my_bool(IKey *key));
+    MOCK_METHOD1(retrieve_key_type_and_data, my_bool(IKey *key));
     MOCK_METHOD1(init, my_bool(std::string *keyring_filename));
     MOCK_METHOD1(flush_to_backup, my_bool(ISerialized_object *serialized_object));
     MOCK_METHOD1(flush_to_storage, my_bool(ISerialized_object *serialized_object));
@@ -909,39 +434,9 @@ namespace keyring__vault_keys_container_unittest
     EXPECT_EQ(vault_keys_container->init(vault_io, credential_file_url), TRUE);
     EXPECT_EQ(vault_keys_container->get_number_of_keys(), static_cast<uint>(0));
     delete logger;
-//    delete invalid_key;
     delete sample_key; //unused in this test
   }
 
-/*
-  TEST_F(Keys_container_with_mocked_io_test, ErrorFromSerializerOnFlushToBackupWhenStoringKey)
-  {
-    keyring_io= new Mock_keyring_io();
-    Mock_logger *logger= new Mock_logger();
-    keys_container= new Keys_container(logger);
-    expect_calls_on_init();
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 0);
-    Mock_serializer *mock_serializer= new Mock_serializer;
-
-    {
-      InSequence dummy;
-
-      ISerialized_object *null_serialized_object= NULL;
-      EXPECT_CALL(*keyring_io, get_serializer())
-        .WillOnce(Return(mock_serializer));
-      EXPECT_CALL(*mock_serializer, serialize(_,NULL,NONE))
-        .WillOnce(Return(null_serialized_object));
-      EXPECT_CALL(*logger, log(MY_ERROR_LEVEL, StrEq("Could not flush keys to keyring's backup")));
-    }
-    EXPECT_EQ(keys_container->store_key(sample_key), 1);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 0);
-
-    delete logger;
-    delete sample_key;
-    delete mock_serializer;
-  }
-*/
   TEST_F(Vault_keys_container_with_mocked_io_test, ErrorFromSerializerOnFlushToKeyringWhenStoringKey)
   {
     vault_io= new Mock_vault_io();
@@ -952,17 +447,10 @@ namespace keyring__vault_keys_container_unittest
     EXPECT_EQ(vault_keys_container->get_number_of_keys(), static_cast<uint>(0));
     Mock_serializer *mock_serializer= new Mock_serializer;
 
-//    ISerialized_object *empty_serialized_object= new Vault_keys_list();
 
     {
       InSequence dummy;
       ISerialized_object *null_serialized_object= NULL;
-      //flush to backup
-/*      EXPECT_CALL(*vault_io, get_serializer())
-        .WillOnce(Return(mock_serializer));
-      EXPECT_CALL(*mock_serializer, serialize(_,NULL,NONE))
-        .WillOnce(Return(empty_serialized_object));*/
-//      EXPECT_CALL(*vault_io, flush_to_backup(empty_serialized_object));
       //flush to keyring
       EXPECT_CALL(*vault_io, get_serializer())
         .WillOnce(Return(mock_serializer));
@@ -977,58 +465,7 @@ namespace keyring__vault_keys_container_unittest
     delete sample_key;
     delete mock_serializer;
   }
-/*
-  TEST_F(Keys_container_with_mocked_io_test, ErrorFromSerializerOnFlushToBackupWhenRemovingKey)
-  {
-    keyring_io= new Mock_keyring_io();
-    Mock_logger *logger= new Mock_logger();
-    keys_container= new Keys_container(logger);
-    expect_calls_on_init();
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 0);
-    Mock_serializer *mock_serializer= new Mock_serializer;
 
-    ISerialized_object *empty_serialized_object= new Buffer;
-    Buffer *serialized_object_with_sample_key= new Buffer(sample_key->get_key_pod_size());
-    sample_key->store_in_buffer(serialized_object_with_sample_key->data,
-                                &(serialized_object_with_sample_key->position));
-    serialized_object_with_sample_key->position= 0; //rewind buffer
-
-    {
-      InSequence dummy;
-      //flush to backup
-      EXPECT_CALL(*keyring_io, get_serializer())
-        .WillOnce(Return(mock_serializer));
-      EXPECT_CALL(*mock_serializer, serialize(_,NULL,NONE))
-        .WillOnce(Return(empty_serialized_object));
-      EXPECT_CALL(*keyring_io, flush_to_backup(empty_serialized_object));
-      //flush to keyring
-      EXPECT_CALL(*keyring_io, get_serializer())
-        .WillOnce(Return(mock_serializer));
-      EXPECT_CALL(*mock_serializer, serialize(_,sample_key,STORE_KEY))
-        .WillOnce(Return(serialized_object_with_sample_key));
-      EXPECT_CALL(*keyring_io, flush_to_storage(serialized_object_with_sample_key));
-    }
-    EXPECT_EQ(keys_container->store_key(sample_key), 0);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    {
-      InSequence dummy;
-      ISerialized_object *null_serialized_object= NULL;
-
-      EXPECT_CALL(*keyring_io, get_serializer())
-        .WillOnce(Return(mock_serializer));
-      EXPECT_CALL(*mock_serializer, serialize(_,NULL,NONE))
-        .WillOnce(Return(null_serialized_object));
-      EXPECT_CALL(*logger, log(MY_ERROR_LEVEL, StrEq("Could not flush keys to keyring's backup")));
-    }
-    EXPECT_EQ(keys_container->remove_key(sample_key), 1);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    delete logger;
-    delete mock_serializer;
-  }
-*/
   TEST_F(Vault_keys_container_with_mocked_io_test, ErrorFromSerializerOnFlushToKeyringWhenRemovingKey)
   {
     vault_io= new Mock_vault_io();
@@ -1071,7 +508,7 @@ namespace keyring__vault_keys_container_unittest
     delete mock_serializer;
   }
 
-  TEST_F(Vault_keys_container_with_mocked_io_test, StoreAndRemoveKey) //TODO: Add fetch operation
+  TEST_F(Vault_keys_container_with_mocked_io_test, StoreAndRemoveKey)
   {
     vault_io= new Mock_vault_io();
     Mock_logger *logger= new Mock_logger();
@@ -1258,7 +695,7 @@ namespace keyring__vault_keys_container_unittest
     delete mock_serializer;
   }
 
-  TEST_F(Vault_keys_container_with_mocked_io_test, ErrorFromRetriveKeyTypeDuringFetch) //TODO: Next test that retrieve is not called when key is fetched for the 2nd time
+  TEST_F(Vault_keys_container_with_mocked_io_test, ErrorFromRetriveKeyTypeDuringFetch)
   {
     vault_io= new Mock_vault_io();
     Mock_logger *logger= new Mock_logger();
@@ -1278,7 +715,7 @@ namespace keyring__vault_keys_container_unittest
     Vault_key key_fetched("key1", NULL, "Robert", NULL, 0);
     ASSERT_TRUE(key_fetched.get_key_data() == NULL);
 
-    EXPECT_CALL(*vault_io, retrieve_key_type_and_value(_))
+    EXPECT_CALL(*vault_io, retrieve_key_type_and_data(_))
       .WillOnce(Return(TRUE));
     //retrieving key for the first time - key's data and type is kept only in Vault
     //need to fetch them on container's fetch operation
@@ -1319,16 +756,16 @@ namespace keyring__vault_keys_container_unittest
     ASSERT_TRUE(key_to_fetch.get_key_data() == NULL);
     IKey *key_fetched_from_keyring;
 
-    EXPECT_CALL(*vault_io, retrieve_key_type_and_value(_))
+    EXPECT_CALL(*vault_io, retrieve_key_type_and_data(_))
       .WillOnce(DoAll(WithArgs<0>(Invoke(set_data)), Return(FALSE)));
     //retrieving key for the first time - key's data and type is kept only in Vault
     //need to fetch them on container's fetch operation
     key_fetched_from_keyring = vault_keys_container->fetch_key(&key_to_fetch);
       
     //When we call fetch_key for the 2nd time - key's data and type should be already cached
-    //thus the second call should not call retrieve_key_type_and_value
+    //thus the second call should not call retrieve_key_type_and_data
     Vault_key key_to_re_fetch("key1", NULL, "Robert", NULL, 0);
-    EXPECT_CALL(*vault_io, retrieve_key_type_and_value(_)).Times(0);
+    EXPECT_CALL(*vault_io, retrieve_key_type_and_data(_)).Times(0);
     key_fetched_from_keyring = vault_keys_container->fetch_key(&key_to_re_fetch);
 
     ASSERT_TRUE(key_fetched_from_keyring != NULL);
@@ -1342,19 +779,5 @@ namespace keyring__vault_keys_container_unittest
     delete logger;
     delete sample_key; //unused in this test
   }
-
- 
-/*  int main(int argc, char **argv) {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    ::testing::InitGoogleTest(&argc, argv);
-    #ifdef HAVE_PSI_INTERFACE
-    if (mysql_rwlock_init(keyring::key_LOCK_keyring, &LOCK_keyring))
-      return TRUE;
-    #endif
-    int ret= RUN_ALL_TESTS();
-    curl_global_cleanup();
-    return ret;
-  }*/
 }
-
 

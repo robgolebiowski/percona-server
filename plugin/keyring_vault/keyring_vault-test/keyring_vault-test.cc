@@ -1,18 +1,3 @@
-/* Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
-
 #undef HAVE_PSI_INTERFACE
 #include <my_global.h>
 #include <iostream>
@@ -217,8 +202,6 @@ void* remove(void *arg)
   return NULL;
 }
 
-
-
 int main(int argc, char **argv)
 {
   my_thread_global_init();
@@ -249,8 +232,8 @@ int main(int argc, char **argv)
 
   my_init();
 
-  keyring_vault_cred_file = (char*)my_malloc(PSI_NOT_INSTRUMENTED, strlen(argv[1])+1, MYF(0));
-  strcpy(keyring_vault_cred_file , argv[1]);
+  keyring_vault_config_file = (char*)my_malloc(PSI_NOT_INSTRUMENTED, strlen(argv[1])+1, MYF(0));
+  strcpy(keyring_vault_config_file, argv[1]);
   threads_store_number= atoll(argv[2]) ;
   threads_remove_number= atoll(argv[3]) ;
   threads_fetch_number= atoll(argv[4]);
@@ -297,7 +280,7 @@ int main(int argc, char **argv)
   for (i= 0; i < threads_number; i++)
     my_thread_join(&otid[i], &tret);
 
-  my_free(keyring_vault_cred_file);
+  my_free(keyring_vault_config_file);
   my_free(otid);
   mysql_mutex_destroy(&LOCK_verbose);
 

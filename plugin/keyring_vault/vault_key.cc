@@ -1,7 +1,3 @@
-//
-// Created by rob on 24.02.17.
-//
-
 #include "vault_key.h"
 #include <sstream>
 
@@ -42,4 +38,3 @@ void Vault_key::create_key_signature() const
 }
 
 } //namespace keyring
-

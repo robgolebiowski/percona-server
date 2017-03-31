@@ -1,7 +1,3 @@
-//
-// Created by rob on 24.02.17.
-//
-
 #ifndef MYSQL_VAULT_PARSER_H
 #define MYSQL_VAULT_PARSER_H
 
@@ -36,7 +32,6 @@ protected:
 };
 
 } //namespace keyring
-
 
 #endif //MYSQL_VAULT_PARSER_H
 

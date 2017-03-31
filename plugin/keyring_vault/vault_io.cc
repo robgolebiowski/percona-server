@@ -70,7 +70,7 @@ my_bool Vault_io::get_serialized_object(ISerialized_object **serialized_object)
   return FALSE;
 }
 
-my_bool Vault_io::retrieve_key_type_and_value(IKey *key) //TODO:Change value to data
+my_bool Vault_io::retrieve_key_type_and_data(IKey *key)
 {
   std::string json_response;
   if(vault_curl->read_key(key, &json_response) ||
@@ -132,33 +132,3 @@ my_bool Vault_io::flush_to_storage(ISerialized_object *serialized_object)
 }
 
 } //namespace keyring
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

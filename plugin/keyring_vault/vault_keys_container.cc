@@ -1,7 +1,3 @@
-//
-// Created by rob on 03.03.17.
-//
-
 #include <my_global.h>
 #include "vault_keys_container.h"
 
@@ -25,7 +21,7 @@ namespace keyring
       return NULL;
 
     if(fetched_key->get_key_type()->empty() &&
-       vault_io->retrieve_key_type_and_value(fetched_key)) //key is fetched for the first time
+       vault_io->retrieve_key_type_and_data(fetched_key)) //key is fetched for the first time
       return NULL;
 
     return Keys_container::fetch_key(key);
@@ -35,5 +31,4 @@ namespace keyring
   {
     return FALSE;
   }
-
-}
+} //namespace keyring

@@ -2,7 +2,6 @@
 #define I_VAULTIO_INCLUDED
 
 #include <my_global.h>
-//#include "keyring_key.h"
 #include "i_keyring_io.h"
 
 namespace keyring {
@@ -10,7 +9,7 @@ namespace keyring {
 class IVault_io : public IKeyring_io
 {
 public:
-  virtual my_bool retrieve_key_type_and_value(IKey *key) = 0;
+  virtual my_bool retrieve_key_type_and_data(IKey *key) = 0;
   
   virtual ~IVault_io() {}
 };

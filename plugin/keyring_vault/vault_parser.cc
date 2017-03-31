@@ -142,7 +142,6 @@ my_bool Vault_parser::parse_key_signature(const std::string *key_signature, std:
   return FALSE;
 }
 
-
 my_bool Vault_parser::parse_key_data(std::string *payload, IKey *key)
 {
   std::string map, type, value;

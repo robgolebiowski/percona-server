@@ -124,5 +124,4 @@ namespace keyring
     *vault_credentials = vault_credentials_in_progress;
     return FALSE;
   }
-  
-}
+} //namespace keyring

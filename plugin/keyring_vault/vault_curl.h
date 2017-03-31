@@ -1,7 +1,3 @@
-//
-// Created by rob on 03.03.17.
-//
-
 #ifndef MYSQL_VAULT_CURL_H
 #define MYSQL_VAULT_CURL_H
 
@@ -32,7 +28,6 @@ public:
   }
 
   my_bool init(Vault_credentials *vault_credentials);
-  //my_bool init(std::string *vault_url, Vault_credentials *vault_credentials);
   my_bool list_keys(std::string *response);
   my_bool write_key(IKey *key, std::string *response);
   my_bool read_key(IKey *key, std::string *response);
@@ -52,6 +47,6 @@ protected:
   Secure_string vault_ca;
 };
 
-}
+} //namespace keyring
 
 #endif //MYSQL_VAULT_CURL_H

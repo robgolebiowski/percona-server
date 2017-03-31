@@ -24,7 +24,7 @@ public:
 
   ~Vault_io();
 
-  virtual my_bool retrieve_key_type_and_value(IKey *key);
+  virtual my_bool retrieve_key_type_and_data(IKey *key);
 
   virtual my_bool init(std::string *keyring_storage_url);
   virtual my_bool flush_to_backup(ISerialized_object *serialized_object)
@@ -37,14 +37,13 @@ public:
   virtual my_bool get_serialized_object(ISerialized_object **serialized_object);
   virtual my_bool has_next_serialized_object()
   {
-    return FALSE; //move to implementation
+    return FALSE;
   }
 
 protected:
   my_bool write_key(IKey *key);
   my_bool delete_key(IKey *key);
   std::string get_errors_from_response(std::string *json_response);
-  //my_bool check_for_errors_in_response_and_log(std::string *json_response);
 
   ILogger *logger;
   IVault_curl *vault_curl;
