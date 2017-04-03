@@ -56,6 +56,10 @@ eval SET @@local.keyring_vault_config='$MYSQL_TMP_DIR/new_keyring_vault_config';
 --error ER_WRONG_VALUE_FOR_VAR
 eval SET @@global.keyring_vault_config='$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault_invalid_token.conf';
 
+eval SET @@global.keyring_vault_config='$MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf';
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
+SELECT @@global.keyring_vault_config;
+
 # Setting keyring_vault_config value to dir.
 --Error ER_WRONG_VALUE_FOR_VAR
 SET @@global.keyring_vault_config='MYSQL_test_invalid/dir/';

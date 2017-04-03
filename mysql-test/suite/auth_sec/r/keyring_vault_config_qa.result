@@ -35,11 +35,15 @@ SET @@local.keyring_vault_config='MYSQL_TMP_DIR/new_keyring_vault_config';
 ERROR HY000: Variable 'keyring_vault_config' is a GLOBAL variable and should be set with SET GLOBAL
 SET @@global.keyring_vault_config='MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault_invalid_token.conf';
 ERROR 42000: Variable 'keyring_vault_config' can't be set to the value of 'MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault_invalid_token.conf'
+SET @@global.keyring_vault_config='/home/rob/git/5.7_keyring_vault/mysql-test/std_data/keyring_vault_confs/keyring_vault.conf';
+SELECT @@global.keyring_vault_config;
+@@global.keyring_vault_config
+MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf
 SET @@global.keyring_vault_config='MYSQL_test_invalid/dir/';
 ERROR 42000: Variable 'keyring_vault_config' can't be set to the value of 'MYSQL_test_invalid/dir/'
 SELECT @@global.keyring_vault_config;
 @@global.keyring_vault_config
-MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault2.conf
+MYSQL_TEST_DIR/std_data/keyring_vault_confs/keyring_vault.conf
 
 UNINSTALL PLUGIN keyring_vault;
 SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
