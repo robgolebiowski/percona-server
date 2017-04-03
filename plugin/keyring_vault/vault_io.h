@@ -4,9 +4,7 @@
 #include <my_global.h>
 #include <logger.h>
 #include "i_vault_io.h"
-#include "vault_keys_list.h"
 #include "vault_parser.h"
-#include "vault_credentials_parser.h"
 #include "vault_curl.h"
 #include "vault_key_serializer.h"
 

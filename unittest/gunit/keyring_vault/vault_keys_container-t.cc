@@ -4,6 +4,7 @@
 #include <mysql/plugin_keyring.h>
 #include "vault_keys_container.h"
 #include "mock_logger.h"
+#include "vault_io.h"
 #include <fstream>
 #include "i_serialized_object.h"
 

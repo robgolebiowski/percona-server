@@ -69,7 +69,7 @@ my_bool Vault_curl::reset_curl_session()
       (list = curl_slist_append(list, "Content-Type: application/json")) == NULL ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_response_memory)) != CURLE_OK ||
-      (curl_res = curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&read_data_ss)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_WRITEDATA, reinterpret_cast<void*>(&read_data_ss))) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list)) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1)) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L)) != CURLE_OK ||

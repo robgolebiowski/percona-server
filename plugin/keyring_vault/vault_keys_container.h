@@ -2,7 +2,7 @@
 #define MYSQL_VAULT_KEYS_CONTAINER_H
 
 #include "keys_container.h"
-#include "vault_io.h"
+#include "i_vault_io.h"
 
 namespace keyring
 {

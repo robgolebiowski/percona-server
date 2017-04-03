@@ -1,5 +1,7 @@
 #include <my_global.h>
 #include "vault_io.h"
+#include "vault_keys_list.h"
+#include "vault_credentials_parser.h"
 #include <curl/curl.h>
 #include <sstream>
 

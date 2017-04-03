@@ -2,7 +2,6 @@
 #define MYSQL_I_VAULT_CURL
 
 #include "i_keyring_key.h"
-#include "i_keyring_io.h"
 #include "vault_credentials.h"
 
 namespace keyring {

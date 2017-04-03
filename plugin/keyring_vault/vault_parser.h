@@ -35,26 +35,3 @@ protected:
 
 #endif //MYSQL_VAULT_PARSER_H
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
