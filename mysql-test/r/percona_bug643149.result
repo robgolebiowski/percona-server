@@ -1,5 +1,6 @@
 SET LOCAL log_slow_verbosity='profiling';
 SET LOCAL long_query_time=0;
+SET LOCAL min_examined_row_limit=0;
 [log_start.inc] percona_bug643149_slow
 SELECT 1;
 1
