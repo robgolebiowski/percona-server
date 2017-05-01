@@ -306,6 +306,12 @@ DROP TABLESPACE `undo002`;
 #
 # Test various forms of ADD DATAFILE
 #
+"removed 1"
+"create 1"
+"removed 2"
+"create 2"
+"create 3"
+"create 4"
 CREATE TABLESPACE s_def ADD DATAFILE 's_def.ibd' ENGINE=InnoDB;
 CREATE TABLESPACE `s1_#_hash` ADD DATAFILE 's1_#_hash.ibd';
 CREATE TABLESPACE s1_remote ADD DATAFILE 'MYSQL_TMP_DIR/s1.ibd.ibd';

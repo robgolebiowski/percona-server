@@ -241,11 +241,19 @@ DROP TABLESPACE `undo002`;
 --echo # Test various forms of ADD DATAFILE
 --echo #
 
---mkdir $MYSQL_TMP_DIR/tablespace.ibd
+--error 0,1
 --rmdir $MYSQL_TMP_DIR/tablespace.ibd
+--echo "removed 1"
 --mkdir $MYSQL_TMP_DIR/tablespace.ibd
+--echo "create 1"
+--rmdir $MYSQL_TMP_DIR/tablespace.ibd
+--echo "removed 2"
+--mkdir $MYSQL_TMP_DIR/tablespace.ibd
+--echo "create 2"
 --mkdir $MYSQL_TMP_DIR/s2_#_dir
+--echo "create 3"
 --mkdir $MYSQL_TMP_DIR/test
+--echo "create 4"
 
 CREATE TABLESPACE s_def ADD DATAFILE 's_def.ibd' ENGINE=InnoDB;
 CREATE TABLESPACE `s1_#_hash` ADD DATAFILE 's1_#_hash.ibd';
