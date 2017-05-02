@@ -47,6 +47,7 @@ SET GLOBAL DEBUG ='$saved_debug';
 # make sure mtr expects a crash & restarts
 -- exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 START SLAVE;
+--let $disconnect_timeout=100
 -- source include/wait_until_disconnected.inc
 -- let $rpl_server_number= 2
 -- source include/rpl_start_server.inc
