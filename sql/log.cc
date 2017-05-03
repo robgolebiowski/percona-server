@@ -647,6 +647,9 @@ bool File_query_log::open()
     goto err;
   }
 
+  if (max_slowlog_size == 0)
+    cur_log_ext= -1;
+
   if (cur_log_ext == (ulong)-1)
   {
     if (generate_new_log_name(log_file_name, &cur_log_ext, name, false))

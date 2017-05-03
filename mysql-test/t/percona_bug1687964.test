@@ -1,0 +1,94 @@
+# Bug#1687964 Changing max_slowlog_size to 0 does not
+# turn off Slow Query Log Rotation
+
+SET @old_slow_query_log = @@global.slow_query_log;
+SET @old_log_output = @@global.log_output;
+SET @old_slow_query_log_file = @@global.slow_query_log_file;
+SET @old_max_slowlog_size = @@global.max_slowlog_size;
+SET @old_max_slowlog_files = @@global.max_slowlog_files;
+SET @old_long_query_time = @@long_query_time;
+
+SET GLOBAL slow_query_log=1;
+SET GLOBAL log_output=FILE;
+SET GLOBAL max_slowlog_size=4096;
+SET GLOBAL max_slowlog_files=5;
+SET long_query_time=0;
+
+--echo #First generate 5 files with sequential
+--echo #extensions, i.e. 000001...000005
+
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+eval SET GLOBAL slow_query_log_file='$MYSQLTEST_VARDIR/abcd';
+
+# avoid 70 selects 1 in .result
+let $i=70;
+disable_query_log;
+disable_result_log;
+while($i) {
+  eval select $i;
+  dec $i;
+}
+enable_query_log;
+enable_result_log;
+
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+perl;
+my @files = <$ENV{'MYSQLTEST_VARDIR'}/abcd*>;
+printf "%d\n", scalar(@files);
+print @files;
+printf "\n";
+EOF
+
+--echo #Change max_slowlog_size to 0 this should stop
+--echo #PS from generating slow query log files with
+--echo #sequential extensions
+
+SET GLOBAL max_slowlog_size=0;
+eval SET GLOBAL slow_query_log_file='$MYSQLTEST_VARDIR/abcd';
+
+SELECT 1;
+
+--echo #There should be one abcd slow query log file
+
+perl;
+my @files = <$ENV{'MYSQLTEST_VARDIR'}/abcd>;
+printf "%d\n", scalar(@files);
+EOF
+
+--echo #Changing back max_slowlog_size to 4096 to
+--echo #check if slow query log sequential extensions
+--echo #are continued, i.e. we should get abcd.000006
+--echo #and abcd slow query log should not be deleted.
+--echo #PS will continue to writing to abcd till its
+--echo #size reaches 4096 - then it will switch to
+--echo #abcd.000006
+
+SET GLOBAL max_slowlog_size=4096;
+
+let $i=25;
+disable_query_log;
+disable_result_log;
+while($i) {
+  eval select $i;
+  dec $i;
+}
+enable_query_log;
+enable_result_log;
+
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+perl;
+my @files = <$ENV{'MYSQLTEST_VARDIR'}/abcd*>;
+printf "%d\n", scalar(@files);
+print @files;
+printf "\n";
+EOF
+
+#Cleanup
+--remove_files_wildcard $MYSQLTEST_VARDIR/ abcd*
+
+SET @@global.slow_query_log = @old_slow_query_log;
+SET @@global.log_output = @old_log_output;
+SET @@global.slow_query_log_file = @old_slow_query_log_file;
+SET @@global.max_slowlog_size = @old_max_slowlog_size;
+SET @@global.max_slowlog_files = @old_max_slowlog_files;
+SET @@long_query_time = @old_long_query_time;

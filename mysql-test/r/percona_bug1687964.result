@@ -1,0 +1,42 @@
+SET @old_slow_query_log = @@global.slow_query_log;
+SET @old_log_output = @@global.log_output;
+SET @old_slow_query_log_file = @@global.slow_query_log_file;
+SET @old_max_slowlog_size = @@global.max_slowlog_size;
+SET @old_max_slowlog_files = @@global.max_slowlog_files;
+SET @old_long_query_time = @@long_query_time;
+SET GLOBAL slow_query_log=1;
+SET GLOBAL log_output=FILE;
+SET GLOBAL max_slowlog_size=4096;
+SET GLOBAL max_slowlog_files=5;
+SET long_query_time=0;
+#First generate 5 files with sequential
+#extensions, i.e. 000001...000005
+SET GLOBAL slow_query_log_file='MYSQLTEST_VARDIR/abcd';
+5
+MYSQLTEST_VARDIR/abcd.000001MYSQLTEST_VARDIR/abcd.000002MYSQLTEST_VARDIR/abcd.000003MYSQLTEST_VARDIR/abcd.000004MYSQLTEST_VARDIR/abcd.000005
+#Change max_slowlog_size to 0 this should stop
+#PS from generating slow query log files with
+#sequential extensions
+SET GLOBAL max_slowlog_size=0;
+SET GLOBAL slow_query_log_file='/home/rob/git/57_bld/mysql-test/var/abcd';
+SELECT 1;
+1
+1
+#There should be one abcd slow query log file
+1
+#Changing back max_slowlog_size to 4096 to
+#check if slow query log sequential extensions
+#are continued, i.e. we should get abcd.000006
+#and abcd slow query log should not be deleted.
+#PS will continue to writing to abcd till its
+#size reaches 4096 - then it will switch to
+#abcd.000006
+SET GLOBAL max_slowlog_size=4096;
+6
+MYSQLTEST_VARDIR/abcdMYSQLTEST_VARDIR/abcd.000001MYSQLTEST_VARDIR/abcd.000002MYSQLTEST_VARDIR/abcd.000003MYSQLTEST_VARDIR/abcd.000004MYSQLTEST_VARDIR/abcd.000005
+SET @@global.slow_query_log = @old_slow_query_log;
+SET @@global.log_output = @old_log_output;
+SET @@global.slow_query_log_file = @old_slow_query_log_file;
+SET @@global.max_slowlog_size = @old_max_slowlog_size;
+SET @@global.max_slowlog_files = @old_max_slowlog_files;
+SET @@long_query_time = @old_long_query_time;
