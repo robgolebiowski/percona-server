@@ -750,12 +750,12 @@ inline int Log_event::do_apply_event_worker(Slave_worker *w)
                     /* we will crash a worker after waiting for
                     2 seconds to make sure that other transactions are
                     scheduled and completed */
-                    if (w->id == 2)
-                    {
+                    //if (w->id == 2)
+                    //{
                       DBUG_SET("-d,crash_in_a_worker");
                       my_sleep(2000000);
                       DBUG_SUICIDE();
-                    }
+                    //}
                   });
   return do_apply_event(w);
 }
