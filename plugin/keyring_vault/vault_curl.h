@@ -21,7 +21,7 @@ public:
   //Vault_curl(ILogger *logger, CURL *curl)
   Vault_curl(ILogger *logger)
     : logger(logger)
-   // , curl(curl)	
+    , curl(NULL)	
     , list(NULL)
   {}
 
@@ -29,7 +29,7 @@ public:
   {
     if (list != NULL)
       curl_slist_free_all(list);
-    //curl_easy_cleanup(curl);
+    curl_easy_cleanup(curl);
     //curl = NULL;
   }
 
@@ -49,7 +49,7 @@ private:
   ILogger *logger;
   Secure_string token_header;
   Secure_string vault_url;
-  //CURL *curl;
+  CURL *curl;
   char curl_errbuf[CURL_ERROR_SIZE]; //error from CURL
   Secure_ostringstream read_data_ss;
   struct curl_slist *list;

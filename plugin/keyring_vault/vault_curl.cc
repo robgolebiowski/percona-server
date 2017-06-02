@@ -179,7 +179,7 @@ bool Vault_curl::list_keys(Secure_string *response)
   //curl_easy_reset(curl);
 //  if (curl != NULL)
 //    curl_easy_cleanup(curl);
-  CURL *curl=curl_easy_init();
+  curl=curl_easy_init();
 //  curl = curl_easy_init();
   //curl_easy_cleanup(curl);
   //curl_easy_cleanup(curl);
@@ -240,17 +240,17 @@ bool Vault_curl::list_keys(Secure_string *response)
                 get_error_from_curl(curl_res).c_str());
 
     logger->log(MY_ERROR_LEVEL,"here");
-    curl_easy_cleanup(curl);
+    //curl_easy_cleanup(curl);
     return true;
   }
   if (http_code == 404)
   {
     *response = ""; // no keys found
-    curl_easy_cleanup(curl);
+    //curl_easy_cleanup(curl);
     return false; 
   }
   *response = read_data_ss.str();
-  curl_easy_cleanup(curl);
+ // curl_easy_cleanup(curl);
   //curl_slist_free_all(list);
   list = NULL;
   return http_code / 100 != 2; // 2** are success return codes
@@ -297,9 +297,9 @@ bool Vault_curl::write_key(const Vault_key &key, Secure_string *response)
 
   Thd_wait_end_guard thd_wait_end_guard;
   (void)thd_wait_end_guard; //silence unused variable error
-  //curl_easy_reset(curl);
+  curl_easy_reset(curl);
 // CURL *curl=NULL; 
-  CURL *curl=curl_easy_init();
+  //CURL *curl=curl_easy_init();
   if (reset_curl_session(curl) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,
                                    key_url.c_str())) != CURLE_OK ||
@@ -307,10 +307,10 @@ bool Vault_curl::write_key(const Vault_key &key, Secure_string *response)
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
-  curl_easy_cleanup(curl);
+ // curl_easy_cleanup(curl);
     return true;
   }
-  curl_easy_cleanup(curl);
+ // curl_easy_cleanup(curl);
   *response = read_data_ss.str();
   return false;
 }
@@ -324,8 +324,8 @@ bool Vault_curl::read_key(const Vault_key &key, Secure_string *response)
 
   Thd_wait_end_guard thd_wait_end_guard;
   (void)thd_wait_end_guard; //silence unused variable error
-  CURL *curl=curl_easy_init();
-  //curl_easy_reset(curl);
+  //CURL *curl=curl_easy_init();
+  curl_easy_reset(curl);
 // CURL *curl=NULL; 
   if (reset_curl_session(curl) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,
@@ -333,10 +333,10 @@ bool Vault_curl::read_key(const Vault_key &key, Secure_string *response)
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
-  curl_easy_cleanup(curl);
+  //curl_easy_cleanup(curl);
     return true;
   }
-  curl_easy_cleanup(curl);
+  //curl_easy_cleanup(curl);
   *response = read_data_ss.str();
   return false;
 }
@@ -351,8 +351,8 @@ bool Vault_curl::delete_key(const Vault_key &key, Secure_string *response)
   Thd_wait_end_guard thd_wait_end_guard;
   (void)thd_wait_end_guard; //silence unused variable error
 // CURL *curl=NULL; 
-  CURL *curl=curl_easy_init();
- // curl_easy_reset(curl);
+ // CURL *curl=curl_easy_init();
+  curl_easy_reset(curl);
   if (reset_curl_session(curl) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, key_url.c_str())) !=
       CURLE_OK ||
@@ -360,10 +360,10 @@ bool Vault_curl::delete_key(const Vault_key &key, Secure_string *response)
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
-  curl_easy_cleanup(curl);
+ // curl_easy_cleanup(curl);
     return true;
   }
-  curl_easy_cleanup(curl);
+ // curl_easy_cleanup(curl);
   *response = read_data_ss.str();
   return false;
 }

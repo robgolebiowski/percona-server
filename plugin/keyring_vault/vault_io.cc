@@ -17,7 +17,7 @@ my_bool Vault_io::init(std::string *keyring_storage_url)
 
 Vault_io::~Vault_io()
 {
-  delete vault_curl;
+//  delete vault_curl;
   delete vault_parser;
 }
 

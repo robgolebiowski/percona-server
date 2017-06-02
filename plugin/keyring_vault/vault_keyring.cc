@@ -14,7 +14,7 @@ using keyring::Vault_curl;
 using keyring::Logger;
 
 //CURL *curl;
-
+IVault_curl *curl  = NULL;
 static void handle_std_bad_alloc_exception(const std::string &message_prefix)
 {
   DBUG_ASSERT(0);
@@ -46,18 +46,21 @@ int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
   if (keyring_filename == NULL)
     return 1;
   mysql_rwlock_wrlock(&LOCK_keyring);
+  delete curl; 
 
 //keys.reset();
 
   //curl_easy_cleanup(curl);
   curl_global_cleanup();
 curl_global_init(CURL_GLOBAL_ALL);
+//curl = new Vault_curl(logger.get());
   //curl = curl_easy_init();
   try
   {
-    boost::movelib::unique_ptr<IVault_curl> vault_curl(new Vault_curl(logger.get()));
+    //boost::movelib::unique_ptr<IVault_curl> vault_curl(new Vault_curl(logger.get()));
+    curl = new Vault_curl(logger.get());
     boost::movelib::unique_ptr<IVault_parser> vault_parser(new Vault_parser(logger.get()));
-    IKeyring_io *keyring_io(new Vault_io(logger.get(), vault_curl.release(), vault_parser.release()));
+    IKeyring_io *keyring_io(new Vault_io(logger.get(), curl, vault_parser.release()));
     if (new_keys->init(keyring_io, keyring_filename))
     {
       mysql_rwlock_unlock(&LOCK_keyring);
@@ -109,12 +112,13 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
 
 curl_global_init(CURL_GLOBAL_ALL);
 
+    curl = new Vault_curl(logger.get());
     //curl = curl_easy_init();
     logger.reset(new Logger(plugin_info));
     keys.reset(new Vault_keys_container(logger.get()));
-    boost::movelib::unique_ptr<IVault_curl> vault_curl(new Vault_curl(logger.get()));
+    //boost::movelib::unique_ptr<IVault_curl> vault_curl(new Vault_curl(logger.get()));
     boost::movelib::unique_ptr<IVault_parser> vault_parser(new Vault_parser(logger.get()));
-    IKeyring_io *keyring_io= new Vault_io(logger.get(), vault_curl.release(),
+    IKeyring_io *keyring_io= new Vault_io(logger.get(), curl,
                                           vault_parser.release());
     if (keys->init(keyring_io, keyring_vault_config_file))
     {
