@@ -33,6 +33,12 @@ public:
     //curl = NULL;
   }
 
+void clean_curl()
+{
+    if (list != NULL)
+      curl_slist_free_all(list);
+    curl_easy_cleanup(curl);
+}
   bool init(const Vault_credentials &vault_credentials);
   bool list_keys(Secure_string *response);
   bool write_key(const Vault_key &key, Secure_string *response);
