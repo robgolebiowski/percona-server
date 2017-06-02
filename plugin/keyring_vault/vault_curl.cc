@@ -111,12 +111,13 @@ std::string Vault_curl::get_error_from_curl(CURLcode curl_code)
 
 bool Vault_curl::init(const Vault_credentials &vault_credentials)
 {
+/*
   curl = curl_easy_init();
   if (curl == NULL)
   {
     logger->log(MY_ERROR_LEVEL, "Could not create CURL session");
     return true;
-  }
+  }*/
   this->token_header = "X-Vault-Token:" + get_credential(vault_credentials, "token");
   this->vault_url = get_credential(vault_credentials, "vault_url") + "/v1/" + get_credential(vault_credentials, "secret_mount_point");
   this->vault_ca = get_credential(vault_credentials, "vault_ca");
@@ -130,10 +131,11 @@ bool Vault_curl::init(const Vault_credentials &vault_credentials)
   return false;
 }
 
-bool Vault_curl::reset_curl_session()
+bool Vault_curl::reset_curl_session(CURL *curl)
 {
   CURLcode curl_res = CURLE_OK;
-  curl_easy_reset(curl);
+  //curl_easy_reset(curl);
+  //curl = curl_easy_init();
   read_data_ss.str("");
   read_data_ss.clear();
   curl_errbuf[0] = '\0';
@@ -169,30 +171,88 @@ bool Vault_curl::reset_curl_session()
   return false;
 }
 
+//CURL* Vault_curl::curl = NULL;
+
 bool Vault_curl::list_keys(Secure_string *response)
 {
   CURLcode curl_res = CURLE_OK;
-  curl_easy_reset(curl);
+  //curl_easy_reset(curl);
+//  if (curl != NULL)
+//    curl_easy_cleanup(curl);
+  CURL *curl=curl_easy_init();
+//  curl = curl_easy_init();
+  //curl_easy_cleanup(curl);
+  //curl_easy_cleanup(curl);
+  //curl_global_cleanup();
+//curl_global_init(CURL_GLOBAL_ALL);
+  //curl = curl_easy_init();
+  //curl_global_cleanup();
+//curl_global_init(CURL_GLOBAL_ALL);
+  //curl = curl_easy_init();
+  //curl_easy_reset(curl);
+  //CURL *curl=NULL;
+  //curl_easy_reset(curl);
   long http_code = 0;
+
+//curl_global_init(CURL_GLOBAL_ALL);
+//curl_global_cleanup();
 
   Thd_wait_end_guard thd_wait_end_guard;
   (void)thd_wait_end_guard; //silence unused variable error
+/*  if (list != NULL)
+  {
+    curl_slist_free_all(list);
+    list = NULL;
+  }
 
-  if (reset_curl_session() ||
-      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + "?list=true").c_str())) != CURLE_OK ||
+  read_data_ss.str("");
+  read_data_ss.clear();
+  curl_errbuf[0] = '\0';
+
+  if ((list = curl_slist_append(list, token_header.c_str())) == NULL ||
+      (list = curl_slist_append(list, "Content-Type: application/json")) == NULL ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_response_memory)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_WRITEDATA, static_cast<void*>(&read_data_ss))) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L)) != CURLE_OK ||
+      (!vault_ca.empty() &&
+       (curl_res = curl_easy_setopt(curl, CURLOPT_CAINFO, vault_ca.c_str())) != CURLE_OK
+      ) ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout)) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progress_callback)) ||
+      //(curl_res = curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback)) ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L))
+     )
+  {
+    logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
+    return true;
+  }*/
+
+  if (reset_curl_session(curl) ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_URL,(vault_url + "?list=true").c_str())) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
       (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL,
                 get_error_from_curl(curl_res).c_str());
+
+    logger->log(MY_ERROR_LEVEL,"here");
+    curl_easy_cleanup(curl);
     return true;
   }
   if (http_code == 404)
   {
     *response = ""; // no keys found
+    curl_easy_cleanup(curl);
     return false; 
   }
   *response = read_data_ss.str();
+  curl_easy_cleanup(curl);
+  //curl_slist_free_all(list);
+  list = NULL;
   return http_code / 100 != 2; // 2** are success return codes
 }
 
@@ -237,16 +297,20 @@ bool Vault_curl::write_key(const Vault_key &key, Secure_string *response)
 
   Thd_wait_end_guard thd_wait_end_guard;
   (void)thd_wait_end_guard; //silence unused variable error
-  
-  if (reset_curl_session() ||
+  //curl_easy_reset(curl);
+// CURL *curl=NULL; 
+  CURL *curl=curl_easy_init();
+  if (reset_curl_session(curl) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,
                                    key_url.c_str())) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata.c_str())) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
+  curl_easy_cleanup(curl);
     return true;
   }
+  curl_easy_cleanup(curl);
   *response = read_data_ss.str();
   return false;
 }
@@ -260,15 +324,19 @@ bool Vault_curl::read_key(const Vault_key &key, Secure_string *response)
 
   Thd_wait_end_guard thd_wait_end_guard;
   (void)thd_wait_end_guard; //silence unused variable error
-
-  if (reset_curl_session() ||
+  CURL *curl=curl_easy_init();
+  //curl_easy_reset(curl);
+// CURL *curl=NULL; 
+  if (reset_curl_session(curl) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,
                                    key_url.c_str())) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
+  curl_easy_cleanup(curl);
     return true;
   }
+  curl_easy_cleanup(curl);
   *response = read_data_ss.str();
   return false;
 }
@@ -282,16 +350,20 @@ bool Vault_curl::delete_key(const Vault_key &key, Secure_string *response)
 
   Thd_wait_end_guard thd_wait_end_guard;
   (void)thd_wait_end_guard; //silence unused variable error
-  
-  if (reset_curl_session() ||
+// CURL *curl=NULL; 
+  CURL *curl=curl_easy_init();
+ // curl_easy_reset(curl);
+  if (reset_curl_session(curl) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, key_url.c_str())) !=
       CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE")) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK)
   {
     logger->log(MY_ERROR_LEVEL, get_error_from_curl(curl_res).c_str());
+  curl_easy_cleanup(curl);
     return true;
   }
+  curl_easy_cleanup(curl);
   *response = read_data_ss.str();
   return false;
 }
