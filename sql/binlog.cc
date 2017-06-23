@@ -40,6 +40,7 @@
 
 #include <list>
 #include <string>
+#include "my_aes.h"
 
 using std::max;
 using std::min;
@@ -4856,6 +4857,8 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     s.common_footer->checksum_alg= static_cast<enum_binlog_checksum_alg>
                                      (binlog_checksum_options);
 
+  //TODO:Robert: Temporary disabled
+  //crypto.scheme = 0;
   DBUG_ASSERT((s.common_footer)->checksum_alg !=
                binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
   if (!s.is_valid())
@@ -4867,6 +4870,35 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
   if (s.write(&log_file))
     goto err;
   bytes_written+= s.common_header->data_written;
+
+  if (encrypt_binlog)
+  {
+    //uint key_version= encryption_key_get_latest_version(ENCRYPTION_KEY_SYSTEM_DATA);
+    //if (key_version == ENCRYPTION_KEY_VERSION_INVALID)
+    //{
+      //sql_print_error("Failed to enable encryption of binary logs");
+      //goto err;
+    //}
+
+    //if (key_version != ENCRYPTION_KEY_NOT_ENCRYPTED)
+    //{
+      //if (my_random_bytes(crypto.nonce, sizeof(crypto.nonce)))
+      //  goto err;
+
+      //TODO:Robert:Temporary set key_version to 1, and crypto
+      //Start_encryption_log_event sele(1, 1, crypto.nonce);
+      Start_encryption_log_event sele(1, 1, (const uchar*)"nonce-234");
+      sele.common_footer->checksum_alg= s.common_footer->checksum_alg;
+      if (write_event(&sele))
+        goto err;
+
+      // Start_encryption_log_event is written, enable the encryption
+      if (crypto.init(sele.crypto_scheme, 1))
+        goto err;
+    //}
+  }
+
+
   /*
     We need to revisit this code and improve it.
     See further comments in the mysqld.
@@ -7014,8 +7046,7 @@ bool MYSQL_BIN_LOG::append_event(Log_event* ev, Master_info *mi)
   DBUG_RETURN(error);
 }
 
-
-bool MYSQL_BIN_LOG::append_buffer(const char* buf, uint len, Master_info *mi)
+bool MYSQL_BIN_LOG::write_event_buffer(uchar* buf, uint len, Master_info *mi)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::append_buffer");
 
@@ -7026,6 +7057,57 @@ bool MYSQL_BIN_LOG::append_buffer(const char* buf, uint len, Master_info *mi)
 
   // write data
   bool error= false;
+
+  //TODO:Robert:Temporary dissabling 
+  uchar *ebuf= 0;
+  //
+  //
+  if (crypto.scheme != 0)
+  {
+    DBUG_ASSERT(crypto.scheme == 1);
+
+    uint elen;
+    uchar iv[BINLOG_IV_LENGTH];
+
+    //TODO:Robert:temporary max is 512, maybe I should use different alloc?
+    ebuf= (uchar*)my_safe_alloca(len, 512);
+    if (!ebuf)
+    {
+      error = true;
+      goto err;
+    }
+
+    crypto.set_iv(iv, my_b_append_tell(&log_file));
+
+    //[>
+      //we want to encrypt everything, excluding the event length:
+      //massage the data before the encryption
+    //*/
+    //memcpy(buf + EVENT_LEN_OFFSET, buf, 4);
+
+    if ((elen = my_aes_encrypt(buf + 4, len - 4, ebuf + 4, crypto.key,
+                   crypto.key_length, my_aes_128_ecb, iv) < 0))
+    {
+      error = true;
+      goto err;
+    }
+
+    //if (encryption_crypt(buf + 4, len - 4,
+                         //ebuf + 4, &elen,
+                         //crypto.key, crypto.key_length, iv, sizeof(iv),
+                         //ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                         //ENCRYPTION_KEY_SYSTEM_DATA, crypto.key_version))
+      //goto err;
+
+    DBUG_ASSERT(elen == len - 4);
+
+    //[> massage the data after the encryption <]
+    memcpy(ebuf, ebuf + EVENT_LEN_OFFSET, 4);
+    int4store(ebuf + EVENT_LEN_OFFSET, len);
+
+    buf= ebuf;
+  }
+
   if (my_b_append(&log_file,(uchar*) buf,len) == 0)
   {
     bytes_written += len;
@@ -7034,6 +7116,9 @@ bool MYSQL_BIN_LOG::append_buffer(const char* buf, uint len, Master_info *mi)
   else
     error= true;
 
+  //TODO:Robert:Temporary dissabling
+err:
+  my_safe_afree(ebuf, len, 512);
   DBUG_RETURN(error);
 }
 #endif // ifdef HAVE_REPLICATION

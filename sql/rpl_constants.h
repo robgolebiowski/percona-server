@@ -18,7 +18,7 @@
 #define RPL_CONSTANTS_H
 
 #include "my_global.h"
-
+#include "my_aes.h" //TODO:Robert:Dodalem to tutaj, czy prawidlowo ?
 
 /*
   Constants used to parse the stream of bytes sent by a slave
@@ -62,5 +62,148 @@ enum ExtraRowInfoFormat {
   */
   ERIF_MULTI        =  255
 };
+
+//TODO:Robert: Temporary removed
+
+static const size_t ENCRYPTION_MASTER_KEY_NAME_MAX_LEN = 100;
+//void get_master_key(ulint master_key_id,
+//void get_binlog_key(char* srv_uuid,
+		    //uchar** binlog_key)
+//{
+//#ifndef UNIV_INNOCHECKSUM
+	//char*	key_type = NULL;
+	//size_t	key_len;
+	//char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+	//int	ret;
+
+	//memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+        //DBUG_ASSERT(srv_uuid != NULL);
+////	if (srv_uuid != NULL) {
+		//snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+			    //"%s-%s-%s", "percona_binlog_",
+			    //srv_uuid, ":1");
+////	} else {
+		//[> For compitable with 5.7.11, we need to get master key with
+		//server id. */
+////		memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+////		ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+////			    "%s-%lu-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
+////			    server_id, master_key_id);
+	////}
+
+	//[> We call key ring API to get master key here. <]
+	//ret = my_key_fetch(key_name, &key_type, NULL,
+			   //reinterpret_cast<void**>(binlog_key), &key_len);
+
+	//if (key_type) {
+		//my_free(key_type);
+	//}
+
+	//if (ret) {
+		//*binlog_key = NULL;
+////		ib::error() << "Encryption can't find master key, please check"
+////				" the keyring plugin is loaded.";
+	//}
+
+//#ifdef UNIV_ENCRYPT_DEBUG
+//[>	if (!ret && *master_key) {
+		//fprintf(stderr, "Fetched master key:%lu ", master_key_id);
+		//ut_print_buf(stderr, *master_key, key_len);
+		//fprintf(stderr, "\n");
+	//}*/
+//#endif [> DEBUG_TDE <]
+
+//#endif
+//}
+
+static const size_t ENCRYPTION_SERVER_UUID_LEN = 36;
+static const size_t ENCRYPTION_KEY_LEN = 32;
+
+//void create_binlog_key(uchar** binlog_key)
+//{
+//#ifndef UNIV_INNOCHECKSUM
+        //char*   key_type = NULL;
+        //size_t  key_len;
+        //char    key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+        //int     ret;
+
+        //char	uuid[ENCRYPTION_SERVER_UUID_LEN + 1] = {0};
+
+        //[> If uuid does not match with current server uuid,
+        //set uuid as current server uuid. */
+        ////if (strcmp(uuid, server_uuid) != 0) {
+        //memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
+        ////}
+        //memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+        //[> Generate new master key <]
+        //snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+                    //"%s-%s-%s", "percona_binlog_",
+                    //uuid, ":1");
+
+        //[> We call key ring API to generate master key here. <]
+        //ret = my_key_generate(key_name, "AES",
+                              //NULL, ENCRYPTION_KEY_LEN);
+
+        //[> We call key ring API to get master key here. <]
+        //ret = my_key_fetch(key_name, &key_type, NULL,
+                           //reinterpret_cast<void**>(binlog_key),
+                           //&key_len);
+
+        //if (ret || *binlog_key == NULL) {
+                ////ib::error() << "Encryption can't find master key, please check"
+                ////                " the keyring plugin is loaded.";
+                //*binlog_key = NULL;
+        ////} else {  //Temporary disabling master key id
+        ////        master_key_id++;
+        //}
+
+        //if (key_type) {
+                //my_free(key_type);
+        //}
+//#endif
+//}
+
+
+#define BINLOG_CRYPTO_SCHEME_LENGTH 1
+#define BINLOG_KEY_VERSION_LENGTH   4
+#define BINLOG_IV_LENGTH            MY_AES_BLOCK_SIZE
+#define BINLOG_IV_OFFS_LENGTH       4
+#define BINLOG_NONCE_LENGTH         (BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH)
+
+struct Binlog_crypt_data {
+  uint  scheme;
+  uint  key_version, key_length; //, ctx_size;
+  //uchar key[MY_AES_MAX_KEY_LENGTH];
+  uchar *key;
+  uchar nonce[BINLOG_NONCE_LENGTH];
+
+  int init(uint sch, uint kv)
+  {
+//TODO:Robert: Bede potrzebowal rozroznienia pomiedzy binlogiem i relay logiem ?
+/*
+    get_binlog_key(server_uuid, &key);
+    if (key == NULL)
+      create_binlog_key(&key);*/
+    key="1111111111111111";
+
+    scheme= sch;
+    //ctx_size= encryption_ctx_size(ENCRYPTION_KEY_SYSTEM_DATA, kv);
+    key_version= 1;//kv;
+    key_length= 16;
+    if (key==NULL)
+      return 1;
+    return 0;
+
+    //return encryption_key_get(ENCRYPTION_KEY_SYSTEM_DATA, kv, key, &key_length);
+  }
+
+  void set_iv(uchar* iv, uint32 offs) const //TODO:Robert:Po co mi to ?
+  {
+    memcpy(iv, nonce, BINLOG_NONCE_LENGTH);
+    int4store(iv + BINLOG_NONCE_LENGTH, offs);
+  }
+};
+
 
 #endif /* RPL_CONSTANTS_H */

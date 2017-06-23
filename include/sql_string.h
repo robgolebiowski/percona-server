@@ -477,6 +477,11 @@ public:
     }
     return 0;
   }
+  //TODO:Robert: Temporary removed
+  //bool append_hex(const uchar *src, uint32 srclen)
+  //{
+    //return append_hex((const char*)src, srclen);
+  //}
   bool fill(size_t max_length,char fill);
   void strip_sp();
   friend int sortcmp(const String *a,const String *b, const CHARSET_INFO *cs);

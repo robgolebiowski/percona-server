@@ -326,6 +326,12 @@ enum Log_event_type
 
   /* Prepared XA transaction terminal event similar to Xid */
   XA_PREPARE_LOG_EVENT= 38,
+
+  //TODO:Robert:In MariaDB there is separation between MySQL and MariaDB events
+  //TODO:Robert:Should it be added here too ?
+  //TODO:RobertL In MariaDB it is equal to 166, but in MySQL it is converted to char, which max value is 127
+  START_ENCRYPTION_EVENT= 39, 
+
   /**
     Add new events here - right above this comment!
     Existing events (except ENUM_END_EVENT) should never change their numbers
@@ -786,7 +792,8 @@ public:
     ROWS_HEADER_LEN_V2= 10,
     TRANSACTION_CONTEXT_HEADER_LEN= 18,
     VIEW_CHANGE_HEADER_LEN= 52,
-    XA_PREPARE_HEADER_LEN= 0
+    XA_PREPARE_HEADER_LEN= 0,
+    START_ENCRYPTION_HEADER_LEN= 0
   }; // end enum_post_header_length
 protected:
   /**

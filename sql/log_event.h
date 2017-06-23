@@ -45,6 +45,8 @@
 #include "sql_list.h"                // I_List
 #endif
 
+#include "rpl_constants.h"
+
 #include <list>
 #include <map>
 #include <set>
@@ -114,6 +116,7 @@ int ignored_error_code(int err_code);
 #define LOG_READ_TRUNC  -6
 #define LOG_READ_TOO_LARGE -7
 #define LOG_READ_CHECKSUM_FAILURE -8
+#define LOG_READ_DECRYPT -9
 
 #define LOG_EVENT_OFFSET 4
 
@@ -613,6 +616,20 @@ public:
     Placeholder for event checksum while writing to binlog.
   */
   ha_checksum crc;
+
+  //TODO:Robert:Czy to powinno być tutaj ? W mariadb jest w private
+  /**
+     Encryption data (key, nonce). Only used if ctx != 0.
+  */
+  Binlog_crypt_data *crypto;
+  /**
+     Event length to be written into the next encrypted block
+  */
+  uint event_len;
+  int write_internal(const uchar *pos, size_t len);
+  int encrypt_and_write(const uchar *pos, size_t len);
+  int maybe_write_event_len(uchar *pos, size_t len);
+
   /**
     Index in @c rli->gaq array to indicate a group that this event is
     purging. The index is set by Coordinator to a group terminator
@@ -745,12 +762,13 @@ public:
     @retval LOG_READ_TRUNC      only a partial event could be read
     @retval LOG_READ_TOO_LARGE  event too large
    */
-  static int read_log_event(IO_CACHE* file, String* packet,
-                            mysql_mutex_t* log_lock,
-                            binary_log::enum_binlog_checksum_alg checksum_alg_arg,
-                            const char *log_file_name_arg= NULL,
-                            bool* is_binlog_active= NULL,
-                            char *event_header= NULL);
+   static int read_log_event(IO_CACHE* file, String* packet,
+                             const Format_description_log_event *fdle,
+                             mysql_mutex_t* log_lock,
+                             enum_binlog_checksum_alg checksum_alg_arg,
+                             const char *log_file_name_arg= NULL,
+                             bool* is_binlog_active= NULL,
+                             char *event_header= NULL);
 
   /*
     init_show_field_list() prepares the column names and types for the
@@ -1675,6 +1693,79 @@ protected:
 #endif
 };
 
+/**
+  @class Start_encryption_log_event
+
+  Start_encryption_log_event marks the beginning of encrypted data (all events
+  after this event are encrypted).
+
+  It contains the cryptographic scheme used for the encryption as well as any
+  data required to decrypt (except the actual key).
+
+  For binlog cryptoscheme 1: key version, and nonce for iv generation.
+*/
+class Start_encryption_log_event : public Binary_log_event, public Log_event
+{
+public:
+#ifdef MYSQL_SERVER
+  //TODO:Robert:Temporary disabled - Log_event does not have a default constructor -
+  //need to check how this is used before I do something about this
+  
+  Start_encryption_log_event(uint crypto_scheme_arg, uint key_version_arg,
+                             const uchar* nonce_arg)
+  : Binary_log_event(binary_log::START_ENCRYPTION_EVENT),
+    Log_event(header(), footer(), Log_event::EVENT_NO_CACHE, Log_event::EVENT_IMMEDIATE_LOGGING),
+    crypto_scheme(crypto_scheme_arg), key_version(key_version_arg)
+  {
+    //cache_type = Log_event::EVENT_NO_CACHE;
+    DBUG_ASSERT(crypto_scheme == 1);
+    memcpy(nonce, nonce_arg, BINLOG_NONCE_LENGTH);
+  }
+
+  bool write_data_body(IO_CACHE* file)
+  //bool write_data_body()
+  {
+    uchar scheme_buf= crypto_scheme;
+    uchar key_version_buf[BINLOG_KEY_VERSION_LENGTH];
+    int4store(key_version_buf, key_version);
+    //TODO:Robert - those my_b_safe_write will need to be changed to write_data - where encryption will be taking place
+    return my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
+           my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
+           my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf));
+  }
+#else
+  void print(FILE* file, PRINT_EVENT_INFO* print_event_info);
+#endif
+
+  Start_encryption_log_event(
+     const char* buf, uint event_len,
+     const Format_description_log_event* description_event);
+
+  bool is_valid() const { return crypto_scheme == 1; }
+
+  Log_event_type get_type_code() { return binary_log::START_ENCRYPTION_EVENT; }
+
+  size_t get_data_size()
+  {
+    return BINLOG_CRYPTO_SCHEME_LENGTH + BINLOG_KEY_VERSION_LENGTH +
+           BINLOG_NONCE_LENGTH;
+  }
+
+  uint crypto_scheme;
+  uint key_version;
+  uchar nonce[BINLOG_NONCE_LENGTH];
+
+protected:
+#if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
+  virtual int do_apply_event(Relay_log_info const *rli);
+  virtual int do_update_pos(Relay_log_info *rli);
+  virtual enum_skip_reason do_shall_skip(Relay_log_info *rli)
+  {
+     return Log_event::EVENT_SKIP_NOT;
+  }
+#endif
+
+};
 
 /**
   @class Format_description_log_event
@@ -1764,6 +1855,18 @@ public:
     */
     return Binary_log_event::FORMAT_DESCRIPTION_HEADER_LEN;
   }
+
+  Binlog_crypt_data crypto_data;
+  bool start_decryption(Start_encryption_log_event* sele);
+  void copy_crypto_data(const Format_description_log_event* o)
+  {
+    crypto_data= o->crypto_data;
+  }
+  void reset_crypto()
+  {
+    crypto_data.scheme= 0;
+  }
+
 protected:
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
   virtual int do_apply_event(Relay_log_info const *rli);

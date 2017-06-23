@@ -8353,6 +8353,8 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
                  "could not queue event from master");
       goto err;
     }
+    new_fdle->copy_crypto_data(mi->get_mi_description_event());
+
     if (new_fdle->common_footer->checksum_alg ==
                                  binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
       new_fdle->common_footer->checksum_alg= binary_log::BINLOG_CHECKSUM_ALG_OFF;
@@ -8655,7 +8657,7 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
   {
     bool is_error= false;
     /* write the event to the relay log */
-    if (likely(rli->relay_log.append_buffer(buf, event_len, mi) == 0))
+    if (likely(!rli->relay_log.write_event_buffer((uchar*)buf, event_len, mi)))
     {
       mi->set_master_log_pos(mi->get_master_log_pos() + inc_pos);
       DBUG_PRINT("info", ("master_log_pos: %lu", (ulong) mi->get_master_log_pos()));

@@ -24,6 +24,7 @@
 #include "tc_log.h"                    // TC_LOG
 #include "atomic_class.h"
 #include "rpl_gtid.h"                  // Gtid_set, Sid_map
+#include "rpl_constants.h"
 
 class Relay_log_info;
 class Master_info;
@@ -436,6 +437,9 @@ class MYSQL_BIN_LOG: public TC_LOG
   uint file_id;
   uint open_count;				// For replication
   int readers_count;
+
+  /* binlog encryption data */
+  Binlog_crypt_data crypto;
 
   /* pointer to the sync period variable, for binlog this will be
      sync_binlog_period, for relay log this will be
@@ -857,7 +861,7 @@ public:
   bool is_query_in_union(THD *thd, query_id_t query_id_param);
 
 #ifdef HAVE_REPLICATION
-  bool append_buffer(const char* buf, uint len, Master_info *mi);
+  bool write_event_buffer(uchar* buf, uint len, Master_info *mi);
   bool append_event(Log_event* ev, Master_info *mi);
 private:
   bool after_append_to_relay_log(Master_info *mi);

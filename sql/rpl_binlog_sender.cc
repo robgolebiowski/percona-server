@@ -1037,6 +1037,8 @@ const char* Binlog_sender::log_read_error_msg(int error)
     return "binlog truncated in the middle of event; consider out of disk space on master";
   case LOG_READ_CHECKSUM_FAILURE:
     return "event read from binlog did not pass crc check";
+  case LOG_READ_DECRYPT:
+    return "Event decryption failure";
   default:
     return "unknown error reading log event on the master";
   }
@@ -1076,7 +1078,10 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
     packet is big enough to read the event, since we have reallocated based
     on the length stated in the event header.
   */
-  if ((error= Log_event::read_log_event(log_cache, &m_packet, NULL, checksum_alg,
+  //if ((error= Log_event::read_log_event(log_cache, &m_packet, NULL, checksum_alg,
+                                        //NULL, NULL, header)))
+  //TODO:Robert:Format_description_log_event *fdle - passing NULL, need to change that?
+  if ((error= Log_event::read_log_event(log_cache, &m_packet, NULL, NULL, checksum_alg,
                                         NULL, NULL, header)))
     goto read_error;
 
