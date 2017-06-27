@@ -177,6 +177,24 @@ struct Binlog_crypt_data {
   //uchar key[MY_AES_MAX_KEY_LENGTH];
   uchar *key;
   uchar nonce[BINLOG_NONCE_LENGTH];
+  uint dst_len; //TODO:Robert:This is added by me.
+  uchar iv[BINLOG_IV_LENGTH];
+
+  //TODO:Robert: This is temporary added by me
+  Binlog_crypt_data()
+  {
+    scheme = 0;
+  }
+
+  //Binlog_crypt_data(const Binlog_crypt_data &b)
+  //{
+    //this->scheme= b.scheme;
+    //this->key_version = b.key_verion;
+    //this->key= b.key;
+    //memcpy(this->iv, b.iv, BINLOG_IV_LENGTH);
+    //this->dst_len = b.dst_len;
+    //memcpy(this->nonce, b.nonce, BINLOG_NONCE_LENGTH);
+  //}
 
   int init(uint sch, uint kv)
   {
@@ -185,7 +203,7 @@ struct Binlog_crypt_data {
     get_binlog_key(server_uuid, &key);
     if (key == NULL)
       create_binlog_key(&key);*/
-    key="1111111111111111";
+    key=(uchar*)"1111111111111111";
 
     scheme= sch;
     //ctx_size= encryption_ctx_size(ENCRYPTION_KEY_SYSTEM_DATA, kv);
@@ -198,10 +216,18 @@ struct Binlog_crypt_data {
     //return encryption_key_get(ENCRYPTION_KEY_SYSTEM_DATA, kv, key, &key_length);
   }
 
-  void set_iv(uchar* iv, uint32 offs) const //TODO:Robert:Po co mi to ?
+  void set_iv(uchar* iv, uint32 offs) 
   {
     memcpy(iv, nonce, BINLOG_NONCE_LENGTH);
     int4store(iv + BINLOG_NONCE_LENGTH, offs);
+
+    memcpy(this->iv, nonce, BINLOG_NONCE_LENGTH);
+    int4store(this->iv + BINLOG_NONCE_LENGTH, offs);
+  }
+
+  uchar* get_iv()
+  {
+    return iv;
   }
 };
 

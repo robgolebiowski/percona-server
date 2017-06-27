@@ -64,6 +64,7 @@ slave_ignored_err_throttle(window_size,
 #include "sql_digest.h"
 #include "rpl_gtid.h"
 #include "xa_aux.h"
+#include "my_byteorder.h"
 
 PSI_memory_key key_memory_log_event;
 PSI_memory_key key_memory_Incident_log_event_message;
@@ -517,7 +518,8 @@ static bool write_str_at_most_255_bytes(IO_CACHE *file, const char *str,
 {
   uchar tmp[1];
   tmp[0]= (uchar) length;
-  return (my_b_safe_write(file, tmp, sizeof(tmp)) ||
+  //TODO:Robert: the problem here is that we cannot access encrypt_and_write from here
+  return (my_b_safe_write(file, tmp, sizeof(tmp)) || 
 	  my_b_safe_write(file, (uchar*) str, length));
 }
 
@@ -635,7 +637,7 @@ const char* Log_event::get_type_str(Log_event_type type)
   case binary_log::RAND_EVENT: return "RAND";
   case binary_log::XID_EVENT: return "Xid";
   case binary_log::USER_VAR_EVENT: return "User var";
-  case binary_log::FORMAT_DESCRIPTION_EVENT: return "Format_desc";
+  case binary_log::FORMAT_DESCRIPTION_EVENT: return " Format_desc";
   case binary_log::TABLE_MAP_EVENT: return "Table_map";
   case binary_log::PRE_GA_WRITE_ROWS_EVENT: return "Write_rows_event_old";
   case binary_log::PRE_GA_UPDATE_ROWS_EVENT: return "Update_rows_event_old";
@@ -687,6 +689,8 @@ Log_event::Log_event(THD* thd_arg, uint16 flags_arg,
   common_header->when= thd->start_time;
   common_header->log_pos= 0;
   common_header->flags= flags_arg;
+
+  crypto = NULL;
 }
 
 /**
@@ -705,6 +709,8 @@ Log_event::Log_event(Log_event_header* header, Log_event_footer *footer,
 {
   server_id=	::server_id;
   common_header->unmasked_server_id= server_id;
+
+  crypto = NULL;
 }
 #endif /* !MYSQL_CLIENT */
 
@@ -731,6 +737,8 @@ Log_event::Log_event(Log_event_header *header,
 #else
   server_id = common_header->unmasked_server_id;
 #endif
+
+  crypto = NULL;
 }
 
 /*
@@ -979,7 +987,9 @@ bool Log_event::wrapper_my_b_safe_write(IO_CACHE* file, const uchar* buf, size_t
   if (need_checksum() && size != 0)
     crc= checksum_crc32(crc, buf, size);
 
-  return my_b_safe_write(file, buf, size);
+  //TODO:Robert: Changed by me.
+  //return my_b_safe_write(file, buf, size);
+  return encrypt_and_write(file, buf, size); 
 }
 
 bool Log_event::write_footer(IO_CACHE* file) 
@@ -993,21 +1003,21 @@ bool Log_event::write_footer(IO_CACHE* file)
     uchar buf[BINLOG_CHECKSUM_LEN];
     int4store(buf, crc);
     //TODO:Robert:Temporary disabled
-    //if (encrypt_and_write(buf, BINLOG_CHECKSUM_LEN))
-      //return 1;
-    return (my_b_safe_write(file, (uchar*) buf, sizeof(buf)));
+    if (encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
+      return 1;
+    //return (my_b_safe_write(file, (uchar*) buf, sizeof(buf)));
   }
   //TODO:Robert: Temporary disabled
-  /*
-  if (ctx)
-  {
-    uint dstlen;
-    uchar dst[MY_AES_BLOCK_SIZE*2];
-    if (encryption_ctx_finish(ctx, dst, &dstlen))
-      DBUG_RETURN(1);
-    if (maybe_write_event_len(dst, dstlen) || write_internal(dst, dstlen)) //TODO:Robert <- there is no write_internal
-      return 1;//DBUG_RETURN(ER_ERROR_ON_WRITE);
-  }*/
+//  if (ctx) //TODO:Robert : Jak oznaczyć czy jest szyfrowane ?
+ // {
+    //uint dstlen;
+  //  uchar dst[MY_AES_BLOCK_SIZE*2];
+    //if (encryption_ctx_finish(ctx, dst, &dstlen))
+      //DBUG_RETURN(1);
+    //if (maybe_write_event_len(dst, dstlen) || write_internal(dst, dstlen)) //TODO:Robert <- there is no write_internal
+   // if (my_b_safe_write(file, dst, crypto->dst_len)) //TODO:Robert:Na razie to zostawiam dla kompatybilności
+   //   return 1;//DBUG_RETURN(ER_ERROR_ON_WRITE);
+  //}
   return 0;
 }
 
@@ -1058,50 +1068,82 @@ uint32 Log_event::write_header_to_memory(uchar *buf)
   where it should be in a valid event header
 */
 //TODO:Robert: Temporary disabled
-/*
-int Log_event::maybe_write_event_len(uchar *pos, size_t len)
+
+int Log_event::maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len)
 {
   if (len && event_len)
   {
     DBUG_ASSERT(len >= EVENT_LEN_OFFSET);
-    if (write_internal(pos + EVENT_LEN_OFFSET - 4, 4))
+    //if (write_internal(pos + EVENT_LEN_OFFSET - 4, 4))
+    if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4))
       return 1;
     int4store(pos + EVENT_LEN_OFFSET - 4, event_len);
     event_len= 0;
   }
   return 0;
-}*/
+}
 
-int Log_event::encrypt_and_write(const uchar *pos, size_t len)
+//TODO:Robert: This is write_internal that needs to be translated here ...
+//int Log_event_writer::write_internal(const uchar *pos, size_t len)
+//{
+  //if (my_b_safe_write(file, pos, len))
+    //return 1;
+  //bytes_written+= len;
+  //return 0;
+//}
+
+
+int Log_event::encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
 {
   //return 1;
   //TODO:Robert:Temporary disabling encryption, I am currently only interested in binlog events
   
   uchar *dst= 0;
   size_t dstsize= 0;
+  uint elen;
 
-  if (ctx)
+  if (crypto != NULL && crypto->scheme)
   {
-    dstsize= encryption_encrypted_length(len, ENCRYPTION_KEY_SYSTEM_DATA,
-                                         crypto->key_version);
-    if (!(dst= (uchar*)my_safe_alloca(dstsize)))
+    dstsize= my_aes_get_size(len, my_aes_128_ecb);
+    if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
       return 1;
 
-    uint dstlen;
-    if (encryption_ctx_update(ctx, pos, len, dst, &dstlen))
+    if ((elen = my_aes_encrypt(pos, len, dst, crypto->key,
+                   crypto->key_length, my_aes_128_ecb, crypto->get_iv()) < 0))
       goto err;
-    if (maybe_write_event_len(dst, dstlen))
+
+    if (maybe_write_event_len(file, dst, dstsize))
       return 1;
     pos= dst;
-    len= dstlen;
+    len= dstsize;
+
+
+    //dstsize= encryption_encrypted_length(len, ENCRYPTION_KEY_SYSTEM_DATA,
+                                         //crypto->key_version);
+    //if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
+      //return 1;
+
+    //if (encryption_ctx_update(ctx, pos, len, dst, &dstlen))
+      //goto err;
+    //if (maybe_write_event_len(dst, dstlen))
+      //return 1;
+    //pos= dst;
+    //len= dstlen;
   }
-  if (write_internal(pos, len))
+  if (my_b_safe_write(file, pos, len))
     goto err;
 
-  my_safe_afree(dst, dstsize);
+  //if (my_b_safe_write(file, pos, len))
+    //goto err;
+  //bytes_written+= len; //TODO:Robert: This is what I am missing
+  //TODO:Robert:This is the old part
+  //if (write_internal(pos, len))
+    //goto err;
+
+  my_safe_afree(dst, dstsize, 512);
   return 0;
 err:
-  my_safe_afree(dst, dstsize);
+  my_safe_afree(dst, dstsize, 512);
   return 1;
   
 }
@@ -1167,7 +1209,24 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 
   write_header_to_memory(header);
 
-  ret= my_b_safe_write(file, header, LOG_EVENT_HEADER_LEN);
+  //TODO:Robert:Ten kod jest wzięty z Log_event_writer::write_header
+
+  uchar *pos= header;
+  size_t len=sizeof(header);
+
+  if (crypto != NULL && crypto->scheme == 1)
+  {
+    uchar iv[BINLOG_IV_LENGTH];
+    crypto->set_iv(iv, my_b_safe_tell(file));
+    event_len= uint4korr(pos + EVENT_LEN_OFFSET);
+    //DBUG_ASSERT(event_len >= len); 
+    memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
+    pos+= 4;
+    len-= 4;
+  }
+  //DBUG_RETURN(encrypt_and_write(file, pos, len));
+  //ret= my_b_safe_write(file, header, LOG_EVENT_HEADER_LEN);
+  ret = encrypt_and_write(file, pos, len);
 
   /*
     Update the checksum.
@@ -5814,7 +5873,8 @@ bool Load_log_event::write_data_header(IO_CACHE* file)
   buf[L_TBL_LEN_OFFSET] = (char)table_name_len;
   buf[L_DB_LEN_OFFSET] = (char)db_len;
   int4store(buf + L_NUM_FIELDS_OFFSET, num_fields);
-  return my_b_safe_write(file, (uchar*)buf, Binary_log_event::LOAD_HEADER_LEN) != 0;
+  //return my_b_safe_write(file, (uchar*)buf, Binary_log_event::LOAD_HEADER_LEN) != 0;
+  return encrypt_and_write(file, (uchar*)buf, Binary_log_event::LOAD_HEADER_LEN) != 0;
 }
 
 
@@ -5828,13 +5888,13 @@ bool Load_log_event::write_data_body(IO_CACHE* file)
     return 1;
   if (num_fields && fields && field_lens)
   {
-    if (my_b_safe_write(file, (uchar*)field_lens, num_fields) ||
-	my_b_safe_write(file, (uchar*)fields, field_block_len))
+    if (encrypt_and_write(file, (uchar*)field_lens, num_fields) ||
+	encrypt_and_write(file, (uchar*)fields, field_block_len))
       return 1;
   }
-  return (my_b_safe_write(file, (uchar*)table_name, table_name_len + 1) ||
-	  my_b_safe_write(file, (uchar*)db, db_len + 1) ||
-	  my_b_safe_write(file, (uchar*)fname, fname_len));
+  return (encrypt_and_write(file, (uchar*)table_name, table_name_len + 1) ||
+	  encrypt_and_write(file, (uchar*)db, db_len + 1) ||
+	  encrypt_and_write(file, (uchar*)fname, fname_len));
 }
 
 
@@ -7994,8 +8054,8 @@ bool Create_file_log_event::write_data_body(IO_CACHE* file)
   bool res;
   if ((res= Load_log_event::write_data_body(file)) || fake_base)
     return res;
-  return (my_b_safe_write(file, (uchar*) "", 1) ||
-          my_b_safe_write(file, block, block_len));
+  return (encrypt_and_write(file, (uchar*) "", 1) ||
+          encrypt_and_write(file, block, block_len));
 }
 
 
@@ -8010,7 +8070,7 @@ bool Create_file_log_event::write_data_header(IO_CACHE* file)
   if ((res= Load_log_event::write_data_header(file)) || fake_base)
     return res;
   int4store(buf + CF_FILE_ID_OFFSET, file_id);
-  return my_b_safe_write(file, buf, Binary_log_event::CREATE_FILE_HEADER_LEN) != 0;
+  return encrypt_and_write(file, buf, Binary_log_event::CREATE_FILE_HEADER_LEN) != 0;
 }
 
 
@@ -13103,7 +13163,9 @@ Incident_log_event::write_data_header(IO_CACHE *file)
 #ifndef MYSQL_CLIENT
   DBUG_RETURN(wrapper_my_b_safe_write(file, buf, sizeof(buf)));
 #else
-   DBUG_RETURN(my_b_safe_write(file, buf, sizeof(buf)));
+   //TODO:Robert: There is no distinction on MYSQL_CLIENT and not
+   //I am not sure if there should be encrypt_and write for a client ...
+   DBUG_RETURN(encrypt_and_write(file, buf, sizeof(buf)));
 #endif
 }
 
@@ -13119,6 +13181,7 @@ Incident_log_event::write_data_body(IO_CACHE *file)
     crc= checksum_crc32(crc, (uchar*) message, message_length);
     // todo: report a bug on write_str accepts uint but treats it as uchar
   }
+  //TODO:Robert:This needs to be changed
   DBUG_RETURN(write_str_at_most_255_bytes(file, message, (uint) message_length));
 }
 

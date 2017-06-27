@@ -41,6 +41,7 @@
 #include <list>
 #include <string>
 #include "my_aes.h"
+#include "my_rnd.h"
 
 using std::max;
 using std::min;
@@ -4857,8 +4858,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     s.common_footer->checksum_alg= static_cast<enum_binlog_checksum_alg>
                                      (binlog_checksum_options);
 
-  //TODO:Robert: Temporary disabled
-  //crypto.scheme = 0;
+  crypto.scheme = 0;
   DBUG_ASSERT((s.common_footer)->checksum_alg !=
                binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
   if (!s.is_valid())
@@ -4882,15 +4882,20 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
 
     //if (key_version != ENCRYPTION_KEY_NOT_ENCRYPTED)
     //{
-      //if (my_random_bytes(crypto.nonce, sizeof(crypto.nonce)))
-      //  goto err;
+      if (my_rand_buffer(crypto.nonce, sizeof(crypto.nonce)))
+        goto err;
 
       //TODO:Robert:Temporary set key_version to 1, and crypto
       //Start_encryption_log_event sele(1, 1, crypto.nonce);
-      Start_encryption_log_event sele(1, 1, (const uchar*)"nonce-234");
+      Start_encryption_log_event sele(1, 1, crypto.nonce);
+      //sele.crypto= &crypto; TODO:Robert: To nie jest potrzebne, wszystko co Sele potrzebuje jest w konstruktorze
       sele.common_footer->checksum_alg= s.common_footer->checksum_alg;
-      if (write_event(&sele))
+      if (sele.write(&log_file))
         goto err;
+      bytes_written+= sele.common_header->data_written;
+
+      //if (write_event(&sele))
+        //goto err;
 
       // Start_encryption_log_event is written, enable the encryption
       if (crypto.init(sele.crypto_scheme, 1))
@@ -4943,6 +4948,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
       global_sid_lock->unlock();
     prev_gtids_ev.common_footer->checksum_alg=
                                    (s.common_footer)->checksum_alg;
+    //TODO:Robert: Tu trzeba dodać encrypcje, crypto= i wszędzie indziej
     if (prev_gtids_ev.write(&log_file))
       goto err;
     bytes_written+= prev_gtids_ev.common_header->data_written;
@@ -7231,6 +7237,8 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
   THD *thd= event_info->thd;
   bool error= 1;
   DBUG_ENTER("MYSQL_BIN_LOG::write_event(Log_event *)");
+
+  event_info->crypto= &crypto;
 
   if (thd->binlog_evt_union.do_union)
   {

@@ -527,7 +527,7 @@ sub resolve_at_variable {
   $group_name =~ s/^\@//; # Remove at
   my $from;
   
-  if ($group_name =~ "env")
+  if ($group_name =~ "env" || $group_name =~ "ENV")
   {
     $from = $ENV{$option_name};
   } 

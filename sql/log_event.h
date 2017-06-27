@@ -626,9 +626,10 @@ public:
      Event length to be written into the next encrypted block
   */
   uint event_len;
-  int write_internal(const uchar *pos, size_t len);
-  int encrypt_and_write(const uchar *pos, size_t len);
-  int maybe_write_event_len(uchar *pos, size_t len);
+  //int write_internal(const uchar *pos, size_t len);
+  int encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len);
+  //int encrypt_and_write(const uchar *pos, size_t len);
+  int maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len);
 
   /**
     Index in @c rli->gaq array to indicate a group that this event is
@@ -1729,9 +1730,9 @@ public:
     uchar key_version_buf[BINLOG_KEY_VERSION_LENGTH];
     int4store(key_version_buf, key_version);
     //TODO:Robert - those my_b_safe_write will need to be changed to write_data - where encryption will be taking place
-    return my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
-           my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
-           my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf));
+    return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
+           wrapper_my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
+           wrapper_my_b_safe_write(file, (uchar*)nonce, BINLOG_NONCE_LENGTH);
   }
 #else
   void print(FILE* file, PRINT_EVENT_INFO* print_event_info);

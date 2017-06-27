@@ -5137,6 +5137,8 @@ int mysqld_main(int argc, char **argv)
 
       /Alfranio
     */
+    //TODO:Robert:Tutaj muszę dodać aktywowanie logu
+    //TODO:Robert:Na razie Previous_gtis_log_event jest wyłączone z szyfrowania
     Previous_gtids_log_event prev_gtids_ev(&gtids_in_binlog);
 
     global_sid_lock->unlock();
