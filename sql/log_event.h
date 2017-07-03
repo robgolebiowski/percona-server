@@ -764,7 +764,8 @@ public:
     @retval LOG_READ_TOO_LARGE  event too large
    */
    static int read_log_event(IO_CACHE* file, String* packet,
-                             const Format_description_log_event *fdle,
+                             Binlog_crypt_data *crypto_data,
+                             //const Format_description_log_event *fdle,
                              mysql_mutex_t* log_lock,
                              enum_binlog_checksum_alg checksum_alg_arg,
                              const char *log_file_name_arg= NULL,
@@ -1718,8 +1719,10 @@ public:
     Log_event(header(), footer(), Log_event::EVENT_NO_CACHE, Log_event::EVENT_IMMEDIATE_LOGGING),
     crypto_scheme(crypto_scheme_arg), key_version(key_version_arg)
   {
+    //
     //cache_type = Log_event::EVENT_NO_CACHE;
     DBUG_ASSERT(crypto_scheme == 1);
+    is_valid_param= crypto_scheme == 1;
     memcpy(nonce, nonce_arg, BINLOG_NONCE_LENGTH);
   }
 
@@ -1729,10 +1732,12 @@ public:
     uchar scheme_buf= crypto_scheme;
     uchar key_version_buf[BINLOG_KEY_VERSION_LENGTH];
     int4store(key_version_buf, key_version);
-    //TODO:Robert - those my_b_safe_write will need to be changed to write_data - where encryption will be taking place
     return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
            wrapper_my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
            wrapper_my_b_safe_write(file, (uchar*)nonce, BINLOG_NONCE_LENGTH);
+    //return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
+           //wrapper_my_b_safe_write(file, (uchar*)"KEYV", BINLOG_KEY_VERSION_LENGTH) ||
+           //wrapper_my_b_safe_write(file, (uchar*)"NONCENONCENO", BINLOG_NONCE_LENGTH);
   }
 #else
   void print(FILE* file, PRINT_EVENT_INFO* print_event_info);
@@ -1742,7 +1747,7 @@ public:
      const char* buf, uint event_len,
      const Format_description_log_event* description_event);
 
-  bool is_valid() const { return crypto_scheme == 1; }
+  //bool is_valid() const { return crypto_scheme == 1; }
 
   Log_event_type get_type_code() { return binary_log::START_ENCRYPTION_EVENT; }
 

@@ -291,6 +291,17 @@ public:
   { return set_int((longlong)num, true, cs); }
   bool set_real(double num,uint decimals, const CHARSET_INFO *cs);
 
+  void reset(char *ptr_arg, uint32 length_arg, uint32 alloced_length_arg,
+             CHARSET_INFO *cs)
+  { 
+    mem_free();
+    m_ptr= ptr_arg;
+    m_length= length_arg;
+    m_alloced_length= alloced_length_arg;
+    m_charset= cs;
+    m_is_alloced= ptr_arg != NULL;
+  }
+
   /*
     PMG 2004.11.12
     This is a method that works the same as perl's "chop". It simply

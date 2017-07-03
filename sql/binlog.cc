@@ -4949,6 +4949,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     prev_gtids_ev.common_footer->checksum_alg=
                                    (s.common_footer)->checksum_alg;
     //TODO:Robert: Tu trzeba dodać encrypcje, crypto= i wszędzie indziej
+    prev_gtids_ev.crypto= &crypto;
     if (prev_gtids_ev.write(&log_file))
       goto err;
     bytes_written+= prev_gtids_ev.common_header->data_written;
@@ -4990,6 +4991,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
 
       prev_gtids_ev.common_footer->checksum_alg=
                                    (s.common_footer)->checksum_alg;
+      prev_gtids_ev.crypto= &crypto;
       if (prev_gtids_ev.write(&log_file))
         goto err;
       bytes_written+= prev_gtids_ev.common_header->data_written;
@@ -5021,6 +5023,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     extra_description_event->created= 0;
     /* Don't set log_pos in event header */
     extra_description_event->set_artificial_event();
+    extra_description_event->crypto= &crypto;
 
     if (extra_description_event->write(&log_file))
       goto err;
@@ -7065,54 +7068,54 @@ bool MYSQL_BIN_LOG::write_event_buffer(uchar* buf, uint len, Master_info *mi)
   bool error= false;
 
   //TODO:Robert:Temporary dissabling 
-  uchar *ebuf= 0;
+  //uchar *ebuf= 0;
   //
   //
-  if (crypto.scheme != 0)
-  {
-    DBUG_ASSERT(crypto.scheme == 1);
+  //if (crypto.scheme != 0)
+  //{
+    //DBUG_ASSERT(crypto.scheme == 1);
 
-    uint elen;
-    uchar iv[BINLOG_IV_LENGTH];
+    //uint elen;
+    //uchar iv[BINLOG_IV_LENGTH];
 
-    //TODO:Robert:temporary max is 512, maybe I should use different alloc?
-    ebuf= (uchar*)my_safe_alloca(len, 512);
-    if (!ebuf)
-    {
-      error = true;
-      goto err;
-    }
-
-    crypto.set_iv(iv, my_b_append_tell(&log_file));
-
-    //[>
-      //we want to encrypt everything, excluding the event length:
-      //massage the data before the encryption
-    //*/
-    //memcpy(buf + EVENT_LEN_OFFSET, buf, 4);
-
-    if ((elen = my_aes_encrypt(buf + 4, len - 4, ebuf + 4, crypto.key,
-                   crypto.key_length, my_aes_128_ecb, iv) < 0))
-    {
-      error = true;
-      goto err;
-    }
-
-    //if (encryption_crypt(buf + 4, len - 4,
-                         //ebuf + 4, &elen,
-                         //crypto.key, crypto.key_length, iv, sizeof(iv),
-                         //ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                         //ENCRYPTION_KEY_SYSTEM_DATA, crypto.key_version))
+    ////TODO:Robert:temporary max is 512, maybe I should use different alloc?
+    //ebuf= (uchar*)my_safe_alloca(len, 512);
+    //if (!ebuf)
+    //{
+      //error = true;
       //goto err;
+    //}
 
-    DBUG_ASSERT(elen == len - 4);
+    //crypto.set_iv(iv, my_b_append_tell(&log_file));
 
-    //[> massage the data after the encryption <]
-    memcpy(ebuf, ebuf + EVENT_LEN_OFFSET, 4);
-    int4store(ebuf + EVENT_LEN_OFFSET, len);
+    ////[>
+      ////we want to encrypt everything, excluding the event length:
+      ////massage the data before the encryption
+    ///[>/
+    ////memcpy(buf + EVENT_LEN_OFFSET, buf, 4);
 
-    buf= ebuf;
-  }
+    //if ((elen = my_aes_encrypt(buf + 4, len - 4, ebuf + 4, crypto.key,
+                   //crypto.key_length, my_aes_128_ecb, iv) < 0))
+    //{
+      //error = true;
+      //goto err;
+    //}
+
+    ////if (encryption_crypt(buf + 4, len - 4,
+                         ////ebuf + 4, &elen,
+                         ////crypto.key, crypto.key_length, iv, sizeof(iv),
+                         ////ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                         ////ENCRYPTION_KEY_SYSTEM_DATA, crypto.key_version))
+      ////goto err;
+
+    //DBUG_ASSERT(elen == len - 4);
+
+    ////[> massage the data after the encryption <]
+    //memcpy(ebuf, ebuf + EVENT_LEN_OFFSET, 4);
+    //int4store(ebuf + EVENT_LEN_OFFSET, len);
+
+    //buf= ebuf;
+  //}
 
   if (my_b_append(&log_file,(uchar*) buf,len) == 0)
   {
@@ -7123,8 +7126,8 @@ bool MYSQL_BIN_LOG::write_event_buffer(uchar* buf, uint len, Master_info *mi)
     error= true;
 
   //TODO:Robert:Temporary dissabling
-err:
-  my_safe_afree(ebuf, len, 512);
+//err:
+  //my_safe_afree(ebuf, len, 512);
   DBUG_RETURN(error);
 }
 #endif // ifdef HAVE_REPLICATION

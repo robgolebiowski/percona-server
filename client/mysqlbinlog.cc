@@ -1203,6 +1203,8 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
        ((my_time_t) (ev->common_header->when.tv_sec) >= start_datetime)) ||
       (ev_type == binary_log::FORMAT_DESCRIPTION_EVENT))
   {
+    //TODO:Robert:I do not think that Start_encryption should be skipped too
+    //TODO:Robert:Read the comments below
     if (ev_type != binary_log::FORMAT_DESCRIPTION_EVENT)
     {
       /*
@@ -1691,6 +1693,13 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
       in_transaction= false;
       print_event_info->skipped_event_in_transaction= false;
       seen_gtid= false;
+      ev->print(result_file, print_event_info);
+      if (head->error == -1)
+        goto err;
+      break;
+    }
+    case binary_log::START_ENCRYPTION_EVENT:
+    {  //TODO:Robert:Uncomment this: //glob_description_event->start_decryption((Start_encryption_log_event*)ev);
       ev->print(result_file, print_event_info);
       if (head->error == -1)
         goto err;

@@ -50,7 +50,7 @@ Binlog_sender::Binlog_sender(THD *thd, const char *start_file,
     m_check_previous_gtid_event(exclude_gtids != NULL),
     m_gtid_clear_fd_created_flag(exclude_gtids == NULL),
     m_diag_area(false),
-    m_errmsg(NULL), m_errno(0), m_last_file(NULL), m_last_pos(0),
+    m_errmsg(NULL), m_errno(0), m_last_file(NULL), m_last_pos(0), crypto_data(NULL),
     m_half_buffer_size_req_counter(0), m_new_shrink_size(PACKET_MIN_SIZE),
     m_flag(flag), m_observe_transmission(false), m_transmit_started(false)
   {}
@@ -999,7 +999,130 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
   if (event_checksum_on() && event_updated)
     calc_event_checksum(event_ptr, event_len);
 
-  DBUG_RETURN(send_packet());
+  if (send_packet())
+    DBUG_RETURN(1);
+
+  char header_buffer[LOG_EVENT_MINIMAL_HEADER_LEN];
+  if (Log_event::peek_event_header(header_buffer, log_cache))
+    DBUG_RETURN(1);
+
+  //peek_event_header actually moves the log_cache->read_pos, thus we need to rewind
+  log_cache->read_pos -= LOG_EVENT_MINIMAL_HEADER_LEN;
+
+  if (header_buffer[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT)
+  {
+    delete crypto_data;
+    crypto_data= NULL;
+
+    event_ptr= NULL;
+    event_len= 0;
+
+    if (read_event(log_cache, binary_log::BINLOG_CHECKSUM_ALG_OFF, &event_ptr,
+                   &event_len))
+      DBUG_RETURN(1);
+
+    event_len-= BINLOG_CHECKSUM_LEN;
+
+    DBUG_ASSERT(event_ptr[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT);
+    Format_description_log_event fdle(3);
+      //ev = new Start_encryption_log_event(buf, event_len, fdle);
+    Start_encryption_log_event sele(reinterpret_cast<char*>(event_ptr), event_len, &fdle);
+        
+    //Start_encryption_log_event *sele= (Start_encryption_log_event *)event_ptr;
+    //if (!sele)
+    //{
+      //set_fatal_error("Expected START_ENCRYPTION_EVENT in binlog file");
+      ////info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
+      //DBUG_RETURN(1);
+    //}
+
+    if (!sele.is_valid())
+      DBUG_RETURN(1);
+
+    crypto_data= new Binlog_crypt_data();
+
+    memcpy(crypto_data->nonce, sele.nonce, BINLOG_NONCE_LENGTH);
+    if(crypto_data->init(sele.crypto_scheme, sele.key_version))
+    {
+      delete crypto_data;
+      crypto_data= NULL;
+      DBUG_RETURN(1);
+    } 
+
+   //if (info->fdev->start_decryption(sele))
+   //{
+     //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
+     //info->errmsg= "Could not decrypt binlog: encryption key error";
+     //return 1;
+   //}
+   //delete sele;
+    //return 1;
+  }
+  DBUG_RETURN(0);
+
+  //TODO:Robert:My changes
+
+  //event_ptr= NULL;
+  //event_len= 0;
+
+  //if (read_event(log_cache, binary_log::BINLOG_CHECKSUM_ALG_OFF, &event_ptr,
+                 //&event_len))
+    //DBUG_RETURN(1);
+
+
+
+  //[>
+    //Read the following Start_encryption_log_event but don't send it to slave.
+    //Slave doesn't need to know whether master's binlog is encrypted,
+    //and if it'll want to encrypt its logs, it should generate its own
+    //random nonce, not use the one from the master.
+  //*/
+  //packet->length(0);
+  //info->last_pos= linfo->pos;
+  //error= Log_event::read_log_event(log, packet, info->fdev,
+                                   //opt_master_verify_checksum
+                                   //? info->current_checksum_alg
+                                   //: BINLOG_CHECKSUM_ALG_OFF);
+  //linfo->pos= my_b_tell(log);
+
+  //if (error)
+  //{
+    //set_read_error(info, error);
+    //DBUG_RETURN(1);
+  //}
+
+  //event_type= (Log_event_type)((uchar)(*packet)[LOG_EVENT_OFFSET]);
+  //if (event_type == START_ENCRYPTION_EVENT)
+  //{
+    //Start_encryption_log_event *sele= (Start_encryption_log_event *)
+      //Log_event::read_log_event(packet->ptr(), packet->length(), &info->errmsg,
+                                //info->fdev, BINLOG_CHECKSUM_ALG_OFF);
+    //if (!sele)
+    //{
+      //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
+      //DBUG_RETURN(1);
+    //}
+
+    //if (info->fdev->start_decryption(sele))
+    //{
+      //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
+      //info->errmsg= "Could not decrypt binlog: encryption key error";
+      //delete sele;
+      //DBUG_RETURN(1);
+    //}
+    //delete sele;
+  //}
+  //else if (start_pos == BIN_LOG_HEADER_SIZE)
+  //{
+    //[>
+      //not Start_encryption_log_event - seek back. But only if
+      //send_one_binlog_file() isn't going to seek anyway
+    //*/
+    //my_b_seek(log, info->last_pos);
+    //linfo->pos= info->last_pos;
+  //}
+
+  //DBUG_RETURN(send_packet());
 }
 
 int Binlog_sender::has_previous_gtid_log_event(IO_CACHE *log_cache,
@@ -1081,7 +1204,8 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
   //if ((error= Log_event::read_log_event(log_cache, &m_packet, NULL, checksum_alg,
                                         //NULL, NULL, header)))
   //TODO:Robert:Format_description_log_event *fdle - passing NULL, need to change that?
-  if ((error= Log_event::read_log_event(log_cache, &m_packet, NULL, NULL, checksum_alg,
+  
+  if ((error= Log_event::read_log_event(log_cache, &m_packet, crypto_data, NULL, checksum_alg,
                                         NULL, NULL, header)))
     goto read_error;
 

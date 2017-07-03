@@ -87,6 +87,9 @@ private:
   const char *m_last_file;
   my_off_t m_last_pos;
 
+  //This should not be pointer just initialized and reset and
+  Binlog_crypt_data *crypto_data;
+
   /*
     Needed to be able to evaluate if buffer needs to be resized (shrunk).
   */

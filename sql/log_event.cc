@@ -1075,9 +1075,9 @@ int Log_event::maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len)
   {
     DBUG_ASSERT(len >= EVENT_LEN_OFFSET);
     //if (write_internal(pos + EVENT_LEN_OFFSET - 4, 4))
-    if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4))
+    if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4)) //TODO:Robert:Co to jest? - Zakodowana część, która później jest przesunięta. pos jest przesunięte o 4 w funkcji write_header!! - To jest odtworzenie timestampu, który wcześniej był przesunięty w miejsce event_len - madness ?
       return 1;
-    int4store(pos + EVENT_LEN_OFFSET - 4, event_len);
+    int4store(pos + EVENT_LEN_OFFSET - 4, event_len); //TODO:Robert:Tu jest zapisanie event_len do bufora, które później jest zapisane do pliku
     event_len= 0;
   }
   return 0;
@@ -1108,8 +1108,12 @@ int Log_event::encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
     if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
       return 1;
 
+       //if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
+                           //crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
+
+
     if ((elen = my_aes_encrypt(pos, len, dst, crypto->key,
-                   crypto->key_length, my_aes_128_ecb, crypto->get_iv()) < 0))
+                   crypto->key_length, my_aes_128_ecb, NULL/*crypto->get_iv()*/) < 0))
       goto err;
 
     if (maybe_write_event_len(file, dst, dstsize))
@@ -1257,7 +1261,9 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 */
 
 int Log_event::read_log_event(IO_CACHE* file, String* packet,
-                              const Format_description_log_event *fdle,
+                              /*TODO:Robert:this should be const - refactor Binlog_crypt_data*/
+                              Binlog_crypt_data *crypto_data,
+                              //const Format_description_log_event *fdle,
                               mysql_mutex_t* log_lock,
                               enum_binlog_checksum_alg checksum_alg_arg,
                               const char *log_file_name_arg,
@@ -1397,35 +1403,51 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
 	}
       );
 
-    /*
-      if (fdle->crypto_data.scheme)
+      if (crypto_data != NULL && crypto_data->scheme == 1)
       {
+        ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
         uchar iv[BINLOG_IV_LENGTH];
-        fdle->crypto_data.set_iv(iv, my_b_tell(file) - data_len);
+        crypto_data->set_iv(iv, my_b_tell(file) - true_data_len); //TODO:Robert:To się zmieniło - możliwe, że iv jest już prawidłowe
 
-        char *newpkt= (char*)my_malloc(data_len + ev_offset + 1, MYF(MY_WME));
+        char *newpkt= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
         if (!newpkt)
           DBUG_RETURN(LOG_READ_MEM);
         memcpy(newpkt, packet->ptr(), ev_offset);
 
-        uint dstlen;
+        int dstlen;
         uchar *src= (uchar*)packet->ptr() + ev_offset;
         uchar *dst= (uchar*)newpkt + ev_offset;
         memcpy(src + EVENT_LEN_OFFSET, src, 4);
-        if (encryption_crypt(src + 4, data_len - 4, dst + 4, &dstlen,
-                fdle->crypto_data.key, fdle->crypto_data.key_length, iv,
-                sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
-                ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
+
+//int my_aes_decrypt(const unsigned char *source, uint32 source_length,
+                   //unsigned char *dest,
+                   //const unsigned char *key, uint32 key_length,
+                   //enum my_aes_opmode mode, const unsigned char *iv,
+                   //bool padding = true);
+        //if ((length= my_aes_decrypt(cipher, cipher_len, (unsigned char *) str,
+                                    //my_key, LOGIN_KEY_LEN, my_aes_128_ecb, NULL)) < 0)
+        //{
+          //[> Attempt to decrypt failed. <]
+          //return 0;
+        //}
+        //str[length]= 0;
+
+        //TODO:Robert:Tymczasowo wyNULLowałem iv
+        if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
+                           crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
+                //sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
+                //ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
         {
           my_free(newpkt);
           DBUG_RETURN(LOG_READ_DECRYPT);
         }
-        DBUG_ASSERT(dstlen == data_len - 4);
+        DBUG_ASSERT((uint)dstlen == true_data_len - 4); //TODO:Robert: Can stay as a comment - We have checked that dstlen is greater than 0, so we can safetly cast
         memcpy(dst, dst + EVENT_LEN_OFFSET, 4);
-        int4store(dst + EVENT_LEN_OFFSET, data_len);
-        packet->reset(newpkt, data_len + ev_offset, data_len + ev_offset + 1,
+        int4store(dst + EVENT_LEN_OFFSET, true_data_len);
+        
+        packet->reset(newpkt, true_data_len + ev_offset, true_data_len + ev_offset + 1,
                       &my_charset_bin);
-      }*/
+      }
 
       /*
         CRC verification of the Dump thread
@@ -1842,6 +1864,9 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       break;
     case binary_log::INCIDENT_EVENT:
       ev = new Incident_log_event(buf, event_len, fdle);
+      break;
+    case binary_log::START_ENCRYPTION_EVENT:
+      ev = new Start_encryption_log_event(buf, event_len, fdle);
       break;
     case binary_log::ROWS_QUERY_LOG_EVENT:
       ev= new Rows_query_log_event(buf, event_len, fdle);
@@ -5388,7 +5413,7 @@ Start_encryption_log_event::Start_encryption_log_event(
   if ((int)event_len ==
      (int)LOG_EVENT_MINIMAL_HEADER_LEN + (int)Start_encryption_log_event::get_data_size())
   {
-    buf += LOG_EVENT_MINIMAL_HEADER_LEN;
+    //buf += LOG_EVENT_MINIMAL_HEADER_LEN;
     crypto_scheme = *(uchar*)buf;
     key_version = uint4korr(buf + BINLOG_CRYPTO_SCHEME_LENGTH);
     memcpy(nonce,
@@ -5397,6 +5422,8 @@ Start_encryption_log_event::Start_encryption_log_event(
   }
   else
     crypto_scheme= ~0; // invalid
+
+  is_valid_param= crypto_scheme == 1;
 }
 
 #if defined(HAVE_REPLICATION) && !defined(MYSQL_CLIENT)
@@ -5423,22 +5450,16 @@ int Start_encryption_log_event::do_update_pos(Relay_log_info *rli)
 void Start_encryption_log_event::print(FILE* file,
                                        PRINT_EVENT_INFO* print_event_info)
 {
-    //Write_on_release_cache cache(&print_event_info->head_cache, file);
-    //TODO:Robert: I am not sure this is correct, based on diff from commit: f256c824d18ff35c58744d8e6809fd7338475154
-    //TODO:Robert: To jest raczej dobrze
-    //IO_CACHE *const head= &print_event_info->head_cache;
-    //TODO:Robert: Ale to bedzie trzeba zmienic, bo String nie jest linkowany z tym objectem i dostaje blad linkowania
-    //StringBuffer<1024> buf;
-    //buf.append(STRING_WITH_LEN("# Encryption scheme: "));
-    //buf.append_ulonglong(crypto_scheme);
-    //buf.append(STRING_WITH_LEN(", key_version: "));
-    //buf.append_ulonglong(key_version);
-    //buf.append(STRING_WITH_LEN(", nonce: "));
-    //TODO:Robert: Temporary disabled
-    //buf.append_hex(nonce, BINLOG_NONCE_LENGTH);
-    //buf.append(STRING_WITH_LEN("\n# The rest of the binlog is encrypted!\n"));
-    //TODO:Robert: To jest dobrze
-    //my_b_write(head, (uchar*)buf.ptr(), buf.length());
+    //Need 2 characters per one hex + 2 for 0x + 1 for \0
+    char nonce_buf[BINLOG_NONCE_LENGTH * 2 + 2 + 1];
+    str_to_hex(nonce_buf, reinterpret_cast<char*>(nonce),
+               BINLOG_NONCE_LENGTH);
+
+    IO_CACHE *const head= &print_event_info->head_cache;
+    print_header(head, print_event_info, FALSE);
+    my_b_printf(head,"Encryption scheme: %d", crypto_scheme);
+    my_b_printf(head,", key_version: %d", key_version);
+    my_b_printf(head,", nonce: %s ", nonce_buf);
 }
 #endif
 
@@ -13165,7 +13186,9 @@ Incident_log_event::write_data_header(IO_CACHE *file)
 #else
    //TODO:Robert: There is no distinction on MYSQL_CLIENT and not
    //I am not sure if there should be encrypt_and write for a client ...
-   DBUG_RETURN(encrypt_and_write(file, buf, sizeof(buf)));
+   //This is used by mysqlbinlog
+   DBUG_RETURN(my_b_safe_write(file, buf, sizeof(buf)));
+   //DBUG_RETURN(encrypt_and_write(file, buf, sizeof(buf)));
 #endif
 }
 
