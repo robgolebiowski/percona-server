@@ -622,6 +622,9 @@ public:
      Encryption data (key, nonce). Only used if ctx != 0.
   */
   Binlog_crypt_data *crypto;
+  
+  void *ctx;         ///< Encryption context or 0 if no encryption is needed
+  
   /**
      Event length to be written into the next encrypted block
   */
@@ -764,8 +767,8 @@ public:
     @retval LOG_READ_TOO_LARGE  event too large
    */
    static int read_log_event(IO_CACHE* file, String* packet,
-                             Binlog_crypt_data *crypto_data,
-                             //const Format_description_log_event *fdle,
+                             //Binlog_crypt_data *crypto_data,
+                             const Format_description_log_event *fdle,
                              mysql_mutex_t* log_lock,
                              enum_binlog_checksum_alg checksum_alg_arg,
                              const char *log_file_name_arg= NULL,

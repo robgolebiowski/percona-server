@@ -87,9 +87,6 @@ private:
   const char *m_last_file;
   my_off_t m_last_pos;
 
-  //This should not be pointer just initialized and reset and
-  Binlog_crypt_data *crypto_data;
-
   /*
     Needed to be able to evaluate if buffer needs to be resized (shrunk).
   */
@@ -258,6 +255,9 @@ private:
      @return It returns 0 if succeeds, otherwise 1 is returned.
   */
   int send_format_description_event(IO_CACHE *log, my_off_t start_pos);
+  //TODO:Robert:Temporary added here
+  Format_description_log_event *fdle; //TODO:Robert: Rename to m_fdle
+
   /**
      It sends a heartbeat to the client.
 

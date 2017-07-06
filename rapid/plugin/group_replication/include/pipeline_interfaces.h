@@ -411,7 +411,7 @@ private:
       return error; /* purecov: inspected */
     }
 
-    //TODO:Robert:Temporary passing NULL
+    //TODO:Temporary passing NULL
     if ((error= Log_event::read_log_event(cache, &packet_data, 0, NULL,
                                           binary_log::BINLOG_CHECKSUM_ALG_OFF)))
     {

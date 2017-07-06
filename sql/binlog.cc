@@ -4948,8 +4948,13 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
       global_sid_lock->unlock();
     prev_gtids_ev.common_footer->checksum_alg=
                                    (s.common_footer)->checksum_alg;
-    //TODO:Robert: Tu trzeba dodać encrypcje, crypto= i wszędzie indziej
-    prev_gtids_ev.crypto= &crypto;
+    //TODO:Robert: Tu trzeba dodać encrypcje, crypto= i wszędzie indzieja
+    //TODO:Robert: To na razie bez enkrypcji
+    if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+    {
+      prev_gtids_ev.crypto= &crypto;
+      prev_gtids_ev.ctx= alloca(crypto.ctx_size);
+    }
     if (prev_gtids_ev.write(&log_file))
       goto err;
     bytes_written+= prev_gtids_ev.common_header->data_written;
@@ -4991,7 +4996,11 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
 
       prev_gtids_ev.common_footer->checksum_alg=
                                    (s.common_footer)->checksum_alg;
-      prev_gtids_ev.crypto= &crypto;
+      if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+      {
+        prev_gtids_ev.crypto= &crypto;
+        prev_gtids_ev.ctx= alloca(crypto.ctx_size);
+      }
       if (prev_gtids_ev.write(&log_file))
         goto err;
       bytes_written+= prev_gtids_ev.common_header->data_written;
@@ -5023,7 +5032,14 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     extra_description_event->created= 0;
     /* Don't set log_pos in event header */
     extra_description_event->set_artificial_event();
-    extra_description_event->crypto= &crypto;
+
+    if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+    {
+      extra_description_event->crypto= &crypto;
+      extra_description_event->ctx= alloca(crypto.ctx_size);
+    }
+    //extra_description_event->crypto= &crypto;
+    //extra_description_event->ctx= alloca(crypto.ctx_size);
 
     if (extra_description_event->write(&log_file))
       goto err;
@@ -7241,7 +7257,11 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
   bool error= 1;
   DBUG_ENTER("MYSQL_BIN_LOG::write_event(Log_event *)");
 
-  event_info->crypto= &crypto;
+  if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+  {
+    event_info->crypto= &crypto;
+    event_info->ctx= alloca(crypto.ctx_size);
+  }
 
   if (thd->binlog_evt_union.do_union)
   {

@@ -18,7 +18,8 @@
 #define RPL_CONSTANTS_H
 
 #include "my_global.h"
-#include "my_aes.h" //TODO:Robert:Dodalem to tutaj, czy prawidlowo ?
+//#include "my_aes.h" //TODO:Robert:Dodalem to tutaj, czy prawidlowo ?
+#include "my_crypt.h"
 
 /*
   Constants used to parse the stream of bytes sent by a slave
@@ -173,7 +174,7 @@ static const size_t ENCRYPTION_KEY_LEN = 32;
 
 struct Binlog_crypt_data {
   uint  scheme;
-  uint  key_version, key_length; //, ctx_size;
+  uint  key_version, key_length, ctx_size;
   //uchar key[MY_AES_MAX_KEY_LENGTH];
   uchar *key;
   uchar nonce[BINLOG_NONCE_LENGTH];
@@ -206,7 +207,7 @@ struct Binlog_crypt_data {
     key=(uchar*)"1111111111111111";
 
     scheme= sch;
-    //ctx_size= encryption_ctx_size(ENCRYPTION_KEY_SYSTEM_DATA, kv);
+    ctx_size= my_aes_ctx_size(MY_AES_ECB);
     key_version= 1;//kv;
     key_length= 16;
     if (key==NULL)
@@ -216,13 +217,13 @@ struct Binlog_crypt_data {
     //return encryption_key_get(ENCRYPTION_KEY_SYSTEM_DATA, kv, key, &key_length);
   }
 
-  void set_iv(uchar* iv, uint32 offs) 
+  void set_iv(uchar* iv, uint32 offs) const
   {
     memcpy(iv, nonce, BINLOG_NONCE_LENGTH);
     int4store(iv + BINLOG_NONCE_LENGTH, offs);
 
-    memcpy(this->iv, nonce, BINLOG_NONCE_LENGTH);
-    int4store(this->iv + BINLOG_NONCE_LENGTH, offs);
+    //memcpy(this->iv, nonce, BINLOG_NONCE_LENGTH);
+    //int4store(this->iv + BINLOG_NONCE_LENGTH, offs);
   }
 
   uchar* get_iv()

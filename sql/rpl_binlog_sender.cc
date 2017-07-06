@@ -50,9 +50,10 @@ Binlog_sender::Binlog_sender(THD *thd, const char *start_file,
     m_check_previous_gtid_event(exclude_gtids != NULL),
     m_gtid_clear_fd_created_flag(exclude_gtids == NULL),
     m_diag_area(false),
-    m_errmsg(NULL), m_errno(0), m_last_file(NULL), m_last_pos(0), crypto_data(NULL),
+    m_errmsg(NULL), m_errno(0), m_last_file(NULL), m_last_pos(0),
     m_half_buffer_size_req_counter(0), m_new_shrink_size(PACKET_MIN_SIZE),
-    m_flag(flag), m_observe_transmission(false), m_transmit_started(false)
+    m_flag(flag), m_observe_transmission(false), m_transmit_started(false),
+    fdle(NULL)
   {}
 
 void Binlog_sender::init()
@@ -926,6 +927,9 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
   uchar* event_ptr;
   uint32 event_len;
 
+  if (fdle == NULL)
+    fdle= new Format_description_log_event(3);
+
   if (read_event(log_cache, binary_log::BINLOG_CHECKSUM_ALG_OFF, &event_ptr,
                  &event_len))
     DBUG_RETURN(1);
@@ -999,6 +1003,19 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
   if (event_checksum_on() && event_updated)
     calc_event_checksum(event_ptr, event_len);
 
+  uint ev_len= event_ptr[EVENT_LEN_OFFSET];
+  if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
+    ev_len-= BINLOG_CHECKSUM_LEN;
+
+  Format_description_log_event *tmp;
+  if (!(tmp= new Format_description_log_event(reinterpret_cast<char*>(event_ptr), ev_len, fdle)))
+  {
+    set_fatal_error("Corrupt Format_description event found or out-of-memory");
+    DBUG_RETURN(1);
+  }
+  delete fdle;
+  fdle= tmp; //TODO:Robert: fdle must be delete in destructor
+
   if (send_packet())
     DBUG_RETURN(1);
 
@@ -1011,8 +1028,8 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
 
   if (header_buffer[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT)
   {
-    delete crypto_data;
-    crypto_data= NULL;
+    //delete crypto_data;
+    //crypto_data= NULL;
 
     event_ptr= NULL;
     event_len= 0;
@@ -1024,9 +1041,9 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     event_len-= BINLOG_CHECKSUM_LEN;
 
     DBUG_ASSERT(event_ptr[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT);
-    Format_description_log_event fdle(3);
+    //Format_description_log_event fdle(3);
       //ev = new Start_encryption_log_event(buf, event_len, fdle);
-    Start_encryption_log_event sele(reinterpret_cast<char*>(event_ptr), event_len, &fdle);
+    Start_encryption_log_event sele(reinterpret_cast<char*>(event_ptr), event_len, fdle);
         
     //Start_encryption_log_event *sele= (Start_encryption_log_event *)event_ptr;
     //if (!sele)
@@ -1039,22 +1056,24 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     if (!sele.is_valid())
       DBUG_RETURN(1);
 
-    crypto_data= new Binlog_crypt_data();
+    //crypto_data= new Binlog_crypt_data();
 
-    memcpy(crypto_data->nonce, sele.nonce, BINLOG_NONCE_LENGTH);
-    if(crypto_data->init(sele.crypto_scheme, sele.key_version))
-    {
-      delete crypto_data;
-      crypto_data= NULL;
-      DBUG_RETURN(1);
-    } 
+    //memcpy(crypto_data->nonce, sele.nonce, BINLOG_NONCE_LENGTH);
+    //if(crypto_data->init(sele.crypto_scheme, sele.key_version))
+    //{
+      //delete crypto_data;
+      //crypto_data= NULL;
+      //DBUG_RETURN(1);
+    //} 
 
-   //if (info->fdev->start_decryption(sele))
-   //{
+   if (fdle->start_decryption(&sele))
+   {
      //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
      //info->errmsg= "Could not decrypt binlog: encryption key error";
+     set_fatal_error("Could not decrypt binlog: encryption key error");
+     DBUG_RETURN(1);
      //return 1;
-   //}
+   }
    //delete sele;
     //return 1;
   }
@@ -1176,7 +1195,7 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
   char header[LOG_EVENT_MINIMAL_HEADER_LEN];
   int error= 0;
 #ifndef DBUG_OFF
-  const char *packet_buffer= NULL;
+  //const char *packet_buffer= NULL; //TODO:Robert:Temporary disabled
 #endif
 
   if ((error= Log_event::peek_event_length(event_len, log_cache, header)))
@@ -1187,7 +1206,7 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
 
   event_offset= m_packet.length();
 #ifndef DBUG_OFF
-  packet_buffer= m_packet.ptr();
+  //packet_buffer= m_packet.ptr(); //TODO:Robert:Temporary disabled
 #endif
 
   DBUG_EXECUTE_IF("dump_thread_before_read_event",
@@ -1205,7 +1224,7 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
                                         //NULL, NULL, header)))
   //TODO:Robert:Format_description_log_event *fdle - passing NULL, need to change that?
   
-  if ((error= Log_event::read_log_event(log_cache, &m_packet, crypto_data, NULL, checksum_alg,
+  if ((error= Log_event::read_log_event(log_cache, &m_packet, fdle, NULL, checksum_alg,
                                         NULL, NULL, header)))
     goto read_error;
 
@@ -1217,7 +1236,9 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
     that it might call functions to replace the buffer by one with the size to
     fit the event.
   */
-  DBUG_ASSERT(packet_buffer == m_packet.ptr());
+  //TODO:Robert:Temporary disabling this check - which was originally here (not from MariaDB) I am allocating new buffer for decrypted data
+  //TODO:Robet:So this assert is no longer true
+  //DBUG_ASSERT(packet_buffer == m_packet.ptr());
   *event_ptr= (uchar *)m_packet.ptr() + event_offset;
 
   DBUG_PRINT("info",

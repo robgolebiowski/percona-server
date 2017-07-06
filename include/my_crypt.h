@@ -28,7 +28,9 @@ extern "C" {
 
 /* return values from my_aes_encrypt/my_aes_decrypt functions */
 #define MY_AES_OK               0
+#ifndef MY_AES_BAD_DATA //TODO:Robert:Dirty hack, change it later
 #define MY_AES_BAD_DATA         -100
+#endif
 #define MY_AES_OPENSSL_ERROR    -101
 #define MY_AES_BAD_KEYSIZE      -102
 

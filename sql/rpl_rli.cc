@@ -633,15 +633,15 @@ int Relay_log_info::init_relay_log_pos(const char* log,
       else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
       {
         //TODO:Robert:Temporary disabled
-        //if (rli_description_event->start_decryption((Start_encryption_log_event*) ev))
-        /*{
+        if (rli_description_event->start_decryption((Start_encryption_log_event*) ev))
+        {
           //TODO:Robert: is this correct, the goto us based on I/O error reading event, above ?
           *errmsg= "Unable to set up decryption of binlog.";
           delete ev;
           goto err;
           //delete fdev;
           //return NULL;
-        }*/
+        }
         delete ev;
       }
       else

@@ -65,6 +65,7 @@ slave_ignored_err_throttle(window_size,
 #include "rpl_gtid.h"
 #include "xa_aux.h"
 #include "my_byteorder.h"
+#include "my_crypt.h"
 
 PSI_memory_key key_memory_log_event;
 PSI_memory_key key_memory_Incident_log_event_message;
@@ -691,6 +692,7 @@ Log_event::Log_event(THD* thd_arg, uint16 flags_arg,
   common_header->flags= flags_arg;
 
   crypto = NULL;
+  ctx= NULL;
 }
 
 /**
@@ -711,6 +713,7 @@ Log_event::Log_event(Log_event_header* header, Log_event_footer *footer,
   common_header->unmasked_server_id= server_id;
 
   crypto = NULL;
+  ctx= NULL;
 }
 #endif /* !MYSQL_CLIENT */
 
@@ -739,6 +742,7 @@ Log_event::Log_event(Log_event_header *header,
 #endif
 
   crypto = NULL;
+  ctx= NULL;
 }
 
 /*
@@ -1004,20 +1008,21 @@ bool Log_event::write_footer(IO_CACHE* file)
     int4store(buf, crc);
     //TODO:Robert:Temporary disabled
     if (encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
-      return 1;
+      return ER_ERROR_ON_WRITE;
     //return (my_b_safe_write(file, (uchar*) buf, sizeof(buf)));
   }
   //TODO:Robert: Temporary disabled
-//  if (ctx) //TODO:Robert : Jak oznaczyć czy jest szyfrowane ?
- // {
-    //uint dstlen;
-  //  uchar dst[MY_AES_BLOCK_SIZE*2];
-    //if (encryption_ctx_finish(ctx, dst, &dstlen))
-      //DBUG_RETURN(1);
-    //if (maybe_write_event_len(dst, dstlen) || write_internal(dst, dstlen)) //TODO:Robert <- there is no write_internal
+  if (ctx) //TODO:Robert : Jak oznaczyć czy jest szyfrowane ?
+  {
+    uint dstlen;
+    uchar dst[MY_AES_BLOCK_SIZE*2];
+    if (my_aes_crypt_finish(ctx, dst, &dstlen))
+      return 1;
+    if (maybe_write_event_len(file, dst, dstlen) || my_b_safe_write(file, dst, dstlen))
+      return ER_ERROR_ON_WRITE;
    // if (my_b_safe_write(file, dst, crypto->dst_len)) //TODO:Robert:Na razie to zostawiam dla kompatybilności
    //   return 1;//DBUG_RETURN(ER_ERROR_ON_WRITE);
-  //}
+  }
   return 0;
 }
 
@@ -1100,26 +1105,34 @@ int Log_event::encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
   
   uchar *dst= 0;
   size_t dstsize= 0;
-  uint elen;
+  //uint elen;
 
-  if (crypto != NULL && crypto->scheme)
+  //if (crypto != NULL && crypto->scheme)
+  if(ctx)
   {
-    dstsize= my_aes_get_size(len, my_aes_128_ecb);
+    dstsize= my_aes_crypt_get_size(MY_AES_ECB, len);
     if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
       return 1;
 
        //if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
                            //crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
 
-
-    if ((elen = my_aes_encrypt(pos, len, dst, crypto->key,
-                   crypto->key_length, my_aes_128_ecb, NULL/*crypto->get_iv()*/) < 0))
+    uint dstlen;
+    if (my_aes_crypt_update(ctx, pos, len, dst, &dstlen))
       goto err;
 
-    if (maybe_write_event_len(file, dst, dstsize))
+    //if (encryption_ctx_update(ctx, pos, len, dst, &dstlen))
+      //goto err;
+
+
+    //if ((elen = my_aes_encrypt(pos, len, dst, crypto->key,
+                   //crypto->key_length, my_aes_128_ecb, NULL[>crypto->get_iv()<]) < 0))
+      //goto err;
+
+    if (maybe_write_event_len(file, dst, dstlen))
       return 1;
     pos= dst;
-    len= dstsize;
+    len= dstlen;
 
 
     //dstsize= encryption_encrypted_length(len, ENCRYPTION_KEY_SYSTEM_DATA,
@@ -1213,21 +1226,56 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 
   write_header_to_memory(header);
 
-  //TODO:Robert:Ten kod jest wzięty z Log_event_writer::write_header
+  //TODO:Robert:Should this be executed even when res is true (below?)
+  if (need_checksum() &&
+      (common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0)
+  {
+    common_header->flags &= ~LOG_EVENT_BINLOG_IN_USE_F;
+    int2store(header + FLAGS_OFFSET, common_header->flags);
+  }
+  crc= my_checksum(crc, header, LOG_EVENT_HEADER_LEN);
 
   uchar *pos= header;
   size_t len=sizeof(header);
 
-  if (crypto != NULL && crypto->scheme == 1)
+  //TODO:Robert:Ten kod jest wzięty z Log_event_writer::write_header
+  if (ctx)
   {
     uchar iv[BINLOG_IV_LENGTH];
     crypto->set_iv(iv, my_b_safe_tell(file));
+
+    int res= 0;
+
+    if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                               crypto->key, crypto->key_length, iv, sizeof(iv))))
+      DBUG_RETURN(res);
+
+    //if (encryption_ctx_init(ctx, crypto->key, crypto->key_length,
+           //iv, sizeof(iv), ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+           //crypto->key_version))
+      //DBUG_RETURN(1);
+
+    DBUG_ASSERT(len >= LOG_EVENT_HEADER_LEN);
     event_len= uint4korr(pos + EVENT_LEN_OFFSET);
-    //DBUG_ASSERT(event_len >= len); 
+    DBUG_ASSERT(event_len >= len);
     memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
     pos+= 4;
     len-= 4;
   }
+
+  //uchar *pos= header;
+  //size_t len=sizeof(header);
+
+  //if (crypto != NULL && crypto->scheme == 1)
+  //{
+    //uchar iv[BINLOG_IV_LENGTH];
+    //crypto->set_iv(iv, my_b_safe_tell(file));
+    //event_len= uint4korr(pos + EVENT_LEN_OFFSET);
+    ////DBUG_ASSERT(event_len >= len); 
+    //memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
+    //pos+= 4;
+    //len-= 4;
+  //}
   //DBUG_RETURN(encrypt_and_write(file, pos, len));
   //ret= my_b_safe_write(file, header, LOG_EVENT_HEADER_LEN);
   ret = encrypt_and_write(file, pos, len);
@@ -1241,13 +1289,14 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
     verification, the flag is dropped before computing the checksum
     too.
   */
-  if (need_checksum() &&
-      (common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0)
-  {
-    common_header->flags &= ~LOG_EVENT_BINLOG_IN_USE_F;
-    int2store(header + FLAGS_OFFSET, common_header->flags);
-  }
-  crc= my_checksum(crc, header, LOG_EVENT_HEADER_LEN);
+  //TODO:Robert: Moved above - before pos (header is changed)
+  //if (need_checksum() &&
+      //(common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0)
+  //{
+    //common_header->flags &= ~LOG_EVENT_BINLOG_IN_USE_F;
+    //int2store(header + FLAGS_OFFSET, common_header->flags);
+  //}
+  //crc= my_checksum(crc, header, LOG_EVENT_HEADER_LEN);
 
   DBUG_RETURN( ret);
 }
@@ -1262,8 +1311,8 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 
 int Log_event::read_log_event(IO_CACHE* file, String* packet,
                               /*TODO:Robert:this should be const - refactor Binlog_crypt_data*/
-                              Binlog_crypt_data *crypto_data,
-                              //const Format_description_log_event *fdle,
+                              //Binlog_crypt_data *crypto_data,
+                              const Format_description_log_event *fdle,
                               mysql_mutex_t* log_lock,
                               enum_binlog_checksum_alg checksum_alg_arg,
                               const char *log_file_name_arg,
@@ -1275,7 +1324,7 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
   int result=0;
   char local_buf[LOG_EVENT_MINIMAL_HEADER_LEN];
   char *buf= event_header != NULL ? event_header : local_buf;
-  uchar ev_offset= packet->length();
+  size_t ev_offset= packet->length();
   DBUG_ENTER("Log_event::read_log_event(IO_CACHE *, String *, mysql_mutex_t, uint8)");
 
   if (log_lock)
@@ -1403,18 +1452,18 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
 	}
       );
 
-      if (crypto_data != NULL && crypto_data->scheme == 1)
+      if (fdle->crypto_data.scheme)
       {
         ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
         uchar iv[BINLOG_IV_LENGTH];
-        crypto_data->set_iv(iv, my_b_tell(file) - true_data_len); //TODO:Robert:To się zmieniło - możliwe, że iv jest już prawidłowe
+        fdle->crypto_data.set_iv(iv, my_b_tell(file) - true_data_len); //TODO:Robert:To się zmieniło - możliwe, że iv jest już prawidłowe
 
         char *newpkt= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
         if (!newpkt)
           DBUG_RETURN(LOG_READ_MEM);
         memcpy(newpkt, packet->ptr(), ev_offset);
 
-        int dstlen;
+        uint dstlen;
         uchar *src= (uchar*)packet->ptr() + ev_offset;
         uchar *dst= (uchar*)newpkt + ev_offset;
         memcpy(src + EVENT_LEN_OFFSET, src, 4);
@@ -1432,10 +1481,20 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
         //}
         //str[length]= 0;
 
+        //if (my_aes_crypt(MY_AES_ECB, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, data_len - 4, dst + 4, &dstlen,
+            //crypto_data->key, crypto_data->key_length, iv, sizeof(iv)))
+        if (my_aes_crypt(MY_AES_CBC, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, true_data_len - 4, dst + 4, &dstlen,
+            fdle->crypto_data.key, fdle->crypto_data.key_length, iv, sizeof(iv)))
+ 
+
+            //sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
+            //ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
+
+
         //TODO:Robert:Tymczasowo wyNULLowałem iv
-        if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
-                           crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
-                //sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
+        //if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
+                           //crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
+                ////sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
                 //ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
         {
           my_free(newpkt);
@@ -1444,9 +1503,13 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
         DBUG_ASSERT((uint)dstlen == true_data_len - 4); //TODO:Robert: Can stay as a comment - We have checked that dstlen is greater than 0, so we can safetly cast
         memcpy(dst, dst + EVENT_LEN_OFFSET, 4);
         int4store(dst + EVENT_LEN_OFFSET, true_data_len);
-        
-        packet->reset(newpkt, true_data_len + ev_offset, true_data_len + ev_offset + 1,
-                      &my_charset_bin);
+
+        packet->length(0);  // size of the content
+        //packet->qs_append('\0'); // Set this as an OK packet
+
+        packet->append(newpkt, true_data_len + ev_offset);
+        //packet->reset(newpkt, true_data_len + ev_offset, true_data_len + ev_offset + 1,
+                      //&my_charset_bin);
       }
 
       /*
@@ -5430,8 +5493,8 @@ Start_encryption_log_event::Start_encryption_log_event(
 int Start_encryption_log_event::do_apply_event(Relay_log_info const *rli)
 {
   //TODO:Robert:Temporary disabled
-  //return rli->get_rli_description_event()->start_decryption(this);
-  return 1; //TODO:Robert:Needs to be removed
+  return rli->get_rli_description_event()->start_decryption(this);
+  //return 1; //TODO:Robert:Needs to be removed
 }
 
 int Start_encryption_log_event::do_update_pos(Relay_log_info *rli)
@@ -5701,6 +5764,17 @@ int Format_description_log_event::do_update_pos(Relay_log_info *rli)
   {
     return Log_event::do_update_pos(rli);
   }
+}
+
+bool Format_description_log_event::start_decryption(Start_encryption_log_event* sele)
+{
+  DBUG_ASSERT(crypto_data.scheme == 0);
+
+  if (!sele->is_valid())
+    return 1;
+
+  memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
+  return crypto_data.init(sele->crypto_scheme, sele->key_version);
 }
 
 Log_event::enum_skip_reason
