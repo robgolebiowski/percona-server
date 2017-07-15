@@ -187,15 +187,23 @@ struct Binlog_crypt_data {
     scheme = 0;
   }
 
-  //Binlog_crypt_data(const Binlog_crypt_data &b)
-  //{
-    //this->scheme= b.scheme;
-    //this->key_version = b.key_verion;
-    //this->key= b.key;
-    //memcpy(this->iv, b.iv, BINLOG_IV_LENGTH);
-    //this->dst_len = b.dst_len;
-    //memcpy(this->nonce, b.nonce, BINLOG_NONCE_LENGTH);
-  //}
+  Binlog_crypt_data& operator=(Binlog_crypt_data b)
+  {
+    if (b.scheme == 1)
+    {
+      this->scheme= b.scheme;
+      this->key_version = b.key_version;
+      this->ctx_size= b.ctx_size;
+      this->key= new uchar[b.key_length];
+      memcpy(this->key, b.key, b.key_length);
+      this->key_length= b.key_length;
+      memcpy(this->iv, b.iv, BINLOG_IV_LENGTH);
+      this->dst_len = b.dst_len;
+      memcpy(this->nonce, b.nonce, BINLOG_NONCE_LENGTH);
+    }
+
+    return *this;
+  }
 
   int init(uint sch, uint kv)
   {

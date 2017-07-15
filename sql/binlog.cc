@@ -454,6 +454,8 @@ public:
   */
   IO_CACHE cache_log;
 
+  Binlog_crypt_data *crypto;
+
 protected:
   /*
     It truncates the cache to a certain position. This includes deleting the
@@ -743,6 +745,12 @@ public:
       trx_cache.reset();
   }
 
+  void set_crypto(Binlog_crypt_data *crypto)
+  {
+    stmt_cache.crypto= crypto;
+    trx_cache.crypto= crypto;
+  }
+
 #ifndef DBUG_OFF
   bool dbug_any_finalized() const {
     return stmt_cache.is_finalized() || trx_cache.is_finalized();
@@ -917,6 +925,9 @@ class Binlog_event_writer
   ha_checksum checksum;
   uint32 end_log_pos;
   THD *thd;
+  /**
+     Encryption data (key, nonce). Only used if ctx != 0.
+  */
 
 public:
   /**
@@ -940,7 +951,102 @@ public:
     // Simulate checksum error
     if (DBUG_EVALUATE_IF("fault_injection_crc_value", 1, 0))
       checksum--;
+
+    ctx= NULL;
   }
+
+  Binlog_crypt_data *crypto;
+  
+  void *ctx;         ///< Encryption context or 0 if no encryption is needed
+  uint event_len;
+
+  int maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len)
+  {
+    if (len && event_len)
+    {
+      DBUG_ASSERT(len >= EVENT_LEN_OFFSET);
+      //if (write_internal(pos + EVENT_LEN_OFFSET - 4, 4))
+      if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4)) //TODO:Robert:Co to jest? - Zakodowana część, która później jest przesunięta. pos jest przesunięte o 4 w funkcji rite_header!! - To jest odtworzenie timestampu, który wcześniej był przesunięty w miejsce event_len - madness ?
+        return 1;
+      int4store(pos + EVENT_LEN_OFFSET - 4, event_len); //TODO:Robert:Tu jest zapisanie event_len do bufora, które później jest zapisane do pliku
+      event_len= 0;
+    }
+    return 0;
+  }
+
+
+  int encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
+  {
+    //return 1;
+    //TODO:Robert:Temporary disabling encryption, I am currently only interested in binlog events
+    
+    uchar *dst= 0;
+    size_t dstsize= 0;
+    //uint elen;
+
+    //if (crypto != NULL && crypto->scheme)
+    if(ctx)
+    {
+      dstsize= my_aes_crypt_get_size(MY_AES_ECB, len);
+      if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
+        return 1;
+
+         //if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
+                             //crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
+
+      uint dstlen;
+      if (my_aes_crypt_update(ctx, pos, len, dst, &dstlen))
+        goto err;
+
+      //if (encryption_ctx_update(ctx, pos, len, dst, &dstlen))
+        //goto err;
+
+
+      //if ((elen = my_aes_encrypt(pos, len, dst, crypto->key,
+                     //crypto->key_length, my_aes_128_ecb, NULL[>crypto->get_iv()<]) < 0))
+        //goto err;
+
+      if (maybe_write_event_len(file, dst, dstlen))
+        return 1;
+      pos= dst;
+      len= dstlen;
+
+
+      //dstsize= encryption_encrypted_length(len, ENCRYPTION_KEY_SYSTEM_DATA,
+                                           //crypto->key_version);
+      //if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
+        //return 1;
+
+      //if (encryption_ctx_update(ctx, pos, len, dst, &dstlen))
+        //goto err;
+      //if (maybe_write_event_len(dst, dstlen))
+        //return 1;
+      //pos= dst;
+      //len= dstlen;
+    }
+    else
+    {
+      dst = 0;
+    }
+
+    if (my_b_safe_write(file, pos, len))
+      goto err;
+
+    //if (my_b_safe_write(file, pos, len))
+      //goto err;
+    //bytes_written+= len; //TODO:Robert: This is what I am missing
+    //TODO:Robert:This is the old part
+    //if (write_internal(pos, len))
+      //goto err;
+
+    my_safe_afree(dst, dstsize, 512);
+    return 0;
+  err:
+    my_safe_afree(dst, dstsize, 512);
+    return 1;
+    
+  }
+
 
   /**
     Write part of an event to disk.
@@ -971,6 +1077,74 @@ public:
     @retval true Error, i.e., my_b_write failed.
     @retval false Success.
   */
+  //bool write_event_part(uchar **buf_p, uint32 *buf_len_p, uint32 *event_len_p)
+  //{
+    //DBUG_ENTER("Binlog_event_writer::write_event_part");
+
+    //if (*buf_len_p == 0)
+      //DBUG_RETURN(false);
+
+    //// This is the beginning of an event
+    //if (*event_len_p == 0)
+    //{
+      //// Caller must ensure that the first part of the event contains
+      //// a full event header.
+      //DBUG_ASSERT(*buf_len_p >= LOG_EVENT_HEADER_LEN);
+
+      //// Read event length
+      //*event_len_p= uint4korr(*buf_p + EVENT_LEN_OFFSET);
+
+      //// Increase end_log_pos
+      //end_log_pos+= *event_len_p;
+
+      //// Change event length if checksum is enabled
+      //if (have_checksum)
+      //{
+        ////TODO:To jest juz uwzglednione
+        ////int4store(*buf_p + EVENT_LEN_OFFSET,
+                  ///[>event_len_p + BINLOG_CHECKSUM_LEN);
+        //// end_log_pos is shifted by the checksum length
+        //end_log_pos+= BINLOG_CHECKSUM_LEN;
+      //}
+
+      //// Store end_log_pos
+      //// TODO:Robert:To nie jest potrzebne
+      ////int4store(*buf_p + LOG_POS_OFFSET, end_log_pos);
+    //}
+
+    //// write the buffer
+    //uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
+    //DBUG_ASSERT(write_bytes > 0);
+    //if (my_b_write(output_cache, *buf_p, write_bytes))
+      //DBUG_RETURN(true);
+
+    //// update the checksum
+    ////if (have_checksum)
+      ////checksum= my_checksum(checksum, *buf_p, write_bytes);
+
+    //// Step positions.
+    //*buf_p+= write_bytes;
+    //*buf_len_p-= write_bytes;
+    //*event_len_p-= write_bytes;
+    //thd->binlog_bytes_written+= write_bytes;
+
+    //if (have_checksum)
+    //{
+      //// store checksum
+      //if (*event_len_p == 0)
+      //{
+        ////char checksum_buf[BINLOG_CHECKSUM_LEN];
+        ////int4store(checksum_buf, checksum);
+        ////if (my_b_write(output_cache, checksum_buf, BINLOG_CHECKSUM_LEN))
+          ////DBUG_RETURN(true);
+        //thd->binlog_bytes_written+= BINLOG_CHECKSUM_LEN;
+        ////checksum= initial_checksum;
+      //}
+    //}
+
+    //DBUG_RETURN(false);
+  //}
+
   bool write_event_part(uchar **buf_p, uint32 *buf_len_p, uint32 *event_len_p)
   {
     DBUG_ENTER("Binlog_event_writer::write_event_part");
@@ -978,6 +1152,9 @@ public:
     if (*buf_len_p == 0)
       DBUG_RETURN(false);
 
+    size_t len= *event_len_p;
+    uchar *pos= *buf_p;
+    
     // This is the beginning of an event
     if (*event_len_p == 0)
     {
@@ -994,6 +1171,7 @@ public:
       // Change event length if checksum is enabled
       if (have_checksum)
       {
+        //TODO:To jest juz uwzglednione
         int4store(*buf_p + EVENT_LEN_OFFSET,
                   *event_len_p + BINLOG_CHECKSUM_LEN);
         // end_log_pos is shifted by the checksum length
@@ -1001,41 +1179,114 @@ public:
       }
 
       // Store end_log_pos
+      // TODO:Robert:To nie jest potrzebne
       int4store(*buf_p + LOG_POS_OFFSET, end_log_pos);
+      //
+      //
+      DBUG_ASSERT(output_cache == mysql_bin_log.get_log_file());
+
+      len= *event_len_p;
+
+      if (ctx)
+      {
+        uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
+        DBUG_ASSERT(write_bytes > 0);
+        
+        // update the checksum Przenioslem to z dolu, co sie stanie, jezeli encrypt_and_write sfailuje - zachować stary checksum?
+        if (have_checksum)
+          checksum= my_checksum(checksum, *buf_p, write_bytes);
+
+        uchar iv[BINLOG_IV_LENGTH];
+        crypto->set_iv(iv, my_b_safe_tell(output_cache));
+
+        int res= 0;
+
+        if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                                   crypto->key, crypto->key_length, iv, sizeof(iv))))
+          DBUG_RETURN(res);
+
+        DBUG_ASSERT(*event_len_p >= LOG_EVENT_HEADER_LEN);
+        event_len= uint4korr(pos + EVENT_LEN_OFFSET); //event_len jest z checksum, event_len_p jest bez checksumu
+        DBUG_ASSERT(event_len >= *event_len_p);
+        memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
+        pos+= 4;
+        len-= 4;
+      }
+
     }
 
-    // write the buffer
-    uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
-    DBUG_ASSERT(write_bytes > 0);
-    if (my_b_write(output_cache, *buf_p, write_bytes))
-      DBUG_RETURN(true);
+    if (ctx)
+    {
+      uint32 write_bytes= std::min<uint32>(*buf_len_p, len);
+      DBUG_ASSERT(write_bytes > 0);
+      if (encrypt_and_write(output_cache, pos, write_bytes))
+        DBUG_RETURN(true);
 
-    // update the checksum
-    if (have_checksum)
-      checksum= my_checksum(checksum, *buf_p, write_bytes);
+      //TODO:Robert: In case of error I should be restoring checksum here
+       //update the checksum
+      //if (have_checksum)
+        //checksum= my_checksum(checksum, *buf_p, write_bytes);
 
-    // Step positions.
-    *buf_p+= write_bytes;
-    *buf_len_p-= write_bytes;
-    *event_len_p-= write_bytes;
-    thd->binlog_bytes_written+= write_bytes;
+      // Step positions.
+      if (write_bytes == len)
+        write_bytes= *event_len_p;
+      
+      *buf_p+= write_bytes;
+      *buf_len_p-= write_bytes;
+      *event_len_p-= write_bytes;
+      thd->binlog_bytes_written+= write_bytes;
+    }
+    else
+    {
+      // write the buffer
+      uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
+      DBUG_ASSERT(write_bytes > 0);
+      if (encrypt_and_write(output_cache, *buf_p, write_bytes))
+        DBUG_RETURN(true);
 
-    if (have_checksum)
+      // update the checksum
+      if (have_checksum)
+        checksum= my_checksum(checksum, *buf_p, write_bytes);
+
+      // Step positions.
+      *buf_p+= write_bytes;
+      *buf_len_p-= write_bytes;
+      *event_len_p-= write_bytes;
+      thd->binlog_bytes_written+= write_bytes;
+    }
+
+    if (*event_len_p == 0)
+    //if (have_checksum)
     {
       // store checksum
-      if (*event_len_p == 0)
+      //if (*event_len_p == 0)
+      if (have_checksum)
       {
-        char checksum_buf[BINLOG_CHECKSUM_LEN];
+        uchar checksum_buf[BINLOG_CHECKSUM_LEN];
         int4store(checksum_buf, checksum);
-        if (my_b_write(output_cache, checksum_buf, BINLOG_CHECKSUM_LEN))
+        //if (my_b_write(output_cache, checksum_buf, BINLOG_CHECKSUM_LEN))
+        if (encrypt_and_write(output_cache, checksum_buf, BINLOG_CHECKSUM_LEN))
           DBUG_RETURN(true);
         thd->binlog_bytes_written+= BINLOG_CHECKSUM_LEN;
         checksum= initial_checksum;
+      }
+
+      if (ctx) //TODO:Robert : Jak oznaczyć czy jest szyfrowane ?
+      {
+        uint dstlen;
+        uchar dst[MY_AES_BLOCK_SIZE*2];
+        if (my_aes_crypt_finish(ctx, dst, &dstlen))
+          return 1;
+        if (maybe_write_event_len(output_cache, dst, dstlen) || my_b_safe_write(output_cache, dst, dstlen))
+          return ER_ERROR_ON_WRITE;
+       // if (my_b_safe_write(file, dst, crypto->dst_len)) //TODO:Robert:Na razie to zostawiam dla kompatybilności
+       //   return 1;//DBUG_RETURN(ER_ERROR_ON_WRITE);
       }
     }
 
     DBUG_RETURN(false);
   }
+
 
   /**
     Write a full event to disk.
@@ -1121,6 +1372,13 @@ int binlog_cache_data::write_event(THD *thd, Log_event *ev)
   {
     DBUG_EXECUTE_IF("simulate_disk_full_at_flush_pending",
                   {DBUG_SET("+d,simulate_file_write_error");});
+
+    //if (crypto->scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+    //{
+      //ev->crypto= crypto;
+      //ev->ctx= alloca(crypto->ctx_size);
+    //}
+
     if (ev->write(&cache_log) != 0)
     {
       DBUG_EXECUTE_IF("simulate_disk_full_at_flush_pending",
@@ -1480,6 +1738,13 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
       correct.
     */
     Binlog_event_writer writer(mysql_bin_log.get_log_file(), thd);
+    writer.crypto= mysql_bin_log.get_crypto_data();
+
+    if (mysql_bin_log.get_crypto_data()->scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+    {
+      writer.crypto= mysql_bin_log.get_crypto_data();
+      writer.ctx= alloca(writer.crypto->ctx_size);
+    }
 
     /* The GTID ownership process might set the commit_error */
     error= (thd->commit_error == THD::CE_FLUSH_ERROR);
@@ -4867,6 +5132,13 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
   /* Set LOG_EVENT_RELAY_LOG_F flag for relay log's FD */
   if (is_relay_log)
     s.set_relay_log_event();
+
+  //if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+  //{
+    //s.crypto= &crypto;
+    //s.ctx= alloca(crypto.ctx_size);
+  //}
+
   if (s.write(&log_file))
     goto err;
   bytes_written+= s.common_header->data_written;
@@ -4890,6 +5162,12 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
       Start_encryption_log_event sele(1, 1, crypto.nonce);
       //sele.crypto= &crypto; TODO:Robert: To nie jest potrzebne, wszystko co Sele potrzebuje jest w konstruktorze
       sele.common_footer->checksum_alg= s.common_footer->checksum_alg;
+      //if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+      //{
+        //sele.crypto= &crypto;
+        //sele.ctx= alloca(crypto.ctx_size);
+      //}
+
       if (sele.write(&log_file))
         goto err;
       bytes_written+= sele.common_header->data_written;
@@ -6831,6 +7109,13 @@ int MYSQL_BIN_LOG::new_file_impl(bool need_lock_log, Format_description_log_even
     */
     Rotate_log_event r(new_name+dirname_length(new_name), 0, LOG_EVENT_OFFSET,
                        is_relay_log ? Rotate_log_event::RELAY_LOG : 0);
+
+    if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+    {
+      r.crypto= &crypto;
+      r.ctx= alloca(crypto.ctx_size);
+    }
+
     /* 
       The current relay-log's closing Rotate event must have checksum
       value computed with an algorithm of the last relay-logged FD event.
@@ -7257,11 +7542,11 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
   bool error= 1;
   DBUG_ENTER("MYSQL_BIN_LOG::write_event(Log_event *)");
 
-  if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
-  {
-    event_info->crypto= &crypto;
-    event_info->ctx= alloca(crypto.ctx_size);
-  }
+  //if (crypto.scheme)//TODO:Robert this part is temporary disabled && file == &log_file)
+  //{
+    //event_info->crypto= &crypto;
+    //event_info->ctx= alloca(crypto.ctx_size);
+  //}
 
   if (thd->binlog_evt_union.do_union)
   {
@@ -7343,7 +7628,8 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
           Intvar_log_event e(thd,(uchar) binary_log::Intvar_event::LAST_INSERT_ID_EVENT,
                              thd->first_successful_insert_id_in_prev_stmt_for_binlog,
                              event_info->event_cache_type, event_info->event_logging_type);
-          if (cache_data->write_event(thd, &e))
+
+         if (cache_data->write_event(thd, &e))
             goto err;
           if (event_info->is_using_immediate_logging())
             thd->binlog_bytes_written+= e.header()->data_written;
@@ -7357,6 +7643,7 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
                              thd->auto_inc_intervals_in_cur_stmt_for_binlog.
                              minimum(), event_info->event_cache_type,
                              event_info->event_logging_type);
+
           if (cache_data->write_event(thd, &e))
             goto err;
           if (event_info->is_using_immediate_logging())
@@ -7367,6 +7654,7 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
           Rand_log_event e(thd,thd->rand_saved_seed1,thd->rand_saved_seed2,
                            event_info->event_cache_type,
                            event_info->event_logging_type);
+
           if (cache_data->write_event(thd, &e))
             goto err;
           if (event_info->is_using_immediate_logging())
@@ -7392,6 +7680,7 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
                                  user_var_event->charset_number, flags,
                                  event_info->event_cache_type,
                                  event_info->event_logging_type);
+
             if (cache_data->write_event(thd, &e))
               goto err;
             if (event_info->is_using_immediate_logging())
@@ -9825,6 +10114,9 @@ int THD::binlog_setup_trx_data()
                                 max_binlog_cache_size,
                                 &binlog_cache_use,
                                 &binlog_cache_disk_use);
+
+  cache_mngr->set_crypto(mysql_bin_log.get_crypto_data());
+
   DBUG_RETURN(0);
 }
 

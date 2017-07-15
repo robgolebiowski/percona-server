@@ -927,8 +927,10 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
   uchar* event_ptr;
   uint32 event_len;
 
-  if (fdle == NULL)
-    fdle= new Format_description_log_event(3);
+  if (fdle != NULL)
+    delete fdle;
+  
+  fdle= new Format_description_log_event(3); //TODO:Robert:Add error handling as in MariaDB
 
   if (read_event(log_cache, binary_log::BINLOG_CHECKSUM_ALG_OFF, &event_ptr,
                  &event_len))
@@ -1013,6 +1015,7 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     set_fatal_error("Corrupt Format_description event found or out-of-memory");
     DBUG_RETURN(1);
   }
+  //tmp->crypto_data= fdle->crypto_data; //TODO:Robert: not needed sele is applied later
   delete fdle;
   fdle= tmp; //TODO:Robert: fdle must be delete in destructor
 
@@ -1034,11 +1037,13 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     event_ptr= NULL;
     event_len= 0;
 
-    if (read_event(log_cache, binary_log::BINLOG_CHECKSUM_ALG_OFF, &event_ptr,
+    if (read_event(log_cache, m_event_checksum_alg, &event_ptr,
                    &event_len))
       DBUG_RETURN(1);
 
-    event_len-= BINLOG_CHECKSUM_LEN;
+    if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF &&
+        m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF)
+      event_len-= BINLOG_CHECKSUM_LEN;
 
     DBUG_ASSERT(event_ptr[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT);
     //Format_description_log_event fdle(3);
@@ -1054,8 +1059,11 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     //}
 
     if (!sele.is_valid())
+    {
+      set_fatal_error("Sele is invalid");
+    
       DBUG_RETURN(1);
-
+    }
     //crypto_data= new Binlog_crypt_data();
 
     //memcpy(crypto_data->nonce, sele.nonce, BINLOG_NONCE_LENGTH);
@@ -1267,6 +1275,7 @@ int Binlog_sender::send_heartbeat_event(my_off_t log_pos)
   const char* p= filename + dirname_length(filename);
   size_t ident_len= strlen(p);
   size_t event_len= ident_len + LOG_EVENT_HEADER_LEN +
+
     (event_checksum_on() ? BINLOG_CHECKSUM_LEN : 0);
 
   DBUG_PRINT("info", ("log_file_name %s, log_pos %llu", p, log_pos));

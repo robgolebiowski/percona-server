@@ -968,6 +968,7 @@ my_bool Log_event::need_checksum()
                   which IO thread instantiates via queue_binlog_ver_3_event.
                */
                get_type_code() == binary_log::ROTATE_EVENT ||
+               get_type_code() == binary_log::START_ENCRYPTION_EVENT ||
                /*
                   The previous event has its checksum option defined
                   according to the format description event.
@@ -1080,7 +1081,7 @@ int Log_event::maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len)
   {
     DBUG_ASSERT(len >= EVENT_LEN_OFFSET);
     //if (write_internal(pos + EVENT_LEN_OFFSET - 4, 4))
-    if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4)) //TODO:Robert:Co to jest? - Zakodowana część, która później jest przesunięta. pos jest przesunięte o 4 w funkcji write_header!! - To jest odtworzenie timestampu, który wcześniej był przesunięty w miejsce event_len - madness ?
+    if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4)) //TODO:Robert:Co to jest? - Zakodowana część, która później jest przesunięta. pos jest przesunięte o 4 w funkcji rite_header!! - To jest odtworzenie timestampu, który wcześniej był przesunięty w miejsce event_len - madness ?
       return 1;
     int4store(pos + EVENT_LEN_OFFSET - 4, event_len); //TODO:Robert:Tu jest zapisanie event_len do bufora, które później jest zapisane do pliku
     event_len= 0;
@@ -1147,6 +1148,11 @@ int Log_event::encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
     //pos= dst;
     //len= dstlen;
   }
+  else
+  {
+    dst = 0;
+  }
+
   if (my_b_safe_write(file, pos, len))
     goto err;
 
@@ -1454,6 +1460,9 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
 
       if (fdle->crypto_data.scheme)
       {
+        DBUG_PRINT("info", ("read_log_event is using ctx"));
+
+
         ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
         uchar iv[BINLOG_IV_LENGTH];
         fdle->crypto_data.set_iv(iv, my_b_tell(file) - true_data_len); //TODO:Robert:To się zmieniło - możliwe, że iv jest już prawidłowe

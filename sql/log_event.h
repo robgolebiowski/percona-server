@@ -4063,6 +4063,35 @@ public:
   {
     common_header->data_written= LOG_EVENT_HEADER_LEN + get_data_size();
     uint32 len= write_header_to_memory(buf);
+
+    //uchar *pos= header;
+     //size_t len=sizeof(header);
+
+  ////TODO:Robert:Ten kod jest wzięty z Log_event_writer::write_header
+  //if (ctx)
+  //{
+    //uchar iv[BINLOG_IV_LENGTH];
+    //crypto->set_iv(iv, my_b_safe_tell(file));
+
+    //int res= 0;
+
+    //if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                               //crypto->key, crypto->key_length, iv, sizeof(iv))))
+      //DBUG_RETURN(res);
+
+    ////if (encryption_ctx_init(ctx, crypto->key, crypto->key_length,
+           ////iv, sizeof(iv), ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+           ////crypto->key_version))
+      ////DBUG_RETURN(1);
+
+    //DBUG_ASSERT(len >= LOG_EVENT_HEADER_LEN);
+    //event_len= uint4korr(pos + EVENT_LEN_OFFSET);
+    //DBUG_ASSERT(event_len >= len);
+    //memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
+    //pos+= 4;
+    //len-= 4;
+  //}
+
     len+= write_data_header_to_memory(buf + len);
     return len;
   }
