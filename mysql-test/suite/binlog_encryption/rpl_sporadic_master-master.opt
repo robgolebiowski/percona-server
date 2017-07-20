@@ -1,0 +1,3 @@
+#We need at least 3 events to proceed in this test. After each failure we need to read two events from binary log, i.e. FORMAT_DESCRIPTION_EVENT and START_ENCRYPTION event,
+#and then next event which will allow us to make progress
+--sporadic-binlog-dump-fail --max-binlog-dump-events=3

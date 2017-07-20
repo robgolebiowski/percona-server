@@ -216,6 +216,7 @@ void Binlog_sender::run()
       break;
 
     file= open_binlog_file(&log_cache, log_file, &m_errmsg);
+
     if (unlikely(file < 0))
     {
       set_fatal_error(m_errmsg);
@@ -1035,12 +1036,19 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     //crypto_data= NULL;
 
     event_ptr= NULL;
-    event_len= 0;
+    uint32 event_len= 0;
+    //uint32 original_event_len= 0;
+
+    my_off_t log_pos= my_b_tell(log_cache);
 
     if (read_event(log_cache, m_event_checksum_alg, &event_ptr,
                    &event_len))
       DBUG_RETURN(1);
 
+    //original_event_len= event_len;
+
+    //TODO:Robert:I do not think I should be stripping the length of event if BINLOG_CHECSUM_ALG_OFF - probably I should not read
+    //TODO:Robert:checksum in the first place
     if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF &&
         m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF)
       event_len-= BINLOG_CHECKSUM_LEN;
@@ -1074,6 +1082,11 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
       //DBUG_RETURN(1);
     //} 
 
+  DBUG_EXECUTE_IF("wrong_key",
+                  {
+                    memcpy(sele.nonce, "000000000000", 12);
+                  };);
+
    if (fdle->start_decryption(&sele))
    {
      //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
@@ -1082,6 +1095,23 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
      DBUG_RETURN(1);
      //return 1;
    }
+  //if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF &&
+       //m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF)
+    //event_len+= BINLOG_CHECKSUM_LEN;
+
+
+  //if (start_pos > BIN_LOG_HEADER_SIZE)
+    ////log_pos = start_pos + event_len;
+    //log_pos = event_len;
+  //else
+    //log_pos= my_b_tell(log_cache);
+
+  if (start_pos <= BIN_LOG_HEADER_SIZE)
+  {
+    log_pos= my_b_tell(log_cache);
+    if (unlikely(send_heartbeat_event(log_pos)))
+       DBUG_RETURN(1);
+  }
    //delete sele;
     //return 1;
   }
@@ -1319,6 +1349,7 @@ inline int Binlog_sender::send_packet()
   DBUG_PRINT("info",
              ("Sending event of type %s", Log_event::get_type_str(
                 (Log_event_type)m_packet.ptr()[1 + EVENT_TYPE_OFFSET])));
+
   // We should always use the same buffer to guarantee that the reallocation
   // logic is not broken.
   if (DBUG_EVALUATE_IF("simulate_send_error", true,

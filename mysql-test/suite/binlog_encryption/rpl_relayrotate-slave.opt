@@ -1,0 +1,5 @@
+--max_relay_log_size=16384
+--log-warnings
+--plugin-load-add=$FILE_KEY_MANAGEMENT_SO
+--loose-keyring_file_data=/home/rob/keys.txt
+--encrypt-binlog

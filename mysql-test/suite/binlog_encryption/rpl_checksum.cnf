@@ -1,0 +1,11 @@
+!include my.cnf
+
+[mysqld.1]
+binlog-checksum=CRC32
+binlog-format='MIXED'
+
+[mysqld.2]
+binlog-checksum=CRC32
+plugin-load-add= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys2.txt
+encrypt-binlog

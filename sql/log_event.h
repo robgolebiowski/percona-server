@@ -135,6 +135,7 @@ struct sql_ex_info
 {
   sql_ex_info() {}                            /* Remove gcc warning */
   binary_log::sql_ex_data_info data_info;
+  void *ctx;
 
   bool write_data(IO_CACHE* file);
   const char* init(const char* buf, const char* buf_end, bool use_new_format);
@@ -632,7 +633,7 @@ public:
   //int write_internal(const uchar *pos, size_t len);
   int encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len);
   //int encrypt_and_write(const uchar *pos, size_t len);
-  int maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len);
+  //int maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len);
 
   /**
     Index in @c rli->gaq array to indicate a group that this event is

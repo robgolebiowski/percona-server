@@ -5146,8 +5146,13 @@ int mysqld_main(int argc, char **argv)
     (prev_gtids_ev.common_footer)->checksum_alg=
       static_cast<enum_binlog_checksum_alg>(binlog_checksum_options);
 
-    prev_gtids_ev.crypto= mysql_bin_log.get_crypto_data();
+    Binlog_crypt_data *crypto_data= mysql_bin_log.get_crypto_data();
 
+    if (crypto_data->scheme == 1)//TODO:Robert this part is temporary disabled && file == &log_file)
+    {
+      prev_gtids_ev.crypto= crypto_data;
+      prev_gtids_ev.ctx= alloca(crypto_data->ctx_size);
+    }
     if (prev_gtids_ev.write(mysql_bin_log.get_log_file()))
       unireg_abort(MYSQLD_ABORT_EXIT);
     mysql_bin_log.add_bytes_written(

@@ -8418,7 +8418,8 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
       we update only the positions and not the file names, as a ROTATE
       EVENT from the master prior to this will update the file name.
     */
-    if (mi->is_auto_position()  && mi->get_master_log_pos() <
+    //if (mi->is_auto_position()  && mi->get_master_log_pos() <
+    if (mi->get_master_log_pos() <
        hb.common_header->log_pos &&  mi->get_master_log_name() != NULL)
     {
 
@@ -8438,6 +8439,14 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
       if (write_ignored_events_info_to_relay_log(mi->info_thd, mi))
         goto end;
     }
+
+    //if (mi->get_master_log_pos() > hb.common_header->log_pos)
+    //{
+      //hb.common_header->log_pos+= mi->get_master_log_pos();
+      //mi->set_master_log_pos(hb.common_header->log_pos);
+      //inc_pos= 0;
+    //}
+
 
     /* 
        compare local and event's versions of log_file, log_pos.
@@ -9369,6 +9378,7 @@ static Log_event* next_event(Relay_log_info* rli)
       DBUG_ASSERT(rli->cur_log_fd >= 0);
       mysql_file_close(rli->cur_log_fd, MYF(MY_WME));
       rli->cur_log_fd = -1;
+      rli->get_rli_description_event()->reset_crypto();
 
       if (relay_log_purge)
       {
