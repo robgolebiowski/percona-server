@@ -643,7 +643,7 @@ const char* Log_event::get_type_str(Log_event_type type)
   case binary_log::RAND_EVENT: return "RAND";
   case binary_log::XID_EVENT: return "Xid";
   case binary_log::USER_VAR_EVENT: return "User var";
-  case binary_log::FORMAT_DESCRIPTION_EVENT: return " Format_desc";
+  case binary_log::FORMAT_DESCRIPTION_EVENT: return "Format_desc";
   case binary_log::TABLE_MAP_EVENT: return "Table_map";
   case binary_log::PRE_GA_WRITE_ROWS_EVENT: return "Write_rows_event_old";
   case binary_log::PRE_GA_UPDATE_ROWS_EVENT: return "Update_rows_event_old";
@@ -3570,6 +3570,7 @@ int Log_event::apply_event(Relay_log_info *rli)
 
   if (rli->is_mts_recovery())
   {
+    DBUG_PRINT("info", ("Robert: Its recovery"));
     bool skip=
       bitmap_is_set(&rli->recovery_groups, rli->mts_recovery_index) &&
       (get_mts_execution_mode(::server_id,
@@ -3599,6 +3600,9 @@ int Log_event::apply_event(Relay_log_info *rli)
   {
     if (parallel)
     {
+      DBUG_PRINT("info", ("Robert: In parallel"));
+      DBUG_PRINT("info", ("Robert: actual_exec_mode=%d",actual_exec_mode));
+
       /*
          There are two classes of events that Coordinator executes
          itself. One e.g the master Rotate requires all Workers to finish up
@@ -3615,7 +3619,7 @@ int Log_event::apply_event(Relay_log_info *rli)
           Workers to sync.
         */
         if (rli->curr_group_da.size() > 0 &&
-            is_mts_db_partitioned(rli))
+            is_mts_db_partitioned(rli)) //&& get_type_code() != binary_log::START_ENCRYPTION_EVENT)
         {
           char llbuff[22];
           /*

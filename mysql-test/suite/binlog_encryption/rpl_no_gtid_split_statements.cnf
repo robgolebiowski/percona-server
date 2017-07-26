@@ -1,0 +1,7 @@
+!include my.cnf
+
+[mysqld.1]
+binlog-format='STATEMENT'
+
+[mysqld.2]
+binlog-format='STATEMENT'

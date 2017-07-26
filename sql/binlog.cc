@@ -4131,12 +4131,15 @@ read_gtids_and_update_trx_parser_from_relaylog(
       }
     }
 
+    Format_description_log_event *new_fd_ev_p= NULL;
     switch (ev->get_type_code())
     {
     case binary_log::FORMAT_DESCRIPTION_EVENT:
+      new_fd_ev_p= (Format_description_log_event *)ev;
+      new_fd_ev_p->copy_crypto_data(fd_ev_p);
       if (fd_ev_p != &fd_ev)
         delete fd_ev_p;
-      fd_ev_p= (Format_description_log_event *)ev;
+      fd_ev_p= new_fd_ev_p;
       break;
     case binary_log::ROTATE_EVENT:
       // do nothing; just accept this event and go to next
@@ -4361,12 +4364,15 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
     event_counter++;
 #endif
     DBUG_PRINT("info", ("Read event of type %s", ev->get_type_str()));
+    Format_description_log_event *new_fd_ev_p= NULL;
     switch (ev->get_type_code())
     {
     case binary_log::FORMAT_DESCRIPTION_EVENT:
+      new_fd_ev_p= (Format_description_log_event *)ev;
+      new_fd_ev_p->copy_crypto_data(fd_ev_p);
       if (fd_ev_p != &fd_ev)
         delete fd_ev_p;
-      fd_ev_p= (Format_description_log_event *)ev;
+      fd_ev_p= new_fd_ev_p;
       break;
     case binary_log::ROTATE_EVENT:
       // do nothing; just accept this event and go to next
@@ -4478,6 +4484,7 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
     {
       if (fd_ev_p->start_decryption((Start_encryption_log_event*) ev))
         ret= ERROR;
+      break;
     }
 
     case binary_log::ANONYMOUS_GTID_LOG_EVENT:

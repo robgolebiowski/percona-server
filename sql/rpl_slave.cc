@@ -864,6 +864,7 @@ read_rotate_from_relay_log(char *filename, char *master_log_file,
   Log_event *ev= NULL;
   bool done= false;
   enum_read_rotate_from_relay_log_status ret= NOT_FOUND_ROTATE;
+  Format_description_log_event* new_fdle;
   while (!done &&
          (ev= Log_event::read_log_event(&log, 0, fd_ev_p, opt_slave_sql_verify_checksum)) !=
          NULL)
@@ -872,9 +873,18 @@ read_rotate_from_relay_log(char *filename, char *master_log_file,
     switch (ev->get_type_code())
     {
     case binary_log::FORMAT_DESCRIPTION_EVENT:
+      new_fdle= (Format_description_log_event*) ev;
+      new_fdle->copy_crypto_data(fd_ev_p);
       if (fd_ev_p != &fd_ev)
         delete fd_ev_p;
-      fd_ev_p= (Format_description_log_event *)ev;
+      fd_ev_p= (Format_description_log_event *)new_fdle;
+      break;
+    case binary_log::START_ENCRYPTION_EVENT:
+      if (fd_ev_p->start_decryption((Start_encryption_log_event*) ev))
+      {
+        sql_print_error("Could not initialize decryption of binlog.");
+        ret= ERROR;
+      }
       break;
     case binary_log::ROTATE_EVENT:
       /*
@@ -4572,7 +4582,8 @@ static int sql_delay_event(Log_event *ev, THD *thd, Relay_log_info *rli)
   int type= ev->get_type_code();
   if (sql_delay && type != binary_log::ROTATE_EVENT &&
       type != binary_log::FORMAT_DESCRIPTION_EVENT &&
-      type != binary_log::START_EVENT_V3)
+      type != binary_log::START_EVENT_V3 &&
+      type != binary_log::START_ENCRYPTION_EVENT)
   {
     // The time when we should execute the event.
     time_t sql_delay_end=
@@ -6496,7 +6507,7 @@ bool mts_recovery_groups(Relay_log_info *rli)
       if (!checksum_detected)
       {
         int i= 0;
-        while (i < 4 && (ev= Log_event::read_log_event(&log,
+        while (i < 5 && (ev= Log_event::read_log_event(&log,
                (mysql_mutex_t*) 0, p_fdle, 0)))
         {
           if (ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT)
@@ -6504,6 +6515,14 @@ bool mts_recovery_groups(Relay_log_info *rli)
             p_fdle->common_footer->checksum_alg=
                                    ev->common_footer->checksum_alg;
             checksum_detected= TRUE;
+          }
+          if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
+          {
+            if (p_fdle->start_decryption((Start_encryption_log_event*) ev))
+            {
+              delete ev;
+              goto err;
+            }
           }
           delete ev;
           i++;
@@ -6527,9 +6546,19 @@ bool mts_recovery_groups(Relay_log_info *rli)
         if (ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT)
           p_fdle->common_footer->checksum_alg= ev->common_footer->checksum_alg;
 
+        if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
+        {
+          if (p_fdle->start_decryption((Start_encryption_log_event*) ev))
+          {
+            delete ev;
+            goto err;
+          }
+        }
+
         if (ev->get_type_code() == binary_log::ROTATE_EVENT ||
             ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT ||
-            ev->get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT)
+            ev->get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT ||
+            ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
         {
           delete ev;
           ev= NULL;

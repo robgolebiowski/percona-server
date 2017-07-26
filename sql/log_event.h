@@ -987,7 +987,8 @@ public:
       get_type_code() == binary_log::ROTATE_EVENT            ||
       get_type_code() == binary_log::SLAVE_EVENT             ||
       get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT||
-      get_type_code() == binary_log::INCIDENT_EVENT;
+      get_type_code() == binary_log::INCIDENT_EVENT;//          ||
+      //get_type_code() == binary_log::START_ENCRYPTION_EVENT;
   }
 
 private:
@@ -1079,6 +1080,8 @@ private:
           to not feed them to workers because that confuses
           get_slave_worker.
         */
+        (get_type_code() == binary_log::START_ENCRYPTION_EVENT) ||
+
         (get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT) ||
         /*
           Rotate_log_event can occur in the middle of a transaction.
@@ -1870,6 +1873,7 @@ public:
   bool start_decryption(Start_encryption_log_event* sele);
   void copy_crypto_data(const Format_description_log_event* o)
   {
+    DBUG_PRINT("info", ("Copying crypto data"));
     crypto_data= o->crypto_data;
   }
   void reset_crypto()

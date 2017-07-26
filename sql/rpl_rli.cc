@@ -569,9 +569,10 @@ int Relay_log_info::init_relay_log_pos(const char* log,
     In all cases, check_binlog_magic() has been called so we're at offset 4 for
     sure.
   */
-  if (pos > BIN_LOG_HEADER_SIZE) /* If pos<=4, we stay at 4 */
+  if (/*true*/pos > BIN_LOG_HEADER_SIZE) /* If pos<=4, we stay at 4 */
   {
     Log_event* ev;
+    //ulonglong move_to= pos; //TODO:Robert:Not needed
     while (keep_looking_for_fd)
     {
       /*
@@ -643,6 +644,7 @@ int Relay_log_info::init_relay_log_pos(const char* log,
           //return NULL;
         }
         delete ev;
+        //move_to= my_b_tell(cur_log);
       }
       else
       {
@@ -654,7 +656,7 @@ int Relay_log_info::init_relay_log_pos(const char* log,
         delete ev;
       }
     }
-    my_b_seek(cur_log,(off_t)pos);
+    my_b_seek(cur_log,(off_t)pos/*move_to*/);
 #ifndef DBUG_OFF
   {
     char llbuf1[22], llbuf2[22];
