@@ -4951,7 +4951,8 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
     if (!error && rli->is_mts_recovery() &&
         ev->get_type_code() != binary_log::ROTATE_EVENT &&
         ev->get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT &&
-        ev->get_type_code() != binary_log::PREVIOUS_GTIDS_LOG_EVENT)
+        ev->get_type_code() != binary_log::PREVIOUS_GTIDS_LOG_EVENT &&
+        ev->get_type_code() != binary_log::START_ENCRYPTION_EVENT)
     {
       if (ev->starts_group())
       {
@@ -6500,6 +6501,7 @@ bool mts_recovery_groups(Relay_log_info *rli)
         sql_print_error("%s", errmsg);
         goto err;
       }
+      p_fdle->reset_crypto();
       /*
         Looking for the actual relay checksum algorithm that is present in
         a FD at head events of the relay log.

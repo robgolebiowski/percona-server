@@ -564,6 +564,7 @@ int Relay_log_info::init_relay_log_pos(const char* log,
                                      linfo.log_file_name,errmsg)) < 0)
       goto err;
     cur_log = &cache_buf;
+    //rli_description_event->reset_crypto();
   }
   /*
     In all cases, check_binlog_magic() has been called so we're at offset 4 for
@@ -2257,7 +2258,8 @@ a file name for --relay-log-index option.", opt_relaylog_index_name);
       sql_print_error("Failed in open_log() called from Relay_log_info::rli_init_info().");
       DBUG_RETURN(1);
     }
-
+    //TODO:Robert://mi->get_mi_description_event()->reset_crypto();
+    
     mysql_mutex_unlock(log_lock);
 
   }
