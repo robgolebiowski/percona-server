@@ -1191,13 +1191,24 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
   write_header_to_memory(header);
 
   //TODO:Robert:Should this be executed even when res is true (below?)
-  if (need_checksum() &&
-      (common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0)
+  bool is_format_decription_and_need_checksum= need_checksum() &&
+       ((common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0);
+
+  //if (need_checksum() &&
+      //(common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0)
+  if (is_format_decription_and_need_checksum)
   {
     common_header->flags &= ~LOG_EVENT_BINLOG_IN_USE_F;
     int2store(header + FLAGS_OFFSET, common_header->flags);
   }
   crc= my_checksum(crc, header, LOG_EVENT_HEADER_LEN);
+
+  //restore IN_USE flag after calculating the checksum
+  if (is_format_decription_and_need_checksum)
+  {
+    common_header->flags |= LOG_EVENT_BINLOG_IN_USE_F;
+    int2store(header + FLAGS_OFFSET, common_header->flags);
+  }
 
   uchar *pos= header;
   size_t len=sizeof(header);
@@ -1412,25 +1423,6 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
     else
     {
       packet->length(packet->length() + data_len);
-      /*
-        Corrupt the event for Dump thread.
-        We also need to exclude Previous_gtids_log_event and Gtid_log_event
-        events from injected corruption to allow dump thread to move forward
-        on binary log until the missing transactions from slave when
-        MASTER_AUTO_POSITION= 1.
-      */
-      DBUG_EXECUTE_IF("corrupt_read_log_event",
-	uchar *debug_event_buf_c = (uchar*) packet->ptr() + ev_offset;
-        if (debug_event_buf_c[EVENT_TYPE_OFFSET] != binary_log::FORMAT_DESCRIPTION_EVENT &&
-            debug_event_buf_c[EVENT_TYPE_OFFSET] != binary_log::PREVIOUS_GTIDS_LOG_EVENT &&
-            debug_event_buf_c[EVENT_TYPE_OFFSET] != binary_log::GTID_LOG_EVENT)
-        {
-          int debug_cor_pos = rand() % (data_len + LOG_EVENT_MINIMAL_HEADER_LEN -
-                              BINLOG_CHECKSUM_LEN);
-          debug_event_buf_c[debug_cor_pos] =~ debug_event_buf_c[debug_cor_pos];
-          DBUG_PRINT("info", ("Corrupt the event at Log_event::read_log_event: byte on position %d", debug_cor_pos));
-	}
-      );
 
       if (fdle->crypto_data.scheme)
       {
@@ -1494,6 +1486,27 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
         //packet->reset(newpkt, true_data_len + ev_offset, true_data_len + ev_offset + 1,
                       //&my_charset_bin);
       }
+
+      /*
+        Corrupt the event for Dump thread.
+        We also need to exclude Previous_gtids_log_event and Gtid_log_event
+        events from injected corruption to allow dump thread to move forward
+        on binary log until the missing transactions from slave when
+        MASTER_AUTO_POSITION= 1.
+      */
+      DBUG_EXECUTE_IF("corrupt_read_log_event",
+	uchar *debug_event_buf_c = (uchar*) packet->ptr() + ev_offset;
+        if (debug_event_buf_c[EVENT_TYPE_OFFSET] != binary_log::FORMAT_DESCRIPTION_EVENT &&
+            debug_event_buf_c[EVENT_TYPE_OFFSET] != binary_log::PREVIOUS_GTIDS_LOG_EVENT &&
+            debug_event_buf_c[EVENT_TYPE_OFFSET] != binary_log::GTID_LOG_EVENT &&
+            debug_event_buf_c[EVENT_TYPE_OFFSET] != binary_log::START_ENCRYPTION_EVENT)
+        {
+          int debug_cor_pos = rand() % (data_len + LOG_EVENT_MINIMAL_HEADER_LEN -
+                              BINLOG_CHECKSUM_LEN);
+          debug_event_buf_c[debug_cor_pos] =~ debug_event_buf_c[debug_cor_pos];
+          DBUG_PRINT("info", ("Corrupt the event at Log_event::read_log_event: byte on position %d", debug_cor_pos));
+	}
+      );
 
       /*
         CRC verification of the Dump thread
@@ -1668,6 +1681,8 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     {
       my_free(dst_buf);
       //DBUG_RETURN(LOG_READ_DECRYPT);
+      error ="decryption error";
+      goto err;
     }
     DBUG_ASSERT((uint)dstlen == data_len - 4); //TODO:Robert: Can stay as a comment - We have checked that dstlen is greater than 0, so we can safetly cast
     memcpy(dst, dst + EVENT_LEN_OFFSET, 4);
@@ -1805,7 +1820,8 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
        Log_event_footer::get_checksum_alg(buf, event_len);
   // Emulate the corruption during reading an event
   DBUG_EXECUTE_IF("corrupt_read_log_event_char",
-    if (event_type != binary_log::FORMAT_DESCRIPTION_EVENT)
+    if (event_type != binary_log::FORMAT_DESCRIPTION_EVENT &&
+        event_type != binary_log::START_ENCRYPTION_EVENT)
     {
       char *debug_event_buf_c = (char *)buf;
       int debug_cor_pos = rand() % (event_len - BINLOG_CHECKSUM_LEN);

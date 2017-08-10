@@ -2080,6 +2080,7 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
 
   relay_log_number_to_name(start_relay_number, file_name);
 
+  Format_description_log_event *description_event= new Format_description_log_event(4);
   memset(&relay_io, 0, sizeof(IO_CACHE));
 
   while (!arrive_end)
@@ -2098,6 +2099,34 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
                         errmsg);
         goto end;
       }
+
+      for (uint i=0; i < 4; i++)
+      {
+        ev= Log_event::read_log_event(&relay_io, NULL,
+                                      description_event,
+                                      opt_slave_sql_verify_checksum);
+
+        if (ev != NULL && ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT)
+        {
+          DBUG_PRINT("info", ("Found format descryption event"));
+
+          delete description_event;
+          description_event= (Format_description_log_event*) ev;
+        }
+        else if (ev != NULL && ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
+        {
+          DBUG_PRINT("info", ("Found encryption event"));
+
+          if (description_event->start_decryption((Start_encryption_log_event*) ev))
+          {
+            delete ev;
+            goto end;
+            error=true;
+          }
+          delete ev;
+          break;
+        }
+      }
       my_b_seek(&relay_io, start_relay_pos);
     }
 
@@ -2105,8 +2134,9 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
     arrive_end= (my_b_tell(&relay_io) == end_relay_pos &&
                  file_number == end_relay_number);
 
+
     ev= Log_event::read_log_event(&relay_io, NULL,
-                                  rli->get_rli_description_event(),
+                                  description_event,//rli_description_event,
                                   opt_slave_sql_verify_checksum);
     if (ev != NULL)
     {
@@ -2173,6 +2203,7 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
 
   error= false;
 end:
+  delete description_event;
   if (my_b_inited(&relay_io))
   {
     end_io_cache(&relay_io);
