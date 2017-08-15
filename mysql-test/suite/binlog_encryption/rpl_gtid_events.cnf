@@ -1,4 +1,14 @@
 !include my.cnf
 
-[mysqld.1]
-binlog-format='STATEMENT'
+[mysqld.2]
+#!use-slave-opt
+#innodb
+log-slave-updates
+#TODO: Robert: Nie ma takiej zmiennej log-basename - u Nas log-bin
+#log-basename= slave
+log-bin=slave-bin
+relay-log=slave-relay-bin
+encrypt-binlog=1
+#relay-log-purge=0
+#gtid-mode=ON
+#enforce-gtid-consistency=ON

@@ -41,7 +41,6 @@
 
 --connection server_1
 
-#SET @binlog_annotate_row_events.save= @@global.binlog_annotate_row_events;
 SET @binlog_checksum.save= @@global.binlog_checksum;
 SET @master_verify_checksum.save= @@global.master_verify_checksum;
 SET @binlog_row_image.save= @@global.binlog_row_image;
@@ -52,10 +51,8 @@ SET @binlog_row_image.save= @@global.binlog_row_image;
 
 --connection server_1
 
-#SET binlog_annotate_row_events= 0;
-#SET GLOBAL binlog_annotate_row_events= 0;
-SET GLOBAL binlog_checksum= CRC32;
-SET GLOBAL master_verify_checksum= 1;
+SET GLOBAL binlog_checksum= NONE;
+SET GLOBAL master_verify_checksum= 0;
 
 --source testdata.inc
 
@@ -65,8 +62,6 @@ SET GLOBAL master_verify_checksum= 1;
 
 --connection server_1
 
-#SET binlog_annotate_row_events= 0;
-#SET GLOBAL binlog_annotate_row_events= 0;
 SET GLOBAL binlog_checksum= CRC32;
 SET GLOBAL master_verify_checksum= 1;
 
@@ -78,8 +73,6 @@ SET GLOBAL master_verify_checksum= 1;
 
 --connection server_1
 
-#SET binlog_annotate_row_events= 1;
-#SET GLOBAL binlog_annotate_row_events= 1;
 SET GLOBAL binlog_checksum= CRC32;
 SET GLOBAL master_verify_checksum= 1;
 
@@ -91,8 +84,6 @@ SET GLOBAL master_verify_checksum= 1;
 
 --connection server_1
 
-#SET binlog_annotate_row_events= 1;
-#SET GLOBAL binlog_annotate_row_events= 1;
 SET GLOBAL binlog_checksum= NONE;
 SET GLOBAL master_verify_checksum= 0;
 SET GLOBAL binlog_row_image= MINIMAL;
@@ -105,12 +96,6 @@ SET binlog_row_image= MINIMAL;
 --echo #############################
 
 --let $master_datadir= `SELECT @@datadir`
-#--echo $master_datadir
-
-#SEARCH_FILE= $MYSQLTEST_VARDIR/log/binlog_encryption.encrypted_master/mysqld.1/data/master-bin.0
-#log/binlog_encryption.encrypted_master/mysqld.1/data/master-bin.000002
-
-#TODO:Robert:Dlaczego tutaj nie ma erroru ?
 
 --let SEARCH_FILE= $master_datadir/master-bin.0*
 --let SEARCH_PATTERN= _to_encrypt
@@ -128,9 +113,6 @@ SET binlog_row_image= MINIMAL;
 --source include/save_master_pos.inc
 --enable_connect_log
 
---let $sync_slave_connection=server_2
---source include/sync_slave_io_with_master.inc
-
 --echo #############################
 --echo # Final checks for the slave
 --echo #############################
@@ -142,7 +124,7 @@ SET binlog_row_image= MINIMAL;
 --let $slave_datadir= `SELECT @@datadir`
 
 --disable_connect_log
-#--source include/sync_io_with_master.inc
+--source include/sync_slave_io.inc
 
 # Check that relay logs are unencrypted
 
@@ -183,7 +165,6 @@ SET binlog_row_image= MINIMAL;
 --echo ##########
 
 --connection server_1
-#SET GLOBAL binlog_annotate_row_events= @binlog_annotate_row_events.save;
 SET GLOBAL binlog_checksum= @binlog_checksum.save;
 SET GLOBAL master_verify_checksum= @master_verify_checksum.save;
 SET GLOBAL binlog_row_image= @binlog_row_image.save;

@@ -3,18 +3,21 @@
 [mysqld.1]
 gtid-mode=ON
 enforce-gtid-consistency=ON
+encrypt-binlog=1
 
 [mysqld.2]
 log-slave-updates
 relay-log-info-repository=table
 gtid-mode=ON
 enforce-gtid-consistency=ON
+encrypt-binlog=1
 
 [mysqld.3]
 log-slave-updates
 relay-log-info-repository=table
 gtid-mode=ON
 enforce-gtid-consistency=ON
+encrypt-binlog=1
 
 [ENV]
 SERVER_MYPORT_1= @mysqld.1.port

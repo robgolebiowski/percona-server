@@ -1,14 +1,4 @@
 !include my.cnf
 
-[mysqld.1]
-gtid-mode=on
-enforce-gtid-consistency
-encrypt_binlog=1
-binlog-format='STATEMENT'
-
 [mysqld.2]
-gtid-mode=on
-enforce-gtid-consistency
-encrypt_binlog=1
-slave-sql-verify-checksum=1
-
+encrypt-binlog=1

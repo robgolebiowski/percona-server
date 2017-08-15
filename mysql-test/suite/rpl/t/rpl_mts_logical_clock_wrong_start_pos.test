@@ -43,11 +43,19 @@ INSERT INTO t1 SET a=1;
 --let $binlog_file= query_get_value("SHOW MASTER STATUS", File, 1)
 --let $logged_query= query_get_value(SHOW BINLOG EVENTS IN "$binlog_file" FROM 4, Info, 7)
 --let $query_pos= query_get_value(SHOW BINLOG EVENTS IN "$binlog_file" FROM 4, End_log_pos,7)
+#--let $query_pos= query_get_value(SHOW BINLOG EVENTS IN "$binlog_file" FROM $query_pos, End_log_pos,7)
+--let $query_pos= 164;
+
+#eval SHOW BINLOG EVENTS IN "$binlog_file" FROM 4;
+
+#--die
 
 --source include/sync_slave_sql_with_master.inc
 --source include/stop_slave.inc
 --replace_result $query_pos QUERY_POS
---eval CHANGE MASTER TO MASTER_LOG_POS=$query_pos, MASTER_AUTO_POSITION=0
+CHANGE MASTER TO MASTER_AUTO_POSITION=0;
+#--eval CHANGE MASTER TO MASTER_LOG_POS=$query_pos, MASTER_AUTO_POSITION=0
+--eval CHANGE MASTER TO MASTER_LOG_POS=$query_pos
 --source include/start_slave_io.inc
 START SLAVE SQL_THREAD;
 

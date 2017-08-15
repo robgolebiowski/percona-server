@@ -62,15 +62,14 @@ SET SQL_LOG_BIN= 0;
 CREATE TEMPORARY TABLE binlogs
 (id INT PRIMARY KEY AUTO_INCREMENT, filename VARCHAR(512));
 include/rpl_read_binlog_index_into_table.inc
-0
 master-bin.000001
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
+include/assert_binlog_events.inc [Format_desc # Start_encryption # Previous_gtids(.|#)*]
 master-bin.000002
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
+include/assert_binlog_events.inc [Format_desc # Start_encryption # Previous_gtids(.|#)*]
 master-bin.000003
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
+include/assert_binlog_events.inc [Format_desc # Start_encryption # Previous_gtids(.|#)*]
 master-bin.000004
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
+include/assert_binlog_events.inc [Format_desc # Start_encryption # Previous_gtids(.|#)*]
 DROP TEMPORARY TABLE binlogs;
 SET SQL_LOG_BIN= 1;
 ==== Test that relay logs contain Previous_gtids ====
@@ -78,20 +77,8 @@ SET SQL_LOG_BIN= 0;
 CREATE TEMPORARY TABLE relay_logs
 (id INT PRIMARY KEY AUTO_INCREMENT, filename VARCHAR(512));
 include/rpl_read_binlog_index_into_table.inc
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
-include/assert_binlog_events.inc [Format_desc # Previous_gtids(.|#)*]
+include/assert_binlog_events.inc [Format_desc # Start_encryption # Previous_gtids(.|#)*]
+include/assert_binlog_events.inc [Format_desc # Start_encryption # Previous_gtids(.|#)*]
 DROP TEMPORARY TABLE relay_logs;
 SET SQL_LOG_BIN= 1;
 ==== Clean up ====

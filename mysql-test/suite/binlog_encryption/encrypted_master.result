@@ -15,8 +15,8 @@ SET @binlog_row_image.save= @@global.binlog_row_image;
 # Test 1: simple binlog, no checksum, no annotation
 ####################################################
 connection server_1;
-SET GLOBAL binlog_checksum= CRC32;
-SET GLOBAL master_verify_checksum= 1;
+SET GLOBAL binlog_checksum= NONE;
+SET GLOBAL master_verify_checksum= 0;
 call mtr.add_suppression("Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT");
 CREATE DATABASE database_name_to_encrypt;
 USE database_name_to_encrypt;
@@ -540,16 +540,11 @@ NOT FOUND /_to_encrypt/ in master-bin.0*
 NOT FOUND /COMMIT/ in master-bin.0*
 NOT FOUND /TIMESTAMP/ in master-bin.0*
 include/save_master_pos.inc
-include/sync_slave_io_with_master.inc
-connection server_1;
-connection server_2;
-connection server_2;
-connection server_2;
-connection server_2;
 #############################
 # Final checks for the slave
 #############################
 connection server_2;
+include/sync_slave_io.inc
 FOUND /_to_encrypt/ in slave-relay-bin.0*
 FOUND /COMMIT/ in slave-relay-bin.0*
 FOUND /TIMESTAMP/ in slave-relay-bin.0*
