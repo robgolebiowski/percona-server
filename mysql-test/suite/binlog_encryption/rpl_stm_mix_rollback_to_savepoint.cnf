@@ -1,0 +1,9 @@
+!include my.cnf
+
+[mysqld.1]
+encrypt-binlog=1
+binlog-format='STATEMENT'
+
+[mysqld.2]
+encrypt-binlog=1
+binlog-format='STATEMENT'

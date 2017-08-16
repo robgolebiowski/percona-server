@@ -1,0 +1,1 @@
+--source extra/rpl_tests/rpl_trx_boundary_parser_relay_log_recovery.test

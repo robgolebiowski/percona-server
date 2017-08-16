@@ -3366,7 +3366,6 @@ bool show_binlog_events(THD *thd, MYSQL_BIN_LOG *binary_log)
       scan_pos= my_b_tell(&log);
       if (ev == NULL || !ev->is_valid())
       {
-        mysql_mutex_unlock(log_lock);
         errmsg = "Wrong offset or I/O error";
         goto err;
       }
@@ -3382,7 +3381,6 @@ bool show_binlog_events(THD *thd, MYSQL_BIN_LOG *binary_log)
           if (description_event->start_decryption((Start_encryption_log_event*) ev))
           {
             delete ev;
-            mysql_mutex_unlock(log_lock);
             errmsg = "Could not initialize decryption of binlog.";
             goto err;
           }
@@ -3424,7 +3422,6 @@ bool show_binlog_events(THD *thd, MYSQL_BIN_LOG *binary_log)
           {
             errmsg = "Error starting decryption";
             delete ev;
-            mysql_mutex_unlock(log_lock);
             goto err;
           }
         }

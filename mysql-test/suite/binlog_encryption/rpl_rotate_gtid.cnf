@@ -1,0 +1,13 @@
+!include my.cnf
+
+[mysqld.1]
+gtid-mode=ON
+enforce-gtid-consistency=ON
+encrypt-binlog=1
+binlog-format='STATEMENT'
+
+[mysqld.2]
+gtid-mode=ON
+enforce-gtid-consistency=ON
+encrypt-binlog=1
+binlog-format='STATEMENT'
