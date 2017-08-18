@@ -16,7 +16,7 @@ namespace keyring
     };
     static bool encode(const void *src, size_t src_len, Secure_string *encoded, Base64Format format);
     static bool decode(const Secure_string &src, Secure_string *dst);
-    //It is caller responsibility to delete memory allocated with delete[]
+    // It is caller responsibility to delete memory allocated with delete[]
     static bool decode(const Secure_string &src, char **dst, uint64 *dst_length);
   };
 }

@@ -9,16 +9,16 @@ CHECK_IF_LIB_FOUND(CURL "keyring_vault unit tests")
 CHECK_IF_CURL_DEPENDS_ON_RTMP("keyring_vault unit tests")
 
 INCLUDE_DIRECTORIES(
-        ${GMOCK_INCLUDE_DIRS}
+        SYSTEM ${GMOCK_INCLUDE_DIRS}
+        SYSTEM ${BOOST_INCLUDE_DIR}
+        SYSTEM ${CURL_INCLUDE_DIRS}
         ${BOOST_PATCHES_DIR}
-        ${BOOST_INCLUDE_DIR}
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/sql
         ${CMAKE_SOURCE_DIR}/plugin/keyring/common
         ${CMAKE_SOURCE_DIR}/plugin/keyring_vault
         ${CMAKE_SOURCE_DIR}/unittest/gunit
         ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring
-        ${CURL_INCLUDE_DIRS}
 )
 
 SET(TESTS

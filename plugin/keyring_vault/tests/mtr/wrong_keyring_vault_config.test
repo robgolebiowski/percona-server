@@ -1,5 +1,3 @@
---disable_ps_protocol
---disable_warnings
 --source include/not_embedded.inc
 
 # This test checks behavior of keyring_vault plugin when it is initialized on server startup and

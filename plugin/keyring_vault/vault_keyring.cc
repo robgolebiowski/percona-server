@@ -126,10 +126,10 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
     keyring_init_psi_keys();
 #endif
     if (init_keyring_locks())
-      return TRUE;
+      return 1;
 
     if (init_curl())
-      return TRUE;
+      return 1;
 
     logger.reset(new Logger(plugin_info));
     keys.reset(new Vault_keys_container(logger.get()));
@@ -147,22 +147,22 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
         " file. Please also make sure Vault is running and accessible."
         " The keyring_vault will stay unusable until correct configuration file gets"
         " provided.");
-      return FALSE;
+      return 0;
     }
     is_keys_container_initialized = TRUE;
-    return FALSE;
+    return 0;
   }
   catch (const std::bad_alloc &e)
   {
     handle_std_bad_alloc_exception("keyring_vault initialization failure");
     cleanup_curl();
-    return TRUE;
+    return 1;
   }
   catch (...)
   {
     handle_unknown_exception("keyring_vault initialization failure");
     cleanup_curl();
-    return TRUE;
+    return 1;
   }
 }
 
@@ -219,8 +219,8 @@ my_bool mysql_key_generate(const char *key_id, const char *key_type,
   }
   catch (...)
   {
-    //We want to make sure that no exception leaves keyring_vault plugin and goes into the server.
-    //That is why there are try..catch blocks in all keyring_vault service methods.
+    // We want to make sure that no exception leaves keyring_vault plugin and goes into the server.
+    // That is why there are try..catch blocks in all keyring_vault service methods.
     handle_unknown_exception("Failed to generate a key");
     return TRUE;
   }

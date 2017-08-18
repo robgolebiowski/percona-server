@@ -20,7 +20,8 @@ namespace keyring
       char* new_end = std::remove(base64_encoded_text.get(), base64_encoded_text.get() + memory_needed, '\n');
       memory_needed = new_end - base64_encoded_text.get();
     }
-    encoded->assign(base64_encoded_text.get(), memory_needed-1); // base64 encode returns data with NULL terminating string - which we do not care about
+    // base64 encode below returns data with NULL terminating string - which we do not care about
+    encoded->assign(base64_encoded_text.get(), memory_needed - 1); 
     memset_s(base64_encoded_text.get(), 0, memory_needed, memory_needed);
 
     return false;

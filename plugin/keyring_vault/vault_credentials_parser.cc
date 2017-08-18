@@ -11,12 +11,12 @@ namespace keyring
 {
   void Vault_credentials_parser::reset_vault_credentials(Vault_credentials *vault_credentials)
   {
-    for(Vault_credentials::iterator iter = vault_credentials->begin();
+    for (Vault_credentials::iterator iter = vault_credentials->begin();
         iter != vault_credentials->end(); ++iter)
       iter->second.clear();
   }
 
-  bool Vault_credentials_parser::is_valid_option(const Secure_string &option)
+  bool Vault_credentials_parser::is_valid_option(const Secure_string &option) const
   {
     return vault_credentials_in_progress.count(option) != 0;
   }

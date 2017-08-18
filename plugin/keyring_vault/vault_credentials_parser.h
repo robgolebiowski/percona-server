@@ -30,7 +30,7 @@ namespace keyring
 
     bool parse_line(uint line_number, const Secure_string& line, Vault_credentials *vault_credentials);
 
-    bool is_valid_option(const Secure_string &option);
+    bool is_valid_option(const Secure_string &option) const;
     Vault_credentials vault_credentials_in_progress;
     std::set<Secure_string> optional_value;
 

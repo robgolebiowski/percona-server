@@ -30,11 +30,11 @@ public:
       curl_slist_free_all(list);
   }
 
-  bool init(const Vault_credentials &vault_credentials);
-  bool list_keys(Secure_string *response);
-  bool write_key(const Vault_key &key, Secure_string *response);
-  bool read_key(const Vault_key &key, Secure_string *response);
-  bool delete_key(const Vault_key &key, Secure_string *response);
+  virtual bool init(const Vault_credentials &vault_credentials);
+  virtual bool list_keys(Secure_string *response);
+  virtual bool write_key(const Vault_key &key, Secure_string *response);
+  virtual bool read_key(const Vault_key &key, Secure_string *response);
+  virtual bool delete_key(const Vault_key &key, Secure_string *response);
 
 private:
 

@@ -42,7 +42,7 @@ class Thd_wait_end_guard
 static size_t write_response_memory(void *contents, size_t size, size_t nmemb, void *userp)
 {
   size_t realsize = size * nmemb;
-  if (size != 0 && realsize/size != nmemb)
+  if (size != 0 && realsize / size != nmemb)
     return 0; // overflow
   Secure_ostringstream *read_data = static_cast<Secure_ostringstream*>(userp);
   size_t ss_pos = read_data->tellp();
@@ -60,7 +60,6 @@ static size_t write_response_memory(void *contents, size_t size, size_t nmemb, v
 }
 
 int progress_callback(void *clientp, double dltotal, double dlnow, double ultotal, double ulnow)
-//int progress_callback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
 {
   ulonglong curr_ping_time = my_timer_milliseconds();
 
@@ -182,7 +181,7 @@ bool Vault_curl::list_keys(Secure_string *response)
   long http_code = 0;
 
   Thd_wait_end_guard thd_wait_end_guard;
-  (void)thd_wait_end_guard; //silence unused variable error
+  (void)thd_wait_end_guard; // silence unused variable error
 
   if (reset_curl_session() ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + "?list=true").c_str())) != CURLE_OK ||
@@ -265,7 +264,7 @@ bool Vault_curl::read_key(const Vault_key &key, Secure_string *response)
   CURLcode curl_res = CURLE_OK;
 
   Thd_wait_end_guard thd_wait_end_guard;
-  (void)thd_wait_end_guard; //silence unused variable error
+  (void)thd_wait_end_guard; // silence unused variable error
 
   if (reset_curl_session() ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL,
@@ -287,7 +286,7 @@ bool Vault_curl::delete_key(const Vault_key &key, Secure_string *response)
   CURLcode curl_res = CURLE_OK;
 
   Thd_wait_end_guard thd_wait_end_guard;
-  (void)thd_wait_end_guard; //silence unused variable error
+  (void)thd_wait_end_guard; // silence unused variable error
   
   if (reset_curl_session() ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, key_url.c_str())) !=

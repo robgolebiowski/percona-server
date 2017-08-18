@@ -1,7 +1,5 @@
 # Keyring_vault plugin and keyring_vault_config variable testing.
 
---disable_ps_protocol
---disable_warnings
 --source include/not_embedded.inc
 
 call mtr.add_suppression("\\[Error\\] Plugin keyring_vault reported: 'Could not open file with credentials.'");

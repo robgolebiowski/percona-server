@@ -91,7 +91,7 @@ SELECT * FROM t2;
 
 CREATE TABLE t10(c1 INT, c2 char(20)) ENGINE = InnoDB;
 
-# Install keyring_vault plugin with different Vault. This means that INNODB Master key will not be accessible
+# Install keyring_vault plugin with different Vault. This means that InnoDB Master key will not be accessible
 # and thus it will not be possible to create new encrypted tables
 
 --replace_regex /\.dll/.so/
@@ -107,8 +107,8 @@ CREATE TABLE t6(c1 INT, c2 char(20)) ENCRYPTION="Y" ENGINE = InnoDB;
 --error ER_CANNOT_FIND_KEY_IN_KEYRING
 ALTER INSTANCE ROTATE INNODB MASTER KEY;
 
-# Although INNODB Master key is not accessible it should still be possible to select from encrypted tables
-# for which tablespace key was already cached by INNODB
+# Although InnoDB Master key is not accessible it should still be possible to select from encrypted tables
+# for which tablespace key was already cached by InnoDB
 SELECT * FROM t2;
 
 UNINSTALL PLUGIN keyring_vault;

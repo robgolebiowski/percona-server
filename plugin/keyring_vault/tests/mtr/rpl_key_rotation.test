@@ -75,6 +75,7 @@ FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
 --echo [On Master]
 CREATE TABLE t4(c1 INT PRIMARY KEY, c2 char(20)) ENCRYPTION="Y" ENGINE = InnoDB;
 INSERT INTO t4 VALUES(1, "rpltest");
+--source include/save_master_pos.inc
 
 --connection slave
 --echo [On Slave]
@@ -89,7 +90,7 @@ eval SET @@global.keyring_vault_config='$KEYRING_CONF_FILE_2';
 query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
 FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
 --source include/start_slave_sql.inc
---sleep 2
+--source include/sync_slave_sql.inc
 SELECT * FROM t4;
 
 --connection master

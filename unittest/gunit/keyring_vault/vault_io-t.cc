@@ -27,6 +27,10 @@ namespace keyring__vault_io_unittest
   using ::testing::SetArgPointee;
 
   static std::string uuid = generate_uuid();
+  static std::string key_1 = (uuid + "key1");
+  static std::string key_2 = (uuid + "key2");
+  static const char *key_1_id = key_1.c_str();
+  static const char *key_2_id = key_2.c_str();
   CURL *curl = NULL;
   std::string credential_file_url = "./keyring_vault.conf";
   ILogger *logger;
@@ -80,11 +84,11 @@ namespace keyring__vault_io_unittest
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
     // First add two keys into Vault
-    Vault_key key1((uuid+"key1").c_str(), "AES", "Arczi", "Artur", 5);
+    Vault_key key1(key_1_id, "AES", "Arczi", "Artur", 5);
     EXPECT_TRUE(*key1.get_key_signature() == get_key_signature(uuid,"key1","Arczi"));
     key1.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key1));
-    Vault_key key2((uuid+"key2").c_str(), "AES", "Kamil", "Kami", 4);
+    Vault_key key2(key_2_id, "AES", "Kamil", "Kami", 4);
     EXPECT_TRUE(*key2.get_key_signature() == get_key_signature(uuid,"key2","Kamil"));
     key2.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key2));
@@ -125,11 +129,11 @@ namespace keyring__vault_io_unittest
     EXPECT_FALSE(vault_io_for_storing.init(&credential_file_url));
 
     // First add two keys into Vault
-    Vault_key key1((uuid+"key1").c_str(), "AES", "Robert", "Robi", 4);
+    Vault_key key1(key_1_id, "AES", "Robert", "Robi", 4);
     EXPECT_TRUE(*key1.get_key_signature() == get_key_signature(uuid,"key1","Robert"));
     key1.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io_for_storing.flush_to_storage(&key1));
-    Vault_key key2((uuid+"key2").c_str(), "AES", "Kamil", "Kami", 4);
+    Vault_key key2(key_2_id, "AES", "Kamil", "Kami", 4);
     EXPECT_TRUE(*key2.get_key_signature() == get_key_signature(uuid,"key2","Kamil"));
     key2.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io_for_storing.flush_to_storage(&key2));
@@ -174,11 +178,11 @@ namespace keyring__vault_io_unittest
     EXPECT_FALSE(vault_io_for_storing.init(&credential_file_url));
 
     // First add two keys into Vault
-    Vault_key key1((uuid+"key1").c_str(), "AES", "Robert", "Robi", 4);
+    Vault_key key1(key_1_id, "AES", "Robert", "Robi", 4);
     EXPECT_TRUE(*key1.get_key_signature() == get_key_signature(uuid,"key1","Robert"));
     key1.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io_for_storing.flush_to_storage(&key1));
-    Vault_key key2((uuid+"key2").c_str(), "AES", "Kamil", "Kami", 4);
+    Vault_key key2(key_2_id, "AES", "Kamil", "Kami", 4);
     EXPECT_TRUE(*key2.get_key_signature() == get_key_signature(uuid,"key2","Kamil"));
     key2.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io_for_storing.flush_to_storage(&key2));
@@ -235,17 +239,17 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, vault_curl, vault_parser);
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
-    Vault_key key_to_store((uuid+"key1").c_str(), "AES", "rob", "Robi", 4);
+    Vault_key key_to_store(key_1_id, "AES", "rob", "Robi", 4);
     key_to_store.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key_to_store));
 
-    Vault_key key((uuid+"key1").c_str(), NULL, "rob", NULL, 0);
+    Vault_key key(key_1_id, NULL, "rob", NULL, 0);
     EXPECT_FALSE(vault_io.retrieve_key_type_and_data(&key));
     EXPECT_TRUE(*key.get_key_signature() == get_key_signature(uuid,"key1","rob"));
     ASSERT_TRUE(memcmp(key.get_key_data(), "Robi", key.get_key_data_size()) == 0);
     EXPECT_STREQ("AES", key.get_key_type()->c_str());
 
-    Vault_key key_to_remove((uuid+"key1").c_str(), NULL, "rob", NULL, 0);
+    Vault_key key_to_remove(key_1_id, NULL, "rob", NULL, 0);
     key_to_remove.set_key_operation(REMOVE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key_to_remove));
   }
@@ -254,7 +258,7 @@ namespace keyring__vault_io_unittest
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
     EXPECT_FALSE(vault_io.init(&credential_file_url));
-    Vault_key key((uuid+"key1").c_str(), "AES", "rob", "Robi", 4);
+    Vault_key key(key_1_id, "AES", "rob", "Robi", 4);
     key.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key));
     Vault_key key_to_remove(key);
@@ -266,10 +270,10 @@ namespace keyring__vault_io_unittest
   {
     Vault_io vault_io(logger, vault_curl, vault_parser);
     EXPECT_FALSE(vault_io.init(&credential_file_url));
-    Vault_key key((uuid+"key1").c_str(), "AES", "rob", "Robi", 4);
+    Vault_key key(key_1_id, "AES", "rob", "Robi", 4);
     key.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key));
-    Vault_key key1_id((uuid+"key1").c_str(), NULL, "rob", NULL, 0);
+    Vault_key key1_id(key_1_id, NULL, "rob", NULL, 0);
     EXPECT_FALSE(vault_io.retrieve_key_type_and_data(&key1_id));
     EXPECT_TRUE(*key1_id.get_key_signature() == get_key_signature(uuid,"key1","rob"));
     ASSERT_TRUE(memcmp(key1_id.get_key_data(), "Robi", key1_id.get_key_data_size()) == 0);
@@ -425,7 +429,7 @@ namespace keyring__vault_io_unittest
       .WillOnce(Return(false)); // init successful
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
-    Vault_key key((uuid+"key1").c_str(), "AES", "Arczi", "Artur", 5);
+    Vault_key key(key_1_id, "AES", "Arczi", "Artur", 5);
     key.set_key_operation(REMOVE_KEY);
 
     EXPECT_CALL(*mock_curl, delete_key(_,_))
@@ -445,7 +449,7 @@ namespace keyring__vault_io_unittest
       .WillOnce(Return(false)); // init successful
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
-    Vault_key key((uuid+"key1").c_str(), "AES", "Arczi", "Artur", 5);
+    Vault_key key(key_1_id, "AES", "Arczi", "Artur", 5);
     key.set_key_operation(REMOVE_KEY);
     Secure_string vault_response("{ errors: [\"Cannot delete this stuff\"] }"); 
 
@@ -467,7 +471,7 @@ namespace keyring__vault_io_unittest
       .WillOnce(Return(false)); // init successful
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
-    Vault_key key((uuid+"key1").c_str(), "AES", "Arczi", "Artur", 5);
+    Vault_key key(key_1_id, "AES", "Arczi", "Artur", 5);
     key.set_key_operation(STORE_KEY);
 
     EXPECT_CALL(*mock_curl, write_key(_,_))
@@ -487,7 +491,7 @@ namespace keyring__vault_io_unittest
       .WillOnce(Return(false)); // init successful
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
-    Vault_key key((uuid+"key1").c_str(), "AES", "Arczi", "Artur", 5);
+    Vault_key key(key_1_id, "AES", "Arczi", "Artur", 5);
     key.set_key_operation(STORE_KEY);
     Secure_string vault_response("{ errors: [\"Cannot write this stuff\"] }"); 
 
@@ -518,11 +522,11 @@ namespace keyring__vault_io_unittest
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
     // First add two keys into Vault
-    Vault_key key1((uuid+"key1").c_str(), "AES", "Arczi", "Artur", 5);
+    Vault_key key1(key_1_id, "AES", "Arczi", "Artur", 5);
     EXPECT_TRUE(*key1.get_key_signature() == get_key_signature(uuid,"key1","Arczi"));
     key1.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key1));
-    Vault_key key2((uuid+"key2").c_str(), "AES", "Kamil", "Kami", 4);
+    Vault_key key2(key_2_id, "AES", "Kamil", "Kami", 4);
     EXPECT_TRUE(*key2.get_key_signature() == get_key_signature(uuid,"key2","Kamil"));
     key2.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key2));
@@ -554,11 +558,11 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, vault_curl, mock_vault_parser);
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
-    Vault_key key_to_store((uuid+"key1").c_str(), "AES", "rob", "Robi", 4);
+    Vault_key key_to_store(key_1_id, "AES", "rob", "Robi", 4);
     key_to_store.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key_to_store));
 
-    Vault_key key((uuid+"key1").c_str(), NULL, "rob", NULL, 0);
+    Vault_key key(key_1_id, NULL, "rob", NULL, 0);
     EXPECT_CALL(*mock_vault_parser, parse_key_data(_, &key))
       .WillOnce(Return(true));
     EXPECT_CALL(*mock_vault_parser, parse_errors(_, _))
@@ -567,7 +571,7 @@ namespace keyring__vault_io_unittest
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault.")));
     EXPECT_TRUE(vault_io.retrieve_key_type_and_data(&key));
 
-    Vault_key key_to_remove((uuid+"key1").c_str(), NULL, "rob", NULL, 0);
+    Vault_key key_to_remove(key_1_id, NULL, "rob", NULL, 0);
     key_to_remove.set_key_operation(REMOVE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key_to_remove));
   }
@@ -579,11 +583,11 @@ namespace keyring__vault_io_unittest
     Vault_io vault_io(logger, vault_curl, mock_vault_parser);
     EXPECT_FALSE(vault_io.init(&credential_file_url));
 
-    Vault_key key_to_store((uuid+"key1").c_str(), "AES", "rob", "Robi", 4);
+    Vault_key key_to_store(key_1_id, "AES", "rob", "Robi", 4);
     key_to_store.set_key_operation(STORE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key_to_store));
 
-    Vault_key key((uuid+"key1").c_str(), NULL, "rob", NULL, 0);
+    Vault_key key(key_1_id, NULL, "rob", NULL, 0);
     EXPECT_CALL(*mock_vault_parser, parse_key_data(_, &key))
       .WillOnce(Return(true));
     EXPECT_CALL(*mock_vault_parser, parse_errors(_, _))
@@ -592,7 +596,7 @@ namespace keyring__vault_io_unittest
       log(MY_ERROR_LEVEL, StrEq("Could not read key from Vault. Error while parsing error messages")));
     EXPECT_TRUE(vault_io.retrieve_key_type_and_data(&key));
 
-    Vault_key key_to_remove((uuid+"key1").c_str(), NULL, "rob", NULL, 0);
+    Vault_key key_to_remove(key_1_id, NULL, "rob", NULL, 0);
     key_to_remove.set_key_operation(REMOVE_KEY);
     EXPECT_FALSE(vault_io.flush_to_storage(&key_to_remove));
   }
