@@ -10,6 +10,8 @@ namespace keyring
   {
     uint64 memory_needed = base64_needed_encoded_length(src_len);
     boost::scoped_array<char> base64_encoded_text(new char[memory_needed]);
+    //Using scoped_array instead of vector or string as those containers do not provide access to underlying
+    //data when they are empty. Calling reserve on those containers does not help.
     if (::base64_encode(src, src_len, base64_encoded_text.get()) != 0)
     {
       memset_s(base64_encoded_text.get(), 0, memory_needed, memory_needed);
