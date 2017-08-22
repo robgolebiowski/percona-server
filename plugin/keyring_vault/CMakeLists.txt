@@ -14,7 +14,7 @@ MACRO (CHECK_IF_LIB_FOUND lib_name project_name)
 ENDMACRO()
 
 MACRO (CHECK_IF_CURL_DEPENDS_ON_RTMP project_name)
-  EXECUTE_PROCESS(COMMAND ldd ${CURL_LIBRARIES}
+  EXECUTE_PROCESS(COMMAND ldd ${CURL_LIBRARY}
                   COMMAND grep rtmp
                   OUTPUT_VARIABLE CURL_DEPENDS_ON_RTMP)
   IF (NOT CURL_DEPENDS_ON_RTMP STREQUAL "")
@@ -24,7 +24,6 @@ Please provide CURL library that does not depend on rtmp library to build keyrin
   ENDIF()
 ENDMACRO()
 
-FIND_CURL()
 CHECK_IF_LIB_FOUND(CURL "keyring_vault")
 
 INCLUDE_DIRECTORIES(${BOOST_PATCHES_DIR})
@@ -48,7 +47,7 @@ MYSQL_ADD_PLUGIN(keyring_vault
                  vault_credentials_parser.cc
                  vault_credentials.cc
                  vault_keyring.cc
-                 LINK_LIBRARIES  ${CURL_LIBRARIES}
+                 LINK_LIBRARIES ${CURL_LIBRARY}
                  MODULE_ONLY
                  MODULE_OUTPUT_NAME "keyring_vault")
 

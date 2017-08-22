@@ -16,9 +16,9 @@ public:
   
   void remove_all_keys()
   {
-    for (ulong idx = 0; idx < keys_hash.records; idx++)
+    for (ulong idx = 0; idx < keys_hash->records; idx++)
     {
-      IKey *key = reinterpret_cast<IKey*>(my_hash_element(&keys_hash, idx));
+      IKey *key = reinterpret_cast<IKey*>(my_hash_element(keys_hash, idx));
       remove_key(key);    
     }
   }

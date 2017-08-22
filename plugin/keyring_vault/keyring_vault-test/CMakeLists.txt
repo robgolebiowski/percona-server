@@ -22,6 +22,6 @@ ADD_EXECUTABLE(keyring_vault-test
 
 TARGET_LINK_LIBRARIES(keyring_vault-test strings dbug regex mysys sql)
 TARGET_LINK_LIBRARIES(keyring_vault-test binlog rpl master slave)
-TARGET_LINK_LIBRARIES(keyring_vault-test ${CURL_LIBRARIES} ${SSL_LIBRARIES})
+TARGET_LINK_LIBRARIES(keyring_vault-test ${CURL_LIBRARY} ${SSL_LIBRARIES})
 
 ADD_TEST(keyring_vault-test keyring_vault-test)

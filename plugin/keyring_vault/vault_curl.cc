@@ -73,6 +73,14 @@ int progress_callback(void *clientp, double dltotal, double dlnow, double ultota
   {
     last_ping_time = curr_ping_time;
   } BOOST_SCOPE_EXIT_END
+
+  //***To keep compiler happy, remove when PS-244 gets resolved
+  (void)dltotal;
+  (void)dlnow;
+  //****
+
+  // The calls to threadpool are disabled till bug PS-244 gets resolved.
+  /* <--Uncomment when PS-244 gets resolved
   if (!was_thd_wait_started)
   { 
     if ((dlnow < dltotal || ulnow < ultotal) && last_ping_time - curr_ping_time > slow_connection_threshold)
@@ -88,7 +96,7 @@ int progress_callback(void *clientp, double dltotal, double dlnow, double ultota
     // connection has speed up or we have finished transfering
     thd_wait_end(current_thd);
     was_thd_wait_started = false;
-  }
+  }*/ // <--Uncomment when PS-244 gets resolved
   return 0;
 }
 

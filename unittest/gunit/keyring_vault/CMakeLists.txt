@@ -4,7 +4,6 @@ IF(NOT GMOCK_FOUND)
     RETURN()
 ENDIF()
 
-FIND_CURL()
 CHECK_IF_LIB_FOUND(CURL "keyring_vault unit tests")
 CHECK_IF_CURL_DEPENDS_ON_RTMP("keyring_vault unit tests")
 
@@ -50,7 +49,7 @@ FOREACH(test ${TESTS})
     ADD_EXECUTABLE(${test}-t ${SRC_FILES})
 
     TARGET_LINK_LIBRARIES(${test}-t gunit_large strings dbug regex mysys sql)
-    TARGET_LINK_LIBRARIES(${test}-t sql binlog rpl master slave sql ${CURL_LIBRARIES} ${SSL_LIBRARIES})
+    TARGET_LINK_LIBRARIES(${test}-t sql binlog rpl master slave sql ${CURL_LIBRARY} ${SSL_LIBRARIES})
 
     IF(WITH_PERFSCHEMA_STORAGE_ENGINE)
         TARGET_LINK_LIBRARIES(${test}-t perfschema)

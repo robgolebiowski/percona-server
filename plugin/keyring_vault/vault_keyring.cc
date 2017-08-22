@@ -14,6 +14,7 @@ using keyring::Vault_curl;
 using keyring::Logger;
 
 CURL *curl = NULL;
+mysql_rwlock_t LOCK_keyring;
 
 static bool init_curl()
 {
@@ -180,18 +181,18 @@ int keyring_vault_deinit(void *arg MY_ATTRIBUTE((unused)))
 my_bool mysql_key_fetch(const char *key_id, char **key_type, const char *user_id,
                         void **key, size_t *key_len)
 {
-  return mysql_key_fetch<keyring::Vault_key>(key_id, key_type, user_id, key, key_len);
+  return mysql_key_fetch<keyring::Vault_key>(key_id, key_type, user_id, key, key_len, "keyring_vault");
 }
 
 my_bool mysql_key_store(const char *key_id, const char *key_type,
                         const char *user_id, const void *key, size_t key_len)
 {
-  return mysql_key_store<keyring::Vault_key>(key_id, key_type, user_id, key, key_len);
+  return mysql_key_store<keyring::Vault_key>(key_id, key_type, user_id, key, key_len, "keyring_vault");
 }
 
 my_bool mysql_key_remove(const char *key_id, const char *user_id)
 {
-  return mysql_key_remove<keyring::Vault_key>(key_id, user_id);
+  return mysql_key_remove<keyring::Vault_key>(key_id, user_id, "keyring_vault");
 }
 
 
@@ -206,7 +207,7 @@ my_bool mysql_key_generate(const char *key_id, const char *key_type,
     if (key.get() == NULL)
       return TRUE;
     memset(key.get(), 0, key_len);
-    if (!is_keys_container_initialized || check_key_for_writting(key_candidate.get(), "generating") ||
+    if (!is_keys_container_initialized || check_key_for_writing(key_candidate.get(), "generating") ||
         my_rand_buffer(key.get(), key_len))
       return TRUE;
 
