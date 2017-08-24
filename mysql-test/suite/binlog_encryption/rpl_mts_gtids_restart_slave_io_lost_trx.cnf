@@ -1,4 +1,6 @@
 !include my.cnf
 
 [mysqld.2]
+early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys2.txt
 encrypt-binlog=1

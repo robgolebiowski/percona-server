@@ -7,6 +7,8 @@ encrypt_binlog=1
 binlog-format='STATEMENT'
 
 [mysqld.2]
+early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys2.txt
 gtid-mode=on
 enforce-gtid-consistency
 encrypt_binlog=1

@@ -75,8 +75,8 @@ if (`SELECT "$binlog" <> "" and "$gtid_set_end" <> "" and "$gtid_set_ini" <> ""`
   {
     --eval $command_show in "$server_log"
   }
-  --let $type= query_get_value($command_show in "$server_log", Event_type, 2)
-  --let $info= query_get_value($command_show in "$server_log", Info, 2)
+  --let $type= query_get_value($command_show in "$server_log", Event_type, 3)
+  --let $info= query_get_value($command_show in "$server_log", Info, 3)
   if ($type != Previous_gtids)
   {
     --source include/show_rpl_debug_info.inc

@@ -43,7 +43,6 @@ start slave;
 # Switch to master and insert one record, then sync it to slave
 connection master;
 insert into t1 values(1);
-SHOW MASTER STATUS;
 --source include/sync_slave_sql_with_master.inc
 
 # The record should now be on slave

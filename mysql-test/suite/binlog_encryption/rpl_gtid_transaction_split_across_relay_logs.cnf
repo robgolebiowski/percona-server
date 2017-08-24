@@ -1,11 +1,15 @@
 !include include/default_mysqld.cnf
 
 [mysqld.1]
+early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys1.txt
 gtid-mode=ON
 enforce-gtid-consistency=ON
 encrypt-binlog=1
 
 [mysqld.2]
+early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys2.txt
 log-slave-updates
 relay-log-info-repository=table
 gtid-mode=ON
@@ -13,6 +17,8 @@ enforce-gtid-consistency=ON
 encrypt-binlog=1
 
 [mysqld.3]
+early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys3.txt
 log-slave-updates
 relay-log-info-repository=table
 gtid-mode=ON

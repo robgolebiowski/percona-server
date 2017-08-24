@@ -11,6 +11,7 @@
 
 --source encryption_algorithms.inc
 --source include/have_innodb.inc
+--source include/not_gtid_enabled.inc
 
 --echo #################
 --echo # Initialization

@@ -1612,7 +1612,7 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
 
   if (data_len < header_size)
   {
-    error = "Event too small";
+    error = "Event invalid";
     goto err;
   }
 
@@ -1633,6 +1633,10 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
 
   if (fdle->crypto_data.scheme)
   {
+#if defined(MYSQL_CLIENT)
+    error ="decryption error";
+    goto err;
+#endif
     DBUG_PRINT("info", ("read_log_event is using ctx"));
 
     //ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
@@ -1667,17 +1671,6 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
         //crypto_data->key, crypto_data->key_length, iv, sizeof(iv)))
     if (my_aes_crypt(MY_AES_CBC, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, data_len - 4, dst + 4, &dstlen,
         fdle->crypto_data.key, fdle->crypto_data.key_length, iv, sizeof(iv)))
-
-
-        //sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
-        //ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
-
-
-    //TODO:Robert:Tymczasowo wyNULLowałem iv
-    //if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
-                       //crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
-            ////sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
-            //ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
     {
       my_free(dst_buf);
       //DBUG_RETURN(LOG_READ_DECRYPT);
@@ -1716,6 +1709,10 @@ err:
   {
     DBUG_ASSERT(error != 0);
     /* Don't log error if read_log_event invoked from SHOW BINLOG EVENTS */
+#ifdef MYSQL_CLIENT
+    if (force_opt)
+      DBUG_RETURN(new Unknown_log_event());
+#endif
 #ifdef MYSQL_SERVER
     THD *thd= current_thd;
     if (!(thd && thd->lex &&
@@ -5593,6 +5590,7 @@ void Start_encryption_log_event::print(FILE* file,
     my_b_printf(head,"Encryption scheme: %d", crypto_scheme);
     my_b_printf(head,", key_version: %d", key_version);
     my_b_printf(head,", nonce: %s ", nonce_buf);
+    my_b_printf(head,"\n# The rest of the binlog is encrypted!\n");
 }
 #endif
 
@@ -5836,16 +5834,17 @@ int Format_description_log_event::do_update_pos(Relay_log_info *rli)
   }
 }
 
-bool Format_description_log_event::start_decryption(Start_encryption_log_event* sele)
-{
-  DBUG_ASSERT(crypto_data.scheme == 0);
+//TODO:Robert: Moved to log_event.h, as mysqlbinlog also is using this function and is not linking with log_event.cc
+//bool Format_description_log_event::start_decryption(Start_encryption_log_event* sele)
+//{
+  //DBUG_ASSERT(crypto_data.scheme == 0);
 
-  if (!sele->is_valid())
-    return 1;
+  //if (!sele->is_valid())
+    //return 1;
 
-  memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
-  return crypto_data.init(sele->crypto_scheme, sele->key_version);
-}
+  //memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
+  //return crypto_data.init(sele->crypto_scheme, sele->key_version);
+//}
 
 Log_event::enum_skip_reason
 Format_description_log_event::do_shall_skip(Relay_log_info *rli)
@@ -8139,8 +8138,14 @@ void Unknown_log_event::print(FILE* file_arg, PRINT_EVENT_INFO* print_event_info
 {
   if (print_event_info->short_form)
     return;
-  print_header(&print_event_info->head_cache, print_event_info, FALSE);
-  my_b_printf(&print_event_info->head_cache, "\n# %s", "Unknown event\n");
+
+  if (what != ENCRYPTED)
+  {
+    print_header(&print_event_info->head_cache, print_event_info, FALSE);
+    my_b_printf(&print_event_info->head_cache, "\n# %s", "Unknown event\n");
+  }
+  else
+    my_b_printf(&print_event_info->head_cache, "\n# %s", "Encrypted event\n");
 }
 #endif  
 

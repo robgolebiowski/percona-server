@@ -10,4 +10,6 @@ encrypt_binlog=1
 gtid-mode=ON
 enforce-gtid-consistency=ON
 binlog-format='STATEMENT'
+early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys2.txt
 encrypt_binlog=1

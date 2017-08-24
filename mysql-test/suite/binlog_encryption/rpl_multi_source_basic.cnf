@@ -4,6 +4,8 @@
 log-slave-updates
 
 [mysqld.2]
+early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
+loose-keyring_file_data= /home/rob/keys2.txt
 master-info-repository=TABLE
 relay-log-info-repository=TABLE
 log-slave-updates

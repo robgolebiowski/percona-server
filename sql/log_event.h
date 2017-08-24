@@ -1870,7 +1870,17 @@ public:
   }
 
   Binlog_crypt_data crypto_data;
-  bool start_decryption(Start_encryption_log_event* sele);
+  bool start_decryption(Start_encryption_log_event* sele)
+  {
+    DBUG_ASSERT(crypto_data.scheme == 0);
+
+    if (!sele->is_valid())
+      return 1;
+
+    memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
+    return crypto_data.init(sele->crypto_scheme, sele->key_version);
+  }
+
   void copy_crypto_data(const Format_description_log_event* o)
   {
     DBUG_PRINT("info", ("Copying crypto data"));
@@ -2746,6 +2756,7 @@ private:
 class Unknown_log_event: public binary_log::Unknown_event , public Log_event
 {
 public:
+  enum { UNKNOWN, ENCRYPTED } what;
   /**
     Even if this is an unknown event, we still pass description_event to
     Log_event's ctor, this way we can extract maximum information from the
@@ -2754,10 +2765,14 @@ public:
   Unknown_log_event(const char* buf,
                     const Format_description_event *description_event)
   : binary_log::Unknown_event(buf, description_event),
-    Log_event(header(), footer())
+    Log_event(header(), footer()), what(UNKNOWN)
   {
     is_valid_param= true;
   }
+
+  /* constructor for hopelessly corrupted events */
+  Unknown_log_event() : Log_event(header(), footer()), what(ENCRYPTED)
+  {}
 
   ~Unknown_log_event() {}
   void print(FILE* file, PRINT_EVENT_INFO* print_event_info);

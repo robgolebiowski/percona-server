@@ -1699,7 +1699,8 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
       break;
     }
     case binary_log::START_ENCRYPTION_EVENT:
-    {  //TODO:Robert:Uncomment this: //glob_description_event->start_decryption((Start_encryption_log_event*)ev);
+    { 
+      glob_description_event->start_decryption((Start_encryption_log_event*)ev);
       ev->print(result_file, print_event_info);
       if (head->error == -1)
         goto err;

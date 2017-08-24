@@ -20,6 +20,9 @@
 #include "my_global.h"
 //#include "my_aes.h" //TODO:Robert:Dodalem to tutaj, czy prawidlowo ?
 #include "my_crypt.h"
+#ifdef MYSQL_SERVER
+#include <mysql/service_mysql_keyring.h>
+#endif
 
 /*
   Constants used to parse the stream of bytes sent by a slave
@@ -218,10 +221,31 @@ struct Binlog_crypt_data {
     ctx_size= my_aes_ctx_size(MY_AES_ECB);
     key_version= 1;//kv;
     key_length= 16;
-    if (key==NULL)
-      return 1;
-    return 0;
 
+#ifdef MYSQL_SERVER
+    char *key_type = NULL;
+    size_t key_len;
+    if (my_key_fetch("percona_binlog_system_key", &key_type, NULL,
+                     reinterpret_cast<void**>(&key), &key_len) ||
+        (key != NULL && key_len != 16))
+    {
+      //report error
+      return 1;
+    }
+
+    if (key == NULL)
+    {
+      my_key_generate("percona_binlog_system_key", "AES", NULL, 16);
+      if (my_key_fetch("percona_binlog_system_key", &key_type, NULL,
+                       reinterpret_cast<void**>(&key), &key_len) ||
+          key_len != 16)
+      {
+        //report error
+        return 1;
+      }   
+    }
+#endif    
+    return 0;
     //return encryption_key_get(ENCRYPTION_KEY_SYSTEM_DATA, kv, key, &key_length);
   }
 
