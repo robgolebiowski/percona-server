@@ -1021,7 +1021,7 @@ bool Log_event::write_footer(IO_CACHE* file)
   if (ctx) //TODO:Robert : Jak oznaczyć czy jest szyfrowane ?
   {
     uint dstlen;
-    uchar dst[MY_AES_BLOCK_SIZE*2];
+    uchar dst[MY_CRYPT_AES_BLOCK_SIZE*2];
     if (my_aes_crypt_finish(ctx, dst, &dstlen))
       return 1;
     if (maybe_write_event_len(file, dst, dstlen, event_len) || my_b_safe_write(file, dst, dstlen))

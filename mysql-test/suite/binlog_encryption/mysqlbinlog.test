@@ -16,6 +16,6 @@ let outfile=$MYSQLTEST_VARDIR/tmp/binlog_enc.sql;
 --error 1
 exec $MYSQL_BINLOG $local > $outfile;
 exec $MYSQL_BINLOG $local --force-read >> $outfile;
+exec $MYSQL_BINLOG $local --force-read --offset=3 >> $outfile;
 exec $MYSQL_BINLOG $remote >> $outfile;
 remove_file $outfile;
-

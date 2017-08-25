@@ -62,10 +62,7 @@ enum my_aes_opmode
 #endif
 
 /* If bad data discovered during decoding */
-#ifndef MY_AES_BAD_DATA //TODO:Robert:Dirty hack, change it later
 #define MY_AES_BAD_DATA -1
-#endif
-//#define MY_AES_BAD_DATA  -1
 
 /** String representations of the supported AES modes. Keep in sync with my_aes_opmode */
 extern const char *my_aes_opmode_names[];
