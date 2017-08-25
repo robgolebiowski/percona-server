@@ -327,15 +327,15 @@ enum Log_event_type
   /* Prepared XA transaction terminal event similar to Xid */
   XA_PREPARE_LOG_EVENT= 38,
 
-  //TODO:Robert:In MariaDB there is separation between MySQL and MariaDB events
-  //TODO:Robert:Should it be added here too ?
-  //TODO:RobertL In MariaDB it is equal to 166, but in MySQL it is converted to char, which max value is 127
-  START_ENCRYPTION_EVENT= 39, 
+  /* New MySQL/Sun events are to be added right above this comment */
+  MYSQL_EVENTS_END,
 
-  /**
-    Add new events here - right above this comment!
-    Existing events (except ENUM_END_EVENT) should never change their numbers
-  */
+  PERCONA_EVENTS_BEGIN= 100,
+
+  START_ENCRYPTION_EVENT= 101,
+
+  /* Add new Percona Server events here - right above this comment! */
+
   ENUM_END_EVENT /* end marker */
 };
 

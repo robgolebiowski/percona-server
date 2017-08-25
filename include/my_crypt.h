@@ -19,8 +19,6 @@
 #define MY_CRYPT_INCLUDED
 
 #include <my_config.h> /* HAVE_EncryptAes128{Ctr,Gcm} */
-//#include <mysql/service_my_crypt.h>
-//
 
 #ifdef __cplusplus
 extern "C" {
