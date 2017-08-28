@@ -3,11 +3,11 @@
 # the key used to encrypt previous binary logs on master has been lost,
 # and master runs with a different one.
 #
-# The test starts with encrypted binlogs on master. 
+# The test starts with encrypted binlogs on master.
 # It stops replication, generates a few statement and row events
-# on the master, then restarts the server with encrypted binlog, 
-# but with a different value for key 1. 
-# 
+# on the master, then restarts the server with encrypted binlog,
+# but with different key storage file.
+#
 # Then it resumes replication and checks what happens when the master
 # feed the encrypted logs to the slave (slave SQL thread should
 # produce and error).
@@ -16,7 +16,7 @@
 # master binlog log, for which the master has a key, starts replication
 # and checks that it works.
 #
-# Then it resets the slave again, purges binary logs on master up 
+# Then it resets the slave again, purges binary logs on master up
 # to the "good" one, starts replication and checks that it works.
 #
 
@@ -48,7 +48,7 @@ CREATE TABLE table1_to_encrypt (
   pk INT AUTO_INCREMENT PRIMARY KEY,
   ts TIMESTAMP NULL,
   b BLOB
-) ENGINE=MyISAM; 
+) ENGINE=MyISAM;
 
 INSERT INTO table1_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
 INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
@@ -60,17 +60,13 @@ INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
 
 --let SEARCH_FILE= master-bin.0*
 --let SEARCH_PATTERN= table1_to_encrypt
---source include/search_pattern_in_file.inc
+--source include/search_pattern_in_files.inc
 
---echo #######################################################
---echo # Pre-test 2: restart master with a different key value
---echo #######################################################
+--echo ################################################################
+--echo # Pre-test 2: restart master with a different keys' storage file
+--echo ################################################################
 
---write_file $MYSQL_TMP_DIR/master_lose_key.key
-1;00000AAAAAAAAAAAAAAAAAAAAAA00000
-EOF
-
---let $rpl_server_parameters= --file-key-management-filename=$MYSQL_TMP_DIR/master_lose_key.key
+--let $rpl_server_parameters= --loose-keyring-file-data=$MYSQL_TMP_DIR/master_lose_key
 
 --let $rpl_server_number= 1
 --source restart_server.inc
@@ -79,7 +75,7 @@ CREATE TABLE table2_to_encrypt (
   pk INT AUTO_INCREMENT PRIMARY KEY,
   ts TIMESTAMP NULL,
   b BLOB
-) ENGINE=MyISAM; 
+) ENGINE=MyISAM;
 
 INSERT INTO table2_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
@@ -91,7 +87,7 @@ INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 
 --let SEARCH_FILE= master-bin.0*
 --let SEARCH_PATTERN= table2_to_encrypt
---source include/search_pattern_in_file.inc
+--source include/search_pattern_in_files.inc
 
 --echo #####################################################
 --echo # Pre-test 3: restart master again with the right key
@@ -107,7 +103,7 @@ CREATE TABLE table3_to_encrypt (
   pk INT AUTO_INCREMENT PRIMARY KEY,
   ts TIMESTAMP NULL,
   b BLOB
-) ENGINE=MyISAM; 
+) ENGINE=MyISAM;
 
 INSERT INTO table3_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
 INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
@@ -119,28 +115,29 @@ INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
 
 --echo #####################################################
 --echo # Test 1: Check that if master has an encrypted
---echo #         binary log which it cannot decrypt, it 
---echo #         still feeds events to the slave, and SQL 
---echo #         thread produces an expected error upon 
+--echo #         binary log which it cannot decrypt, it
+--echo #         still feeds events to the slave, and SQL
+--echo #         thread produces an expected error upon
 --echo #         receiving these unreadable events .
 --echo #         This behavior is confirmed in MDEV-11323
 --echo #####################################################
 --connection server_2
 
 --disable_connect_log
-START SLAVE IO_THREAD;
---source include/wait_for_slave_io_to_start.inc
-
 START SLAVE SQL_THREAD;
---let $slave_sql_errno= 1594
---source include/wait_for_slave_sql_error.inc
+START SLAVE IO_THREAD;
+--let $slave_io_errno= 1595
+--source include/wait_for_slave_io_error.inc
 --enable_connect_log
 
 # Here we should see only table1_to_encrypt and its contents,
 # because it was logged with the initial key
 --sorted_result
 SHOW TABLES;
-SELECT COUNT(*) FROM table1_to_encrypt;
+--let $wait_condition=SELECT COUNT(*)=1 FROM information_schema.tables WHERE table_name = "table1_to_encrypt"
+--source include/wait_condition.inc
+--let $wait_condition=SELECT COUNT(*)=8 FROM table1_to_encrypt
+--source include/wait_condition.inc
 
 --echo #####################################################
 --echo # Test 2: check that replication works if it starts
@@ -191,6 +188,14 @@ SHOW TABLES;
 --echo ##########
 --echo # Cleanup
 --echo ##########
+
+--connection server_2
+
+--echo #Recreate table_1_to_encrypt and table_2_to_encrypt on slave so the master-slave sync would
+--echo #finished OK.
+
+CREATE TABLE table1_to_encrypt LIKE table3_to_encrypt;
+CREATE TABLE table2_to_encrypt LIKE table3_to_encrypt;
 
 --connection server_1
 
