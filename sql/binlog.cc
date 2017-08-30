@@ -1039,11 +1039,12 @@ public:
       //
       DBUG_ASSERT(output_cache == mysql_bin_log.get_log_file());
 
-      len= *buf_len_p;
+      len= *event_len_p;
 
       if (ctx)
       {
         uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
+        len= write_bytes;
         DBUG_ASSERT(write_bytes > 0);
         
         // update the checksum Przenioslem to z dolu, co sie stanie, jezeli encrypt_and_write sfailuje - zachować stary checksum?
@@ -1069,8 +1070,8 @@ public:
 
     }
 
-    if (ctx)
-    {
+    //if (ctx)
+    //{
       uint32 write_bytes= std::min<uint32>(*buf_len_p, len);
       DBUG_ASSERT(write_bytes > 0);
       if (encrypt_and_write(output_cache, pos, write_bytes))
@@ -1082,20 +1083,32 @@ public:
         //checksum= my_checksum(checksum, *buf_p, write_bytes);
 
       // Step positions.
-      if (is_header)
-      {
-          write_bytes= *buf_len_p;
-      }
+      //
+      if (ctx && is_header)
+        write_bytes+=4;// *buf_len_p;
       else if (have_checksum)
-      {
         checksum= my_checksum(checksum, *buf_p, write_bytes);
-      }
-        
+
+      //if (ctx)
+      //{
+        //if (is_header)
+        //{
+            //write_bytes+=4;// *buf_len_p;
+        //}
+        //else if (have_checksum)
+        //{
+          //checksum= my_checksum(checksum, *buf_p, write_bytes);
+        //}
+      //}
+      //else if (have_checksum)
+        //checksum= my_checksum(checksum, *buf_p, write_bytes);
+
       *buf_p+= write_bytes;
       *buf_len_p-= write_bytes;
       *event_len_p-= write_bytes;
       thd->binlog_bytes_written+= write_bytes;
-    }
+    //}
+    /*
     else
     {
       // write the buffer
@@ -1113,7 +1126,7 @@ public:
       *buf_len_p-= write_bytes;
       *event_len_p-= write_bytes;
       thd->binlog_bytes_written+= write_bytes;
-    }
+    }*/
 
     if (*event_len_p == 0)
     //if (have_checksum)
