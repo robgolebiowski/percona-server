@@ -40,7 +40,6 @@
 
 #include <list>
 #include <string>
-#include "my_aes.h"
 #include "my_rnd.h"
 #include "log_crypt.h"
 
@@ -926,10 +925,6 @@ class Binlog_event_writer
   ha_checksum checksum;
   uint32 end_log_pos;
   THD *thd;
-  /**
-     Encryption data (key, nonce). Only used if ctx != 0.
-  */
-
 public:
   /**
     Constructs a new Binlog_event_writer. Should be called once before
@@ -956,63 +951,20 @@ public:
     ctx= NULL;
   }
 
+  /**
+     Encryption data (key, nonce). Only used if ctx != 0.
+  */
   Binlog_crypt_data *crypto;
-  
-  void *ctx;         ///< Encryption context or 0 if no encryption is needed
+
+  /**
+     Encryption context or 0 if no encryption is needed
+  */
+  void *ctx;
   uint event_len;
-
-  //int maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len)
-  //{
-    //if (len && event_len)
-    //{
-      //DBUG_ASSERT(len >= EVENT_LEN_OFFSET);
-      //if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4))
-        //return 1;
-      //int4store(pos + EVENT_LEN_OFFSET - 4, event_len);
-      //event_len= 0;
-    //}
-    //return 0;
-  //}
-
 
   int encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
   {
     return ::encrypt_and_write(file, pos, len, event_len, ctx);
-    //uchar *dst= 0;
-    //size_t dstsize= 0;
-
-    //if(ctx)
-    //{
-      //dstsize= my_aes_crypt_get_size(MY_AES_ECB, len);
-      //if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
-        //return 1;
-
-         ////if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
-                             ////crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
-
-      //uint dstlen;
-      //if (my_aes_crypt_update(ctx, pos, len, dst, &dstlen))
-        //goto err;
-
-      //if (maybe_write_event_len(file, dst, dstlen))
-        //return 1;
-      //pos= dst;
-      //len= dstlen;
-    //}
-    //else
-    //{
-      //dst = 0;
-    //}
-
-    //if (my_b_safe_write(file, pos, len))
-      //goto err;
-
-    //my_safe_afree(dst, dstsize, 512);
-    //return 0;
-  //err:
-    //my_safe_afree(dst, dstsize, 512);
-    //return 1;
-    
   }
 
 
@@ -1045,74 +997,6 @@ public:
     @retval true Error, i.e., my_b_write failed.
     @retval false Success.
   */
-  //bool write_event_part(uchar **buf_p, uint32 *buf_len_p, uint32 *event_len_p)
-  //{
-    //DBUG_ENTER("Binlog_event_writer::write_event_part");
-
-    //if (*buf_len_p == 0)
-      //DBUG_RETURN(false);
-
-    //// This is the beginning of an event
-    //if (*event_len_p == 0)
-    //{
-      //// Caller must ensure that the first part of the event contains
-      //// a full event header.
-      //DBUG_ASSERT(*buf_len_p >= LOG_EVENT_HEADER_LEN);
-
-      //// Read event length
-      //*event_len_p= uint4korr(*buf_p + EVENT_LEN_OFFSET);
-
-      //// Increase end_log_pos
-      //end_log_pos+= *event_len_p;
-
-      //// Change event length if checksum is enabled
-      //if (have_checksum)
-      //{
-        ////TODO:To jest juz uwzglednione
-        ////int4store(*buf_p + EVENT_LEN_OFFSET,
-                  ///[>event_len_p + BINLOG_CHECKSUM_LEN);
-        //// end_log_pos is shifted by the checksum length
-        //end_log_pos+= BINLOG_CHECKSUM_LEN;
-      //}
-
-      //// Store end_log_pos
-      //// TODO:Robert:To nie jest potrzebne
-      ////int4store(*buf_p + LOG_POS_OFFSET, end_log_pos);
-    //}
-
-    //// write the buffer
-    //uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
-    //DBUG_ASSERT(write_bytes > 0);
-    //if (my_b_write(output_cache, *buf_p, write_bytes))
-      //DBUG_RETURN(true);
-
-    //// update the checksum
-    ////if (have_checksum)
-      ////checksum= my_checksum(checksum, *buf_p, write_bytes);
-
-    //// Step positions.
-    //*buf_p+= write_bytes;
-    //*buf_len_p-= write_bytes;
-    //*event_len_p-= write_bytes;
-    //thd->binlog_bytes_written+= write_bytes;
-
-    //if (have_checksum)
-    //{
-      //// store checksum
-      //if (*event_len_p == 0)
-      //{
-        ////char checksum_buf[BINLOG_CHECKSUM_LEN];
-        ////int4store(checksum_buf, checksum);
-        ////if (my_b_write(output_cache, checksum_buf, BINLOG_CHECKSUM_LEN))
-          ////DBUG_RETURN(true);
-        //thd->binlog_bytes_written+= BINLOG_CHECKSUM_LEN;
-        ////checksum= initial_checksum;
-      //}
-    //}
-
-    //DBUG_RETURN(false);
-  //}
-
   bool write_event_part(uchar **buf_p, uint32 *buf_len_p, uint32 *event_len_p)
   {
     DBUG_ENTER("Binlog_event_writer::write_event_part");
@@ -1250,7 +1134,7 @@ public:
       if (ctx) //TODO:Robert : Jak oznaczyć czy jest szyfrowane ?
       {
         uint dstlen;
-        uchar dst[MY_AES_BLOCK_SIZE*2];
+        uchar dst[MY_CRYPT_AES_BLOCK_SIZE*2];
         if (my_aes_crypt_finish(ctx, dst, &dstlen))
           return 1;
         if (maybe_write_event_len(output_cache, dst, dstlen, event_len) || my_b_safe_write(output_cache, dst, dstlen))
