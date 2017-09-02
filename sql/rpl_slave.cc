@@ -883,6 +883,7 @@ read_rotate_from_relay_log(char *filename, char *master_log_file,
       if (fd_ev_p->start_decryption((Start_encryption_log_event*) ev))
       {
         sql_print_error("Could not initialize decryption of binlog.");
+        done= true;
         ret= ERROR;
       }
       break;
@@ -6504,7 +6505,8 @@ bool mts_recovery_groups(Relay_log_info *rli)
       p_fdle->reset_crypto();
       /*
         Looking for the actual relay checksum algorithm that is present in
-        a FD at head events of the relay log.
+        a FD at head events of the relay log. We also check if relay log is
+        encrypted by checking for the presence of START_ENCRYPTION_EVENT.
       */
       if (!checksum_detected)
       {
@@ -8449,10 +8451,15 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
       to the last skipped transaction. Note that,
       we update only the positions and not the file names, as a ROTATE
       EVENT from the master prior to this will update the file name.
+
+      When master's binlog is encrypted it will also send heartbeat
+      event after reading Start_encryption_event from the binlog.
+      As Start_encryption_event is not send to slave, the master
+      informs the slave to update it's master_log_pos by sending
+      heartbeat event.
     */
-    //if (mi->is_auto_position()  && mi->get_master_log_pos() <
-    if (mi->get_master_log_pos() <
-       hb.common_header->log_pos &&  mi->get_master_log_name() != NULL)
+    if (mi->get_master_log_pos() < hb.common_header->log_pos &&
+        mi->get_master_log_name() != NULL)
     {
 
       DBUG_ASSERT(memcmp(const_cast<char*>(mi->get_master_log_name()),
@@ -8471,14 +8478,6 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
       if (write_ignored_events_info_to_relay_log(mi->info_thd, mi))
         goto end;
     }
-
-    //if (mi->get_master_log_pos() > hb.common_header->log_pos)
-    //{
-      //hb.common_header->log_pos+= mi->get_master_log_pos();
-      //mi->set_master_log_pos(hb.common_header->log_pos);
-      //inc_pos= 0;
-    //}
-
 
     /* 
        compare local and event's versions of log_file, log_pos.
@@ -8698,7 +8697,7 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
   {
     bool is_error= false;
     /* write the event to the relay log */
-    if (likely(!rli->relay_log.write_event_buffer((uchar*)buf, event_len, mi)))
+    if (likely(rli->relay_log.append_buffer(reinterpret_cast<uchar*>(const_cast<char*>(buf)), event_len, mi) == 0))
     {
       mi->set_master_log_pos(mi->get_master_log_pos() + inc_pos);
       DBUG_PRINT("info", ("master_log_pos: %lu", (ulong) mi->get_master_log_pos()));

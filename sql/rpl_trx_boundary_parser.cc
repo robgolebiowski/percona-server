@@ -185,7 +185,6 @@ Transaction_boundary_parser::get_event_boundary_type(
     case binary_log::INTVAR_EVENT:
     case binary_log::RAND_EVENT:
     case binary_log::USER_VAR_EVENT:
-    //case binary_log::START_ENCRYPTION_EVENT:  
       boundary_type= EVENT_BOUNDARY_TYPE_PRE_STATEMENT;
       break;
 
@@ -230,7 +229,7 @@ Transaction_boundary_parser::get_event_boundary_type(
     case binary_log::EXEC_LOAD_EVENT:
     case binary_log::INCIDENT_EVENT:
     case binary_log::TRANSACTION_CONTEXT_EVENT:
-    case binary_log::START_ENCRYPTION_EVENT:  
+    case binary_log::START_ENCRYPTION_EVENT:
       boundary_type= EVENT_BOUNDARY_TYPE_IGNORE;
       break;
 

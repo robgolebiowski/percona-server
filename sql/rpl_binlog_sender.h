@@ -22,7 +22,7 @@
 #include "binlog_event.h"     // enum_binlog_checksum_alg, Log_event_type
 #include "mysqld_error.h"     // ER_*
 #include "sql_error.h"        // Diagnostics_area
-
+#include "boost/move/unique_ptr.hpp"
 
 /**
   The major logic of dump thread is implemented in this class. It sends
@@ -141,6 +141,8 @@ private:
    */
   const static float PACKET_SHRINK_FACTOR;
 
+  boost::movelib::unique_ptr<Format_description_log_event> m_fdle;
+
   uint32 m_flag;
   /*
     It is true if any plugin requires to observe the transmission for each event.
@@ -255,8 +257,6 @@ private:
      @return It returns 0 if succeeds, otherwise 1 is returned.
   */
   int send_format_description_event(IO_CACHE *log, my_off_t start_pos);
-  //TODO:Robert:Temporary added here
-  Format_description_log_event *fdle; //TODO:Robert: Rename to m_fdle
 
   /**
      It sends a heartbeat to the client.

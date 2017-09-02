@@ -564,16 +564,14 @@ int Relay_log_info::init_relay_log_pos(const char* log,
                                      linfo.log_file_name,errmsg)) < 0)
       goto err;
     cur_log = &cache_buf;
-    //rli_description_event->reset_crypto();
   }
   /*
     In all cases, check_binlog_magic() has been called so we're at offset 4 for
     sure.
   */
-  if (/*true*/pos > BIN_LOG_HEADER_SIZE) /* If pos<=4, we stay at 4 */
+  if (pos > BIN_LOG_HEADER_SIZE) /* If pos<=4, we stay at 4 */
   {
     Log_event* ev;
-    //ulonglong move_to= pos; //TODO:Robert:Not needed
     while (keep_looking_for_fd)
     {
       /*
@@ -607,7 +605,6 @@ int Relay_log_info::init_relay_log_pos(const char* log,
         Format_description_log_event *old= rli_description_event;
         DBUG_PRINT("info",("found Format_description_log_event"));
         ((Format_description_log_event*)ev)->copy_crypto_data(old);
-
         set_rli_description_event((Format_description_log_event *)ev);
         /*
           As ev was returned by read_log_event, it has passed is_valid(), so
@@ -634,18 +631,13 @@ int Relay_log_info::init_relay_log_pos(const char* log,
       }
       else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
       {
-        //TODO:Robert:Temporary disabled
         if (rli_description_event->start_decryption((Start_encryption_log_event*) ev))
         {
-          //TODO:Robert: is this correct, the goto us based on I/O error reading event, above ?
           *errmsg= "Unable to set up decryption of binlog.";
           delete ev;
           goto err;
-          //delete fdev;
-          //return NULL;
         }
         delete ev;
-        //move_to= my_b_tell(cur_log);
       }
       else
       {
@@ -657,7 +649,7 @@ int Relay_log_info::init_relay_log_pos(const char* log,
         delete ev;
       }
     }
-    my_b_seek(cur_log,(off_t)pos/*move_to*/);
+    my_b_seek(cur_log,(off_t)pos);
 #ifndef DBUG_OFF
   {
     char llbuf1[22], llbuf2[22];
@@ -2258,8 +2250,7 @@ a file name for --relay-log-index option.", opt_relaylog_index_name);
       sql_print_error("Failed in open_log() called from Relay_log_info::rli_init_info().");
       DBUG_RETURN(1);
     }
-    //TODO:Robert://mi->get_mi_description_event()->reset_crypto();
-    
+
     mysql_mutex_unlock(log_lock);
 
   }

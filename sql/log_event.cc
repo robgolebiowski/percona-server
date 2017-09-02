@@ -519,14 +519,8 @@ static bool write_str_at_most_255_bytes(IO_CACHE *file, const char *str,
 {
   uchar tmp[1];
   tmp[0]= (uchar) length;
-  //TODO:Robert: the problem here is that we cannot access encrypt_and_write from here
-	    //encrypt_and_write(file,(uchar*) &(data_info.opt_flags), 1, event_len_to_crypt, ctx));
-  //return (my_b_safe_write(file, tmp, sizeof(tmp)) || 
-	  //my_b_safe_write(file, (uchar*) str, length));
-
-  return (encrypt_and_write(file, tmp, sizeof(tmp), event_len_to_crypt, ctx) || 
+  return (encrypt_and_write(file, tmp, sizeof(tmp), event_len_to_crypt, ctx) ||
 	  encrypt_and_write(file, (uchar*) str, length, event_len_to_crypt, ctx));
-
 }
 
 /**
@@ -695,7 +689,6 @@ Log_event::Log_event(THD* thd_arg, uint16 flags_arg,
   common_header->when= thd->start_time;
   common_header->log_pos= 0;
   common_header->flags= flags_arg;
-
   crypto = NULL;
   ctx= NULL;
 }
@@ -716,7 +709,6 @@ Log_event::Log_event(Log_event_header* header, Log_event_footer *footer,
 {
   server_id=	::server_id;
   common_header->unmasked_server_id= server_id;
-
   crypto = NULL;
   ctx= NULL;
 }
@@ -745,7 +737,6 @@ Log_event::Log_event(Log_event_header *header,
 #else
   server_id = common_header->unmasked_server_id;
 #endif
-
   crypto = NULL;
   ctx= NULL;
 }
@@ -997,9 +988,7 @@ bool Log_event::wrapper_my_b_safe_write(IO_CACHE* file, const uchar* buf, size_t
   if (need_checksum() && size != 0)
     crc= checksum_crc32(crc, buf, size);
 
-  //TODO:Robert: Changed by me.
-  //return my_b_safe_write(file, buf, size);
-  return encrypt_and_write(file, buf, size); 
+  return encrypt_and_write(file, buf, size);
 }
 
 bool Log_event::write_footer(IO_CACHE* file) 
@@ -1012,22 +1001,16 @@ bool Log_event::write_footer(IO_CACHE* file)
   {
     uchar buf[BINLOG_CHECKSUM_LEN];
     int4store(buf, crc);
-    //TODO:Robert:Temporary disabled
     if (encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
-      return ER_ERROR_ON_WRITE;
-    //return (my_b_safe_write(file, (uchar*) buf, sizeof(buf)));
+      return 1;
   }
-  //TODO:Robert: Temporary disabled
-  if (ctx) //TODO:Robert : Jak oznaczyć czy jest szyfrowane ?
+  if (ctx)
   {
     uint dstlen;
     uchar dst[MY_CRYPT_AES_BLOCK_SIZE*2];
-    if (my_aes_crypt_finish(ctx, dst, &dstlen))
+    if (my_aes_crypt_finish(ctx, dst, &dstlen) || maybe_write_event_len(file, dst, dstlen, event_len) ||
+        my_b_safe_write(file, dst, dstlen))
       return 1;
-    if (maybe_write_event_len(file, dst, dstlen, event_len) || my_b_safe_write(file, dst, dstlen))
-      return ER_ERROR_ON_WRITE;
-   // if (my_b_safe_write(file, dst, crypto->dst_len)) //TODO:Robert:Na razie to zostawiam dla kompatybilności
-   //   return 1;//DBUG_RETURN(ER_ERROR_ON_WRITE);
   }
   return 0;
 }
@@ -1074,65 +1057,14 @@ uint32 Log_event::write_header_to_memory(uchar *buf)
   return LOG_EVENT_HEADER_LEN;
 }
 
-/*
-  as soon as encryption produces the first output block, write event_len
-  where it should be in a valid event header
-*/
-
-//int Log_event::maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len)
-//{
-  //if (len && event_len)
-  //{
-    //DBUG_ASSERT(len >= EVENT_LEN_OFFSET);
-    //if (my_b_safe_write(file, pos + EVENT_LEN_OFFSET - 4, 4)) 
-      //return 1;
-    //int4store(pos + EVENT_LEN_OFFSET - 4, event_len);
-    //event_len= 0;
-  //}
-  //return 0;
-//}
-
 int Log_event::encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
 {
   return ::encrypt_and_write(file, pos, len, event_len, ctx);
-  //uchar *dst= 0;
-  //size_t dstsize= 0;
-
-  //if(ctx)
-  //{
-    //dstsize= my_aes_crypt_get_size(MY_AES_CBC, len);
-    //if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
-      //return 1;
-
-    //uint dstlen;
-    //if (my_aes_crypt_update(ctx, pos, len, dst, &dstlen))
-      //goto err;
-
-    //if (maybe_write_event_len(file, dst, dstlen))
-      //return 1;
-    //pos= dst;
-    //len= dstlen;
-  //}
-  //else
-  //{
-    //dst = 0;
-  //}
-
-  //if (my_b_safe_write(file, pos, len))
-    //goto err;
-
-  //my_safe_afree(dst, dstsize, 512);
-  //return 0;
-//err:
-  //my_safe_afree(dst, dstsize, 512);
-  //return 1;
-  
 }
 
 bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 {
   uchar header[LOG_EVENT_HEADER_LEN];
-  bool ret;
   DBUG_ENTER("Log_event::write_header");
 
   /* Store number of bytes that will be written by this event */
@@ -1190,12 +1122,20 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 
   write_header_to_memory(header);
 
-  //TODO:Robert:Should this be executed even when res is true (below?)
   bool is_format_decription_and_need_checksum= need_checksum() &&
        ((common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0);
 
-  //if (need_checksum() &&
-      //(common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0)
+  /*
+    Update the checksum.
+
+    In case this is a Format_description_log_event, we need to clear
+    the LOG_EVENT_BINLOG_IN_USE_F flag before computing the checksum,
+    since the flag will be cleared when the binlog is closed.  On
+    verification, the flag is dropped before computing the checksum
+    too. We need to compute the checksum before we encrypt the header,
+    in case binlog encryption is turned on. 
+  */
+
   if (is_format_decription_and_need_checksum)
   {
     common_header->flags &= ~LOG_EVENT_BINLOG_IN_USE_F;
@@ -1213,14 +1153,12 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
   uchar *pos= header;
   size_t len=sizeof(header);
 
-  //TODO:Robert:Ten kod jest wzięty z Log_event_writer::write_header
   if (ctx)
   {
     std::string info("encrypting event ");
     info += get_type_code();
     const char* info_str= info.c_str();
     DBUG_PRINT("info", ("%s", info_str));
-    //DBUG_PRINT("info", ("write_event_buffer is using ctx"));
 
     uchar iv[BINLOG_IV_LENGTH];
     crypto->set_iv(iv, my_b_safe_tell(file));
@@ -1231,11 +1169,6 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
                                crypto->key, crypto->key_length, iv, sizeof(iv))))
       DBUG_RETURN(res);
 
-    //if (encryption_ctx_init(ctx, crypto->key, crypto->key_length,
-           //iv, sizeof(iv), ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-           //crypto->key_version))
-      //DBUG_RETURN(1);
-
     DBUG_ASSERT(len >= LOG_EVENT_HEADER_LEN);
     event_len= uint4korr(pos + EVENT_LEN_OFFSET);
     DBUG_ASSERT(event_len >= len);
@@ -1243,53 +1176,8 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
     pos+= 4;
     len-= 4;
   }
-  else
-  {
-    std::string info("not encrypting event ");
-    info += get_type_code();
-    info += '\n';
-    const char* info_str= info.c_str();
-    DBUG_PRINT("info", ("%s", info_str));
 
-  
-  }
-
-  //uchar *pos= header;
-  //size_t len=sizeof(header);
-
-  //if (crypto != NULL && crypto->scheme == 1)
-  //{
-    //uchar iv[BINLOG_IV_LENGTH];
-    //crypto->set_iv(iv, my_b_safe_tell(file));
-    //event_len= uint4korr(pos + EVENT_LEN_OFFSET);
-    ////DBUG_ASSERT(event_len >= len); 
-    //memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
-    //pos+= 4;
-    //len-= 4;
-  //}
-  //DBUG_RETURN(encrypt_and_write(file, pos, len));
-  //ret= my_b_safe_write(file, header, LOG_EVENT_HEADER_LEN);
-  ret = encrypt_and_write(file, pos, len);
-
-  /*
-    Update the checksum.
-
-    In case this is a Format_description_log_event, we need to clear
-    the LOG_EVENT_BINLOG_IN_USE_F flag before computing the checksum,
-    since the flag will be cleared when the binlog is closed.  On
-    verification, the flag is dropped before computing the checksum
-    too.
-  */
-  //TODO:Robert: Moved above - before pos (header is changed)
-  //if (need_checksum() &&
-      //(common_header->flags & LOG_EVENT_BINLOG_IN_USE_F) != 0)
-  //{
-    //common_header->flags &= ~LOG_EVENT_BINLOG_IN_USE_F;
-    //int2store(header + FLAGS_OFFSET, common_header->flags);
-  //}
-  //crc= my_checksum(crc, header, LOG_EVENT_HEADER_LEN);
-
-  DBUG_RETURN( ret);
+  DBUG_RETURN(encrypt_and_write(file, pos, len));
 }
 
 
@@ -1301,8 +1189,6 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 */
 
 int Log_event::read_log_event(IO_CACHE* file, String* packet,
-                              /*TODO:Robert:this should be const - refactor Binlog_crypt_data*/
-                              //Binlog_crypt_data *crypto_data,
                               const Format_description_log_event *fdle,
                               mysql_mutex_t* log_lock,
                               enum_binlog_checksum_alg checksum_alg_arg,
@@ -1355,8 +1241,6 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
 	     LOG_READ_TOO_LARGE);
     goto end;
   }
-
-
 
   /*
     If the event header wasn't passed, the caller doesn't know the event size
@@ -1424,14 +1308,11 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
     {
       packet->length(packet->length() + data_len);
 
-      if (fdle->crypto_data.scheme)
+      if (fdle != NULL && fdle->crypto_data.scheme)
       {
-        DBUG_PRINT("info", ("read_log_event is using ctx"));
-
-
         ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
         uchar iv[BINLOG_IV_LENGTH];
-        fdle->crypto_data.set_iv(iv, my_b_tell(file) - true_data_len); //TODO:Robert:To się zmieniło - możliwe, że iv jest już prawidłowe
+        fdle->crypto_data.set_iv(iv, my_b_tell(file) - true_data_len);
 
         char *newpkt= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
         if (!newpkt)
@@ -1443,39 +1324,13 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
         uchar *dst= (uchar*)newpkt + ev_offset;
         memcpy(src + EVENT_LEN_OFFSET, src, 4);
 
-//int my_aes_decrypt(const unsigned char *source, uint32 source_length,
-                   //unsigned char *dest,
-                   //const unsigned char *key, uint32 key_length,
-                   //enum my_aes_opmode mode, const unsigned char *iv,
-                   //bool padding = true);
-        //if ((length= my_aes_decrypt(cipher, cipher_len, (unsigned char *) str,
-                                    //my_key, LOGIN_KEY_LEN, my_aes_128_ecb, NULL)) < 0)
-        //{
-          //[> Attempt to decrypt failed. <]
-          //return 0;
-        //}
-        //str[length]= 0;
-
-        //if (my_aes_crypt(MY_AES_ECB, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, data_len - 4, dst + 4, &dstlen,
-            //crypto_data->key, crypto_data->key_length, iv, sizeof(iv)))
         if (my_aes_crypt(MY_AES_CBC, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, true_data_len - 4, dst + 4, &dstlen,
             fdle->crypto_data.key, fdle->crypto_data.key_length, iv, sizeof(iv)))
- 
-
-            //sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
-            //ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
-
-
-        //TODO:Robert:Tymczasowo wyNULLowałem iv
-        //if ((dstlen = my_aes_decrypt(src + 4, true_data_len - 4, dst + 4, 
-                           //crypto_data->key, crypto_data->key_length, my_aes_128_ecb, NULL)) < 0)
-                ////sizeof(iv), ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD,
-                //ENCRYPTION_KEY_SYSTEM_DATA, fdle->crypto_data.key_version))
         {
           my_free(newpkt);
           DBUG_RETURN(LOG_READ_DECRYPT);
         }
-        DBUG_ASSERT((uint)dstlen == true_data_len - 4); //TODO:Robert: Can stay as a comment - We have checked that dstlen is greater than 0, so we can safetly cast
+        DBUG_ASSERT((uint)dstlen == true_data_len - 4); //We have checked that dstlen is greater than 0, so we can safetly cast
         memcpy(dst, dst + EVENT_LEN_OFFSET, 4);
         int4store(dst + EVENT_LEN_OFFSET, true_data_len);
 
@@ -1507,7 +1362,6 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
           DBUG_PRINT("info", ("Corrupt the event at Log_event::read_log_event: byte on position %d", debug_cor_pos));
 	}
       );
-
       /*
         CRC verification of the Dump thread
       */
@@ -1634,19 +1488,16 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
   if (fdle->crypto_data.scheme)
   {
 #if defined(MYSQL_CLIENT)
+    //Clients do not have access to keyring and thus cannot decrypt
+    //binlog events
     error ="decryption error";
     goto err;
 #endif
-    DBUG_PRINT("info", ("read_log_event is using ctx"));
-
-    //ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
     uchar iv[BINLOG_IV_LENGTH];
-    fdle->crypto_data.set_iv(iv, my_b_tell(file) - data_len); //TODO:Robert:To się zmieniło - możliwe, że iv jest już prawidłowe
+    fdle->crypto_data.set_iv(iv, my_b_tell(file) - data_len);
 
     char *dst_buf= (char*)my_malloc(key_memory_log_event, data_len + 1, MYF(MY_WME));
     dst_buf[data_len]=0;
-    //if (!newpkt)
-      //DBUG_RETURN(LOG_READ_MEM);
     memcpy(dst_buf, buf, data_len);
 
     uint dstlen;
@@ -1654,44 +1505,20 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     uchar *dst= (uchar*)dst_buf;
     memcpy(src + EVENT_LEN_OFFSET, src, 4);
 
-//int my_aes_decrypt(const unsigned char *source, uint32 source_length,
-               //unsigned char *dest,
-               //const unsigned char *key, uint32 key_length,
-               //enum my_aes_opmode mode, const unsigned char *iv,
-               //bool padding = true);
-    //if ((length= my_aes_decrypt(cipher, cipher_len, (unsigned char *) str,
-                                //my_key, LOGIN_KEY_LEN, my_aes_128_ecb, NULL)) < 0)
-    //{
-      //[> Attempt to decrypt failed. <]
-      //return 0;
-    //}
-    //str[length]= 0;
-
-    //if (my_aes_crypt(MY_AES_ECB, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, data_len - 4, dst + 4, &dstlen,
-        //crypto_data->key, crypto_data->key_length, iv, sizeof(iv)))
     if (my_aes_crypt(MY_AES_CBC, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, data_len - 4, dst + 4, &dstlen,
         fdle->crypto_data.key, fdle->crypto_data.key_length, iv, sizeof(iv)))
     {
       my_free(dst_buf);
-      //DBUG_RETURN(LOG_READ_DECRYPT);
       error ="decryption error";
       goto err;
     }
-    DBUG_ASSERT((uint)dstlen == data_len - 4); //TODO:Robert: Can stay as a comment - We have checked that dstlen is greater than 0, so we can safetly cast
+    DBUG_ASSERT((uint)dstlen == data_len - 4); //We have checked that dstlen is greater than 0, so we can safetly cast
     memcpy(dst, dst + EVENT_LEN_OFFSET, 4);
     int4store(dst + EVENT_LEN_OFFSET, data_len);
 
     my_free(buf);
     buf= dst_buf;
-    //packet->length(0);  // size of the content
-    //packet->qs_append('\0'); // Set this as an OK packet
-
-    //packet->append(newpkt, true_data_len + ev_offset);
-    //packet->reset(newpkt, true_data_len + ev_offset, true_data_len + ev_offset + 1,
-                  //&my_charset_bin);
   }
-
-
 
 #if defined(MYSQL_CLIENT)
   if (f && f(&buf, &data_len, fdle))
@@ -3583,7 +3410,6 @@ int Log_event::apply_event(Relay_log_info *rli)
 
   if (rli->is_mts_recovery())
   {
-    DBUG_PRINT("info", ("Robert: Its recovery"));
     bool skip=
       bitmap_is_set(&rli->recovery_groups, rli->mts_recovery_index) &&
       (get_mts_execution_mode(::server_id,
@@ -3613,9 +3439,6 @@ int Log_event::apply_event(Relay_log_info *rli)
   {
     if (parallel)
     {
-      DBUG_PRINT("info", ("Robert: In parallel"));
-      DBUG_PRINT("info", ("Robert: actual_exec_mode=%d",actual_exec_mode));
-
       /*
          There are two classes of events that Coordinator executes
          itself. One e.g the master Rotate requires all Workers to finish up
@@ -3632,7 +3455,7 @@ int Log_event::apply_event(Relay_log_info *rli)
           Workers to sync.
         */
         if (rli->curr_group_da.size() > 0 &&
-            is_mts_db_partitioned(rli)) //&& get_type_code() != binary_log::START_ENCRYPTION_EVENT)
+            is_mts_db_partitioned(rli))
         {
           char llbuff[22];
           /*
@@ -5543,7 +5366,6 @@ Start_encryption_log_event::Start_encryption_log_event(
   if ((int)event_len ==
      (int)LOG_EVENT_MINIMAL_HEADER_LEN + (int)Start_encryption_log_event::get_data_size())
   {
-    //buf += LOG_EVENT_MINIMAL_HEADER_LEN;
     crypto_scheme = *(uchar*)buf;
     key_version = uint4korr(buf + BINLOG_CRYPTO_SCHEME_LENGTH);
     memcpy(nonce,
@@ -5559,9 +5381,7 @@ Start_encryption_log_event::Start_encryption_log_event(
 #if defined(HAVE_REPLICATION) && !defined(MYSQL_CLIENT)
 int Start_encryption_log_event::do_apply_event(Relay_log_info const *rli)
 {
-  //TODO:Robert:Temporary disabled
   return rli->get_rli_description_event()->start_decryption(this);
-  //return 1; //TODO:Robert:Needs to be removed
 }
 
 int Start_encryption_log_event::do_update_pos(Relay_log_info *rli)
@@ -5834,18 +5654,6 @@ int Format_description_log_event::do_update_pos(Relay_log_info *rli)
   }
 }
 
-//TODO:Robert: Moved to log_event.h, as mysqlbinlog also is using this function and is not linking with log_event.cc
-//bool Format_description_log_event::start_decryption(Start_encryption_log_event* sele)
-//{
-  //DBUG_ASSERT(crypto_data.scheme == 0);
-
-  //if (!sele->is_valid())
-    //return 1;
-
-  //memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
-  //return crypto_data.init(sele->crypto_scheme, sele->key_version);
-//}
-
 Log_event::enum_skip_reason
 Format_description_log_event::do_shall_skip(Relay_log_info *rli)
 {
@@ -6037,7 +5845,6 @@ bool Load_log_event::write_data_header(IO_CACHE* file)
   buf[L_TBL_LEN_OFFSET] = (char)table_name_len;
   buf[L_DB_LEN_OFFSET] = (char)db_len;
   int4store(buf + L_NUM_FIELDS_OFFSET, num_fields);
-  //return my_b_safe_write(file, (uchar*)buf, Binary_log_event::LOAD_HEADER_LEN) != 0;
   return encrypt_and_write(file, (uchar*)buf, Binary_log_event::LOAD_HEADER_LEN) != 0;
 }
 
@@ -9252,7 +9059,6 @@ bool sql_ex_info::write_data(IO_CACHE* file)
                                         (uint) data_info.line_start_len, event_len_to_crypt, ctx) ||
 	    write_str_at_most_255_bytes(file, data_info.escaped,
                                         (uint) data_info.escaped_len, event_len_to_crypt, ctx) ||
-	    //my_b_safe_write(file,(uchar*) &(data_info.opt_flags), 1));
 	    encrypt_and_write(file,(uchar*) &(data_info.opt_flags), 1, event_len_to_crypt, ctx));
   }
   else
@@ -9269,7 +9075,6 @@ bool sql_ex_info::write_data(IO_CACHE* file)
     old_ex.escaped=    *(data_info.escaped);
     old_ex.opt_flags=  data_info.opt_flags;
     old_ex.empty_flags= data_info.empty_flags;
-    //return my_b_safe_write(file, (uchar*) &old_ex, sizeof(old_ex)) != 0;
     return encrypt_and_write(file, (uchar*) &old_ex, sizeof(old_ex), event_len_to_crypt, ctx) != 0;
   }
 }
@@ -13337,11 +13142,7 @@ Incident_log_event::write_data_header(IO_CACHE *file)
 #ifndef MYSQL_CLIENT
   DBUG_RETURN(wrapper_my_b_safe_write(file, buf, sizeof(buf)));
 #else
-   //TODO:Robert: There is no distinction on MYSQL_CLIENT and not
-   //I am not sure if there should be encrypt_and write for a client ...
-   //This is used by mysqlbinlog
    DBUG_RETURN(my_b_safe_write(file, buf, sizeof(buf)));
-   //DBUG_RETURN(encrypt_and_write(file, buf, sizeof(buf)));
 #endif
 }
 
@@ -13357,7 +13158,6 @@ Incident_log_event::write_data_body(IO_CACHE *file)
     crc= checksum_crc32(crc, (uchar*) message, message_length);
     // todo: report a bug on write_str accepts uint but treats it as uchar
   }
-  //TODO:Robert:This needs to be changed
   DBUG_RETURN(write_str_at_most_255_bytes(file, message, (uint) message_length, event_len, ctx));
 }
 
@@ -13470,7 +13270,6 @@ Rows_query_log_event::write_data_body(IO_CACHE *file)
    m_rows_query length will be stored using only one byte, but on read
    that length will be ignored and the complete query will be read.
   */
-
   DBUG_RETURN(write_str_at_most_255_bytes(file, m_rows_query,
               strlen(m_rows_query), event_len, ctx));
 }

@@ -618,22 +618,21 @@ public:
   */
   ha_checksum crc;
 
-  //TODO:Robert:Czy to powinno być tutaj ? W mariadb jest w private
   /**
      Encryption data (key, nonce). Only used if ctx != 0.
   */
   Binlog_crypt_data *crypto;
-  
-  void *ctx;         ///< Encryption context or 0 if no encryption is needed
+
+  /**
+     Encryption context or 0 if no encryption is needed
+  */
+  void *ctx;
   
   /**
      Event length to be written into the next encrypted block
   */
   uint event_len;
-  //int write_internal(const uchar *pos, size_t len);
   int encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len);
-  //int encrypt_and_write(const uchar *pos, size_t len);
-  //int maybe_write_event_len(IO_CACHE *file, uchar *pos, size_t len);
 
   /**
     Index in @c rli->gaq array to indicate a group that this event is
@@ -750,6 +749,7 @@ public:
     given binlog is still active.
 
     @param[in]  file                log file to be read
+    @param[in]  fdle                format description log event
     @param[out] packet              packet to hold the event
     @param[in]  lock                the lock to be used upon read
     @param[in]  checksum_alg_arg    the checksum algorithm
@@ -767,14 +767,13 @@ public:
     @retval LOG_READ_TRUNC      only a partial event could be read
     @retval LOG_READ_TOO_LARGE  event too large
    */
-   static int read_log_event(IO_CACHE* file, String* packet,
-                             //Binlog_crypt_data *crypto_data,
-                             const Format_description_log_event *fdle,
-                             mysql_mutex_t* log_lock,
-                             enum_binlog_checksum_alg checksum_alg_arg,
-                             const char *log_file_name_arg= NULL,
-                             bool* is_binlog_active= NULL,
-                             char *event_header= NULL);
+  static int read_log_event(IO_CACHE* file, String* packet,
+                            const Format_description_log_event *fdle,
+                            mysql_mutex_t* log_lock,
+                            binary_log::enum_binlog_checksum_alg checksum_alg_arg,
+                            const char *log_file_name_arg= NULL,
+                            bool* is_binlog_active= NULL,
+                            char *event_header= NULL);
 
   /*
     init_show_field_list() prepares the column names and types for the
@@ -987,8 +986,7 @@ public:
       get_type_code() == binary_log::ROTATE_EVENT            ||
       get_type_code() == binary_log::SLAVE_EVENT             ||
       get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT||
-      get_type_code() == binary_log::INCIDENT_EVENT;//          ||
-      //get_type_code() == binary_log::START_ENCRYPTION_EVENT;
+      get_type_code() == binary_log::INCIDENT_EVENT;
   }
 
 private:
@@ -1080,8 +1078,6 @@ private:
           to not feed them to workers because that confuses
           get_slave_worker.
         */
-        (get_type_code() == binary_log::START_ENCRYPTION_EVENT) ||
-
         (get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT) ||
         /*
           Rotate_log_event can occur in the middle of a transaction.
@@ -1091,7 +1087,8 @@ private:
         */
         (get_type_code() == binary_log::ROTATE_EVENT &&
          ((server_id == (uint32) ::server_id) ||
-          (common_header->log_pos == 0 && mts_in_group))))
+          (common_header->log_pos == 0 && mts_in_group))) ||
+        (get_type_code() == binary_log::START_ENCRYPTION_EVENT))
       return EVENT_EXEC_ASYNC;
     else if (is_mts_sequential_exec(is_dbname_type))
       return EVENT_EXEC_SYNC;
@@ -1717,24 +1714,18 @@ class Start_encryption_log_event : public Binary_log_event, public Log_event
 {
 public:
 #ifdef MYSQL_SERVER
-  //TODO:Robert:Temporary disabled - Log_event does not have a default constructor -
-  //need to check how this is used before I do something about this
-  
   Start_encryption_log_event(uint crypto_scheme_arg, uint key_version_arg,
                              const uchar* nonce_arg)
   : Binary_log_event(binary_log::START_ENCRYPTION_EVENT),
     Log_event(header(), footer(), Log_event::EVENT_NO_CACHE, Log_event::EVENT_IMMEDIATE_LOGGING),
     crypto_scheme(crypto_scheme_arg), key_version(key_version_arg)
   {
-    //
-    //cache_type = Log_event::EVENT_NO_CACHE;
     DBUG_ASSERT(crypto_scheme == 1);
     is_valid_param= crypto_scheme == 1;
     memcpy(nonce, nonce_arg, BINLOG_NONCE_LENGTH);
   }
 
   bool write_data_body(IO_CACHE* file)
-  //bool write_data_body()
   {
     uchar scheme_buf= crypto_scheme;
     uchar key_version_buf[BINLOG_KEY_VERSION_LENGTH];
@@ -1742,9 +1733,6 @@ public:
     return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
            wrapper_my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
            wrapper_my_b_safe_write(file, (uchar*)nonce, BINLOG_NONCE_LENGTH);
-    //return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
-           //wrapper_my_b_safe_write(file, (uchar*)"KEYV", BINLOG_KEY_VERSION_LENGTH) ||
-           //wrapper_my_b_safe_write(file, (uchar*)"NONCENONCENO", BINLOG_NONCE_LENGTH);
   }
 #else
   void print(FILE* file, PRINT_EVENT_INFO* print_event_info);
@@ -1753,8 +1741,6 @@ public:
   Start_encryption_log_event(
      const char* buf, uint event_len,
      const Format_description_log_event* description_event);
-
-  //bool is_valid() const { return crypto_scheme == 1; }
 
   Log_event_type get_type_code() { return binary_log::START_ENCRYPTION_EVENT; }
 
@@ -1886,6 +1872,7 @@ public:
     DBUG_PRINT("info", ("Copying crypto data"));
     crypto_data= o->crypto_data;
   }
+
   void reset_crypto()
   {
     crypto_data.scheme= 0;
@@ -4083,35 +4070,6 @@ public:
   {
     common_header->data_written= LOG_EVENT_HEADER_LEN + get_data_size();
     uint32 len= write_header_to_memory(buf);
-
-    //uchar *pos= header;
-     //size_t len=sizeof(header);
-
-  ////TODO:Robert:Ten kod jest wzięty z Log_event_writer::write_header
-  //if (ctx)
-  //{
-    //uchar iv[BINLOG_IV_LENGTH];
-    //crypto->set_iv(iv, my_b_safe_tell(file));
-
-    //int res= 0;
-
-    //if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                               //crypto->key, crypto->key_length, iv, sizeof(iv))))
-      //DBUG_RETURN(res);
-
-    ////if (encryption_ctx_init(ctx, crypto->key, crypto->key_length,
-           ////iv, sizeof(iv), ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-           ////crypto->key_version))
-      ////DBUG_RETURN(1);
-
-    //DBUG_ASSERT(len >= LOG_EVENT_HEADER_LEN);
-    //event_len= uint4korr(pos + EVENT_LEN_OFFSET);
-    //DBUG_ASSERT(event_len >= len);
-    //memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
-    //pos+= 4;
-    //len-= 4;
-  //}
-
     len+= write_data_header_to_memory(buf + len);
     return len;
   }

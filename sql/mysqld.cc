@@ -5137,8 +5137,6 @@ int mysqld_main(int argc, char **argv)
 
       /Alfranio
     */
-    //TODO:Robert:Tutaj muszę dodać aktywowanie logu
-    //TODO:Robert:Na razie Previous_gtis_log_event jest wyłączone z szyfrowania
     Previous_gtids_log_event prev_gtids_ev(&gtids_in_binlog);
 
     global_sid_lock->unlock();
@@ -5148,7 +5146,7 @@ int mysqld_main(int argc, char **argv)
 
     Binlog_crypt_data *crypto_data= mysql_bin_log.get_crypto_data();
 
-    if (crypto_data->scheme == 1)//TODO:Robert this part is temporary disabled && file == &log_file)
+    if (crypto_data->scheme == 1)
     {
       prev_gtids_ev.crypto= crypto_data;
       prev_gtids_ev.ctx= alloca(crypto_data->ctx_size);

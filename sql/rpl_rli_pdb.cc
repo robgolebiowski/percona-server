@@ -2080,7 +2080,6 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
 
   relay_log_number_to_name(start_relay_number, file_name);
 
-  Format_description_log_event *description_event= new Format_description_log_event(4);
   memset(&relay_io, 0, sizeof(IO_CACHE));
 
   while (!arrive_end)
@@ -2100,31 +2099,24 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
         goto end;
       }
 
-      for (uint i=0; i < 4; i++)
+      //Search for Start_encryption_event. When relay log is encrypted the second
+      //event (after Format_description_event) will be Start_encryption_event.
+      for (uint i=0; i < 2; i++)
       {
         ev= Log_event::read_log_event(&relay_io, NULL,
-                                      description_event,
+                                      rli->get_rli_description_event(),
                                       opt_slave_sql_verify_checksum);
 
-        if (ev != NULL && ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT)
+        if (ev != NULL)
         {
-          DBUG_PRINT("info", ("Found format descryption event"));
-
-          delete description_event;
-          description_event= (Format_description_log_event*) ev;
-        }
-        else if (ev != NULL && ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
-        {
-          DBUG_PRINT("info", ("Found encryption event"));
-
-          if (description_event->start_decryption((Start_encryption_log_event*) ev))
+          if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT && 
+              !rli->get_rli_description_event()->start_decryption((Start_encryption_log_event*) ev))
           {
             delete ev;
             goto end;
             error=true;
           }
           delete ev;
-          break;
         }
       }
       my_b_seek(&relay_io, start_relay_pos);
@@ -2134,9 +2126,8 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
     arrive_end= (my_b_tell(&relay_io) == end_relay_pos &&
                  file_number == end_relay_number);
 
-
     ev= Log_event::read_log_event(&relay_io, NULL,
-                                  description_event,//rli_description_event,
+                                  rli->get_rli_description_event(),
                                   opt_slave_sql_verify_checksum);
     if (ev != NULL)
     {
@@ -2203,7 +2194,6 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
 
   error= false;
 end:
-  delete description_event;
   if (my_b_inited(&relay_io))
   {
     end_io_cache(&relay_io);

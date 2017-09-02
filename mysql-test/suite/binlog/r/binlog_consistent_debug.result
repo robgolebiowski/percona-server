@@ -50,6 +50,6 @@ SET DEBUG_SYNC="now SIGNAL finish_show";
 # connection con2
 VARIABLE_NAME	VARIABLE_VALUE
 Binlog_snapshot_file	master-bin.000002
-Binlog_snapshot_position	POSITION
+Binlog_snapshot_position	217
 # connection con3
 # connection default

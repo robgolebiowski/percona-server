@@ -52,8 +52,8 @@ Binlog_sender::Binlog_sender(THD *thd, const char *start_file,
     m_diag_area(false),
     m_errmsg(NULL), m_errno(0), m_last_file(NULL), m_last_pos(0),
     m_half_buffer_size_req_counter(0), m_new_shrink_size(PACKET_MIN_SIZE),
-    m_flag(flag), m_observe_transmission(false), m_transmit_started(false),
-    fdle(NULL)
+    m_fdle(NULL), m_flag(flag), m_observe_transmission(false),
+    m_transmit_started(false)
   {}
 
 void Binlog_sender::init()
@@ -216,7 +216,6 @@ void Binlog_sender::run()
       break;
 
     file= open_binlog_file(&log_cache, log_file, &m_errmsg);
-
     if (unlikely(file < 0))
     {
       set_fatal_error(m_errmsg);
@@ -928,10 +927,12 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
   uchar* event_ptr;
   uint32 event_len;
 
-  if (fdle != NULL)
-    delete fdle;
-  
-  fdle= new Format_description_log_event(3); //TODO:Robert:Add error handling as in MariaDB
+  m_fdle.reset(new Format_description_log_event(4));
+  if (m_fdle == NULL)
+  {
+    set_fatal_error("Out-of-memory");
+    DBUG_RETURN(1);
+  }
 
   if (read_event(log_cache, binary_log::BINLOG_CHECKSUM_ALG_OFF, &event_ptr,
                  &event_len))
@@ -1006,24 +1007,28 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
   if (event_checksum_on() && event_updated)
     calc_event_checksum(event_ptr, event_len);
 
-  uint ev_len= event_ptr[EVENT_LEN_OFFSET];
-  if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
-    ev_len-= BINLOG_CHECKSUM_LEN;
+  if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF &&
+      m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF)
+    event_len-= BINLOG_CHECKSUM_LEN;
 
-  Format_description_log_event *tmp;
-  if (!(tmp= new Format_description_log_event(reinterpret_cast<char*>(event_ptr), ev_len, fdle)))
+  Format_description_log_event *new_fdle= NULL;
+
+  try 
+  {
+    new_fdle= new Format_description_log_event(reinterpret_cast<char*>(event_ptr), event_len, m_fdle.get());
+  }
+  catch(...)
   {
     set_fatal_error("Corrupt Format_description event found or out-of-memory");
     DBUG_RETURN(1);
   }
-  //tmp->crypto_data= fdle->crypto_data; //TODO:Robert: not needed sele is applied later
-  delete fdle;
-  fdle= tmp; //TODO:Robert: fdle must be delete in destructor
+  m_fdle.reset(new_fdle);
 
   if (send_packet())
     DBUG_RETURN(1);
 
   char header_buffer[LOG_EVENT_MINIMAL_HEADER_LEN];
+  //Let's check if next event is Start encryption event
   if (Log_event::peek_event_header(header_buffer, log_cache))
     DBUG_RETURN(1);
 
@@ -1032,154 +1037,43 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
 
   if (header_buffer[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT)
   {
-    //delete crypto_data;
-    //crypto_data= NULL;
-
     event_ptr= NULL;
-    uint32 event_len= 0;
-    //uint32 original_event_len= 0;
-
     my_off_t log_pos= my_b_tell(log_cache);
 
     if (read_event(log_cache, m_event_checksum_alg, &event_ptr,
                    &event_len))
       DBUG_RETURN(1);
 
-    //original_event_len= event_len;
-
-    //TODO:Robert:I do not think I should be stripping the length of event if BINLOG_CHECSUM_ALG_OFF - probably I should not read
-    //TODO:Robert:checksum in the first place
     if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF &&
         m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF)
       event_len-= BINLOG_CHECKSUM_LEN;
 
     DBUG_ASSERT(event_ptr[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT);
-    //Format_description_log_event fdle(3);
-      //ev = new Start_encryption_log_event(buf, event_len, fdle);
-    Start_encryption_log_event sele(reinterpret_cast<char*>(event_ptr), event_len, fdle);
+    Start_encryption_log_event sele(reinterpret_cast<char*>(event_ptr), event_len, m_fdle.get());
         
-    //Start_encryption_log_event *sele= (Start_encryption_log_event *)event_ptr;
-    //if (!sele)
-    //{
-      //set_fatal_error("Expected START_ENCRYPTION_EVENT in binlog file");
-      ////info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
-      //DBUG_RETURN(1);
-    //}
-
     if (!sele.is_valid())
     {
       set_fatal_error("Sele is invalid");
-    
       DBUG_RETURN(1);
     }
-    //crypto_data= new Binlog_crypt_data();
 
-    //memcpy(crypto_data->nonce, sele.nonce, BINLOG_NONCE_LENGTH);
-    //if(crypto_data->init(sele.crypto_scheme, sele.key_version))
-    //{
-      //delete crypto_data;
-      //crypto_data= NULL;
-      //DBUG_RETURN(1);
-    //} 
+    if (m_fdle->start_decryption(&sele))
+    {
+      set_fatal_error("Could not decrypt binlog: encryption key error");
+      DBUG_RETURN(1);
+    }
 
-  DBUG_EXECUTE_IF("wrong_key",
-                  {
-                    memcpy(sele.nonce, "000000000000", 12);
-                  };);
-
-   if (fdle->start_decryption(&sele))
-   {
-     //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
-     //info->errmsg= "Could not decrypt binlog: encryption key error";
-     set_fatal_error("Could not decrypt binlog: encryption key error");
-     DBUG_RETURN(1);
-     //return 1;
-   }
-  //if (m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF &&
-       //m_event_checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF)
-    //event_len+= BINLOG_CHECKSUM_LEN;
-
-
-  //if (start_pos > BIN_LOG_HEADER_SIZE)
-    ////log_pos = start_pos + event_len;
-    //log_pos = event_len;
-  //else
-    //log_pos= my_b_tell(log_cache);
-
-  if (start_pos <= BIN_LOG_HEADER_SIZE)
-  {
-    log_pos= my_b_tell(log_cache);
-    if (unlikely(send_heartbeat_event(log_pos)))
-       DBUG_RETURN(1);
-  }
-   //delete sele;
-    //return 1;
+    if (start_pos <= BIN_LOG_HEADER_SIZE)
+    {
+      log_pos= my_b_tell(log_cache);
+      //We have read start encryption event from master binlog, but we have
+      //not send it to slave. We need to inform slave that master position
+      //has advanced.
+      if (unlikely(send_heartbeat_event(log_pos)))
+         DBUG_RETURN(1);
+    }
   }
   DBUG_RETURN(0);
-
-  //TODO:Robert:My changes
-
-  //event_ptr= NULL;
-  //event_len= 0;
-
-  //if (read_event(log_cache, binary_log::BINLOG_CHECKSUM_ALG_OFF, &event_ptr,
-                 //&event_len))
-    //DBUG_RETURN(1);
-
-
-
-  //[>
-    //Read the following Start_encryption_log_event but don't send it to slave.
-    //Slave doesn't need to know whether master's binlog is encrypted,
-    //and if it'll want to encrypt its logs, it should generate its own
-    //random nonce, not use the one from the master.
-  //*/
-  //packet->length(0);
-  //info->last_pos= linfo->pos;
-  //error= Log_event::read_log_event(log, packet, info->fdev,
-                                   //opt_master_verify_checksum
-                                   //? info->current_checksum_alg
-                                   //: BINLOG_CHECKSUM_ALG_OFF);
-  //linfo->pos= my_b_tell(log);
-
-  //if (error)
-  //{
-    //set_read_error(info, error);
-    //DBUG_RETURN(1);
-  //}
-
-  //event_type= (Log_event_type)((uchar)(*packet)[LOG_EVENT_OFFSET]);
-  //if (event_type == START_ENCRYPTION_EVENT)
-  //{
-    //Start_encryption_log_event *sele= (Start_encryption_log_event *)
-      //Log_event::read_log_event(packet->ptr(), packet->length(), &info->errmsg,
-                                //info->fdev, BINLOG_CHECKSUM_ALG_OFF);
-    //if (!sele)
-    //{
-      //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
-      //DBUG_RETURN(1);
-    //}
-
-    //if (info->fdev->start_decryption(sele))
-    //{
-      //info->error= ER_MASTER_FATAL_ERROR_READING_BINLOG;
-      //info->errmsg= "Could not decrypt binlog: encryption key error";
-      //delete sele;
-      //DBUG_RETURN(1);
-    //}
-    //delete sele;
-  //}
-  //else if (start_pos == BIN_LOG_HEADER_SIZE)
-  //{
-    //[>
-      //not Start_encryption_log_event - seek back. But only if
-      //send_one_binlog_file() isn't going to seek anyway
-    //*/
-    //my_b_seek(log, info->last_pos);
-    //linfo->pos= info->last_pos;
-  //}
-
-  //DBUG_RETURN(send_packet());
 }
 
 int Binlog_sender::has_previous_gtid_log_event(IO_CACHE *log_cache,
@@ -1233,7 +1127,7 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
   char header[LOG_EVENT_MINIMAL_HEADER_LEN];
   int error= 0;
 #ifndef DBUG_OFF
-  //const char *packet_buffer= NULL; //TODO:Robert:Temporary disabled
+  const char *packet_buffer= NULL;
 #endif
 
   if ((error= Log_event::peek_event_length(event_len, log_cache, header)))
@@ -1244,7 +1138,7 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
 
   event_offset= m_packet.length();
 #ifndef DBUG_OFF
-  //packet_buffer= m_packet.ptr(); //TODO:Robert:Temporary disabled
+  packet_buffer= m_packet.ptr();
 #endif
 
   DBUG_EXECUTE_IF("dump_thread_before_read_event",
@@ -1258,11 +1152,7 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
     packet is big enough to read the event, since we have reallocated based
     on the length stated in the event header.
   */
-  //if ((error= Log_event::read_log_event(log_cache, &m_packet, NULL, checksum_alg,
-                                        //NULL, NULL, header)))
-  //TODO:Robert:Format_description_log_event *fdle - passing NULL, need to change that?
-  
-  if ((error= Log_event::read_log_event(log_cache, &m_packet, fdle, NULL, checksum_alg,
+  if ((error= Log_event::read_log_event(log_cache, &m_packet, m_fdle.get(), NULL, checksum_alg,
                                         NULL, NULL, header)))
     goto read_error;
 
@@ -1270,13 +1160,12 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
 
   /*
     As we pre-allocate the buffer to store the event at reset_transmit_packet,
-    the buffer should not be changed while calling read_log_event, even knowing
-    that it might call functions to replace the buffer by one with the size to
-    fit the event.
+    the buffer should not be changed while calling read_log_event (unless binlog
+    encryption is on), even knowing that it might call functions to replace the
+    buffer by one with the size to fit the event. When encryption is on - the buffer
+    will be replaced with memory allocated for storing decrypted data.
   */
-  //TODO:Robert:Temporary disabling this check - which was originally here (not from MariaDB) I am allocating new buffer for decrypted data
-  //TODO:Robet:So this assert is no longer true
-  //DBUG_ASSERT(packet_buffer == m_packet.ptr());
+  DBUG_ASSERT(encrypt_binlog || packet_buffer == m_packet.ptr());
   *event_ptr= (uchar *)m_packet.ptr() + event_offset;
 
   DBUG_PRINT("info",
@@ -1305,7 +1194,6 @@ int Binlog_sender::send_heartbeat_event(my_off_t log_pos)
   const char* p= filename + dirname_length(filename);
   size_t ident_len= strlen(p);
   size_t event_len= ident_len + LOG_EVENT_HEADER_LEN +
-
     (event_checksum_on() ? BINLOG_CHECKSUM_LEN : 0);
 
   DBUG_PRINT("info", ("log_file_name %s, log_pos %llu", p, log_pos));
@@ -1349,7 +1237,6 @@ inline int Binlog_sender::send_packet()
   DBUG_PRINT("info",
              ("Sending event of type %s", Log_event::get_type_str(
                 (Log_event_type)m_packet.ptr()[1 + EVENT_TYPE_OFFSET])));
-
   // We should always use the same buffer to guarantee that the reallocation
   // logic is not broken.
   if (DBUG_EVALUATE_IF("simulate_send_error", true,

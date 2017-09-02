@@ -473,6 +473,8 @@ class MYSQL_BIN_LOG: public TC_LOG
     return *sync_period_ptr;
   }
 
+  int write_to_file(Log_event* event);
+
   int write_to_file(IO_CACHE *cache);
   /*
     This is used to start writing to a new log file. The difference from
@@ -867,7 +869,7 @@ public:
   bool is_query_in_union(THD *thd, query_id_t query_id_param);
 
 #ifdef HAVE_REPLICATION
-  bool write_event_buffer(uchar* buf, uint len, Master_info *mi);
+  bool append_buffer(uchar* buf, uint len, Master_info *mi);
   bool append_event(Log_event* ev, Master_info *mi);
 private:
   bool after_append_to_relay_log(Master_info *mi);
