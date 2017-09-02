@@ -1048,21 +1048,10 @@ public:
         if (have_checksum)
           checksum= my_checksum(checksum, *buf_p, write_bytes);
 
-        uchar iv[BINLOG_IV_LENGTH];
-        crypto->set_iv(iv, my_b_safe_tell(output_cache));
-
         int res= 0;
 
-        if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                                   crypto->key, crypto->key_length, iv, sizeof(iv))))
+        if ((res= init_event_crypt(output_cache, crypto, pos, ctx, len, event_len)))
           DBUG_RETURN(res);
-
-        DBUG_ASSERT(*event_len_p >= LOG_EVENT_HEADER_LEN);
-        event_len= uint4korr(pos + EVENT_LEN_OFFSET); //event_len jest z checksum, event_len_p jest bez checksumu
-        DBUG_ASSERT(event_len >= *event_len_p);
-        memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
-        pos+= 4;
-        len-= 4;
       }
     }
     
@@ -1095,15 +1084,8 @@ public:
         thd->binlog_bytes_written+= BINLOG_CHECKSUM_LEN;
         checksum= initial_checksum;
       }
-      if (ctx)
-      {
-        uint dstlen;
-        uchar dst[MY_CRYPT_AES_BLOCK_SIZE*2];
-        if (my_aes_crypt_finish(ctx, dst, &dstlen))
-          return 1;
-        if (maybe_write_event_len(output_cache, dst, dstlen, event_len) || my_b_safe_write(output_cache, dst, dstlen))
-          return ER_ERROR_ON_WRITE;
-      }
+      if (ctx && finish_event_crypt(output_cache, event_len, ctx))
+        DBUG_RETURN(true);
     }
 
     DBUG_RETURN(false);

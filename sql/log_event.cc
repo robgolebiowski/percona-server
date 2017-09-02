@@ -1004,14 +1004,9 @@ bool Log_event::write_footer(IO_CACHE* file)
     if (encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
       return 1;
   }
-  if (ctx)
-  {
-    uint dstlen;
-    uchar dst[MY_CRYPT_AES_BLOCK_SIZE*2];
-    if (my_aes_crypt_finish(ctx, dst, &dstlen) || maybe_write_event_len(file, dst, dstlen, event_len) ||
-        my_b_safe_write(file, dst, dstlen))
-      return 1;
-  }
+  if (ctx && finish_event_crypt(file, event_len, ctx))
+    return 1;
+
   return 0;
 }
 
@@ -1155,26 +1150,10 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 
   if (ctx)
   {
-    std::string info("encrypting event ");
-    info += get_type_code();
-    const char* info_str= info.c_str();
-    DBUG_PRINT("info", ("%s", info_str));
-
-    uchar iv[BINLOG_IV_LENGTH];
-    crypto->set_iv(iv, my_b_safe_tell(file));
-
     int res= 0;
-
-    if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                               crypto->key, crypto->key_length, iv, sizeof(iv))))
+    //zmienić po teście header na pos
+    if ((res= init_event_crypt(file, crypto, pos, ctx, len, event_len)))
       DBUG_RETURN(res);
-
-    DBUG_ASSERT(len >= LOG_EVENT_HEADER_LEN);
-    event_len= uint4korr(pos + EVENT_LEN_OFFSET);
-    DBUG_ASSERT(event_len >= len);
-    memcpy(pos + EVENT_LEN_OFFSET, pos, 4);
-    pos+= 4;
-    len-= 4;
   }
 
   DBUG_RETURN(encrypt_and_write(file, pos, len));

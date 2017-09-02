@@ -49,3 +49,34 @@
     return 1;
     
   }
+
+  static int init_event_crypt(IO_CACHE *output_cache, Binlog_crypt_data *crypto, uchar* &header, void *ctx, size_t &buf_len, uint &event_len)
+  {
+    uchar iv[BINLOG_IV_LENGTH];
+    crypto->set_iv(iv, my_b_safe_tell(output_cache));
+
+    int res= 0;
+
+    if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                               crypto->key, crypto->key_length, iv, sizeof(iv))))
+      return res;
+
+    DBUG_ASSERT(buf_len >= LOG_EVENT_HEADER_LEN);
+    event_len= uint4korr(header + EVENT_LEN_OFFSET); //event_len jest z checksum, event_len_p jest bez checksumu
+    DBUG_ASSERT(event_len >= buf_len);
+    memcpy(header + EVENT_LEN_OFFSET, header, 4);
+    header+= 4;
+    buf_len-= 4;
+
+    return res;
+  }
+
+  static int finish_event_crypt(IO_CACHE *output_cache, uint event_len, void *ctx)
+  {
+    uint dstlen;
+    uchar dst[MY_CRYPT_AES_BLOCK_SIZE*2];
+    if (my_aes_crypt_finish(ctx, dst, &dstlen) || maybe_write_event_len(output_cache, dst, dstlen, event_len) ||
+        my_b_safe_write(output_cache, dst, dstlen))
+      return 1;
+    return 0;
+  }
