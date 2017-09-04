@@ -7164,7 +7164,6 @@ bool MYSQL_BIN_LOG::append_event(Log_event* ev, Master_info *mi)
   DBUG_RETURN(error);
 }
 
-
 bool MYSQL_BIN_LOG::append_buffer(uchar* buf, uint len, Master_info *mi)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::append_buffer");
@@ -7175,55 +7174,25 @@ bool MYSQL_BIN_LOG::append_buffer(uchar* buf, uint len, Master_info *mi)
   mysql_mutex_assert_owner(&LOCK_log);
 
   // write data
-  bool error= false;
-
   uchar *ebuf= NULL;
   
   if (crypto.scheme != 0)
   {
     DBUG_ASSERT(crypto.scheme == 1);
 
-    uint elen;
-    uchar iv[BINLOG_IV_LENGTH];
-
     ebuf= (uchar*)my_safe_alloca(len, 512);
-    if (!ebuf)
-    {
-      error = true;
-      goto err;
-    }
-
-    crypto.set_iv(iv, my_b_append_tell(&log_file));
-
-    memcpy(buf + EVENT_LEN_OFFSET, buf, 4);
-
-   if (my_aes_crypt(MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                    buf + 4, len - 4, ebuf + 4, &elen,
-                    crypto.key, crypto.key_length, iv, sizeof(iv)))
-    {
-      error = true;
-      goto err;
-    }
-    DBUG_ASSERT(elen == len - 4);
-
-    memcpy(ebuf, ebuf + EVENT_LEN_OFFSET, 4);
-    int4store(ebuf + EVENT_LEN_OFFSET, len);
+    if (!ebuf ||
+        encrypt_event(my_b_append_tell(&log_file), &crypto, buf, ebuf, len))
+      DBUG_RETURN(true);
 
     buf= ebuf;
   }
 
-  if (my_b_append(&log_file,(uchar*) buf,len) == 0)
-  {
-    bytes_written += len;
-    error= after_append_to_relay_log(mi);
-  }
-  else
-    error= true;
+  if (my_b_append(&log_file,(uchar*) buf,len))
+    DBUG_RETURN(true);
 
-err:
-  if (ebuf != NULL)
-    my_safe_afree(ebuf, len, 512);
-  DBUG_RETURN(error);
+  bytes_written += len;
+  DBUG_RETURN(after_append_to_relay_log(mi));
 }
 #endif // ifdef HAVE_REPLICATION
 

@@ -118,6 +118,7 @@ SET(SQL_SHARED_SOURCES
   lock.cc
   locking_service.cc
   log.cc
+  log_crypt.cc
   mdl.cc
   my_decimal.cc
   net_serv.cc

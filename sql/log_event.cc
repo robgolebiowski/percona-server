@@ -1159,7 +1159,6 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
   DBUG_RETURN(encrypt_and_write(file, pos, len));
 }
 
-
 /**
   This needn't be format-tolerant, because we only read
   LOG_EVENT_MINIMAL_HEADER_LEN (we just want to read the event's length).
@@ -1290,35 +1289,24 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
       if (fdle != NULL && fdle->crypto_data.scheme)
       {
         ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
-        uchar iv[BINLOG_IV_LENGTH];
-        fdle->crypto_data.set_iv(iv, my_b_tell(file) - true_data_len);
 
         char *newpkt= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
         if (!newpkt)
           DBUG_RETURN(LOG_READ_MEM);
         memcpy(newpkt, packet->ptr(), ev_offset);
 
-        uint dstlen;
         uchar *src= (uchar*)packet->ptr() + ev_offset;
         uchar *dst= (uchar*)newpkt + ev_offset;
         memcpy(src + EVENT_LEN_OFFSET, src, 4);
 
-        if (my_aes_crypt(MY_AES_CBC, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, true_data_len - 4, dst + 4, &dstlen,
-            fdle->crypto_data.key, fdle->crypto_data.key_length, iv, sizeof(iv)))
+        if (decrypt_event(my_b_tell(file) - true_data_len, &fdle->crypto_data, src, dst, true_data_len))
         {
           my_free(newpkt);
           DBUG_RETURN(LOG_READ_DECRYPT);
         }
-        DBUG_ASSERT((uint)dstlen == true_data_len - 4); //We have checked that dstlen is greater than 0, so we can safetly cast
-        memcpy(dst, dst + EVENT_LEN_OFFSET, 4);
-        int4store(dst + EVENT_LEN_OFFSET, true_data_len);
 
         packet->length(0);  // size of the content
-        //packet->qs_append('\0'); // Set this as an OK packet
-
         packet->append(newpkt, true_data_len + ev_offset);
-        //packet->reset(newpkt, true_data_len + ev_offset, true_data_len + ev_offset + 1,
-                      //&my_charset_bin);
       }
 
       /*
@@ -1374,6 +1362,8 @@ end:
 #define UNLOCK_MUTEX
 #define LOCK_MUTEX
 #endif
+
+
 
 #ifndef MYSQL_CLIENT
 /**
@@ -1472,29 +1462,17 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     error ="decryption error";
     goto err;
 #endif
-    uchar iv[BINLOG_IV_LENGTH];
-    fdle->crypto_data.set_iv(iv, my_b_tell(file) - data_len);
-
     char *dst_buf= (char*)my_malloc(key_memory_log_event, data_len + 1, MYF(MY_WME));
     dst_buf[data_len]=0;
     memcpy(dst_buf, buf, data_len);
-
-    uint dstlen;
-    uchar *src= (uchar*)buf;
-    uchar *dst= (uchar*)dst_buf;
-    memcpy(src + EVENT_LEN_OFFSET, src, 4);
-
-    if (my_aes_crypt(MY_AES_CBC, ENCRYPTION_FLAG_DECRYPT | ENCRYPTION_FLAG_NOPAD, src + 4, data_len - 4, dst + 4, &dstlen,
-        fdle->crypto_data.key, fdle->crypto_data.key_length, iv, sizeof(iv)))
+    
+    if (decrypt_event(my_b_tell(file) - data_len, &fdle->crypto_data, (uchar*)buf, (uchar*)dst_buf, data_len))
     {
       my_free(dst_buf);
       error ="decryption error";
       goto err;
     }
-    DBUG_ASSERT((uint)dstlen == data_len - 4); //We have checked that dstlen is greater than 0, so we can safetly cast
-    memcpy(dst, dst + EVENT_LEN_OFFSET, 4);
-    int4store(dst + EVENT_LEN_OFFSET, data_len);
-
+    
     my_free(buf);
     buf= dst_buf;
   }
