@@ -10,7 +10,7 @@ enum GENERATE_CREDENTIALS
 
 static bool generate_credential_file(const std::string &credential_file_path,
                                      const GENERATE_CREDENTIALS generate_credetials = CORRECT,
-                                     const std::string secret_mount_point = "")
+                                     const std::string &secret_mount_point = "")
 {
   std::remove(credential_file_path.c_str());
   const char* mysql_test_dir(getenv("MYSQL_TEST_DIR"));

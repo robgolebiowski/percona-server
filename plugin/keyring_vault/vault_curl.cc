@@ -173,7 +173,6 @@ bool Vault_curl::reset_curl_session()
       (curl_res = curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL)) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout)) != CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progress_callback)) ||
-      //(curl_res = curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback)) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L))
      )
   {

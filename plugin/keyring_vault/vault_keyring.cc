@@ -93,7 +93,7 @@ int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
   catch (const std::bad_alloc &e)
   {
     handle_std_bad_alloc_exception("Cannot set keyring_vault_config_file");
-    return TRUE;
+    return 1;
   }
   catch (...)
   {
