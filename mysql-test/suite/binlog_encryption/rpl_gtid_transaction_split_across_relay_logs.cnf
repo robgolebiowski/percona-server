@@ -6,6 +6,7 @@ loose-keyring_file_data= /home/rob/keys1.txt
 gtid-mode=ON
 enforce-gtid-consistency=ON
 encrypt-binlog=1
+master-verify-checksum=1
 
 [mysqld.2]
 early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
@@ -15,6 +16,7 @@ relay-log-info-repository=table
 gtid-mode=ON
 enforce-gtid-consistency=ON
 encrypt-binlog=1
+master-verify-checksum=1
 
 [mysqld.3]
 early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
@@ -24,6 +26,7 @@ relay-log-info-repository=table
 gtid-mode=ON
 enforce-gtid-consistency=ON
 encrypt-binlog=1
+master-verify-checksum=1
 
 [ENV]
 SERVER_MYPORT_1= @mysqld.1.port

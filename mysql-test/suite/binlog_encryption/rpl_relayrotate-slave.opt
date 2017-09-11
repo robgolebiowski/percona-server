@@ -3,3 +3,4 @@
 --plugin-load-add=$FILE_KEY_MANAGEMENT_SO
 --loose-keyring_file_data=/home/rob/keys2.txt
 --encrypt-binlog
+--master-verify-checksum=1

@@ -16,9 +16,6 @@ must be CRC32 because of the command line option
 CRC32
 select @@session.binlog_checksum as 'no session var';
 ERROR HY000: Variable 'binlog_checksum' is a GLOBAL variable
-select @@global.master_verify_checksum  as 'must be zero because of default';
-must be zero because of default
-0
 select @@session.master_verify_checksum  as 'no session var';
 ERROR HY000: Variable 'master_verify_checksum' is a GLOBAL variable
 set @slave_save_binlog_checksum= @@global.binlog_checksum;

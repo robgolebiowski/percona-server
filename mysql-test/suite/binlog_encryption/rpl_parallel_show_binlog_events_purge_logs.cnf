@@ -5,3 +5,4 @@ plugin-load-add= @ENV.FILE_KEY_MANAGEMENT_SO
 loose-keyring_file_data= /home/rob/keys2.txt
 #loose-file-key-management-filename=@ENV.MYSQLTEST_VARDIR/std_data/keys.txt
 encrypt-binlog
+master-verify-checksum=1

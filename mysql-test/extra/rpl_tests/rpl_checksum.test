@@ -27,7 +27,6 @@ select @@global.binlog_checksum as 'must be CRC32 because of the command line op
 --error ER_INCORRECT_GLOBAL_LOCAL_VAR
 select @@session.binlog_checksum as 'no session var';
 
-select @@global.master_verify_checksum  as 'must be zero because of default';
 --error ER_INCORRECT_GLOBAL_LOCAL_VAR
 select @@session.master_verify_checksum  as 'no session var';
 

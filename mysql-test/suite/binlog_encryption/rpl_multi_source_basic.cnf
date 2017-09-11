@@ -10,6 +10,7 @@ master-info-repository=TABLE
 relay-log-info-repository=TABLE
 log-slave-updates
 encrypt-binlog=1
+master-verify-checksum=1
 
 [mysqld.3]
 

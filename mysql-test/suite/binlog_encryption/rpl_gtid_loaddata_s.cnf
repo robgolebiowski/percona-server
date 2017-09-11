@@ -5,3 +5,4 @@ binlog-ignore-db=test
 early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
 loose-keyring_file_data= /home/rob/keys2.txt
 encrypt-binlog=1
+master-verify-checksum=1

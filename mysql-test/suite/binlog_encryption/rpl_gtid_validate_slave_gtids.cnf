@@ -4,3 +4,4 @@
 encrypt-binlog=1
 early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
 loose-keyring_file_data= /home/rob/keys2.txt
+master-verify-checksum=1

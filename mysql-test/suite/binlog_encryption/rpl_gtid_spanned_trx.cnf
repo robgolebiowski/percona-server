@@ -13,4 +13,5 @@ gtid-mode=on
 enforce-gtid-consistency
 encrypt_binlog=1
 slave-sql-verify-checksum=1
+master-verify-checksum=1
 

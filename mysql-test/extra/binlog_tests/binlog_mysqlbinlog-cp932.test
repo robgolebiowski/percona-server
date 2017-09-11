@@ -5,6 +5,7 @@
 -- source include/have_binlog_format_mixed_or_statement.inc
 -- source include/have_cp932.inc
 -- source include/have_log_bin.inc
+-- source include/not_gtid_enabled.inc
 
 RESET MASTER;
 
@@ -19,22 +20,19 @@ flush logs;
 let $datadir = `SELECT @@DATADIR`;
 rename table t3 to t03, t4 to t04;
 
-let $use_remote_mysqlbinlog= 1;
 
-#--let $mysqlbinlog_args= $MYSQLD_DATADIR/master-bin.000001
-#--let $mysqlbinlog_args= $datadir/master-bin.saved
 --let $mysqlbinlog_args= $datadir/master-bin.000001
 if ($use_remote_mysqlbinlog)
 {
-    #--let $mysqlbinlog_args= --read-from-remote-server --protocol=tcp --host=127.0.0.1 --port=$MASTER_MYPORT -uroot $datadir/master-bin.saved
     --let $mysqlbinlog_args= --read-from-remote-server --protocol=tcp --host=127.0.0.1 --port=$MASTER_MYPORT -uroot master-bin.000001
     --let $use_remote_mysqlbinlog= 0
 }
 
+--exec $MYSQL_BINLOG --short-form $mysqlbinlog_args > ~/output2
 --exec $MYSQL_BINLOG --short-form $mysqlbinlog_args | $MYSQL --default-character-set=utf8
+#--let $wait_condition=SELECT COUNT(*)=2 FROM information_schema.tables WHERE table_name = "t3" OR table_name = "t4"
 
 
-#--exec $MYSQL_BINLOG --short-form $datadir/master-bin.saved | $MYSQL --default-character-set=utf8
 # original and recovered data must be equal
 select HEX(f) from t03;
 select HEX(f) from t3;
