@@ -33,6 +33,7 @@ INCLUDE_DIRECTORIES(
 SET(TESTS
   keyring-api
   keys_container
+  system_keys_container
   buffered_file_io
   file_io
 )
@@ -55,6 +56,7 @@ IF (MERGE_UNITTESTS)
   LIST(APPEND SRC_FILES
        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
+       ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
@@ -84,6 +86,7 @@ ENDIF(MERGE_UNITTESTS)
     SET(SRC_FILES ${test}-t.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
+       ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc

@@ -15,6 +15,7 @@
 
 #include <my_global.h>
 #include "keys_container.h"
+#include "system_keys_container.h"
 
 namespace keyring {
 
@@ -41,6 +42,23 @@ Keys_container::Keys_container(ILogger *logger)
  , keyring_io(NULL)
 {
   my_hash_clear(keys_hash);
+  system_keys_container= new System_keys_container();
+  //system_keys_ids.insert("percona_binlog");
+  //System_key_data["percona_binlog"]= 
+  //system_key_id_version.insert(std::make_pair("percona_binlog", 0));
+}
+
+Keys_container::Keys_container(ILogger *logger,
+                               ISystem_keys_container *system_keys_container)
+ : keys_hash(new HASH)
+ , logger(logger)
+ , keyring_io(NULL)
+ , system_keys_container(system_keys_container)
+{
+  my_hash_clear(keys_hash);
+  //system_keys_ids.insert("percona_binlog");
+  //System_key_data["percona_binlog"]= 
+  //system_key_id_version.insert(std::make_pair("percona_binlog", 0));
 }
 
 Keys_container::~Keys_container()
@@ -74,6 +92,8 @@ std::string Keys_container::get_keyring_storage_url()
 
 my_bool Keys_container::store_key_in_hash(IKey *key)
 {
+  system_keys_container->update_if_system_key(key);
+
   if (my_hash_insert(keys_hash, (uchar *) key))
     return TRUE;
   return FALSE;

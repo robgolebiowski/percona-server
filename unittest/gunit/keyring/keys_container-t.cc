@@ -273,6 +273,48 @@ namespace keyring__keys_container_unittest
     ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
 
     my_free(fetched_key->release_key_data());
+  }
+
+  TEST_F(Keys_container_test, StoreStoreStoreFetchSystemKey)
+  {
+    IKeyring_io *keyring_io= new Buffered_file_io(logger);
+    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
+
+    std::string key_data1("system_key_data_1");
+    Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+
+    EXPECT_EQ(keys_container->store_key(key1), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
+
+    std::string key_data2("system_key_data_2");
+    Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    EXPECT_EQ(keys_container->store_key(key2), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
+
+    std::string key_data3("system_key_data_3");
+    Key *key3= new Key("percona_binlog:2", "AES", "Robert", key_data3.c_str(), key_data3.length()+1);
+
+    EXPECT_EQ(keys_container->store_key(key3), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
+
+    Key latest_percona_binlog_key("percona_binlog", NULL, "Robert",NULL,0);
+    IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
+    //IKey* latest_percona_binlog_key= keys_container->get_sys
+
+    ASSERT_TRUE(fetched_key != NULL);
+    std::string expected_key_signature= "Roberts_key2Robert";
+    EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
+    uchar *key_data_fetched= fetched_key->get_key_data();
+    size_t key_data_fetched_size= fetched_key->get_key_data_size();
+    EXPECT_STREQ(key_data2.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    ASSERT_TRUE(key_data2.length()+1 == key_data_fetched_size);
+
+    Key key3_id("Roberts_key3", "AES", "Robert",NULL,0);
+    keys_container->remove_key(&key3_id);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
+
+    my_free(fetched_key->release_key_data());
 }
 
   TEST_F(Keys_container_test, StoreTwiceTheSame)
