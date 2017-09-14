@@ -2,7 +2,7 @@
 #define MYSQL_VAULT_BASE64_H
 
 #include <my_global.h>
-#include "vault_secure_string.h"
+#include "secure_string.h"
 
 namespace keyring
 {

@@ -3,8 +3,7 @@
 
 #include <my_global.h>
 #include <map>
-#include "vault_memory.h"
-#include "vault_secure_string.h"
+#include "secure_string.h"
 
 namespace keyring
 {
