@@ -24,6 +24,7 @@
 #include <sys_vars_shared.h> //For PolyLock, AutoWLock, AutoRLock
 #include "i_keys_container.h"
 #include "keyring_memory.h"
+#include "i_system_keys_container.h"
 
 namespace keyring {
 
@@ -33,6 +34,7 @@ class Keys_container : public IKeys_container
 {
 public:
   Keys_container(ILogger* logger);
+  Keys_container(ILogger *logger, ISystem_keys_container *system_keys_container);
   my_bool init(IKeyring_io* keyring_io, std::string keyring_storage_url);
   my_bool store_key(IKey *key);
   IKey* fetch_key(IKey *key);
@@ -46,6 +48,9 @@ public:
     return keys_hash->records;
   };
 protected:
+
+  //typedef std::pair<std::string, System_key_data> System_key;
+
   Keys_container(const Keys_container &);
   virtual void allocate_and_set_data_for_key(IKey *key,
                                              std::string *source_key_type,
@@ -59,10 +64,17 @@ protected:
   virtual my_bool flush_to_backup();
   virtual my_bool flush_to_storage(IKey *key, Key_operation operation);
 
+  //IKey* get_system_key_from_map(std::string key_id);
+  //IKey* get_system_key_from_hash(IKey *key);
+  //my_bool get_system_key(std::string key_id);
+
   HASH *keys_hash;
+  //HASH *system_keys_hash;
   ILogger *logger;
   IKeyring_io *keyring_io;
   std::string keyring_storage_url;
+  ISystem_keys_container *system_keys_container;
+  //std::map<std::string, System_key> system_key_id_data;
 };
 
 } //namespace keyring
