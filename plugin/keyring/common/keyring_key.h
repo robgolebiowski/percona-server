@@ -33,6 +33,8 @@ struct Key : IKey
 
   ~Key();
 
+  virtual IKey* clone() const;
+
   my_bool load_from_buffer(uchar* buffer, size_t *buffer_position,
                            size_t input_buffer_size);
   void store_in_buffer(uchar* buffer, size_t *buffer_position) const;

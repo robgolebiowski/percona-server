@@ -43,6 +43,8 @@ struct IKey : public Keyring_alloc
   virtual my_bool is_key_valid()= 0;
   virtual my_bool is_key_length_valid()= 0;
 
+  virtual IKey* clone() const= 0;
+
   virtual ~IKey() {}
 };
 

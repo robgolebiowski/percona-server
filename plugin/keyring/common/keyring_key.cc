@@ -40,6 +40,11 @@ Key::Key(IKey *other)
        other->get_user_id()->c_str(), other->get_key_data(), other->get_key_data_size());
 }
 
+IKey* Key::clone() const
+{
+  return new Key(*this);
+}
+
 void Key::init(const char *a_key_id, const char *a_key_type, const char *a_user_id,
                const void *a_key, size_t a_key_len)
 {
