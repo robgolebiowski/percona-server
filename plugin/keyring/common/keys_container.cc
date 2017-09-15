@@ -42,7 +42,7 @@ Keys_container::Keys_container(ILogger *logger)
  , keyring_io(NULL)
 {
   my_hash_clear(keys_hash);
-  system_keys_container= new System_keys_container();
+  system_keys_container.reset(new System_keys_container());
   //system_keys_ids.insert("percona_binlog");
   //System_key_data["percona_binlog"]= 
   //system_key_id_version.insert(std::make_pair("percona_binlog", 0));
@@ -113,6 +113,10 @@ my_bool Keys_container::store_key(IKey* key)
 
 IKey* Keys_container::get_key_from_hash(IKey *key)
 {
+  IKey* system_key= system_keys_container->fetch_system_key(key);
+  if (system_key != NULL)
+    return system_key;
+
   return reinterpret_cast<IKey*>(my_hash_search(keys_hash,
     reinterpret_cast<const uchar*>(key->get_key_signature()->c_str()),
     key->get_key_signature()->length()));

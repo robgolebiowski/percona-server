@@ -24,11 +24,23 @@
 #define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR"/keyring"
 #endif
 
+//#ifdef WIN32
+//#define PLUGIN_EXPORT extern "C" __declspec(dllexport)
+//#else
+//#define PLUGIN_EXPORT extern "C"
+//#endif
+
 using keyring::Buffered_file_io;
 using keyring::Keys_container;
 using keyring::Logger;
 
 mysql_rwlock_t LOCK_keyring;
+
+//PLUGIN_EXPORT
+//my_bool keyring_key_store_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+//{
+  //return keyring_udf_func_init(initid, args, message, (VALIDATE_KEY_ID | VALIDATE_KEY_TYPE | VALIDATE_KEY), 1, 0);
+//}
 
 int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
                             struct st_mysql_sys_var *var  MY_ATTRIBUTE((unused)),
