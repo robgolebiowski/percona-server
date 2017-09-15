@@ -73,7 +73,9 @@ protected:
   ILogger *logger;
   IKeyring_io *keyring_io;
   std::string keyring_storage_url;
-  ISystem_keys_container *system_keys_container;
+  //ISystem_keys_container *system_keys_container;
+  boost::movelib::unique_ptr<ISystem_keys_container> system_keys_container;
+
   //std::map<std::string, System_key> system_key_id_data;
 };
 
