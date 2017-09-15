@@ -293,16 +293,89 @@ namespace keyring__keys_container_unittest
 
     std::string key_data3("system_key_data_3");
     Key *key3= new Key("percona_binlog:2", "AES", "Robert", key_data3.c_str(), key_data3.length()+1);
-
     EXPECT_EQ(keys_container->store_key(key3), 0);
     ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
 
-    Key latest_percona_binlog_key("percona_binlog", NULL, "Robert",NULL,0);
+    Key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
     IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
-    //IKey* latest_percona_binlog_key= keys_container->get_sys
 
     ASSERT_TRUE(fetched_key != NULL);
-    std::string expected_key_signature= "Roberts_key2Robert";
+    std::string expected_key_signature= "percona_binlog";
+    EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
+    uchar *key_data_fetched= fetched_key->get_key_data();
+    size_t key_data_fetched_size= fetched_key->get_key_data_size();
+    EXPECT_STREQ(key_data3.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    ASSERT_TRUE(key_data3.length()+1 == key_data_fetched_size);
+
+    my_free(fetched_key->release_key_data());
+    delete sample_key; //unused in this test
+  }
+
+  TEST_F(Keys_container_test, StoreStoreStoreSystemKeyAndTryRemovingSystemKey)
+  {
+    IKeyring_io *keyring_io= new Buffered_file_io(logger);
+    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
+
+    std::string key_data1("system_key_data_1");
+    Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+
+    EXPECT_EQ(keys_container->store_key(key1), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
+
+    std::string key_data2("system_key_data_2");
+    Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    EXPECT_EQ(keys_container->store_key(key2), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
+
+    std::string key_data3("system_key_data_3");
+    Key *key3= new Key("percona_binlog:2", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+    EXPECT_EQ(keys_container->store_key(key3), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
+
+    Key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+    ASSERT_TRUE(keys_container->remove_key(&latest_percona_binlog_key) == TRUE);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
+
+    delete sample_key; //unused in this test
+  }
+
+
+  TEST_F(Keys_container_test, StoreStoreStoreRemoveFetchSystemKeyFetchRegularKey)
+  {
+    IKeyring_io *keyring_io= new Buffered_file_io(logger);
+    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
+
+    std::string key_data1("system_key_data_1");
+    Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+
+    EXPECT_EQ(keys_container->store_key(key1), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
+
+    std::string key_data2("system_key_data_2");
+    Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    EXPECT_EQ(keys_container->store_key(key2), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
+
+    std::string key_data3("Robi3");
+    Key *key3= new Key("Roberts_key3", "AES", "Robert", key_data3.c_str(), key_data3.length()+1);
+    EXPECT_EQ(keys_container->store_key(key3), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
+
+    std::string key_data4("Robi4");
+    Key *key4= new Key("Roberts_key4", "AES", "Robert", key_data4.c_str(), key_data4.length()+1);
+    EXPECT_EQ(keys_container->store_key(key4), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 4);
+
+    Key key3_id("Roberts_key3", "AES", "Robert",NULL,0);
+    keys_container->remove_key(&key3_id);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
+
+    Key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+    IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
+
+    ASSERT_TRUE(fetched_key != NULL);
+    std::string expected_key_signature= "percona_binlog";
     EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
     uchar *key_data_fetched= fetched_key->get_key_data();
@@ -310,12 +383,24 @@ namespace keyring__keys_container_unittest
     EXPECT_STREQ(key_data2.c_str(), reinterpret_cast<const char*>(key_data_fetched));
     ASSERT_TRUE(key_data2.length()+1 == key_data_fetched_size);
 
-    Key key3_id("Roberts_key3", "AES", "Robert",NULL,0);
-    keys_container->remove_key(&key3_id);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
-
     my_free(fetched_key->release_key_data());
-}
+
+    Key regular_key("Roberts_key4", NULL, "Robert", NULL, 0);
+    IKey *fetched_regular_key= keys_container->fetch_key(&regular_key);
+
+    ASSERT_TRUE(fetched_regular_key != NULL);
+    std::string expected_regular_key_signature= "Roberts_key4Robert";
+    EXPECT_STREQ(fetched_regular_key->get_key_signature()->c_str(), expected_regular_key_signature.c_str());
+    EXPECT_EQ(fetched_regular_key->get_key_signature()->length(), expected_regular_key_signature.length());
+    uchar *regular_key_data_fetched= fetched_regular_key->get_key_data();
+    size_t regular_key_data_fetched_size= fetched_regular_key->get_key_data_size();
+    EXPECT_STREQ(key_data4.c_str(), reinterpret_cast<const char*>(regular_key_data_fetched));
+    ASSERT_TRUE(key_data4.length()+1 == regular_key_data_fetched_size);
+
+    my_free(fetched_regular_key->release_key_data());
+    delete sample_key; //unused in this test
+
+  }
 
   TEST_F(Keys_container_test, StoreTwiceTheSame)
   {
