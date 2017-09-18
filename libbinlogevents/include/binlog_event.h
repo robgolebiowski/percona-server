@@ -327,7 +327,7 @@ enum Log_event_type
   /* Prepared XA transaction terminal event similar to Xid */
   XA_PREPARE_LOG_EVENT= 38,
 
-  /* New MySQL/Sun events are to be added right above this comment */
+  /* New MySQL events are to be added right above this comment */
   MYSQL_EVENTS_END,
 
   PERCONA_EVENTS_BEGIN= 100,

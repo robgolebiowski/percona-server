@@ -65,7 +65,6 @@ slave_ignored_err_throttle(window_size,
 #include "rpl_gtid.h"
 #include "xa_aux.h"
 #include "my_byteorder.h"
-#include "log_crypt.h"
 
 PSI_memory_key key_memory_log_event;
 PSI_memory_key key_memory_Incident_log_event_message;
@@ -514,13 +513,13 @@ static void cleanup_load_tmpdir()
    2. Stores complete str.
 */
 
-static bool write_str_at_most_255_bytes(IO_CACHE *file, const char *str,
-                                        uint length, uint &event_len_to_crypt, void *ctx)
+static bool write_str_at_most_255_bytes(IO_CACHE *file, const char *str, uint length,
+                                        Event_encrypter *event_encrypter)
 {
   uchar tmp[1];
   tmp[0]= (uchar) length;
-  return (encrypt_and_write(file, tmp, sizeof(tmp), event_len_to_crypt, ctx) ||
-	  encrypt_and_write(file, (uchar*) str, length, event_len_to_crypt, ctx));
+  return (event_encrypter->encrypt_and_write(file, tmp, sizeof(tmp)) ||
+	  event_encrypter->encrypt_and_write(file, (uchar*) str, length));
 }
 
 /**
@@ -689,8 +688,6 @@ Log_event::Log_event(THD* thd_arg, uint16 flags_arg,
   common_header->when= thd->start_time;
   common_header->log_pos= 0;
   common_header->flags= flags_arg;
-  crypto = NULL;
-  ctx= NULL;
 }
 
 /**
@@ -709,8 +706,6 @@ Log_event::Log_event(Log_event_header* header, Log_event_footer *footer,
 {
   server_id=	::server_id;
   common_header->unmasked_server_id= server_id;
-  crypto = NULL;
-  ctx= NULL;
 }
 #endif /* !MYSQL_CLIENT */
 
@@ -737,8 +732,6 @@ Log_event::Log_event(Log_event_header *header,
 #else
   server_id = common_header->unmasked_server_id;
 #endif
-  crypto = NULL;
-  ctx= NULL;
 }
 
 /*
@@ -988,7 +981,7 @@ bool Log_event::wrapper_my_b_safe_write(IO_CACHE* file, const uchar* buf, size_t
   if (need_checksum() && size != 0)
     crc= checksum_crc32(crc, buf, size);
 
-  return encrypt_and_write(file, buf, size);
+  return event_encrypter.encrypt_and_write(file, buf, size);
 }
 
 bool Log_event::write_footer(IO_CACHE* file) 
@@ -1001,10 +994,10 @@ bool Log_event::write_footer(IO_CACHE* file)
   {
     uchar buf[BINLOG_CHECKSUM_LEN];
     int4store(buf, crc);
-    if (encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
+    if (event_encrypter.encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
       return 1;
   }
-  if (ctx && finish_event_crypt(file, event_len, ctx))
+  if (event_encrypter.ctx && event_encrypter.finish(file))
     return 1;
 
   return 0;
@@ -1052,10 +1045,6 @@ uint32 Log_event::write_header_to_memory(uchar *buf)
   return LOG_EVENT_HEADER_LEN;
 }
 
-int Log_event::encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
-{
-  return ::encrypt_and_write(file, pos, len, event_len, ctx);
-}
 
 bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 {
@@ -1148,15 +1137,15 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
   uchar *pos= header;
   size_t len=sizeof(header);
 
-  if (ctx)
+  if (event_encrypter.ctx)
   {
     int res= 0;
     //zmienić po teście header na pos
-    if ((res= init_event_crypt(file, crypto, pos, ctx, len, event_len)))
+    if ((res= event_encrypter.init(file, pos, len)))
       DBUG_RETURN(res);
   }
 
-  DBUG_RETURN(encrypt_and_write(file, pos, len));
+  DBUG_RETURN(event_encrypter.encrypt_and_write(file, pos, len));
 }
 
 /**
@@ -5802,7 +5791,7 @@ bool Load_log_event::write_data_header(IO_CACHE* file)
   buf[L_TBL_LEN_OFFSET] = (char)table_name_len;
   buf[L_DB_LEN_OFFSET] = (char)db_len;
   int4store(buf + L_NUM_FIELDS_OFFSET, num_fields);
-  return encrypt_and_write(file, (uchar*)buf, Binary_log_event::LOAD_HEADER_LEN) != 0;
+  return event_encrypter.encrypt_and_write(file, (uchar*)buf, Binary_log_event::LOAD_HEADER_LEN) != 0;
 }
 
 
@@ -5812,18 +5801,18 @@ bool Load_log_event::write_data_header(IO_CACHE* file)
 
 bool Load_log_event::write_data_body(IO_CACHE* file)
 {
-  sql_ex.ctx= ctx;
+  sql_ex.event_encrypter= &event_encrypter;
   if (sql_ex.write_data(file))
     return 1;
   if (num_fields && fields && field_lens)
   {
-    if (encrypt_and_write(file, (uchar*)field_lens, num_fields) ||
-	encrypt_and_write(file, (uchar*)fields, field_block_len))
+    if (event_encrypter.encrypt_and_write(file, (uchar*)field_lens, num_fields) ||
+	event_encrypter.encrypt_and_write(file, (uchar*)fields, field_block_len))
       return 1;
   }
-  return (encrypt_and_write(file, (uchar*)table_name, table_name_len + 1) ||
-	  encrypt_and_write(file, (uchar*)db, db_len + 1) ||
-	  encrypt_and_write(file, (uchar*)fname, fname_len));
+  return (event_encrypter.encrypt_and_write(file, (uchar*)table_name, table_name_len + 1) ||
+	  event_encrypter.encrypt_and_write(file, (uchar*)db, db_len + 1) ||
+	  event_encrypter.encrypt_and_write(file, (uchar*)fname, fname_len));
 }
 
 
@@ -7989,8 +7978,8 @@ bool Create_file_log_event::write_data_body(IO_CACHE* file)
   bool res;
   if ((res= Load_log_event::write_data_body(file)) || fake_base)
     return res;
-  return (encrypt_and_write(file, (uchar*) "", 1) ||
-          encrypt_and_write(file, block, block_len));
+  return (event_encrypter.encrypt_and_write(file, (uchar*) "", 1) ||
+          event_encrypter.encrypt_and_write(file, block, block_len));
 }
 
 
@@ -8005,7 +7994,7 @@ bool Create_file_log_event::write_data_header(IO_CACHE* file)
   if ((res= Load_log_event::write_data_header(file)) || fake_base)
     return res;
   int4store(buf + CF_FILE_ID_OFFSET, file_id);
-  return encrypt_and_write(file, buf, Binary_log_event::CREATE_FILE_HEADER_LEN) != 0;
+  return event_encrypter.encrypt_and_write(file, buf, Binary_log_event::CREATE_FILE_HEADER_LEN) != 0;
 }
 
 
@@ -9003,20 +8992,19 @@ Execute_load_query_log_event::do_apply_event(Relay_log_info const *rli)
 
 bool sql_ex_info::write_data(IO_CACHE* file)
 {
-  uint event_len_to_crypt= 0;
   if (data_info.new_format())
   {
-    return (write_str_at_most_255_bytes(file, data_info.field_term,
-                                        (uint) data_info.field_term_len, event_len_to_crypt, ctx) ||
-	    write_str_at_most_255_bytes(file, data_info.enclosed,
-                                        (uint) data_info.enclosed_len, event_len_to_crypt, ctx) ||
+    return (write_str_at_most_255_bytes(file, data_info.field_term, 
+                                        (uint) data_info.field_term_len, event_encrypter) ||
+	    write_str_at_most_255_bytes(file, data_info.enclosed, 
+                                        (uint) data_info.enclosed_len, event_encrypter) ||
 	    write_str_at_most_255_bytes(file, data_info.line_term,
-                                        (uint) data_info.line_term_len, event_len_to_crypt, ctx) ||
+                                        (uint) data_info.line_term_len, event_encrypter) ||
 	    write_str_at_most_255_bytes(file, data_info.line_start,
-                                        (uint) data_info.line_start_len, event_len_to_crypt, ctx) ||
+                                        (uint) data_info.line_start_len, event_encrypter) ||
 	    write_str_at_most_255_bytes(file, data_info.escaped,
-                                        (uint) data_info.escaped_len, event_len_to_crypt, ctx) ||
-	    encrypt_and_write(file,(uchar*) &(data_info.opt_flags), 1, event_len_to_crypt, ctx));
+                                        (uint) data_info.escaped_len, event_encrypter) ||
+            event_encrypter->encrypt_and_write(file, (uchar*) &(data_info.opt_flags), 1));
   }
   else
   {
@@ -9032,7 +9020,7 @@ bool sql_ex_info::write_data(IO_CACHE* file)
     old_ex.escaped=    *(data_info.escaped);
     old_ex.opt_flags=  data_info.opt_flags;
     old_ex.empty_flags= data_info.empty_flags;
-    return encrypt_and_write(file, (uchar*) &old_ex, sizeof(old_ex), event_len_to_crypt, ctx) != 0;
+    return event_encrypter->encrypt_and_write(file, (uchar*) &old_ex, sizeof(old_ex)) != 0;
   }
 }
 
@@ -13115,7 +13103,7 @@ Incident_log_event::write_data_body(IO_CACHE *file)
     crc= checksum_crc32(crc, (uchar*) message, message_length);
     // todo: report a bug on write_str accepts uint but treats it as uchar
   }
-  DBUG_RETURN(write_str_at_most_255_bytes(file, message, (uint) message_length, event_len, ctx));
+  DBUG_RETURN(write_str_at_most_255_bytes(file, message, (uint) message_length, &event_encrypter));
 }
 
 
@@ -13228,7 +13216,7 @@ Rows_query_log_event::write_data_body(IO_CACHE *file)
    that length will be ignored and the complete query will be read.
   */
   DBUG_RETURN(write_str_at_most_255_bytes(file, m_rows_query,
-              strlen(m_rows_query), event_len, ctx));
+                                          strlen(m_rows_query), &event_encrypter));
 }
 
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)

@@ -51,6 +51,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include "log_crypt.h"
 
 #ifdef MYSQL_CLIENT
 class Format_description_log_event;
@@ -135,7 +136,7 @@ struct sql_ex_info
 {
   sql_ex_info() {}                            /* Remove gcc warning */
   binary_log::sql_ex_data_info data_info;
-  void *ctx;
+  Event_encrypter *event_encrypter;
 
   bool write_data(IO_CACHE* file);
   const char* init(const char* buf, const char* buf_end, bool use_new_format);
@@ -618,21 +619,7 @@ public:
   */
   ha_checksum crc;
 
-  /**
-     Encryption data (key, nonce). Only used if ctx != 0.
-  */
-  Binlog_crypt_data *crypto;
-
-  /**
-     Encryption context or 0 if no encryption is needed
-  */
-  void *ctx;
-  
-  /**
-     Event length to be written into the next encrypted block
-  */
-  uint event_len;
-  int encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len);
+  Event_encrypter event_encrypter;
 
   /**
     Index in @c rli->gaq array to indicate a group that this event is

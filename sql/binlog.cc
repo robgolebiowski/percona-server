@@ -41,7 +41,6 @@
 #include <list>
 #include <string>
 #include "my_rnd.h"
-#include "log_crypt.h"
 
 using std::max;
 using std::min;
@@ -949,25 +948,9 @@ public:
     if (DBUG_EVALUATE_IF("fault_injection_crc_value", 1, 0))
       checksum--;
 
-    ctx= NULL;
   }
 
-  /**
-     Encryption data (key, nonce). Only used if ctx != 0.
-  */
-  Binlog_crypt_data *crypto;
-
-  /**
-     Encryption context or 0 if no encryption is needed
-  */
-  void *ctx;
-  uint event_len;
-
-  int encrypt_and_write(IO_CACHE *file, const uchar *pos, size_t len)
-  {
-    return ::encrypt_and_write(file, pos, len, event_len, ctx);
-  }
-
+  Event_encrypter event_encrypter;
 
   /**
     Write part of an event to disk.
@@ -1038,7 +1021,7 @@ public:
 
       len= *event_len_p;
 
-      if (ctx)
+      if (event_encrypter.ctx)
       {
         uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
         len= write_bytes;
@@ -1050,7 +1033,7 @@ public:
 
         int res= 0;
 
-        if ((res= init_event_crypt(output_cache, crypto, pos, ctx, len, event_len)))
+        if ((res= event_encrypter.init(output_cache, pos, len)))
           DBUG_RETURN(res);
       }
     }
@@ -1058,10 +1041,10 @@ public:
     // write the buffer
     uint32 write_bytes= std::min<uint32>(*buf_len_p, len);
     DBUG_ASSERT(write_bytes > 0);
-    if (encrypt_and_write(output_cache, pos, write_bytes))
+    if (event_encrypter.encrypt_and_write(output_cache, pos, write_bytes))
       DBUG_RETURN(true);
 
-    if (ctx && is_header)
+    if (event_encrypter.ctx && is_header)
       write_bytes+=4;
     else if (have_checksum)
       checksum= my_checksum(checksum, *buf_p, write_bytes);
@@ -1079,12 +1062,12 @@ public:
       {
         uchar checksum_buf[BINLOG_CHECKSUM_LEN];
         int4store(checksum_buf, checksum);
-        if (encrypt_and_write(output_cache, checksum_buf, BINLOG_CHECKSUM_LEN))
+        if (event_encrypter.encrypt_and_write(output_cache, checksum_buf, BINLOG_CHECKSUM_LEN))
           DBUG_RETURN(true);
         thd->binlog_bytes_written+= BINLOG_CHECKSUM_LEN;
         checksum= initial_checksum;
       }
-      if (ctx && finish_event_crypt(output_cache, event_len, ctx))
+      if (event_encrypter.ctx && event_encrypter.finish(output_cache))
         DBUG_RETURN(true);
     }
 
@@ -1534,13 +1517,10 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
       correct.
     */
     Binlog_event_writer writer(mysql_bin_log.get_log_file(), thd);
-    writer.crypto= mysql_bin_log.get_crypto_data();
+    writer.event_encrypter.crypto= mysql_bin_log.get_crypto_data();
 
     if (mysql_bin_log.get_crypto_data()->scheme)
-    {
-      writer.crypto= mysql_bin_log.get_crypto_data();
-      writer.ctx= alloca(writer.crypto->ctx_size);
-    }
+      writer.event_encrypter.ctx= alloca(writer.event_encrypter.crypto->ctx_size);
 
     /* The GTID ownership process might set the commit_error */
     error= (thd->commit_error == THD::CE_FLUSH_ERROR);
@@ -6814,8 +6794,8 @@ int MYSQL_BIN_LOG::write_to_file(Log_event* event)
 {
   if (crypto.scheme)
   {
-    event->crypto= &crypto;
-    event->ctx= alloca(crypto.ctx_size);
+    event->event_encrypter.crypto= &crypto;
+    event->event_encrypter.ctx= alloca(crypto.ctx_size);
   }
   return event->write(&log_file);
 }
