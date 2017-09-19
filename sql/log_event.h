@@ -45,8 +45,6 @@
 #include "sql_list.h"                // I_List
 #endif
 
-#include "rpl_constants.h"
-
 #include <list>
 #include <map>
 #include <set>
@@ -1750,7 +1748,6 @@ protected:
      return Log_event::EVENT_SKIP_NOT;
   }
 #endif
-
 };
 
 /**

@@ -590,12 +590,6 @@ public:
 #endif
 
 public:
-  //TODO:Robert:Move to more appropriate place
-  Binlog_crypt_data* get_crypto_data()
-  {
-    return &crypto;
-  }
-  
   /* Committed transactions timestamp */
    Logical_clock max_committed_transaction;
   /* "Prepared" transactions timestamp */
@@ -972,6 +966,11 @@ public:
       @retval !=0    Error
   */
   int get_gtid_executed(Sid_map *sid_map, Gtid_set *gtid_set);
+
+  Binlog_crypt_data* get_crypto_data()
+  {
+    return &crypto;
+  }
 private:
   void publish_coordinates_for_global_status(void) const;
 };

@@ -4,10 +4,7 @@
 encrypt-binlog=0
 
 [mysqld.2]
-#log-slave-updates
 encrypt-binlog
 master-verify-checksum=1
 plugin-load-add= @ENV.FILE_KEY_MANAGEMENT_SO
-#file-key-management
 loose-keyring_file_data= /home/rob/keys.txt
-#loose-file-key-management-filename= @ENV.MYSQL_TEST_DIR/std_data/keys.txt

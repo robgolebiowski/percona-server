@@ -30,8 +30,6 @@ if ($use_remote_mysqlbinlog)
 
 --exec $MYSQL_BINLOG --short-form $mysqlbinlog_args > ~/output2
 --exec $MYSQL_BINLOG --short-form $mysqlbinlog_args | $MYSQL --default-character-set=utf8
-#--let $wait_condition=SELECT COUNT(*)=2 FROM information_schema.tables WHERE table_name = "t3" OR table_name = "t4"
-
 
 # original and recovered data must be equal
 select HEX(f) from t03;

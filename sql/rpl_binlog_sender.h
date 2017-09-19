@@ -257,7 +257,6 @@ private:
      @return It returns 0 if succeeds, otherwise 1 is returned.
   */
   int send_format_description_event(IO_CACHE *log, my_off_t start_pos);
-
   /**
      It sends a heartbeat to the client.
 

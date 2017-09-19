@@ -1,17 +1,10 @@
 !include my.cnf
 
 [mysqld.2]
-#!use-slave-opt
-#innodb
 early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
 loose-keyring_file_data= /home/rob/keys.txt
 log-slave-updates
-#TODO: Robert: Nie ma takiej zmiennej log-basename - u Nas log-bin
-#log-basename= slave
 log-bin=slave-bin
 relay-log=slave-relay-bin
 encrypt-binlog=1
 master-verify-checksum=1
-#relay-log-purge=0
-#gtid-mode=ON
-#enforce-gtid-consistency=ON

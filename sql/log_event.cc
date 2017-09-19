@@ -64,7 +64,6 @@ slave_ignored_err_throttle(window_size,
 #include "sql_digest.h"
 #include "rpl_gtid.h"
 #include "xa_aux.h"
-#include "my_byteorder.h"
 
 PSI_memory_key key_memory_log_event;
 PSI_memory_key key_memory_Incident_log_event_message;
@@ -999,7 +998,6 @@ bool Log_event::write_footer(IO_CACHE* file)
   }
   if (event_encrypter.ctx && event_encrypter.finish(file))
     return 1;
-
   return 0;
 }
 
@@ -1140,7 +1138,6 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
   if (event_encrypter.ctx)
   {
     int res= 0;
-    //zmienić po teście header na pos
     if ((res= event_encrypter.init(file, pos, len)))
       DBUG_RETURN(res);
   }
@@ -1297,7 +1294,6 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
         packet->length(0);  // size of the content
         packet->append(newpkt, true_data_len + ev_offset);
       }
-
       /*
         Corrupt the event for Dump thread.
         We also need to exclude Previous_gtids_log_event and Gtid_log_event
@@ -1351,8 +1347,6 @@ end:
 #define UNLOCK_MUTEX
 #define LOCK_MUTEX
 #endif
-
-
 
 #ifndef MYSQL_CLIENT
 /**
@@ -8994,9 +8988,9 @@ bool sql_ex_info::write_data(IO_CACHE* file)
 {
   if (data_info.new_format())
   {
-    return (write_str_at_most_255_bytes(file, data_info.field_term, 
+    return (write_str_at_most_255_bytes(file, data_info.field_term,
                                         (uint) data_info.field_term_len, event_encrypter) ||
-	    write_str_at_most_255_bytes(file, data_info.enclosed, 
+	    write_str_at_most_255_bytes(file, data_info.enclosed,
                                         (uint) data_info.enclosed_len, event_encrypter) ||
 	    write_str_at_most_255_bytes(file, data_info.line_term,
                                         (uint) data_info.line_term_len, event_encrypter) ||
@@ -9004,7 +8998,7 @@ bool sql_ex_info::write_data(IO_CACHE* file)
                                         (uint) data_info.line_start_len, event_encrypter) ||
 	    write_str_at_most_255_bytes(file, data_info.escaped,
                                         (uint) data_info.escaped_len, event_encrypter) ||
-            event_encrypter->encrypt_and_write(file, (uchar*) &(data_info.opt_flags), 1));
+            event_encrypter->encrypt_and_write(file,(uchar*) &(data_info.opt_flags), 1));
   }
   else
   {
@@ -13216,7 +13210,7 @@ Rows_query_log_event::write_data_body(IO_CACHE *file)
    that length will be ignored and the complete query will be read.
   */
   DBUG_RETURN(write_str_at_most_255_bytes(file, m_rows_query,
-                                          strlen(m_rows_query), &event_encrypter));
+              strlen(m_rows_query), &event_encrypter));
 }
 
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)

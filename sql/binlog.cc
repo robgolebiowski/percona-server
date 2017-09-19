@@ -453,8 +453,6 @@ public:
   */
   IO_CACHE cache_log;
 
-  Binlog_crypt_data *crypto;
-
 protected:
   /*
     It truncates the cache to a certain position. This includes deleting the
@@ -744,12 +742,6 @@ public:
       trx_cache.reset();
   }
 
-  void set_crypto(Binlog_crypt_data *crypto)
-  {
-    stmt_cache.crypto= crypto;
-    trx_cache.crypto= crypto;
-  }
-
 #ifndef DBUG_OFF
   bool dbug_any_finalized() const {
     return stmt_cache.is_finalized() || trx_cache.is_finalized();
@@ -947,7 +939,6 @@ public:
     // Simulate checksum error
     if (DBUG_EVALUATE_IF("fault_injection_crc_value", 1, 0))
       checksum--;
-
   }
 
   Event_encrypter event_encrypter;
@@ -1027,7 +1018,7 @@ public:
         len= write_bytes;
         DBUG_ASSERT(write_bytes > 0);
         
-        // update the checksum Przenioslem to z dolu, co sie stanie, jezeli encrypt_and_write sfailuje - zachować stary checksum?
+        // update the checksum
         if (have_checksum)
           checksum= my_checksum(checksum, *buf_p, write_bytes);
 
@@ -9850,9 +9841,6 @@ int THD::binlog_setup_trx_data()
                                 max_binlog_cache_size,
                                 &binlog_cache_use,
                                 &binlog_cache_disk_use);
-
-  cache_mngr->set_crypto(mysql_bin_log.get_crypto_data());
-
   DBUG_RETURN(0);
 }
 
