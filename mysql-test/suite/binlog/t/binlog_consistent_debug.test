@@ -99,7 +99,7 @@ reap;
 
 --connection con2
 --echo # connection con2
---replace_result 154 POSITION 217 POSITION
+--replace_result 217 POSITION
 reap;
 --disconnect con2
 
