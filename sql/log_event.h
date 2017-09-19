@@ -51,7 +51,7 @@
 #include <map>
 #include <set>
 #include <string>
-#include "log_crypt.h"
+#include "event_crypt.h"
 
 #ifdef MYSQL_CLIENT
 class Format_description_log_event;
