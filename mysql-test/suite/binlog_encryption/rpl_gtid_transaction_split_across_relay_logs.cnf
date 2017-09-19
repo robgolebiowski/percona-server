@@ -1,16 +1,18 @@
 !include include/default_mysqld.cnf
 
 [mysqld.1]
-early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
-loose-keyring_file_data= /home/rob/keys1.txt
+plugin_dir=@env.KEYRING_PLUGIN_DIR
+early-plugin-load=@env.KEYRING_PLUGIN
+loose-keyring_file_data="@env.MYSQL_TMP_DIR/keyring1"
 gtid-mode=ON
 enforce-gtid-consistency=ON
 encrypt-binlog=1
 master-verify-checksum=1
 
 [mysqld.2]
-early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
-loose-keyring_file_data= /home/rob/keys2.txt
+plugin_dir=@env.KEYRING_PLUGIN_DIR
+early-plugin-load=@env.KEYRING_PLUGIN
+loose-keyring_file_data="@env.MYSQL_TMP_DIR/keyring2"
 log-slave-updates
 relay-log-info-repository=table
 gtid-mode=ON
@@ -19,8 +21,9 @@ encrypt-binlog=1
 master-verify-checksum=1
 
 [mysqld.3]
-early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
-loose-keyring_file_data= /home/rob/keys3.txt
+plugin_dir=@env.KEYRING_PLUGIN_DIR
+early-plugin-load=@env.KEYRING_PLUGIN
+loose-keyring_file_data="@env.MYSQL_TMP_DIR/keyring3"
 log-slave-updates
 relay-log-info-repository=table
 gtid-mode=ON

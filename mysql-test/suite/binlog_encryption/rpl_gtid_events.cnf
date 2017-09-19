@@ -1,8 +1,9 @@
 !include my.cnf
 
 [mysqld.2]
-early-plugin-load= @ENV.FILE_KEY_MANAGEMENT_SO
-loose-keyring_file_data= /home/rob/keys.txt
+plugin_dir=@env.KEYRING_PLUGIN_DIR
+early-plugin-load=@env.KEYRING_PLUGIN
+loose-keyring_file_data="@env.MYSQL_TMP_DIR/keyring"
 log-slave-updates
 log-bin=slave-bin
 relay-log=slave-relay-bin

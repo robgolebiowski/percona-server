@@ -1,7 +1,8 @@
 !include my.cnf
 
 [mysqld.2]
-plugin-load-add= @ENV.FILE_KEY_MANAGEMENT_SO
-loose-keyring_file_data= /home/rob/keys2.txt
+plugin_dir=@env.KEYRING_PLUGIN_DIR
+early-plugin-load=@env.KEYRING_PLUGIN
+loose-keyring_file_data="@env.MYSQL_TMP_DIR/keyring2"
 encrypt-binlog
 master-verify-checksum=1

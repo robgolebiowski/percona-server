@@ -6,7 +6,8 @@ binlog-format='MIXED'
 
 [mysqld.2]
 binlog-checksum=CRC32
-plugin-load-add= @ENV.FILE_KEY_MANAGEMENT_SO
-loose-keyring_file_data= /home/rob/keys2.txt
+plugin_dir=@env.KEYRING_PLUGIN_DIR
+early-plugin-load=@env.KEYRING_PLUGIN
+loose-keyring_file_data="@env.MYSQL_TMP_DIR/keyring"
 encrypt-binlog
 master-verify-checksum=1
