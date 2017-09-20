@@ -39,6 +39,7 @@ SET(MYSYS_SSL_SOURCES
     my_md5.cc
     my_rnd.cc
     my_murmur3.cc
+    my_crypt.cc
     ${MYSYS_AES_IMPLEMENTATION}
    )
 

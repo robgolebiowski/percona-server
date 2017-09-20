@@ -1,0 +1,9 @@
+# The purpose of this test is to provide a reference for how the
+# incident log event is represented in the output from the mysqlbinlog
+# program.
+
+source include/have_log_bin.inc;
+source include/have_debug.inc;
+
+--let $use_remote_mysqlbinlog= 1
+--source extra/binlog_tests/binlog_incident.test

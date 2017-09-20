@@ -326,10 +326,16 @@ enum Log_event_type
 
   /* Prepared XA transaction terminal event similar to Xid */
   XA_PREPARE_LOG_EVENT= 38,
-  /**
-    Add new events here - right above this comment!
-    Existing events (except ENUM_END_EVENT) should never change their numbers
-  */
+
+  /* New MySQL events are to be added right above this comment */
+  MYSQL_EVENTS_END,
+
+  PERCONA_EVENTS_BEGIN= 100,
+
+  START_ENCRYPTION_EVENT= 101,
+
+  /* Add new Percona Server events here - right above this comment! */
+
   ENUM_END_EVENT /* end marker */
 };
 
@@ -786,7 +792,8 @@ public:
     ROWS_HEADER_LEN_V2= 10,
     TRANSACTION_CONTEXT_HEADER_LEN= 18,
     VIEW_CHANGE_HEADER_LEN= 52,
-    XA_PREPARE_HEADER_LEN= 0
+    XA_PREPARE_HEADER_LEN= 0,
+    START_ENCRYPTION_HEADER_LEN= 0
   }; // end enum_post_header_length
 protected:
   /**

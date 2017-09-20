@@ -159,15 +159,35 @@ Format_description_event::Format_description_event(uint8_t binlog_ver,
       VIEW_CHANGE_HEADER_LEN,
       XA_PREPARE_HEADER_LEN
     };
+
+    static uint8_t percona_server_event_header_length[]=
+    {
+      START_ENCRYPTION_HEADER_LEN
+    };
      /*
        Allows us to sanity-check that all events initialized their
        events (see the end of this 'if' block).
     */
+    uint number_of_mysql_event_types= MYSQL_EVENTS_END - 1;
     post_header_len.resize(number_of_event_types +
-                            BINLOG_CHECKSUM_ALG_DESC_LEN, 255);
-    post_header_len.insert(post_header_len.begin(), server_event_header_length,
-                            server_event_header_length + number_of_event_types);
+                           BINLOG_CHECKSUM_ALG_DESC_LEN, 255);
+    BAPI_ASSERT(number_of_mysql_event_types == sizeof(server_event_header_length));
+    std::copy(server_event_header_length,
+              server_event_header_length + sizeof(server_event_header_length),
+              post_header_len.begin());
+
+    // Set header length of the reserved events to 0
+    std::fill(post_header_len.begin() + number_of_mysql_event_types,
+              post_header_len.begin() + number_of_mysql_event_types +
+              PERCONA_EVENTS_BEGIN - MYSQL_EVENTS_END + 1,
+              0);
+    BAPI_ASSERT((ENUM_END_EVENT - PERCONA_EVENTS_BEGIN - 1) == sizeof(percona_server_event_header_length));
+    std::copy(percona_server_event_header_length,
+              percona_server_event_header_length + sizeof(percona_server_event_header_length),
+              post_header_len.begin() + PERCONA_EVENTS_BEGIN);
+
     // Sanity-check that all post header lengths are initialized.
+    BAPI_ASSERT(number_of_event_types + (uint)BINLOG_CHECKSUM_ALG_DESC_LEN == post_header_len.size());
 #ifndef DBUG_OFF
     for (int i= 0; i < number_of_event_types; i++)
       BAPI_ASSERT(post_header_len[i] != 255);
@@ -507,7 +527,13 @@ Incident_event::Incident_event(const char *buf, unsigned int event_len,
   char const *const str_end= buf - common_header_len + event_len;
   uint8_t len= 0;                   // Assignment to keep compiler happy
   const char *str= NULL;          // Assignment to keep compiler happy
-  read_str_at_most_255_bytes(&ptr, str_end, &str, &len);
+  if (read_str_at_most_255_bytes(&ptr, str_end, &str, &len))
+  {
+    /* Mark this event invalid */
+    incident= INCIDENT_NONE;
+    return;
+  }
+
   if (!(message= static_cast<char*>(bapi_malloc(len + 1, 16))))
   {
     /* Mark this event invalid */
