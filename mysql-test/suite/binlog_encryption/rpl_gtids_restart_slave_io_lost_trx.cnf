@@ -12,6 +12,6 @@ enforce-gtid-consistency=ON
 binlog-format='STATEMENT'
 plugin_dir=@env.KEYRING_PLUGIN_DIR
 early-plugin-load=@env.KEYRING_PLUGIN
-loose-keyring_file_data="@env.MYSQL_TMP_DIR/keyring2"
+keyring_file_data=../../tmp/keyring2
 encrypt_binlog=1
 master-verify-checksum=1
