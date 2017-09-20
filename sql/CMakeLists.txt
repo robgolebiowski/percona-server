@@ -25,6 +25,7 @@ INCLUDE_DIRECTORIES(
   ${SSL_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}/sql
   ${LZ4_INCLUDE_DIR}
+  SYSTEM ${BOOST_INCLUDE_DIR}
 )
 
 SET(CONF_SOURCES
@@ -118,6 +119,7 @@ SET(SQL_SHARED_SOURCES
   lock.cc
   locking_service.cc
   log.cc
+  event_crypt.cc
   mdl.cc
   my_decimal.cc
   net_serv.cc
