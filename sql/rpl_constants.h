@@ -19,6 +19,7 @@
 
 #include "my_global.h"
 #include "my_crypt.h"
+#include "my_sys.h"
 #ifdef MYSQL_SERVER
 #include <mysql/service_mysql_keyring.h>
 #endif
@@ -85,19 +86,37 @@ struct Binlog_crypt_data {
   uchar iv[BINLOG_IV_LENGTH];
 
   Binlog_crypt_data()
+    : scheme(0)
+    , key(NULL) 
+  {}
+
+  ~Binlog_crypt_data()
   {
-    scheme = 0;
+    if (key != NULL)
+      my_free(key);
+    key= NULL;
   }
 
-  Binlog_crypt_data& operator=(Binlog_crypt_data b)
+  Binlog_crypt_data& operator=(const Binlog_crypt_data &b)
   {
     if (b.scheme == 1)
     {
       this->scheme= b.scheme;
       this->key_version = b.key_version;
       this->ctx_size= b.ctx_size;
-      this->key= new uchar[b.key_length];
-      memcpy(this->key, b.key, b.key_length);
+      if (b.key_length && b.key != NULL)
+      {
+        if (key != NULL)
+          my_free(this->key);
+        this->key= reinterpret_cast<uchar*>(my_malloc(PSI_NOT_INSTRUMENTED, b.key_length, MYF(MY_WME)));
+        memcpy(this->key, b.key, b.key_length);
+      }
+      else
+      {
+        if (key != NULL)
+          my_free(this->key);
+        this->key= NULL;
+      }
       this->key_length= b.key_length;
       memcpy(this->iv, b.iv, BINLOG_IV_LENGTH);
       this->dst_len = b.dst_len;
@@ -113,23 +132,38 @@ struct Binlog_crypt_data {
     ctx_size= my_aes_ctx_size(MY_AES_ECB);
     key_version= kv;
     key_length= 16;
+    if (key != NULL)
+      my_free(key);
+    key= NULL;
 
 #ifdef MYSQL_SERVER
-    char *key_type = NULL;
+    char *key_type= NULL;
     size_t key_len;
-    if (my_key_fetch("percona_binlog_system_key", &key_type, NULL,
+    if (my_key_fetch("percona_binlog", &key_type, NULL,
                      reinterpret_cast<void**>(&key), &key_len) ||
         (key != NULL && key_len != 16))
+    {
+      if (key_type != NULL)
+        my_free(key_type);
       return 1;
+    }
+    my_free(key_type);
+    key_type= NULL;
 
     if (key == NULL)
     {
-      my_key_generate("percona_binlog_system_key", "AES", NULL, 16);
-      if (my_key_fetch("percona_binlog_system_key", &key_type, NULL,
+      my_key_generate("percona_binlog", "AES", NULL, 16);
+      if (my_key_fetch("percona_binlog", &key_type, NULL,
                        reinterpret_cast<void**>(&key), &key_len) ||
           key_len != 16)
+      {
+        if (key_type != NULL)
+          my_free(key_type);
         return 1;
+      }
+      DBUG_ASSERT(strncmp(key_type, "AES", 3) == 0);
     }
+    my_free(key_type);
 #endif    
     return 0;
   }

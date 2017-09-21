@@ -7306,16 +7306,27 @@ bool MYSQL_BIN_LOG::append_buffer(uchar* buf, uint len, Master_info *mi)
   {
     DBUG_ASSERT(crypto.scheme == 1);
 
-    ebuf= (uchar*)my_safe_alloca(len, 512);
+    ebuf= (uchar*)my_malloc(PSI_NOT_INSTRUMENTED, len, MYF(MY_WME));//  my_safe_alloca(len, 512);
     if (!ebuf ||
         encrypt_event(my_b_append_tell(&log_file), &crypto, buf, ebuf, len))
+    {
+      if (ebuf != NULL)
+        my_free(ebuf);
       DBUG_RETURN(true);
+    }
 
     buf= ebuf;
   }
 
   if (my_b_append(&log_file,(uchar*) buf,len))
+  {
+    if (ebuf != NULL)
+      my_free(ebuf);
     DBUG_RETURN(true);
+  }
+
+  if (ebuf != NULL)
+    my_free(ebuf);
 
   bytes_written += len;
   DBUG_RETURN(after_append_to_relay_log(mi));

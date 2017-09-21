@@ -1278,23 +1278,24 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
       {
         ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
 
-        char *newpkt= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
-        if (!newpkt)
+        char *decrypted_packet= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
+        if (!decrypted_packet)
           DBUG_RETURN(LOG_READ_MEM);
-        memcpy(newpkt, packet->ptr(), ev_offset);
+        memcpy(decrypted_packet, packet->ptr(), ev_offset);
 
         uchar *src= (uchar*)packet->ptr() + ev_offset;
-        uchar *dst= (uchar*)newpkt + ev_offset;
+        uchar *dst= (uchar*)decrypted_packet + ev_offset;
         memcpy(src + EVENT_LEN_OFFSET, src, 4);
 
         if (decrypt_event(my_b_tell(file) - true_data_len, &fdle->crypto_data, src, dst, true_data_len))
         {
-          my_free(newpkt);
+          my_free(decrypted_packet);
           DBUG_RETURN(LOG_READ_DECRYPT);
         }
 
         packet->length(0);  // size of the content
-        packet->append(newpkt, true_data_len + ev_offset);
+        packet->append(decrypted_packet, true_data_len + ev_offset);
+        my_free(decrypted_packet);
       }
       /*
         Corrupt the event for Dump thread.
