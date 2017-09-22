@@ -26,6 +26,7 @@ FOUND /table1_no_encryption/ in master-bin.0*
 #####################################################
 # Part 2: restart master, now with binlog encryption
 #####################################################
+UNINSTALL PLUGIN keyring_file;
 connection default;
 connection server_1;
 CREATE TABLE table2_to_encrypt (
@@ -43,6 +44,7 @@ NOT FOUND /table2_to_encrypt/ in master-bin.0*
 #####################################################
 # Part 3: restart master again without encryption
 #####################################################
+UNINSTALL PLUGIN keyring_file;
 connection default;
 connection server_1;
 CREATE TABLE table3_no_encryption (
@@ -77,5 +79,6 @@ SELECT COUNT(*) FROM table3_no_encryption;
 COUNT(*)
 4
 DROP TABLE table1_no_encryption, table2_to_encrypt, table3_no_encryption;
+UNINSTALL PLUGIN keyring_file;
 connection server_2;
 include/rpl_end.inc
