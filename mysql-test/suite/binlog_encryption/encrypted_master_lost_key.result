@@ -1,6 +1,6 @@
+call mtr.add_suppression('event read from binlog did not pass crc check');
 call mtr.add_suppression('Event crc check failed! Most likely there is event corruption');
 call mtr.add_suppression("Error reading GTIDs from binary log");
-call mtr.add_suppression("Slave I/O for channel '': Got fatal error 1236 from master when reading data from binary log: 'event read from binlog did not pass crc check*");
 #################
 # Initialization
 #################
@@ -28,6 +28,7 @@ NOT FOUND /table1_to_encrypt/ in master-bin.0*
 ################################################################
 # Pre-test 2: restart master with a different keys' storage file
 ################################################################
+UNINSTALL PLUGIN keyring_file;
 connection default;
 connection server_1;
 CREATE TABLE table2_to_encrypt (
@@ -41,6 +42,7 @@ SET binlog_format=ROW;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 NOT FOUND /table2_to_encrypt/ in master-bin.0*
+UNINSTALL PLUGIN keyring_file;
 #####################################################
 # Pre-test 3: restart master again with the right key
 #####################################################

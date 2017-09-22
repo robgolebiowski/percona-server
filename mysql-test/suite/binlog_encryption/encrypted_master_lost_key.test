@@ -20,9 +20,9 @@
 # to the "good" one, starts replication and checks that it works.
 #
 
+call mtr.add_suppression('event read from binlog did not pass crc check');
 call mtr.add_suppression('Event crc check failed! Most likely there is event corruption');
 call mtr.add_suppression("Error reading GTIDs from binary log");
-call mtr.add_suppression("Slave I/O for channel '': Got fatal error 1236 from master when reading data from binary log: 'event read from binlog did not pass crc check*");
 
 --source include/have_binlog_format_mixed.inc
 
@@ -70,6 +70,8 @@ INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
 --echo # Pre-test 2: restart master with a different keys' storage file
 --echo ################################################################
 
+UNINSTALL PLUGIN keyring_file;
+
 --let $rpl_server_parameters= --loose-keyring-file-data=$MYSQL_TMP_DIR/master_lose_key
 
 --let $rpl_server_number= 1
@@ -92,6 +94,8 @@ INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 --let SEARCH_FILE= master-bin.0*
 --let SEARCH_PATTERN= table2_to_encrypt
 --source include/search_pattern_in_files.inc
+
+UNINSTALL PLUGIN keyring_file;
 
 --echo #####################################################
 --echo # Pre-test 3: restart master again with the right key
