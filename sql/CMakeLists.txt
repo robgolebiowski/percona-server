@@ -411,7 +411,7 @@ SET (BINLOG_SOURCE rpl_gtid_misc.cc
                    rpl_gtid_mutex_cond_array.cc rpl_gtid_persist.cc
                    log_event.cc log_event_old.cc binlog.cc sql_binlog.cc
                    rpl_filter.cc rpl_record.cc rpl_record_old.cc
-                   rpl_utility.cc rpl_injector.cc rpl_table_access.cc)
+                   rpl_utility.cc rpl_injector.cc rpl_table_access.cc event_crypt.cc)
 ADD_CONVENIENCE_LIBRARY(binlog ${BINLOG_SOURCE})
 TARGET_LINK_LIBRARIES(binlog binlogevents_static)
 
