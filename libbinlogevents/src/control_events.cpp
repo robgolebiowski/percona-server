@@ -158,6 +158,8 @@ Format_description_event::Format_description_event(uint8_t binlog_ver,
       TRANSACTION_CONTEXT_HEADER_LEN,
       VIEW_CHANGE_HEADER_LEN,
       XA_PREPARE_HEADER_LEN,
+      0, // Set header length of the reserved events to 0 - MYSQL_EVENTS_END
+      0, // Set header length of the reserved events to 0 - PERCONA_EVENTS_BEGIN
       START_ENCRYPTION_HEADER_LEN
     };
      /*
