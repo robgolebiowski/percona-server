@@ -23,6 +23,7 @@
 call mtr.add_suppression('event read from binlog did not pass crc check');
 call mtr.add_suppression('Event crc check failed! Most likely there is event corruption');
 call mtr.add_suppression("Error reading GTIDs from binary log");
+call mtr.add_suppression('Found invalid event in binary log');
 
 --source include/have_binlog_format_mixed.inc
 
