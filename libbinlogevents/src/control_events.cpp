@@ -157,19 +157,23 @@ Format_description_event::Format_description_event(uint8_t binlog_ver,
        IGNORABLE_HEADER_LEN,
       TRANSACTION_CONTEXT_HEADER_LEN,
       VIEW_CHANGE_HEADER_LEN,
-      XA_PREPARE_HEADER_LEN,
-      0, // Set header length of the reserved events to 0 - MYSQL_EVENTS_END
-      0, // Set header length of the reserved events to 0 - PERCONA_EVENTS_BEGIN
-      START_ENCRYPTION_HEADER_LEN
+      XA_PREPARE_HEADER_LEN
     };
      /*
        Allows us to sanity-check that all events initialized their
        events (see the end of this 'if' block).
     */
+    uint number_of_mysql_event_types= MYSQL_EVENTS_END - 1;
     post_header_len.resize(number_of_event_types +
                             BINLOG_CHECKSUM_ALG_DESC_LEN, 255);
     post_header_len.insert(post_header_len.begin(), server_event_header_length,
-                            server_event_header_length + number_of_event_types);
+                           server_event_header_length + number_of_mysql_event_types);
+
+    // Set header length of the reserved events to 0
+    post_header_len.insert(post_header_len.begin() + number_of_mysql_event_types,
+                           PERCONA_EVENTS_BEGIN - MYSQL_EVENTS_END + 1, 0);
+    post_header_len.insert(post_header_len.begin() + PERCONA_EVENTS_BEGIN,
+                           START_ENCRYPTION_HEADER_LEN);
     // Sanity-check that all post header lengths are initialized.
 #ifndef DBUG_OFF
     for (int i= 0; i < number_of_event_types; i++)
