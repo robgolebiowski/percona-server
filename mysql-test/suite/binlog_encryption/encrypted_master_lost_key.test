@@ -43,6 +43,8 @@ call mtr.add_suppression('Found invalid event in binary log');
 --source include/stop_slave.inc
 --enable_connect_log
 
+call mtr.add_suppression('event read from binlog did not pass crc check');
+
 --echo #####################################################
 --echo # Pre-test 1: Initial key value
 --echo #####################################################
