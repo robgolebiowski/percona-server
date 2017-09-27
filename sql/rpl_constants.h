@@ -73,7 +73,7 @@ static const size_t ENCRYPTION_KEY_LEN = 32;
 
 #define BINLOG_CRYPTO_SCHEME_LENGTH 1
 #define BINLOG_KEY_VERSION_LENGTH   4
-#define BINLOG_IV_LENGTH            MY_CRYPT_AES_BLOCK_SIZE
+#define BINLOG_IV_LENGTH            MY_AES_BLOCK_SIZE
 #define BINLOG_IV_OFFS_LENGTH       4
 #define BINLOG_NONCE_LENGTH         (BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH)
 
@@ -170,13 +170,14 @@ struct Binlog_crypt_data {
 
   void set_iv(uchar* iv, uint32 offs) const
   {
-    memcpy(iv, nonce, BINLOG_NONCE_LENGTH);
-    int4store(iv + BINLOG_NONCE_LENGTH, offs);
-  }
+    DBUG_ASSERT(key != NULL && key_length == 16);
 
-  uchar* get_iv()
-  {
-    return iv;
+    uchar iv_plain[BINLOG_IV_LENGTH];
+    memcpy(iv_plain, nonce, BINLOG_NONCE_LENGTH);
+    int4store(iv_plain + BINLOG_NONCE_LENGTH, offs);
+
+    my_aes_encrypt(iv_plain, BINLOG_IV_LENGTH, iv,
+                   key, key_length, my_aes_128_ecb, NULL, false);
   }
 };
 

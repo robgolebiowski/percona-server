@@ -111,7 +111,7 @@ int Event_encrypter::finish(IO_CACHE *output_cache)
   DBUG_ASSERT(output_cache != NULL && ctx != NULL);
 
   uint dstlen;
-  uchar dst[MY_CRYPT_AES_BLOCK_SIZE*2];
+  uchar dst[MY_AES_BLOCK_SIZE*2];
   if (my_aes_crypt_finish(ctx, dst, &dstlen) ||
       maybe_write_event_len(output_cache, dst, dstlen) ||
       my_b_safe_write(output_cache, dst, dstlen))

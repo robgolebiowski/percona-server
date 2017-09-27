@@ -19,24 +19,21 @@
 #define MY_CRYPT_INCLUDED
 
 #include <my_config.h> /* HAVE_EncryptAes128{Ctr,Gcm} */
+#include "my_aes.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* return values from my_aes_encrypt/my_aes_decrypt functions */
-#define MY_CRYPT_AES_OK               0
-#define MY_CRYPT_AES_BAD_DATA         -100
-#define MY_CRYPT_AES_OPENSSL_ERROR    -101
-#define MY_CRYPT_AES_BAD_KEYSIZE      -102
-
-/* The block size for all supported algorithms */
-#define MY_CRYPT_AES_BLOCK_SIZE 16
+#define MY_AES_OK                     0
+#define MY_AES_OPENSSL_ERROR          -101
+#define MY_AES_BAD_KEYSIZE            -102
 
 /* The max key length of all supported algorithms */
-#define MY_CRYPT_AES_MAX_KEY_LENGTH 32
+#define MY_AES_MAX_KEY_LENGTH 32
 
-#define MY_CRYPT_AES_CTX_SIZE 512
+#define MY_AES_CTX_SIZE 512
 
 #define ENCRYPTION_FLAG_DECRYPT     0
 #define ENCRYPTION_FLAG_ENCRYPT     1

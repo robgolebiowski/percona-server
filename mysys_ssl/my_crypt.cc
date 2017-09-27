@@ -62,29 +62,29 @@ public:
   virtual int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key,
                    uint klen, const uchar *iv, uint ivlen)
   {
-    compile_time_assert(MY_CRYPT_AES_CTX_SIZE >= sizeof(MyCTX));
+    compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX));
     if (unlikely(!cipher))
-      return MY_CRYPT_AES_BAD_KEYSIZE;
+      return MY_AES_BAD_KEYSIZE;
 
     if (!EVP_CipherInit_ex(ctx, cipher, NULL, key, iv, encrypt))
-      return MY_CRYPT_AES_OPENSSL_ERROR;
+      return MY_AES_OPENSSL_ERROR;
 
     DBUG_ASSERT(EVP_CIPHER_CTX_key_length(ctx) == (int)klen);
     DBUG_ASSERT(EVP_CIPHER_CTX_iv_length(ctx) <= (int)ivlen);
 
-    return MY_CRYPT_AES_OK;
+    return MY_AES_OK;
   }
   virtual int update(const uchar *src, uint slen, uchar *dst, uint *dlen)
   {
     if (!EVP_CipherUpdate(ctx, dst, (int*)dlen, src, slen))
-      return MY_CRYPT_AES_OPENSSL_ERROR;
-    return MY_CRYPT_AES_OK;
+      return MY_AES_OPENSSL_ERROR;
+    return MY_AES_OK;
   }
   virtual int finish(uchar *dst, uint *dlen)
   {
     if (!EVP_CipherFinal_ex(ctx, dst, (int*)dlen))
-      return MY_CRYPT_AES_BAD_DATA;
-    return MY_CRYPT_AES_OK;
+      return MY_AES_BAD_DATA;
+    return MY_AES_OK;
   }
 };
 
@@ -93,7 +93,7 @@ class MyCTX_nopad : public MyCTX
 public:
   const uchar *key;
   uint klen, buf_len;
-  uchar oiv[MY_CRYPT_AES_BLOCK_SIZE];
+  uchar oiv[MY_AES_BLOCK_SIZE];
 
   MyCTX_nopad() : MyCTX() { }
   ~MyCTX_nopad() { }
@@ -101,7 +101,7 @@ public:
   int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, uint klen,
            const uchar *iv, uint ivlen)
   {
-    compile_time_assert(MY_CRYPT_AES_CTX_SIZE >= sizeof(MyCTX_nopad));
+    compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX_nopad));
     this->key= key;
     this->klen= klen;
     this->buf_len= 0;
@@ -122,7 +122,7 @@ public:
 
   int finish(uchar *dst, uint *dlen)
   {
-    buf_len %= MY_CRYPT_AES_BLOCK_SIZE;
+    buf_len %= MY_AES_BLOCK_SIZE;
     if (buf_len)
     {
       uchar *buf= EVP_CIPHER_CTX_buf_noconst(ctx);
@@ -135,7 +135,7 @@ public:
         If OpenSSL will change that, we'll need to change the implementation
         of this class too.
       */
-      uchar mask[MY_CRYPT_AES_BLOCK_SIZE];
+      uchar mask[MY_AES_BLOCK_SIZE];
       uint mlen;
 
       my_aes_crypt(MY_AES_ECB, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
@@ -146,7 +146,7 @@ public:
         dst[i]= buf[i] ^ mask[i];
     }
     *dlen= buf_len;
-    return MY_CRYPT_AES_OK;
+    return MY_AES_OK;
   }
 };
 
@@ -187,7 +187,7 @@ public:
   int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, uint klen,
            const uchar *iv, uint ivlen)
   {
-    compile_time_assert(MY_CRYPT_AES_CTX_SIZE >= sizeof(MyCTX_gcm));
+    compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX_gcm));
     int res= MyCTX::init(cipher, encrypt, key, klen, iv, ivlen);
     int real_ivlen= EVP_CIPHER_CTX_iv_length(ctx);
     aad= iv + real_ivlen;
@@ -206,16 +206,16 @@ public:
     if (!EVP_CIPHER_CTX_encrypting(ctx))
     {
       /* encrypted string must contain authenticaton tag (see MDEV-11174) */
-      if (slen < MY_CRYPT_AES_BLOCK_SIZE)
-        return MY_CRYPT_AES_BAD_DATA;
-      slen-= MY_CRYPT_AES_BLOCK_SIZE;
-      if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, MY_CRYPT_AES_BLOCK_SIZE,
+      if (slen < MY_AES_BLOCK_SIZE)
+        return MY_AES_BAD_DATA;
+      slen-= MY_AES_BLOCK_SIZE;
+      if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, MY_AES_BLOCK_SIZE,
                               (void*)(src + slen)))
-        return MY_CRYPT_AES_OPENSSL_ERROR;
+        return MY_AES_OPENSSL_ERROR;
     }
     int unused;
     if (aadlen && !EVP_CipherUpdate(ctx, NULL, &unused, aad, aadlen))
-      return MY_CRYPT_AES_OPENSSL_ERROR;
+      return MY_AES_OPENSSL_ERROR;
     aadlen= 0;
     return MyCTX::update(src, slen, dst, dlen);
   }
@@ -224,18 +224,18 @@ public:
   {
     int fin;
     if (!EVP_CipherFinal_ex(ctx, dst, &fin))
-      return MY_CRYPT_AES_BAD_DATA;
+      return MY_AES_BAD_DATA;
     DBUG_ASSERT(fin == 0);
 
     if (EVP_CIPHER_CTX_encrypting(ctx))
     {
-      if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, MY_CRYPT_AES_BLOCK_SIZE, dst))
-        return MY_CRYPT_AES_OPENSSL_ERROR;
-      *dlen= MY_CRYPT_AES_BLOCK_SIZE;
+      if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, MY_AES_BLOCK_SIZE, dst))
+        return MY_AES_OPENSSL_ERROR;
+      *dlen= MY_AES_BLOCK_SIZE;
     }
     else
       *dlen= 0;
-    return MY_CRYPT_AES_OK;
+    return MY_AES_OK;
   }
 };
 
@@ -261,7 +261,7 @@ int my_aes_crypt_init(void *ctx, enum my_aes_mode mode, int flags,
 #ifdef HAVE_EncryptAes128Gcm
   if (mode == MY_AES_GCM)
     if (flags & ENCRYPTION_FLAG_NOPAD)
-      return MY_CRYPT_AES_OPENSSL_ERROR;
+      return MY_AES_OPENSSL_ERROR;
     else
       new (ctx) MyCTX_gcm();
   else
@@ -295,7 +295,7 @@ int my_aes_crypt(enum my_aes_mode mode, int flags,
                  const uchar *src, uint slen, uchar *dst, uint *dlen,
                  const uchar *key, uint klen, const uchar *iv, uint ivlen)
 {
-  void *ctx= alloca(MY_CRYPT_AES_CTX_SIZE);
+  void *ctx= alloca(MY_AES_CTX_SIZE);
   int res1, res2;
   uint d1= 0, d2;
   if ((res1= my_aes_crypt_init(ctx, mode, flags, key, klen, iv, ivlen)))
@@ -323,16 +323,16 @@ unsigned int my_aes_crypt_get_size(enum my_aes_mode mode __attribute__((unused))
     return source_length;
 #ifdef HAVE_EncryptAes128Gcm
   if (mode == MY_AES_GCM)
-    return source_length + MY_CRYPT_AES_BLOCK_SIZE;
+    return source_length + MY_AES_BLOCK_SIZE;
 #endif
 #endif
-  return (source_length / MY_CRYPT_AES_BLOCK_SIZE + 1) * MY_CRYPT_AES_BLOCK_SIZE;
+  return (source_length / MY_AES_BLOCK_SIZE + 1) * MY_AES_BLOCK_SIZE;
 }
 
 
 unsigned int my_aes_ctx_size(enum my_aes_mode)
 {
-  return MY_CRYPT_AES_CTX_SIZE;
+  return MY_AES_CTX_SIZE;
 }
 
 #ifdef HAVE_YASSL
@@ -341,7 +341,7 @@ int my_random_bytes(uchar* buf, int num)
 {
   TaoCrypt::RandomNumberGenerator rand;
   rand.GenerateBlock((TaoCrypt::byte*) buf, num);
-  return MY_CRYPT_AES_OK;
+  return MY_AES_OK;
 }
 #else
 
@@ -355,8 +355,8 @@ int my_random_bytes(uchar *buf, int num)
   */
   RAND_METHOD *rand = RAND_OpenSSL();
   if (rand == NULL || rand->bytes(buf, num) != 1)
-    return MY_CRYPT_AES_OPENSSL_ERROR;
-  return MY_CRYPT_AES_OK;
+    return MY_AES_OPENSSL_ERROR;
+  return MY_AES_OK;
 }
 #endif
 
