@@ -31,7 +31,18 @@ NOT FOUND /table1_to_encrypt/ in master-bin.0*
 # Pre-test 2: restart master with a different keys' storage file
 ################################################################
 UNINSTALL PLUGIN keyring_file;
+include/rpl_restart_server.inc [server_number=1 parameters: --loose-keyring-file-data=/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/tmp/master_lose_key]
+connection server_1;
+connection server_1;
+connection server_1;
 connection default;
+connection server_1;
+connection server_1_1;
+connection default;
+connection server_1;
+connection server_1_1;
+connection server_1;
+connection server_1;
 connection server_1;
 CREATE TABLE table2_to_encrypt (
 pk INT AUTO_INCREMENT PRIMARY KEY,
@@ -48,7 +59,18 @@ UNINSTALL PLUGIN keyring_file;
 #####################################################
 # Pre-test 3: restart master again with the right key
 #####################################################
+include/rpl_restart_server.inc [server_number=1]
+connection server_1;
+connection server_1;
+connection server_1;
 connection default;
+connection server_1;
+connection server_1_1;
+connection default;
+connection server_1;
+connection server_1_1;
+connection server_1;
+connection server_1;
 connection server_1;
 CREATE TABLE table3_to_encrypt (
 pk INT AUTO_INCREMENT PRIMARY KEY,

@@ -27,7 +27,18 @@ FOUND /table1_no_encryption/ in master-bin.0*
 # Part 2: restart master, now with binlog encryption
 #####################################################
 UNINSTALL PLUGIN keyring_file;
+include/rpl_restart_server.inc [server_number=1 parameters: --encrypt-binlog=1]
+connection server_1;
+connection server_1;
+connection server_1;
 connection default;
+connection server_1;
+connection server_1_1;
+connection default;
+connection server_1;
+connection server_1_1;
+connection server_1;
+connection server_1;
 connection server_1;
 CREATE TABLE table2_to_encrypt (
 pk INT AUTO_INCREMENT PRIMARY KEY,
@@ -45,7 +56,18 @@ NOT FOUND /table2_to_encrypt/ in master-bin.0*
 # Part 3: restart master again without encryption
 #####################################################
 UNINSTALL PLUGIN keyring_file;
+include/rpl_restart_server.inc [server_number=1 parameters: --encrypt-binlog=0]
+connection server_1;
+connection server_1;
+connection server_1;
 connection default;
+connection server_1;
+connection server_1_1;
+connection default;
+connection server_1;
+connection server_1_1;
+connection server_1;
+connection server_1;
 connection server_1;
 CREATE TABLE table3_no_encryption (
 pk INT AUTO_INCREMENT PRIMARY KEY,

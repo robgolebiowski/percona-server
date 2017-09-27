@@ -78,7 +78,8 @@ UNINSTALL PLUGIN keyring_file;
 --let $rpl_server_parameters= --loose-keyring-file-data=$MYSQL_TMP_DIR/master_lose_key
 
 --let $rpl_server_number= 1
---source restart_server.inc
+--source include/rpl_restart_server.inc
+#--source restart_server.inc
 
 CREATE TABLE table2_to_encrypt (
   pk INT AUTO_INCREMENT PRIMARY KEY,
@@ -106,7 +107,8 @@ UNINSTALL PLUGIN keyring_file;
 
 --let $rpl_server_parameters=
 --let $rpl_server_number= 1
---source restart_server.inc
+--source include/rpl_restart_server.inc
+#--source restart_server.inc
 
 --let $good_master_binlog= query_get_value(SHOW MASTER STATUS,File,1)
 

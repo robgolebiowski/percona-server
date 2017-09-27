@@ -63,7 +63,8 @@ UNINSTALL PLUGIN keyring_file;
 
 --let $rpl_server_parameters= --encrypt-binlog=1
 --let $rpl_server_number= 1
---source restart_server.inc
+--source include/rpl_restart_server.inc
+#--source restart_server.inc
 
 CREATE TABLE table2_to_encrypt (
   pk INT AUTO_INCREMENT PRIMARY KEY,
@@ -92,7 +93,8 @@ UNINSTALL PLUGIN keyring_file;
 
 --let $rpl_server_parameters= --encrypt-binlog=0
 --let $rpl_server_number= 1
---source restart_server.inc
+--source include/rpl_restart_server.inc
+#--source restart_server.inc
 
 CREATE TABLE table3_no_encryption (
   pk INT AUTO_INCREMENT PRIMARY KEY,
