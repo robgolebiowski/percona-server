@@ -78,6 +78,7 @@ UNINSTALL PLUGIN keyring_file;
 --let $rpl_server_parameters= --loose-keyring-file-data=$MYSQL_TMP_DIR/master_lose_key
 
 --let $rpl_server_number= 1
+--let $rpl_omit_print_server_parameters= 1
 --source include/rpl_restart_server.inc
 #--source restart_server.inc
 
