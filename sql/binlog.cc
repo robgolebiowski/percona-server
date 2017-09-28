@@ -5112,10 +5112,18 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     Start_encryption_log_event sele(1, 1, crypto.nonce);
     sele.common_footer->checksum_alg= s.common_footer->checksum_alg;
     if (write_to_file(&sele))
+    {
+      sql_print_error("Failed to write Start_encryption event to binary log and thus "
+                      "failed to initialize binlog encryption.");
       goto err;
+    }
     bytes_written+= sele.common_header->data_written;
     if (crypto.init(sele.crypto_scheme, 1))
+    {
+      sql_print_error("Failed to fetch percona_binlog key from keyring and thus "
+                      "failed to initialize binlog encryption.");
       goto err;
+    }
   }
 
   /*

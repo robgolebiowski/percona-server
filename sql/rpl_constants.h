@@ -139,6 +139,10 @@ struct Binlog_crypt_data {
 #ifdef MYSQL_SERVER
     char *key_type= NULL;
     size_t key_len;
+
+    DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
+                    { return 1; } );
+
     if (my_key_fetch("percona_binlog", &key_type, NULL,
                      reinterpret_cast<void**>(&key), &key_len) ||
         (key != NULL && key_len != 16))
