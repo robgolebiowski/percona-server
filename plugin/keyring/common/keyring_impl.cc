@@ -224,3 +224,37 @@ my_bool mysql_key_remove(boost::movelib::unique_ptr<IKey> key_to_remove)
   mysql_rwlock_unlock(&LOCK_keyring);
   return retval;
 }
+
+my_bool mysql_key_store(const char *key_id, const char *key_type,
+                        const char *user_id, const void *key, size_t key_len);
+my_bool mysql_key_fetch(const char *key_id, char **key_type, const char *user_id,
+                        void **key, size_t *key_len);
+
+bool init_system_keys()
+{
+  //We do not care whether key store succedes. It can fail if keyring already contains
+  //percona_server key
+  char *key_type, *key;
+  size_t key_length;
+  const size_t percona_server_key_length= 16;
+
+  uchar percona_server_key[percona_server_key_length];
+  my_rand_buffer(percona_server_key, percona_server_key_length);
+  my_key_store("percona_server", "AES", NULL, percona_server_key, percona_server_key_length);
+
+  bool failure= mysql_key_fetch("percona_server", &key_type, NULL, (void**)&key, &key_length) == TRUE;
+
+  if (failure || key == NULL || key_type == NULL ||
+      strncmp(key_type, "AES", 3) != 0 || key_length != percona_server_key_length)
+  {
+    logger->log(MY_ERROR_LEVEL, "Could not add percona_binlog system key to keyring");
+    failure= true;
+  }
+
+  if (key != NULL)
+    my_free(key);
+  if (key_type != NULL)
+    my_free(key_type);
+
+  return failure;
+}
