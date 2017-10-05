@@ -65,6 +65,8 @@ void log_operation_error(const char *failed_operation, const char *plugin_name);
 
 my_bool is_key_length_and_type_valid(const char *key_type, size_t key_len);
 
+bool init_system_keys();
+
 template <typename T>
 my_bool mysql_key_fetch(const char *key_id, char **key_type, const char *user_id,
                         void **key, size_t *key_len, const char *plugin_name)

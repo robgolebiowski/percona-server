@@ -113,13 +113,18 @@ my_bool Keys_container::store_key(IKey* key)
 
 IKey* Keys_container::get_key_from_hash(IKey *key)
 {
-  IKey* system_key= system_keys_container->fetch_system_key(key);
-  if (system_key != NULL)
-    return system_key;
-
+  std::string system_key_id= 
+    system_keys_container->get_latest_key_id_if_system_key(key);
+  //IKey* system_key= system_keys_container->fetch_system_key(key);
+  //if (system_key != NULL)
+    //return system_key;
   return reinterpret_cast<IKey*>(my_hash_search(keys_hash,
-    reinterpret_cast<const uchar*>(key->get_key_signature()->c_str()),
-    key->get_key_signature()->length()));
+    reinterpret_cast<const uchar*>(system_key_id.empty() ? 
+                                   key->get_key_signature()->c_str() :
+                                   system_key_id.c_str()),
+                                   system_key_id.empty () ?
+                                   key->get_key_signature()->length() :
+                                   system_key_id.length()));
 }
 
 void Keys_container::allocate_and_set_data_for_key(IKey *key,
