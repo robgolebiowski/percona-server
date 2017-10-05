@@ -9,12 +9,9 @@ namespace keyring
   class ISystem_keys_container : public Keyring_alloc
   {
   public:
-    /**
-     * This function adds/updates key in system_keys_container
-     * if key provided by the key argument is a system_key
-    */ 
+    virtual std::string get_latest_key_id_if_system_key(IKey *key) = 0;
     virtual void update_if_system_key(IKey *key) = 0;
-    virtual IKey* fetch_system_key(IKey *key) = 0;
+
     virtual ~ISystem_keys_container()
     {}
   };

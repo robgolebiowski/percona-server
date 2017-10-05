@@ -12,34 +12,31 @@ class System_keys_container : public ISystem_keys_container
 {
 public:
   System_keys_container();
-  ~System_keys_container();
 
+  virtual std::string get_latest_key_id_if_system_key(IKey *key);
   virtual void update_if_system_key(IKey *key);
-  virtual IKey* fetch_system_key(IKey *key);
 
 protected:
-  struct System_key_data
-  {
-    System_key_data()
-      : version(0),
-        key(NULL)
-    {}
-    long version;
-    IKey *key;
-  };
-  struct System_key
-  {
-    std::string id;
-    System_key_data data;
-  };
 
-  bool is_system_key(IKey *key, System_key &system_key);
-  void update_system_key(System_key& system_key);
-  IKey* get_system_key_from_map(std::string key_id);
+  bool is_system_key(IKey *key, std::string &system_key_id, long &key_version);
+  void update_system_key(IKey* key, std::string &system_key_id, long key_version);
 
 private:
-  std::map<std::string, System_key> system_key_id_data;
-  std::vector<IKey*> keys_allocated_by_us;
+  struct KeyIdAndVersion
+  {
+    KeyIdAndVersion()
+    {}
+
+    KeyIdAndVersion(std::string key_id, long version)
+      : key_id(key_id)
+      , version(version)
+    {}
+
+    std::string key_id;
+    long version;
+  };
+
+  std::map<std::string, KeyIdAndVersion> system_key_id_to_key_id;
 };
 
 } //namespace keyring
