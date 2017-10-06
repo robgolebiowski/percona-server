@@ -3,11 +3,6 @@
 
 namespace keyring {
 
-IKey* Vault_key::clone() const
-{
-  return new Vault_key(*this);
-}
-
 my_bool Vault_key::get_next_key(IKey **key)
 {
   if (was_key_retrieved)
