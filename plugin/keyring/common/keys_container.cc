@@ -43,9 +43,6 @@ Keys_container::Keys_container(ILogger *logger)
 {
   my_hash_clear(keys_hash);
   system_keys_container.reset(new System_keys_container());
-  //system_keys_ids.insert("percona_binlog");
-  //System_key_data["percona_binlog"]= 
-  //system_key_id_version.insert(std::make_pair("percona_binlog", 0));
 }
 
 Keys_container::Keys_container(ILogger *logger,
@@ -56,9 +53,6 @@ Keys_container::Keys_container(ILogger *logger,
  , system_keys_container(system_keys_container)
 {
   my_hash_clear(keys_hash);
-  //system_keys_ids.insert("percona_binlog");
-  //System_key_data["percona_binlog"]= 
-  //system_key_id_version.insert(std::make_pair("percona_binlog", 0));
 }
 
 Keys_container::~Keys_container()
@@ -115,9 +109,6 @@ IKey* Keys_container::get_key_from_hash(IKey *key)
 {
   std::string system_key_id= 
     system_keys_container->get_latest_key_id_if_system_key(key);
-  //IKey* system_key= system_keys_container->fetch_system_key(key);
-  //if (system_key != NULL)
-    //return system_key;
   return reinterpret_cast<IKey*>(my_hash_search(keys_hash,
     reinterpret_cast<const uchar*>(system_key_id.empty() ? 
                                    key->get_key_signature()->c_str() :
@@ -128,10 +119,12 @@ IKey* Keys_container::get_key_from_hash(IKey *key)
 }
 
 void Keys_container::allocate_and_set_data_for_key(IKey *key,
+                                                   std::string key_id, 
                                                    std::string *source_key_type,
                                                    uchar *source_key_data,
                                                    size_t source_key_data_size)
 {
+  *(key->get_key_id())= key_id;
   key->set_key_type(source_key_type);
   uchar *key_data= keyring_malloc<uchar*>(source_key_data_size);
   memcpy(key_data, source_key_data, source_key_data_size);
@@ -151,7 +144,9 @@ IKey*Keys_container::fetch_key(IKey *key)
   if (fetched_key->get_key_type()->empty())
     return NULL;
 
-  allocate_and_set_data_for_key(key, fetched_key->get_key_type(),
+  allocate_and_set_data_for_key(key,
+                                *(fetched_key->get_key_id()), 
+                                fetched_key->get_key_type(),
                                 fetched_key->get_key_data(),
                                 fetched_key->get_key_data_size());
   return key;
@@ -169,7 +164,10 @@ my_bool Keys_container::remove_key_from_hash(IKey *key)
 my_bool Keys_container::remove_key(IKey *key)
 {
   IKey* fetched_key_to_delete= get_key_from_hash(key);
-  if (fetched_key_to_delete == NULL || flush_to_backup() ||
+  //removing system keys is forbidden
+  if (fetched_key_to_delete == NULL ||
+      system_keys_container->is_system_key(fetched_key_to_delete) ||
+      flush_to_backup() ||
       remove_key_from_hash(fetched_key_to_delete))
     return TRUE;
   if (flush_to_storage(fetched_key_to_delete, REMOVE_KEY))

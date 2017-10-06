@@ -24,8 +24,6 @@ struct Vault_key : public Key, public ISerialized_object
   Vault_key()
   {}
  
-  virtual IKey* clone() const;
-
   using Key::get_key_data;
   uchar* get_key_data() const;
   using Key::get_key_data_size;
