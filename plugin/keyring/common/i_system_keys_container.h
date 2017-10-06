@@ -11,6 +11,7 @@ namespace keyring
   public:
     virtual std::string get_latest_key_id_if_system_key(IKey *key) = 0;
     virtual void update_if_system_key(IKey *key) = 0;
+    virtual bool is_system_key(IKey *key) = 0;
 
     virtual ~ISystem_keys_container()
     {}

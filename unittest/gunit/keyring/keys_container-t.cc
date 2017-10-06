@@ -292,7 +292,7 @@ namespace keyring__keys_container_unittest
     ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
 
     std::string key_data3("system_key_data_3");
-    Key *key3= new Key("percona_binlog:2", "AES", "Robert", key_data3.c_str(), key_data3.length()+1);
+    Key *key3= new Key("percona_binlog:2", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
     EXPECT_EQ(keys_container->store_key(key3), 0);
     ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
 
@@ -300,7 +300,7 @@ namespace keyring__keys_container_unittest
     IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
 
     ASSERT_TRUE(fetched_key != NULL);
-    std::string expected_key_signature= "percona_binlog";
+    std::string expected_key_signature= "percona_binlog:2";
     EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
     uchar *key_data_fetched= fetched_key->get_key_data();
@@ -333,8 +333,12 @@ namespace keyring__keys_container_unittest
     EXPECT_EQ(keys_container->store_key(key3), 0);
     ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
 
-    Key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+    Key latest_percona_binlog_key("percona_binlog:2", NULL, NULL, NULL, 0);
     ASSERT_TRUE(keys_container->remove_key(&latest_percona_binlog_key) == TRUE);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
+
+    Key percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+    ASSERT_TRUE(keys_container->remove_key(&percona_binlog_key) == TRUE);
     ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
 
     delete sample_key; //unused in this test
@@ -375,7 +379,7 @@ namespace keyring__keys_container_unittest
     IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
 
     ASSERT_TRUE(fetched_key != NULL);
-    std::string expected_key_signature= "percona_binlog";
+    std::string expected_key_signature= "percona_binlog:1";
     EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
     uchar *key_data_fetched= fetched_key->get_key_data();

@@ -260,6 +260,7 @@ namespace keyring__api_unittest
     delete[] keyring_filename;
     keyring_filename= new char[strlen("./new_keyring")+1];
     strcpy(keyring_filename, "./new_keyring");
+    remove(keyring_filename); //just to make sure new_keyring does not exist
     keyring_file_data_value= keyring_filename;
     keyring_deinit_with_mock_logger();
     keyring_init_with_mock_logger();
@@ -302,6 +303,9 @@ namespace keyring__api_unittest
     my_free(key);
     key= NULL;
     remove("./new_keyring");
+    //backup will stay as adding percona_binlog key will be unsuccessful - we have already added it in
+    //keyring
+    remove("./new_keyring.backup");
   }
 
   TEST_F(Keyring_api_test, NullUser)

@@ -48,11 +48,9 @@ public:
     return keys_hash->records;
   };
 protected:
-
-  //typedef std::pair<std::string, System_key_data> System_key;
-
   Keys_container(const Keys_container &);
   virtual void allocate_and_set_data_for_key(IKey *key,
+                                             std::string key_id,
                                              std::string *source_key_type,
                                              uchar *source_key_data,
                                              size_t source_key_data_size);
@@ -64,19 +62,11 @@ protected:
   virtual my_bool flush_to_backup();
   virtual my_bool flush_to_storage(IKey *key, Key_operation operation);
 
-  //IKey* get_system_key_from_map(std::string key_id);
-  //IKey* get_system_key_from_hash(IKey *key);
-  //my_bool get_system_key(std::string key_id);
-
   HASH *keys_hash;
-  //HASH *system_keys_hash;
   ILogger *logger;
   IKeyring_io *keyring_io;
   std::string keyring_storage_url;
-  //ISystem_keys_container *system_keys_container;
   boost::movelib::unique_ptr<ISystem_keys_container> system_keys_container;
-
-  //std::map<std::string, System_key> system_key_id_data;
 };
 
 } //namespace keyring
