@@ -86,7 +86,7 @@ std::string Keys_container::get_keyring_storage_url()
 
 my_bool Keys_container::store_key_in_hash(IKey *key)
 {
-  system_keys_container->update_if_system_key(key);
+  system_keys_container->update_if_system_key(key); //rename it to .._with_version
 
   if (my_hash_insert(keys_hash, (uchar *) key))
     return TRUE;
@@ -95,6 +95,9 @@ my_bool Keys_container::store_key_in_hash(IKey *key)
 
 my_bool Keys_container::store_key(IKey* key)
 {
+  if (system_keys_container->get_key_with_rotated_id_if_system_key(key)) //rename it to ..._if_system_key_without_version
+    return TRUE;
+
   if (flush_to_backup() || store_key_in_hash(key))
     return TRUE;
   if (flush_to_storage(key, STORE_KEY))
@@ -108,7 +111,7 @@ my_bool Keys_container::store_key(IKey* key)
 IKey* Keys_container::get_key_from_hash(IKey *key)
 {
   std::string system_key_id= 
-    system_keys_container->get_latest_key_id_if_system_key(key);
+    system_keys_container->get_latest_key_id_version_if_system_key(key);
   return reinterpret_cast<IKey*>(my_hash_search(keys_hash,
     reinterpret_cast<const uchar*>(system_key_id.empty() ? 
                                    key->get_key_signature()->c_str() :
