@@ -5,6 +5,7 @@
 #include "mock_logger.h"
 //#include "plugin/keyring/common/key.h"
 #include "keyring_key.h"
+#include <sstream>
 
 #if !defined(MERGE_UNITTESTS) && defined(HAVE_PSI_INTERFACE)
 namespace keyring
@@ -18,12 +19,12 @@ namespace keyring__system_keys_container_unittest
 {
   using namespace keyring;
   using keyring::Key;
-  using ::testing::Return;
-  using ::testing::InSequence;
-  using ::testing::_;
+  //using ::testing::Return;
+  //using ::testing::InSequence;
+  //using ::testing::_;
   using ::testing::StrEq;
-  using ::testing::DoAll;
-  using ::testing::SetArgPointee;
+  //using ::testing::DoAll;
+  //using ::testing::SetArgPointee;
 
   class System_keys_container_test : public ::testing::Test
   {
@@ -39,7 +40,7 @@ namespace keyring__system_keys_container_unittest
     sys_keys_container.update_if_system_key(key1);
 
     Key key_id("percona_binlog", NULL, NULL, NULL,0);
-    std::string system_key_id = sys_keys_container.get_latest_key_id_if_system_key(&key_id);
+    std::string system_key_id = sys_keys_container.get_latest_key_id_version_if_system_key(&key_id);
     EXPECT_STREQ(system_key_id.c_str(), "percona_binlog:0");
 
     delete key1;
@@ -58,7 +59,7 @@ namespace keyring__system_keys_container_unittest
     sys_keys_container.update_if_system_key(key2);
 
     Key key_id("percona_binlog", NULL, NULL, NULL,0);
-    std::string system_key_id = sys_keys_container.get_latest_key_id_if_system_key(&key_id);
+    std::string system_key_id = sys_keys_container.get_latest_key_id_version_if_system_key(&key_id);
     EXPECT_STREQ(system_key_id.c_str(), "percona_binlog:1");
 
     delete key1;
@@ -84,7 +85,7 @@ namespace keyring__system_keys_container_unittest
 
 
     Key key_id("percona_binlog", NULL, NULL, NULL,0);
-    std::string system_key_id = sys_keys_container.get_latest_key_id_if_system_key(&key_id);
+    std::string system_key_id = sys_keys_container.get_latest_key_id_version_if_system_key(&key_id);
     EXPECT_STREQ(system_key_id.c_str(), "percona_binlog:2");
 
     delete key1;
@@ -106,7 +107,7 @@ namespace keyring__system_keys_container_unittest
     sys_keys_container.update_if_system_key(key2);
 
     Key key_id("percona_binlog", NULL, NULL, NULL,0);
-    std::string system_key_id = sys_keys_container.get_latest_key_id_if_system_key(&key_id);
+    std::string system_key_id = sys_keys_container.get_latest_key_id_version_if_system_key(&key_id);
     EXPECT_STREQ(system_key_id.c_str(), "percona_binlog:0");
 
     delete key1;
@@ -131,7 +132,7 @@ namespace keyring__system_keys_container_unittest
     sys_keys_container.update_if_system_key(key3);
 
     Key key_id("percona_binlog", NULL, NULL, NULL,0);
-    std::string system_key_id = sys_keys_container.get_latest_key_id_if_system_key(&key_id);
+    std::string system_key_id = sys_keys_container.get_latest_key_id_version_if_system_key(&key_id);
     EXPECT_STREQ(system_key_id.c_str(), "percona_binlog:1");
 
     delete key1;
@@ -157,12 +158,117 @@ namespace keyring__system_keys_container_unittest
     sys_keys_container.update_if_system_key(key3);
 
     Key key_id("percona_binlog", NULL, NULL, NULL,0);
-    std::string system_key_id = sys_keys_container.get_latest_key_id_if_system_key(&key_id);
+    std::string system_key_id = sys_keys_container.get_latest_key_id_version_if_system_key(&key_id);
     EXPECT_STREQ(system_key_id.c_str(), "percona_binlog:2");
 
     delete key1;
     delete key2;
     delete key3;
   }
-} //namespace keyring__system_keys_container_unittest
 
+  TEST_F(System_keys_container_test, IfSystemKey)
+  {
+    std::string key_data1("system_key_data_1");
+    Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+
+    EXPECT_EQ(sys_keys_container.is_system_key(key1), true);
+
+    std::string key_data2("system_key_data_2");
+    Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+
+    EXPECT_EQ(sys_keys_container.is_system_key(key2), true);
+
+    std::string key_data3("system_key_data_3");
+    Key *key3= new Key("percona_binlog:2", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+
+    EXPECT_EQ(sys_keys_container.is_system_key(key3), true);
+
+    std::string key_data("system_key_data");
+    Key *key_without_version= new Key("percona_binlog", "AES", NULL, key_data.c_str(), key_data.length()+1);
+
+    EXPECT_EQ(sys_keys_container.is_system_key(key_without_version), true);
+
+    delete key1;
+    delete key2;
+    delete key3;
+    delete key_without_version;
+  }
+
+  TEST_F(System_keys_container_test, GetKeyWithRotattedId)
+  {
+    std::string key_data1("system_key_data_1");
+    Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+
+    sys_keys_container.update_if_system_key(key1);
+
+    Key *percona_binlog_key = new Key("percona_binlog", "AES", NULL, "sys_key", 8);
+    EXPECT_EQ(sys_keys_container.get_key_with_rotated_id_if_system_key(percona_binlog_key), false);
+    EXPECT_STREQ(percona_binlog_key->get_key_id()->c_str(), "percona_binlog:1");
+
+    std::string key_data2("system_key_data_2");
+    Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+
+    sys_keys_container.update_if_system_key(key2);
+
+    Key *percona_binlog_key2 = new Key("percona_binlog", "AES", NULL, "sys_key", 8);
+    EXPECT_EQ(sys_keys_container.get_key_with_rotated_id_if_system_key(percona_binlog_key2), false);
+    EXPECT_STREQ(percona_binlog_key2->get_key_id()->c_str(), "percona_binlog:2");
+
+    std::string key_data3("system_key_data_3");
+    Key *key3= new Key("percona_binlog:2", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+
+    sys_keys_container.update_if_system_key(key3);
+
+    Key *percona_binlog_key3 = new Key("percona_binlog", "AES", NULL, "sys_key", 8);
+    EXPECT_EQ(sys_keys_container.get_key_with_rotated_id_if_system_key(percona_binlog_key3), false);
+    EXPECT_STREQ(percona_binlog_key3->get_key_id()->c_str(), "percona_binlog:3");
+
+    delete key1;
+    delete key2;
+    delete key3;
+  }
+
+  TEST_F(System_keys_container_test, RotateToMaxKeyId)
+  {
+    std::string key_data1("system_key_data");
+    std::ostringstream correct_percona_binlog_key_id_ss;
+    correct_percona_binlog_key_id_ss << "percona_binlog:";
+    correct_percona_binlog_key_id_ss << (LONG_MAX - 1);
+    std::string correct_percona_binlog_key_id = correct_percona_binlog_key_id_ss.str();
+
+    Key *key1= new Key(correct_percona_binlog_key_id.c_str(), "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    sys_keys_container.update_if_system_key(key1);
+
+    Key *percona_binlog_key = new Key("percona_binlog", "AES", NULL, "sys_key", 8);
+    EXPECT_EQ(sys_keys_container.get_key_with_rotated_id_if_system_key(percona_binlog_key), false);
+
+    std::ostringstream max_percona_binlog_key_id_ss;
+    max_percona_binlog_key_id_ss << "percona_binlog:";
+    max_percona_binlog_key_id_ss << LONG_MAX;
+    std::string max_percona_binlog_key_id = max_percona_binlog_key_id_ss.str();
+
+    EXPECT_STREQ(percona_binlog_key->get_key_id()->c_str(), max_percona_binlog_key_id.c_str());
+
+    delete key1;
+  }
+
+  TEST_F(System_keys_container_test, RotateFromMaxKeyId)
+  {
+    std::string key_data1("system_key_data");
+    std::ostringstream max_percona_binlog_key_id_ss;
+    max_percona_binlog_key_id_ss << "percona_binlog:";
+    max_percona_binlog_key_id_ss << LONG_MAX;
+    std::string max_percona_binlog_key_id = max_percona_binlog_key_id_ss.str();
+
+    Key *key1= new Key(max_percona_binlog_key_id.c_str(), "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    sys_keys_container.update_if_system_key(key1);
+
+    Key *percona_binlog_key = new Key("percona_binlog", "AES", NULL, "sys_key", 8);
+    EXPECT_EQ(sys_keys_container.get_key_with_rotated_id_if_system_key(percona_binlog_key), true);
+
+    EXPECT_STREQ(percona_binlog_key->get_key_id()->c_str(), "percona_binlog");
+
+    delete key1;
+  }
+
+} //namespace keyring__system_keys_container_unittest
