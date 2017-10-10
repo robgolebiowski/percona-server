@@ -1,11 +1,11 @@
 #include <my_global.h>
 #include "event_crypt.h"
 
-static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, uint buf_len) 
+static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
 {
   DBUG_ASSERT(crypto->scheme != 0 && crypto->key != NULL);
 
-  uint elen;
+  size_t elen;
   uchar iv[BINLOG_IV_LENGTH];
 
   crypto->set_iv(iv, offs);
@@ -26,12 +26,12 @@ static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data *crypt
   return false;
 }
 
-bool encrypt_event(uint32 offs, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, uint buf_len) 
+bool encrypt_event(uint32 offs, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
 {
   return encrypt_event(offs, ENCRYPTION_FLAG_ENCRYPT, crypto, buf, ebuf, buf_len);
 }
 
-bool decrypt_event(uint32 offs, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, uint buf_len) 
+bool decrypt_event(uint32 offs, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
 {
   return encrypt_event(offs, ENCRYPTION_FLAG_DECRYPT, crypto, buf, ebuf, buf_len);
 }
@@ -85,7 +85,7 @@ int Event_encrypter::encrypt_and_write(IO_CACHE *output_cache, const uchar *pos,
       return 1;
 
     uint dstlen;
-    if (my_aes_crypt_update(ctx, pos, len, dst, &dstlen))
+    if (my_aes_crypt_update(ctx, pos, len, dst, (size_t*)&dstlen))
       goto err;
 
     if (maybe_write_event_len(output_cache, dst, dstlen))
@@ -112,7 +112,7 @@ int Event_encrypter::finish(IO_CACHE *output_cache)
 {
   DBUG_ASSERT(output_cache != NULL && ctx != NULL);
 
-  uint dstlen;
+  size_t dstlen;
   uchar dst[MY_AES_BLOCK_SIZE*2];
   if (my_aes_crypt_finish(ctx, dst, &dstlen) ||
       maybe_write_event_len(output_cache, dst, dstlen) ||

@@ -1276,7 +1276,7 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
 
       if (fdle != NULL && fdle->crypto_data.scheme)
       {
-        ulong true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
+        size_t true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
 
         char *decrypted_packet= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
         if (!decrypted_packet)
@@ -1397,7 +1397,7 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     */
     DBUG_RETURN(0);
   }
-  ulong data_len = uint4korr(head + EVENT_LEN_OFFSET);
+  size_t data_len = uint4korr(head + EVENT_LEN_OFFSET);
   char *buf= 0;
   const char *error= 0;
   Log_event *res=  0;

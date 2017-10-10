@@ -60,7 +60,7 @@ public:
   }
 
   virtual int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key,
-                   uint klen, const uchar *iv, uint ivlen)
+                   size_t klen, const uchar *iv, size_t ivlen)
   {
     compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX));
     if (unlikely(!cipher))
@@ -74,13 +74,13 @@ public:
 
     return MY_AES_OK;
   }
-  virtual int update(const uchar *src, uint slen, uchar *dst, uint *dlen)
+  virtual int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen)
   {
     if (!EVP_CipherUpdate(ctx, dst, (int*)dlen, src, slen))
       return MY_AES_OPENSSL_ERROR;
     return MY_AES_OK;
   }
-  virtual int finish(uchar *dst, uint *dlen)
+  virtual int finish(uchar *dst, size_t *dlen)
   {
     if (!EVP_CipherFinal_ex(ctx, dst, (int*)dlen))
       return MY_AES_BAD_DATA;
@@ -98,8 +98,8 @@ public:
   MyCTX_nopad() : MyCTX() { }
   ~MyCTX_nopad() { }
 
-  int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, uint klen,
-           const uchar *iv, uint ivlen)
+  int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, size_t klen,
+           const uchar *iv, size_t ivlen)
   {
     compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX_nopad));
     this->key= key;
@@ -114,13 +114,13 @@ public:
     return res;
   }
 
-  int update(const uchar *src, uint slen, uchar *dst, uint *dlen)
+  int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen)
   {
     buf_len+= slen;
     return MyCTX::update(src, slen, dst, dlen);
   }
 
-  int finish(uchar *dst, uint *dlen)
+  int finish(uchar *dst, size_t *dlen)
   {
     buf_len %= MY_AES_BLOCK_SIZE;
     if (buf_len)
@@ -136,7 +136,7 @@ public:
         of this class too.
       */
       uchar mask[MY_AES_BLOCK_SIZE];
-      uint mlen;
+      size_t mlen;
 
       my_aes_crypt(MY_AES_ECB, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
                    oiv, sizeof(mask), mask, &mlen, key, klen, 0, 0);
@@ -184,8 +184,8 @@ public:
   MyCTX_gcm() : MyCTX() { }
   ~MyCTX_gcm() { }
 
-  int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, uint klen,
-           const uchar *iv, uint ivlen)
+  int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, size_t klen,
+           const uchar *iv, size_t ivlen)
   {
     compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX_gcm));
     int res= MyCTX::init(cipher, encrypt, key, klen, iv, ivlen);
@@ -195,7 +195,7 @@ public:
     return res;
   }
 
-  int update(const uchar *src, uint slen, uchar *dst, uint *dlen)
+  int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen)
   {
     /*
       note that this GCM class cannot do streaming decryption, because
@@ -220,7 +220,7 @@ public:
     return MyCTX::update(src, slen, dst, dlen);
   }
 
-  int finish(uchar *dst, uint *dlen)
+  int finish(uchar *dst, size_t *dlen)
   {
     int fin;
     if (!EVP_CipherFinal_ex(ctx, dst, &fin))
@@ -251,11 +251,9 @@ const EVP_CIPHER *(*ciphers[])(uint)= {
 #endif
 };
 
-extern "C" {
-
 int my_aes_crypt_init(void *ctx, enum my_aes_mode mode, int flags,
-                      const unsigned char* key, unsigned int klen,
-                      const unsigned char* iv, unsigned int ivlen)
+                      const unsigned char* key, size_t klen,
+                      const unsigned char* iv, size_t ivlen)
 {
 #ifdef HAVE_EncryptAes128Ctr
 #ifdef HAVE_EncryptAes128Gcm
@@ -278,13 +276,13 @@ int my_aes_crypt_init(void *ctx, enum my_aes_mode mode, int flags,
                              key, klen, iv, ivlen);
 }
 
-int my_aes_crypt_update(void *ctx, const uchar *src, uint slen,
-                        uchar *dst, uint *dlen)
+int my_aes_crypt_update(void *ctx, const uchar *src, size_t slen,
+                        uchar *dst, size_t *dlen)
 {
   return ((MyCTX*)ctx)->update(src, slen, dst, dlen);
 }
 
-int my_aes_crypt_finish(void *ctx, uchar *dst, uint *dlen)
+int my_aes_crypt_finish(void *ctx, uchar *dst, size_t *dlen)
 {
   int res= ((MyCTX*)ctx)->finish(dst, dlen);
   ((MyCTX*)ctx)->~MyCTX();
@@ -292,12 +290,12 @@ int my_aes_crypt_finish(void *ctx, uchar *dst, uint *dlen)
 }
 
 int my_aes_crypt(enum my_aes_mode mode, int flags,
-                 const uchar *src, uint slen, uchar *dst, uint *dlen,
-                 const uchar *key, uint klen, const uchar *iv, uint ivlen)
+                 const uchar *src, size_t slen, uchar *dst, size_t *dlen,
+                 const uchar *key, size_t klen, const uchar *iv, size_t ivlen)
 {
   void *ctx= alloca(MY_AES_CTX_SIZE);
   int res1, res2;
-  uint d1= 0, d2;
+  size_t d1= 0, d2;
   if ((res1= my_aes_crypt_init(ctx, mode, flags, key, klen, iv, ivlen)))
     return res1;
   res1= my_aes_crypt_update(ctx, src, slen, dst, &d1);
@@ -316,7 +314,7 @@ int my_aes_crypt(enum my_aes_mode mode, int flags,
   Without padding (ENCRYPTION_FLAG_NOPAD) cyphertext has the same length
   as the plaintext
 */
-unsigned int my_aes_crypt_get_size(enum my_aes_mode mode __attribute__((unused)), unsigned int source_length)
+size_t my_aes_crypt_get_size(enum my_aes_mode mode __attribute__((unused)), size_t source_length)
 {
 #ifdef HAVE_EncryptAes128Ctr
   if (mode == MY_AES_CTR)
@@ -330,7 +328,7 @@ unsigned int my_aes_crypt_get_size(enum my_aes_mode mode __attribute__((unused))
 }
 
 
-unsigned int my_aes_ctx_size(enum my_aes_mode)
+size_t my_aes_ctx_size(enum my_aes_mode)
 {
   return MY_AES_CTX_SIZE;
 }
@@ -359,6 +357,3 @@ int my_random_bytes(uchar *buf, int num)
   return MY_AES_OK;
 }
 #endif
-
-}
-

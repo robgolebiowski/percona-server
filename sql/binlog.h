@@ -864,7 +864,7 @@ public:
   bool is_query_in_union(THD *thd, query_id_t query_id_param);
 
 #ifdef HAVE_REPLICATION
-  bool append_buffer(uchar* buf, uint len, Master_info *mi);
+  bool append_buffer(uchar* buf, size_t len, Master_info *mi);
   bool append_event(Log_event* ev, Master_info *mi);
 private:
   bool after_append_to_relay_log(Master_info *mi);

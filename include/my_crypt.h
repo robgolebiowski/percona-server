@@ -21,10 +21,6 @@
 #include <my_config.h> /* HAVE_EncryptAes128{Ctr,Gcm} */
 #include "my_aes.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define MY_AES_OK                     0
 #define MY_AES_OPENSSL_ERROR          -101
 #define MY_AES_BAD_KEYSIZE            -102
@@ -49,21 +45,17 @@ enum my_aes_mode {
 };
 
 int my_aes_crypt_init(void *ctx, enum my_aes_mode mode, int flags,
-                      const unsigned char* key, unsigned int klen,
-                      const unsigned char* iv, unsigned int ivlen);
-int my_aes_crypt_update(void *ctx, const unsigned char *src, unsigned int slen,
-                        unsigned char *dst, unsigned int *dlen);
-int my_aes_crypt_finish(void *ctx, unsigned char *dst, unsigned int *dlen);
+                      const unsigned char* key, size_t klen,
+                      const unsigned char* iv, size_t ivlen);
+int my_aes_crypt_update(void *ctx, const unsigned char *src, size_t slen,
+                        unsigned char *dst, size_t *dlen);
+int my_aes_crypt_finish(void *ctx, unsigned char *dst, size_t *dlen);
 int my_aes_crypt(enum my_aes_mode mode, int flags,
-                 const unsigned char *src, unsigned int slen, unsigned char *dst, unsigned int *dlen,
-                 const unsigned char *key, unsigned int klen, const unsigned char *iv, unsigned int ivlen);
+                 const unsigned char *src, size_t slen, unsigned char *dst, size_t *dlen,
+                 const unsigned char *key, size_t klen, const unsigned char *iv, size_t ivlen);
 
 int my_random_bytes(unsigned char* buf, int num);
-unsigned int my_aes_crypt_get_size(enum my_aes_mode mode, unsigned int source_length);
-unsigned int my_aes_ctx_size(enum my_aes_mode mode);
-
-#ifdef __cplusplus
-}
-#endif
+size_t my_aes_crypt_get_size(enum my_aes_mode mode, size_t source_length);
+size_t my_aes_ctx_size(enum my_aes_mode mode);
 
 #endif /* MY_CRYPT_INCLUDED */

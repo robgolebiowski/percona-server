@@ -7300,7 +7300,7 @@ bool MYSQL_BIN_LOG::append_event(Log_event* ev, Master_info *mi)
   DBUG_RETURN(error);
 }
 
-bool MYSQL_BIN_LOG::append_buffer(uchar* buf, uint len, Master_info *mi)
+bool MYSQL_BIN_LOG::append_buffer(uchar* buf, size_t len, Master_info *mi)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::append_buffer");
 
