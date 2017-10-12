@@ -1059,14 +1059,14 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     DBUG_RETURN(1);
 
   char header_buffer[LOG_EVENT_MINIMAL_HEADER_LEN];
-  //Let's check if next event is Start encryption event
+  // Let's check if next event is Start encryption event
   if (Log_event::peek_event_header(header_buffer, log_cache))
     DBUG_RETURN(1);
 
-  //peek_event_header actually moves the log_cache->read_pos, thus we need to rewind
+  // peek_event_header actually moves the log_cache->read_pos, thus we need to rewind
   log_cache->read_pos -= LOG_EVENT_MINIMAL_HEADER_LEN;
 
-  if (header_buffer[EVENT_TYPE_OFFSET] == binary_log::START_ENCRYPTION_EVENT)
+  if (static_cast<uchar>(header_buffer[EVENT_TYPE_OFFSET]) == binary_log::START_ENCRYPTION_EVENT)
   {
     event_ptr= NULL;
     my_off_t log_pos= my_b_tell(log_cache);
@@ -1097,7 +1097,7 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     if (start_pos <= BIN_LOG_HEADER_SIZE)
     {
       log_pos= my_b_tell(log_cache);
-      //We have read start encryption event from master binlog, but we have
+      // We have read start encryption event from master binlog, but we have
       //not send it to slave. We need to inform slave that master position
       //has advanced.
       if (unlikely(send_heartbeat_event(log_pos)))

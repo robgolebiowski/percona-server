@@ -5160,7 +5160,7 @@ int mysqld_main(int argc, char **argv)
     if (crypto_data->scheme == 1)
     {
       prev_gtids_ev.event_encrypter.crypto= crypto_data;
-      prev_gtids_ev.event_encrypter.ctx= alloca(crypto_data->ctx_size);
+      //prev_gtids_ev.event_encrypter.ctx= alloca(crypto_data->ctx_size);
     }
     if (prev_gtids_ev.write(mysql_bin_log.get_log_file()))
       unireg_abort(MYSQLD_ABORT_EXIT);

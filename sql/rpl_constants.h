@@ -129,7 +129,7 @@ struct Binlog_crypt_data {
     return *this;
   }
 
-  int init(uint sch, uint kv)
+  bool init(uint sch, uint kv)
   {
     scheme= sch;
     ctx_size= my_aes_ctx_size(MY_AES_ECB);
@@ -151,7 +151,7 @@ struct Binlog_crypt_data {
       free_key();
       if (key_type != NULL)
         my_free(key_type);
-      return 1;
+      return true;
     }
     my_free(key_type);
     key_type= NULL;
@@ -166,13 +166,13 @@ struct Binlog_crypt_data {
         free_key();
         if (key_type != NULL)
           my_free(key_type);
-        return 1;
+        return true;
       }
       DBUG_ASSERT(strncmp(key_type, "AES", 3) == 0);
     }
     my_free(key_type);
 #endif    
-    return 0;
+    return false;
   }
 
   void set_iv(uchar* iv, uint32 offs) const

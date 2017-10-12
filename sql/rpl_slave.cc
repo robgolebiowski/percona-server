@@ -5980,7 +5980,7 @@ ignore_log_space_limit=%d",
           thd->killed= THD::KILLED_NO_VALUE;
       );
       DBUG_EXECUTE_IF("stop_io_after_reading_unknown_event",
-        if (event_buf[EVENT_TYPE_OFFSET] >= binary_log::ENUM_END_EVENT)
+        if (static_cast<uchar>(event_buf[EVENT_TYPE_OFFSET]) >= binary_log::ENUM_END_EVENT)
           thd->killed= THD::KILLED_NO_VALUE;
       );
       DBUG_EXECUTE_IF("stop_io_after_queuing_event",
@@ -8644,7 +8644,7 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
     if (event_type == binary_log::WRITE_ROWS_EVENT ||
         event_type == binary_log::PREVIOUS_GTIDS_LOG_EVENT)
     {
-      char *event_buf= const_cast<char*>(buf);
+      uchar *event_buf= const_cast<uchar*>(reinterpret_cast<const uchar*>(buf));
       /* Overwrite the log event type with an unknown type. */
       event_buf[EVENT_TYPE_OFFSET]= binary_log::ENUM_END_EVENT + 1;
       /* Set LOG_EVENT_IGNORABLE_F for the log event. */

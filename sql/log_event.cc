@@ -998,7 +998,7 @@ bool Log_event::write_footer(IO_CACHE* file)
     if (event_encrypter.encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
       return 1;
   }
-  if (event_encrypter.ctx && event_encrypter.finish(file))
+  if (event_encrypter.crypto && event_encrypter.finish(file))
     return 1;
   return 0;
 }
@@ -1137,7 +1137,7 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
   uchar *pos= header;
   size_t len=sizeof(header);
 
-  if (event_encrypter.ctx)
+  if (event_encrypter.crypto)
   {
     int res= 0;
     if ((res= event_encrypter.init(file, pos, len)))

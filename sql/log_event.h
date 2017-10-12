@@ -1890,7 +1890,7 @@ public:
     DBUG_ASSERT(crypto_data.scheme == 0);
 
     if (!sele->is_valid())
-      return 1;
+      return true;
 
     memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
     return crypto_data.init(sele->crypto_scheme, sele->key_version);

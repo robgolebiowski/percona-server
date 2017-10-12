@@ -44,12 +44,47 @@ enum my_aes_mode {
 #endif
 };
 
-int my_aes_crypt_init(void *ctx, enum my_aes_mode mode, int flags,
+//#ifdef HAVE_YASSL
+//#include "yassl.cc"
+//#else
+//#include <openssl/evp.h>
+//#endif
+
+//#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+//#define EVP_CIPHER_CTX_SIZE 168
+//#else
+//#define EVP_CIPHER_CTX_SIZE sizeof(EVP_CIPHER_CTX)
+//#endif
+
+//struct EVP_CIPHER;
+
+class MyCTX
+{
+public:
+  //char ctx_buf[EVP_CIPHER_CTX_SIZE];
+  //EVP_CIPHER_CTX *ctx;
+
+  MyCTX();
+  virtual ~MyCTX();
+
+  virtual int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
+  //virtual int init(int encrypt, const uchar *key, size_t klen,
+                   const uchar *iv, size_t ivlen);
+  virtual int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen);
+  virtual int finish(uchar *dst, size_t *dlen);
+
+protected:
+  struct Impl;
+  Impl* pimpl;
+};
+
+int my_aes_crypt_init(MyCTX* &ctx, enum my_aes_mode mode, int flags,
                       const unsigned char* key, size_t klen,
                       const unsigned char* iv, size_t ivlen);
-int my_aes_crypt_update(void *ctx, const unsigned char *src, size_t slen,
+int my_aes_crypt_update(MyCTX *ctx, const unsigned char *src, size_t slen,
                         unsigned char *dst, size_t *dlen);
-int my_aes_crypt_finish(void *ctx, unsigned char *dst, size_t *dlen);
+int my_aes_crypt_finish(MyCTX* &ctx, uchar *dst, size_t *dlen);
+//int my_aes_crypt_finish(MyCTX *ctx, unsigned char *dst, size_t *dlen);
 int my_aes_crypt(enum my_aes_mode mode, int flags,
                  const unsigned char *src, size_t slen, unsigned char *dst, size_t *dlen,
                  const unsigned char *key, size_t klen, const unsigned char *iv, size_t ivlen);

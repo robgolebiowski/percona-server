@@ -1104,7 +1104,7 @@ public:
 
       len= *event_len_p;
 
-      if (event_encrypter.ctx)
+      if (event_encrypter.crypto)
       {
         uint32 write_bytes= std::min<uint32>(*buf_len_p, *event_len_p);
         len= write_bytes;
@@ -1114,10 +1114,8 @@ public:
         if (have_checksum)
           checksum= my_checksum(checksum, *buf_p, write_bytes);
 
-        int res= 0;
-
-        if ((res= event_encrypter.init(output_cache, pos, len)))
-          DBUG_RETURN(res);
+        if (event_encrypter.init(output_cache, pos, len))
+          DBUG_RETURN(true);
       }
     }
     
@@ -1127,7 +1125,7 @@ public:
     if (event_encrypter.encrypt_and_write(output_cache, pos, write_bytes))
       DBUG_RETURN(true);
 
-    if (event_encrypter.ctx && is_header)
+    if (event_encrypter.crypto && is_header)
       write_bytes+=4;
     else if (have_checksum)
       checksum= my_checksum(checksum, *buf_p, write_bytes);
@@ -1150,7 +1148,7 @@ public:
         thd->binlog_bytes_written+= BINLOG_CHECKSUM_LEN;
         checksum= initial_checksum;
       }
-      if (event_encrypter.ctx && event_encrypter.finish(output_cache))
+      if (event_encrypter.crypto && event_encrypter.finish(output_cache))
         DBUG_RETURN(true);
     }
 
@@ -1606,10 +1604,11 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
       correct.
     */
     Binlog_event_writer writer(mysql_bin_log.get_log_file(), thd);
-    writer.event_encrypter.crypto= mysql_bin_log.get_crypto_data();
+    //writer.event_encrypter.crypto= mysql_bin_log.get_crypto_data();
 
     if (mysql_bin_log.get_crypto_data()->scheme)
-      writer.event_encrypter.ctx= alloca(writer.event_encrypter.crypto->ctx_size);
+      writer.event_encrypter.crypto= mysql_bin_log.get_crypto_data();
+      //writer.event_encrypter.ctx= alloca(writer.event_encrypter.crypto->ctx_size);
 
     /* The GTID ownership process might set the commit_error */
     error= (thd->commit_error == THD::CE_FLUSH_ERROR);
@@ -6948,7 +6947,7 @@ int MYSQL_BIN_LOG::write_to_file(Log_event* event)
   if (crypto.scheme)
   {
     event->event_encrypter.crypto= &crypto;
-    event->event_encrypter.ctx= alloca(crypto.ctx_size);
+    //event->event_encrypter.ctx= alloca(crypto.ctx_size);
   }
   return event->write(&log_file);
 }

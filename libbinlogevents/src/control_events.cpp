@@ -179,12 +179,12 @@ Format_description_event::Format_description_event(uint8_t binlog_ver,
     // Set header length of the reserved events to 0
     std::fill(post_header_len.begin() + number_of_mysql_event_types,
               post_header_len.begin() + number_of_mysql_event_types +
-              PERCONA_EVENTS_BEGIN - MYSQL_EVENTS_END + 1,
+               START_ENCRYPTION_EVENT - MYSQL_EVENTS_END,
               0);
-    BAPI_ASSERT((ENUM_END_EVENT - PERCONA_EVENTS_BEGIN - 1) == sizeof(percona_server_event_header_length));
+    BAPI_ASSERT((ENUM_END_EVENT - START_ENCRYPTION_EVENT) == sizeof(percona_server_event_header_length));
     std::copy(percona_server_event_header_length,
               percona_server_event_header_length + sizeof(percona_server_event_header_length),
-              post_header_len.begin() + PERCONA_EVENTS_BEGIN);
+              post_header_len.begin() + START_ENCRYPTION_EVENT-1);
 
     // Sanity-check that all post header lengths are initialized.
     BAPI_ASSERT(number_of_event_types + (uint)BINLOG_CHECKSUM_ALG_DESC_LEN == post_header_len.size());

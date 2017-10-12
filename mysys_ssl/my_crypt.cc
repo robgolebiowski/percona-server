@@ -29,19 +29,132 @@
 
 #include <my_crypt.h>
 
+#include "boost/move/unique_ptr.hpp"
+
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-#define SSL_LIBRARY OpenSSL_version(OPENSSL_VERSION)
+//#define SSL_LIBRARY OpenSSL_version(OPENSSL_VERSION)
 #define ERR_remove_state(X) ERR_clear_error()
-#define EVP_CIPHER_CTX_SIZE 168
-#undef EVP_CIPHER_CTX_init
-#define EVP_CIPHER_CTX_init(X) do { bzero((X), EVP_CIPHER_CTX_SIZE); EVP_CIPHER_CTX_reset(X); } while(0)
+//#define EVP_CIPHER_CTX_SIZE 168
+//#undef EVP_CIPHER_CTX_init
+//#define EVP_CIPHER_CTX_init(X) do { bzero((X), EVP_CIPHER_CTX_SIZE); EVP_CIPHER_CTX_reset(X); } while(0)
 #else
 #define EVP_CIPHER_CTX_reset(X) EVP_CIPHER_CTX_cleanup(X)
-#define EVP_CIPHER_CTX_SIZE sizeof(EVP_CIPHER_CTX)
+//#define EVP_CIPHER_CTX_SIZE sizeof(EVP_CIPHER_CTX)
 #define EVP_CIPHER_CTX_buf_noconst(ctx) ((ctx)->buf)
 #define RAND_OpenSSL() RAND_SSLeay()
 #endif
 
+#define make_aes_dispatcher(mode)                               \
+  static inline const EVP_CIPHER *aes_ ## mode(uint klen)       \
+  {                                                             \
+    switch (klen) {                                             \
+    case 16: return EVP_aes_128_ ## mode();                     \
+    case 24: return EVP_aes_192_ ## mode();                     \
+    case 32: return EVP_aes_256_ ## mode();                     \
+    default: return 0;                                          \
+    }                                                           \
+  }
+
+make_aes_dispatcher(ecb)
+make_aes_dispatcher(cbc)
+#ifdef HAVE_EncryptAes128Ctr
+make_aes_dispatcher(ctr)
+#endif /* HAVE_EncryptAes128Ctr */
+#ifdef HAVE_EncryptAes128Gcm
+make_aes_dispatcher(gcm)
+#endif
+
+const EVP_CIPHER *(*ciphers[])(uint)= {
+    aes_ecb, aes_cbc
+#ifdef HAVE_EncryptAes128Ctr
+  , aes_ctr
+#ifdef HAVE_EncryptAes128Gcm
+  , aes_gcm
+#endif
+#endif
+};
+
+struct MyCTX::Impl
+{
+  Impl() 
+  : ctx(NULL)
+  {}
+
+  EVP_CIPHER_CTX *ctx;
+  //char ctx_buf[EVP_CIPHER_CTX_SIZE];
+  //EVP_CIPHER *cipher
+};
+
+MyCTX::MyCTX()
+{
+  pimpl = new Impl();
+  //pimpl->ctx= (EVP_CIPHER_CTX *)pimpl->ctx_buf;
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  //EVP_CIPHER_CTX ctx_value;
+  //EVP_CIPHER_CTX *ctx= &ctx_value;
+  pimpl->ctx= new EVP_CIPHER_CTX();
+  EVP_CIPHER_CTX_init(pimpl->ctx);
+#else
+  pimpl->ctx= EVP_CIPHER_CTX_new(); //TODO:Co jeżeli new się nie powiedzie ?
+  //if (unlikely(!ctx))
+    //return MY_AES_BAD_DATA;
+#endif
+
+  //EVP_CIPHER_CTX_init(pimpl->ctx);
+
+}
+
+MyCTX::~MyCTX()
+{
+  
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  EVP_CIPHER_CTX_cleanup(pimpl->ctx);
+  delete pimpl->ctx;
+#else
+  EVP_CIPHER_CTX_reset(pimpl->ctx);
+  EVP_CIPHER_CTX_free(pimpl->ctx);
+#endif
+
+
+  //EVP_CIPHER_CTX_reset(pimpl->ctx);
+  ERR_remove_state(0);
+  delete pimpl;
+}
+
+//int MyCTX::init(const EVP_CIPHER *cipher, int encrypt, const uchar *key,
+int MyCTX::init(const my_aes_mode mode, int encrypt, const uchar *key,
+                size_t klen, const uchar *iv, size_t ivlen)
+{
+  compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX));
+  if (unlikely(!ciphers[mode](klen)))
+    return MY_AES_BAD_KEYSIZE;
+
+  if (!EVP_CipherInit_ex(pimpl->ctx, ciphers[mode](klen), NULL,
+                         key, iv, encrypt))
+    return MY_AES_OPENSSL_ERROR;
+
+  DBUG_ASSERT(EVP_CIPHER_CTX_key_length(pimpl->ctx) == (int)klen);
+  DBUG_ASSERT(EVP_CIPHER_CTX_iv_length(pimpl->ctx) <= (int)ivlen);
+
+  return MY_AES_OK;
+}
+
+int MyCTX::update(const uchar *src, size_t slen, uchar *dst, size_t *dlen)
+{
+  if (!EVP_CipherUpdate(pimpl->ctx, dst, (int*)dlen, src, slen))
+    return MY_AES_OPENSSL_ERROR;
+  return MY_AES_OK;
+}
+
+int MyCTX::finish(uchar *dst, size_t *dlen)
+{
+  if (!EVP_CipherFinal_ex(pimpl->ctx, dst, (int*)dlen))
+    return MY_AES_BAD_DATA;
+  return MY_AES_OK;
+}
+
+/*
 class MyCTX
 {
 public:
@@ -86,7 +199,7 @@ public:
       return MY_AES_BAD_DATA;
     return MY_AES_OK;
   }
-};
+};*/
 
 class MyCTX_nopad : public MyCTX
 {
@@ -96,9 +209,10 @@ public:
   uchar oiv[MY_AES_BLOCK_SIZE];
 
   MyCTX_nopad() : MyCTX() { }
-  ~MyCTX_nopad() { }
+  virtual ~MyCTX_nopad() { }
 
-  int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, size_t klen,
+  int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
+  //int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, size_t klen,
            const uchar *iv, size_t ivlen)
   {
     compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX_nopad));
@@ -108,9 +222,9 @@ public:
     memcpy(oiv, iv, ivlen);
     DBUG_ASSERT(ivlen == 0 || ivlen == sizeof(oiv));
 
-    int res= MyCTX::init(cipher, encrypt, key, klen, iv, ivlen);
+    int res= MyCTX::init(mode, encrypt, key, klen, iv, ivlen);
 
-    EVP_CIPHER_CTX_set_padding(ctx, 0);
+    EVP_CIPHER_CTX_set_padding(pimpl->ctx, 0);
     return res;
   }
 
@@ -125,7 +239,7 @@ public:
     buf_len %= MY_AES_BLOCK_SIZE;
     if (buf_len)
     {
-      uchar *buf= EVP_CIPHER_CTX_buf_noconst(ctx);
+      uchar *buf= EVP_CIPHER_CTX_buf_noconst(pimpl->ctx);
       /*
         Not much we can do, block ciphers cannot encrypt data that aren't
         a multiple of the block length. At least not without padding.
@@ -150,24 +264,6 @@ public:
   }
 };
 
-#define make_aes_dispatcher(mode)                               \
-  static inline const EVP_CIPHER *aes_ ## mode(uint klen)       \
-  {                                                             \
-    switch (klen) {                                             \
-    case 16: return EVP_aes_128_ ## mode();                     \
-    case 24: return EVP_aes_192_ ## mode();                     \
-    case 32: return EVP_aes_256_ ## mode();                     \
-    default: return 0;                                          \
-    }                                                           \
-  }
-
-make_aes_dispatcher(ecb)
-make_aes_dispatcher(cbc)
-#ifdef HAVE_EncryptAes128Ctr
-make_aes_dispatcher(ctr)
-#endif /* HAVE_EncryptAes128Ctr */
-#ifdef HAVE_EncryptAes128Gcm
-make_aes_dispatcher(gcm)
 
 /*
   special implementation for GCM; to fit OpenSSL AES-GCM into the
@@ -176,20 +272,24 @@ make_aes_dispatcher(gcm)
     - the tag is appended to the ciphertext
 */
 
+
+#ifdef HAVE_EncryptAes128Gcm
+
 class MyCTX_gcm : public MyCTX
 {
 public:
   const uchar *aad;
   int aadlen;
   MyCTX_gcm() : MyCTX() { }
-  ~MyCTX_gcm() { }
+  virtual ~MyCTX_gcm() { }
 
-  int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, size_t klen,
+  int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
+  //int init(const EVP_CIPHER *cipher, int encrypt, const uchar *key, size_t klen,
            const uchar *iv, size_t ivlen)
   {
     compile_time_assert(MY_AES_CTX_SIZE >= sizeof(MyCTX_gcm));
-    int res= MyCTX::init(cipher, encrypt, key, klen, iv, ivlen);
-    int real_ivlen= EVP_CIPHER_CTX_iv_length(ctx);
+    int res= MyCTX::init(mode, encrypt, key, klen, iv, ivlen);
+    int real_ivlen= EVP_CIPHER_CTX_iv_length(pimpl->ctx);
     aad= iv + real_ivlen;
     aadlen= ivlen - real_ivlen;
     return res;
@@ -209,12 +309,12 @@ public:
       if (slen < MY_AES_BLOCK_SIZE)
         return MY_AES_BAD_DATA;
       slen-= MY_AES_BLOCK_SIZE;
-      if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, MY_AES_BLOCK_SIZE,
+      if(!EVP_CIPHER_CTX_ctrl(pimpl->ctx, EVP_CTRL_GCM_SET_TAG, MY_AES_BLOCK_SIZE,
                               (void*)(src + slen)))
         return MY_AES_OPENSSL_ERROR;
     }
     int unused;
-    if (aadlen && !EVP_CipherUpdate(ctx, NULL, &unused, aad, aadlen))
+    if (aadlen && !EVP_CipherUpdate(pimpl->ctx, NULL, &unused, aad, aadlen))
       return MY_AES_OPENSSL_ERROR;
     aadlen= 0;
     return MyCTX::update(src, slen, dst, dlen);
@@ -223,13 +323,13 @@ public:
   int finish(uchar *dst, size_t *dlen)
   {
     int fin;
-    if (!EVP_CipherFinal_ex(ctx, dst, &fin))
+    if (!EVP_CipherFinal_ex(pimpl->ctx, dst, &fin))
       return MY_AES_BAD_DATA;
     DBUG_ASSERT(fin == 0);
 
-    if (EVP_CIPHER_CTX_encrypting(ctx))
+    if (EVP_CIPHER_CTX_encrypting(pimpl->ctx))
     {
-      if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, MY_AES_BLOCK_SIZE, dst))
+      if(!EVP_CIPHER_CTX_ctrl(pimpl->ctx, EVP_CTRL_GCM_GET_TAG, MY_AES_BLOCK_SIZE, dst))
         return MY_AES_OPENSSL_ERROR;
       *dlen= MY_AES_BLOCK_SIZE;
     }
@@ -241,17 +341,9 @@ public:
 
 #endif
 
-const EVP_CIPHER *(*ciphers[])(uint)= {
-    aes_ecb, aes_cbc
-#ifdef HAVE_EncryptAes128Ctr
-  , aes_ctr
-#ifdef HAVE_EncryptAes128Gcm
-  , aes_gcm
-#endif
-#endif
-};
 
-int my_aes_crypt_init(void *ctx, enum my_aes_mode mode, int flags,
+
+int my_aes_crypt_init(MyCTX* &ctx, const my_aes_mode mode, int flags,
                       const unsigned char* key, size_t klen,
                       const unsigned char* iv, size_t ivlen)
 {
@@ -261,43 +353,57 @@ int my_aes_crypt_init(void *ctx, enum my_aes_mode mode, int flags,
     if (flags & ENCRYPTION_FLAG_NOPAD)
       return MY_AES_OPENSSL_ERROR;
     else
-      new (ctx) MyCTX_gcm();
+      ctx= new MyCTX_gcm(); //TODO:Change to not-throwing constructor
+        //new (ctx) MyCTX_gcm();
   else
 #endif
   if (mode == MY_AES_CTR)
-    new (ctx) MyCTX();
+    //new (ctx) MyCTX();
+    ctx= new MyCTX();
   else
 #endif
-  if (flags & ENCRYPTION_FLAG_NOPAD)
-    new (ctx) MyCTX_nopad();
+    ctx= (flags & ENCRYPTION_FLAG_NOPAD) ? new MyCTX_nopad()
+                                         : new MyCTX();
+/*  if (flags & ENCRYPTION_FLAG_NOPAD)
+    ctx = new MyCTX_nopad();
   else
-    new (ctx) MyCTX();
-  return ((MyCTX*)ctx)->init(ciphers[mode](klen), flags & 1,
-                             key, klen, iv, ivlen);
+    new (ctx) MyCTX();*/
+  return ((MyCTX*)ctx)->init(mode, flags & 1, key, klen,
+                             iv, ivlen);
 }
 
-int my_aes_crypt_update(void *ctx, const uchar *src, size_t slen,
+int my_aes_crypt_update(MyCTX *ctx, const uchar *src, size_t slen,
                         uchar *dst, size_t *dlen)
 {
   return ((MyCTX*)ctx)->update(src, slen, dst, dlen);
 }
 
-int my_aes_crypt_finish(void *ctx, uchar *dst, size_t *dlen)
+int my_aes_crypt_finish(MyCTX* &ctx, uchar *dst, size_t *dlen)
 {
-  int res= ((MyCTX*)ctx)->finish(dst, dlen);
-  ((MyCTX*)ctx)->~MyCTX();
+  //int res= ((MyCTX*)ctx)->finish(dst, dlen);
+  int res= ctx->finish(dst, dlen);
+  delete ctx; 
+  ctx= NULL;
+  //((MyCTX*)ctx)->~MyCTX();
   return res;
 }
 
-int my_aes_crypt(enum my_aes_mode mode, int flags,
+//int my_aes_crypt(enum my_aes_mode mode, int flags,
+int my_aes_crypt(const my_aes_mode mode, int flags,
                  const uchar *src, size_t slen, uchar *dst, size_t *dlen,
                  const uchar *key, size_t klen, const uchar *iv, size_t ivlen)
 {
-  void *ctx= alloca(MY_AES_CTX_SIZE);
   int res1, res2;
   size_t d1= 0, d2;
+  //boost::movelib::unique_ptr<MyCTX> ctx;
+  MyCTX *ctx = NULL;
   if ((res1= my_aes_crypt_init(ctx, mode, flags, key, klen, iv, ivlen)))
+  {
+    if (ctx != NULL)
+      delete ctx;
     return res1;
+  }
+  //ctx.reset(ctx_raw);
   res1= my_aes_crypt_update(ctx, src, slen, dst, &d1);
   res2= my_aes_crypt_finish(ctx, dst + d1, &d2);
   if (res1 || res2)
