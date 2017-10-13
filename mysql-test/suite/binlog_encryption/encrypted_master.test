@@ -27,8 +27,7 @@
 --echo #################
 
 --disable_connect_log
---let $rpl_topology= 1->2
---source include/rpl_init.inc
+--source include/master-slave.inc
 --enable_connect_log
 
 # We stop SQL thread because we want to have

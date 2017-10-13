@@ -434,10 +434,10 @@ size_t my_aes_crypt_get_size(enum my_aes_mode mode __attribute__((unused)), size
 }
 
 
-size_t my_aes_ctx_size(enum my_aes_mode)
-{
-  return MY_AES_CTX_SIZE;
-}
+//size_t my_aes_ctx_size(enum my_aes_mode)
+//{
+  //return MY_AES_CTX_SIZE;
+//}
 
 #ifdef HAVE_YASSL
 #include <random.hpp>

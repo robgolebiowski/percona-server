@@ -91,6 +91,6 @@ int my_aes_crypt(enum my_aes_mode mode, int flags,
 
 int my_random_bytes(unsigned char* buf, int num);
 size_t my_aes_crypt_get_size(enum my_aes_mode mode, size_t source_length);
-size_t my_aes_ctx_size(enum my_aes_mode mode);
+//size_t my_aes_ctx_size(enum my_aes_mode mode);
 
 #endif /* MY_CRYPT_INCLUDED */

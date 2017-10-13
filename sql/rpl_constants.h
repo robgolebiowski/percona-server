@@ -79,7 +79,7 @@ static const size_t ENCRYPTION_KEY_LEN = 32;
 
 struct Binlog_crypt_data {
   uint  scheme;
-  uint  key_version, key_length, ctx_size;
+  uint  key_version, key_length;//, ctx_size;
   uchar *key;
   uchar nonce[BINLOG_NONCE_LENGTH];
   uint dst_len;
@@ -113,7 +113,7 @@ struct Binlog_crypt_data {
     {
       this->scheme= b.scheme;
       this->key_version = b.key_version;
-      this->ctx_size= b.ctx_size;
+      //this->ctx_size= b.ctx_size;
       free_key();
       if (b.key_length && b.key != NULL)
       {
@@ -132,7 +132,7 @@ struct Binlog_crypt_data {
   bool init(uint sch, uint kv)
   {
     scheme= sch;
-    ctx_size= my_aes_ctx_size(MY_AES_ECB);
+    //ctx_size= my_aes_ctx_size(MY_AES_ECB);
     key_version= kv;
     free_key();
     key_length= 16;
