@@ -1084,7 +1084,7 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
         
     if (!sele.is_valid())
     {
-      set_fatal_error("Sele is invalid");
+      set_fatal_error("Start encryption log event is invalid");
       DBUG_RETURN(1);
     }
 

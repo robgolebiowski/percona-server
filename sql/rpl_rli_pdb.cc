@@ -2024,9 +2024,8 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
                         errmsg);
         goto end;
       }
-
-      //Search for Start_encryption_event. When relay log is encrypted the second
-      //event (after Format_description_event) will be Start_encryption_event.
+      // Search for Start_encryption_event. When relay log is encrypted the second
+      // event (after Format_description_event) will be Start_encryption_event.
       for (uint i=0; i < 2; i++)
       {
         ev= Log_event::read_log_event(&relay_io, NULL,

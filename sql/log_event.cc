@@ -1278,7 +1278,9 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
       {
         size_t true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
 
-        char *decrypted_packet= (char*)my_malloc(key_memory_log_event, true_data_len + ev_offset + 1, MYF(MY_WME));
+        char *decrypted_packet=
+          reinterpret_cast<char*>(my_malloc(key_memory_log_event, true_data_len + ev_offset + 1,
+                                            MYF(MY_WME)));
         if (!decrypted_packet)
           DBUG_RETURN(LOG_READ_MEM);
         memcpy(decrypted_packet, packet->ptr(), ev_offset);
@@ -1448,7 +1450,8 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     error ="decryption error";
     goto err;
 #endif
-    char *dst_buf= (char*)my_malloc(key_memory_log_event, data_len + 1, MYF(MY_WME));
+    char *dst_buf=
+      reinterpret_cast<char*>(my_malloc(key_memory_log_event, data_len + 1, MYF(MY_WME)));
     dst_buf[data_len]=0;
     memcpy(dst_buf, buf, data_len);
     
@@ -1545,7 +1548,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
   uint event_type= static_cast<const uchar>(buf[EVENT_TYPE_OFFSET]);
   // all following START events in the current file are without checksum
   if (event_type == binary_log::START_EVENT_V3)
-    (const_cast< Format_description_log_event *>(fdle))->
+    (const_cast<Format_description_log_event *>(fdle))->
             common_footer->checksum_alg= binary_log::BINLOG_CHECKSUM_ALG_OFF;
   // Sanity check for Format description event
   if (event_type == binary_log::FORMAT_DESCRIPTION_EVENT)

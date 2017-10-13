@@ -3290,7 +3290,7 @@ bool show_binlog_events(THD *thd, MYSQL_BIN_LOG *binary_log)
           if (description_event->start_decryption((Start_encryption_log_event*) ev))
           {
             delete ev;
-            errmsg = "Could not initialize decryption of binlog.";
+            errmsg= "Could not initialize decryption of binlog.";
             goto err;
           }
         }
@@ -3318,7 +3318,13 @@ bool show_binlog_events(THD *thd, MYSQL_BIN_LOG *binary_log)
       if (ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT)
       {
         Format_description_log_event* new_fdle=
-          (Format_description_log_event*) ev;
+          dynamic_cast<Format_description_log_event*>(ev);
+        if (new_fdle == NULL)
+        {
+          errmsg= "Invalid Format description log event.";
+          delete ev;
+          goto err;
+        }
         new_fdle->copy_crypto_data(description_event);
         delete description_event;
         description_event= new_fdle;
@@ -4067,7 +4073,14 @@ read_gtids_and_update_trx_parser_from_relaylog(
     switch (ev->get_type_code())
     {
     case binary_log::FORMAT_DESCRIPTION_EVENT:
-      new_fd_ev_p= (Format_description_log_event *)ev;
+      new_fd_ev_p= dynamic_cast<Format_description_log_event*>(ev);
+      if (new_fd_ev_p == NULL)
+      {
+        my_error(ER_BINLOG_LOGICAL_CORRUPTION, MYF(0), filename,
+                 "Invalind Format description log event.");
+        error= true;
+        break;
+      }
       new_fd_ev_p->copy_crypto_data(fd_ev_p);
       if (fd_ev_p != &fd_ev)
         delete fd_ev_p;
@@ -4414,7 +4427,17 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
     }
     case binary_log::START_ENCRYPTION_EVENT:
     {
-      if (fd_ev_p->start_decryption((Start_encryption_log_event*) ev))
+      Start_encryption_log_event* start_enc_event= dynamic_cast<Start_encryption_log_event*>(ev);
+
+      if (start_enc_event != NULL)
+      {
+        my_error(ER_BINLOG_LOGICAL_CORRUPTION, MYF(0), filename,
+                 "Invalind Format description log event.");
+        ret= ERROR;
+        break;
+      }
+
+      if (fd_ev_p->start_decryption(start_enc_event))
         ret= ERROR;
       break;
     }
@@ -7315,7 +7338,7 @@ bool MYSQL_BIN_LOG::append_buffer(uchar* buf, size_t len, Master_info *mi)
   {
     DBUG_ASSERT(crypto.scheme == 1);
 
-    ebuf= (uchar*)my_malloc(PSI_NOT_INSTRUMENTED, len, MYF(MY_WME));//  my_safe_alloca(len, 512);
+    ebuf= reinterpret_cast<uchar*>(my_malloc(PSI_NOT_INSTRUMENTED, len, MYF(MY_WME)));
     if (!ebuf ||
         encrypt_event(my_b_append_tell(&log_file), &crypto, buf, ebuf, len))
     {

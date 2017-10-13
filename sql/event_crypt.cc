@@ -89,13 +89,13 @@ bool Event_encrypter::encrypt_and_write(IO_CACHE *output_cache, const uchar *pos
 {
   DBUG_ASSERT(output_cache != NULL);
 
-  uchar *dst= 0;
+  uchar *dst= NULL;
   size_t dstsize= 0;
 
   if(crypto)
   {
     dstsize= my_aes_crypt_get_size(MY_AES_ECB, len);
-    if (!(dst= (uchar*)my_safe_alloca(dstsize, 512)))
+    if (!(dst= reinterpret_cast<uchar*>(my_safe_alloca(dstsize, 512))))
       return true;
 
     uint dstlen;
