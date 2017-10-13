@@ -6,7 +6,7 @@ SELECT 1;
 1
 1
 SET GLOBAL binlog_error_action= IGNORE_ERROR;
-flush logs;
+FLUSH LOGS;
 ERROR HY000: Can't open file: './master-bin.000002' (errno: 1 - Operation not permitted)
 SET debug="-d,binlog_encryption_error_on_key_fetch";
 SET GLOBAL binlog_error_action= ABORT_SERVER;

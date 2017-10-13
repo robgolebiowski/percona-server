@@ -18,7 +18,7 @@ CREATE TABLE table1_to_encrypt (
 pk INT AUTO_INCREMENT PRIMARY KEY,
 ts TIMESTAMP NULL,
 b BLOB
-) ENGINE=MyISAM;
+);
 INSERT INTO table1_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
 INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
 SET binlog_format=ROW;

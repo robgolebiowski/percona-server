@@ -1,10 +1,11 @@
 #################
 # Initialization
 #################
-include/rpl_init.inc [topology=1->2]
+include/master-slave.inc
 Warnings:
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
+[connection master]
 connection server_2;
 include/stop_slave.inc
 #####################################################
@@ -15,7 +16,7 @@ CREATE TABLE table1_no_encryption (
 pk INT AUTO_INCREMENT PRIMARY KEY,
 ts TIMESTAMP NULL,
 b BLOB
-) ENGINE=MyISAM;
+);
 INSERT INTO table1_no_encryption VALUES (NULL,NOW(),'data_no_encryption');
 INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
 FLUSH BINARY LOGS;
@@ -32,9 +33,13 @@ connection server_1;
 connection server_1;
 connection server_1;
 connection default;
+connection master;
+connection master1;
 connection server_1;
 connection server_1_1;
 connection default;
+connection master;
+connection master1;
 connection server_1;
 connection server_1_1;
 connection server_1;
@@ -44,7 +49,7 @@ CREATE TABLE table2_to_encrypt (
 pk INT AUTO_INCREMENT PRIMARY KEY,
 ts TIMESTAMP NULL,
 b BLOB
-) ENGINE=MyISAM;
+);
 INSERT INTO table2_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 FLUSH BINARY LOGS;
@@ -61,9 +66,13 @@ connection server_1;
 connection server_1;
 connection server_1;
 connection default;
+connection master;
+connection master1;
 connection server_1;
 connection server_1_1;
 connection default;
+connection master;
+connection master1;
 connection server_1;
 connection server_1_1;
 connection server_1;
@@ -73,7 +82,7 @@ CREATE TABLE table3_no_encryption (
 pk INT AUTO_INCREMENT PRIMARY KEY,
 ts TIMESTAMP NULL,
 b BLOB
-) ENGINE=MyISAM;
+);
 INSERT INTO table3_no_encryption VALUES (NULL,NOW(),'data_no_encryption');
 INSERT INTO table3_no_encryption SELECT NULL,NOW(),b FROM table3_no_encryption;
 INSERT INTO table3_no_encryption SELECT NULL,NOW(),b FROM table3_no_encryption;

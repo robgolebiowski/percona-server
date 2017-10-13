@@ -16,8 +16,7 @@
 --echo # Initialization
 --echo #################
 
---let $rpl_topology= 1->2
---source include/rpl_init.inc
+--source include/master-slave.inc
 
 --enable_connect_log
 
@@ -38,7 +37,7 @@ CREATE TABLE table1_no_encryption (
   pk INT AUTO_INCREMENT PRIMARY KEY,
   ts TIMESTAMP NULL,
   b BLOB
-) ENGINE=MyISAM; 
+);
 
 INSERT INTO table1_no_encryption VALUES (NULL,NOW(),'data_no_encryption');
 INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
@@ -70,7 +69,7 @@ CREATE TABLE table2_to_encrypt (
   pk INT AUTO_INCREMENT PRIMARY KEY,
   ts TIMESTAMP NULL,
   b BLOB
-) ENGINE=MyISAM; 
+);
 
 INSERT INTO table2_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
@@ -94,13 +93,12 @@ UNINSTALL PLUGIN keyring_file;
 --let $rpl_server_parameters= --encrypt-binlog=0
 --let $rpl_server_number= 1
 --source include/rpl_restart_server.inc
-#--source restart_server.inc
 
 CREATE TABLE table3_no_encryption (
   pk INT AUTO_INCREMENT PRIMARY KEY,
   ts TIMESTAMP NULL,
   b BLOB
-) ENGINE=MyISAM; 
+);
 
 INSERT INTO table3_no_encryption VALUES (NULL,NOW(),'data_no_encryption');
 INSERT INTO table3_no_encryption SELECT NULL,NOW(),b FROM table3_no_encryption;

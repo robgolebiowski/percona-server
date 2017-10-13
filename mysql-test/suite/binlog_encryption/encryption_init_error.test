@@ -11,7 +11,7 @@ SET debug="+d,binlog_encryption_error_on_key_fetch";
 SELECT 1;
 SET GLOBAL binlog_error_action= IGNORE_ERROR;
 --error ER_CANT_OPEN_FILE
-flush logs;
+FLUSH LOGS;
 
 SET debug="-d,binlog_encryption_error_on_key_fetch";
 eval SET GLOBAL binlog_error_action= $saved_binlog_error_action;
