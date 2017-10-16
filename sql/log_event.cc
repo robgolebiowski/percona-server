@@ -998,7 +998,8 @@ bool Log_event::write_footer(IO_CACHE* file)
     if (event_encrypter.encrypt_and_write(file, buf, BINLOG_CHECKSUM_LEN))
       return 1;
   }
-  if (event_encrypter.crypto && event_encrypter.finish(file))
+  if (event_encrypter.is_encryption_enabled() &&
+      event_encrypter.finish(file))
     return 1;
   return 0;
 }
@@ -1122,22 +1123,22 @@ bool Log_event::write_header(IO_CACHE* file, size_t event_data_length)
 
   if (is_format_decription_and_need_checksum)
   {
-    common_header->flags &= ~LOG_EVENT_BINLOG_IN_USE_F;
+    common_header->flags&= ~LOG_EVENT_BINLOG_IN_USE_F;
     int2store(header + FLAGS_OFFSET, common_header->flags);
   }
   crc= my_checksum(crc, header, LOG_EVENT_HEADER_LEN);
 
-  //restore IN_USE flag after calculating the checksum
+  // restore IN_USE flag after calculating the checksum
   if (is_format_decription_and_need_checksum)
   {
-    common_header->flags |= LOG_EVENT_BINLOG_IN_USE_F;
+    common_header->flags|= LOG_EVENT_BINLOG_IN_USE_F;
     int2store(header + FLAGS_OFFSET, common_header->flags);
   }
 
   uchar *pos= header;
-  size_t len=sizeof(header);
+  size_t len= sizeof(header);
 
-  if (event_encrypter.crypto)
+  if (event_encrypter.is_encryption_enabled())
   {
     int res= 0;
     if ((res= event_encrypter.init(file, pos, len)))
@@ -1274,9 +1275,9 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
     {
       packet->length(packet->length() + data_len);
 
-      if (fdle != NULL && fdle->crypto_data.scheme)
+      if (fdle != NULL && fdle->crypto_data.is_enabled())
       {
-        size_t true_data_len = data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
+        size_t true_data_len= data_len + LOG_EVENT_MINIMAL_HEADER_LEN;
 
         char *decrypted_packet=
           reinterpret_cast<char*>(my_malloc(key_memory_log_event, true_data_len + ev_offset + 1,
@@ -1289,7 +1290,7 @@ int Log_event::read_log_event(IO_CACHE* file, String* packet,
         uchar *dst= (uchar*)decrypted_packet + ev_offset;
         memcpy(src + EVENT_LEN_OFFSET, src, 4);
 
-        if (decrypt_event(my_b_tell(file) - true_data_len, &fdle->crypto_data, src, dst, true_data_len))
+        if (decrypt_event(my_b_tell(file) - true_data_len, fdle->crypto_data, src, dst, true_data_len))
         {
           my_free(decrypted_packet);
           DBUG_RETURN(LOG_READ_DECRYPT);
@@ -1442,12 +1443,13 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     goto err;
   }
 
-  if (fdle->crypto_data.scheme)
+  if (fdle->crypto_data.is_enabled())
   {
 #if defined(MYSQL_CLIENT)
-    //Clients do not have access to keyring and thus cannot decrypt
-    //binlog events
-    error ="decryption error";
+    // Clients do not have access to keyring and thus cannot decrypt
+    // binlog events
+    error= "Decryption error as clients do not have access to keyring and thus "
+           "cannot decrypt binlog events.";
     goto err;
 #endif
     char *dst_buf=
@@ -1455,10 +1457,10 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     dst_buf[data_len]=0;
     memcpy(dst_buf, buf, data_len);
     
-    if (decrypt_event(my_b_tell(file) - data_len, &fdle->crypto_data, (uchar*)buf, (uchar*)dst_buf, data_len))
+    if (decrypt_event(my_b_tell(file) - data_len, fdle->crypto_data, (uchar*)buf, (uchar*)dst_buf, data_len))
     {
       my_free(dst_buf);
-      error ="decryption error";
+      error= "decryption error";
       goto err;
     }
     
@@ -5455,7 +5457,7 @@ int Start_encryption_log_event::do_apply_event(Relay_log_info const *rli)
 int Start_encryption_log_event::do_update_pos(Relay_log_info *rli)
 {
   /*
-    master never sends Start_encryption_log_event, any SELE that a slave
+    Master never sends Start_encryption_log_event, any SELE that a slave
     might see was created locally in MYSQL_BIN_LOG::open() on the slave
   */
   rli->inc_event_relay_log_pos();
@@ -5468,7 +5470,7 @@ int Start_encryption_log_event::do_update_pos(Relay_log_info *rli)
 void Start_encryption_log_event::print(FILE* file,
                                        PRINT_EVENT_INFO* print_event_info)
 {
-    //Need 2 characters per one hex + 2 for 0x + 1 for \0
+    // Need 2 characters per one hex + 2 for 0x + 1 for \0
     char nonce_buf[BINLOG_NONCE_LENGTH * 2 + 2 + 1];
     str_to_hex(nonce_buf, reinterpret_cast<char*>(nonce),
                BINLOG_NONCE_LENGTH);
@@ -5689,7 +5691,7 @@ int Format_description_log_event::do_apply_event(Relay_log_info const *rli)
   if (!ret)
   {
     /* Save the information describing this binlog */
-    copy_crypto_data(rli->get_rli_description_event());
+    copy_crypto_data(*rli->get_rli_description_event());
     const_cast<Relay_log_info *>(rli)->set_rli_description_event(this);
   }
 

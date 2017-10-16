@@ -1,19 +1,19 @@
 #include <my_global.h>
 #include "event_crypt.h"
 
-static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
+static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data &crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
 {
-  DBUG_ASSERT(crypto->scheme != 0 && crypto->key != NULL);
+  DBUG_ASSERT(crypto.is_enabled() && crypto.get_key() != NULL);
 
   size_t elen;
   uchar iv[BINLOG_IV_LENGTH];
 
-  crypto->set_iv(iv, offs);
+  crypto.set_iv(iv, offs);
   memcpy(buf + EVENT_LEN_OFFSET, buf, 4);
 
  if (my_aes_crypt(MY_AES_CBC, flags | ENCRYPTION_FLAG_NOPAD,
                   buf + 4, buf_len - 4, ebuf + 4, &elen,
-                  crypto->key, crypto->key_length, iv, sizeof(iv)))
+                  crypto.get_key(), crypto.get_key_length(), iv, sizeof(iv)))
   {
     memcpy(buf, buf + EVENT_LEN_OFFSET, 4);
     return true;
@@ -26,34 +26,34 @@ static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data *crypt
   return false;
 }
 
-bool encrypt_event(uint32 offs, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
+bool encrypt_event(uint32 offs, const Binlog_crypt_data &crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
 {
   return encrypt_event(offs, ENCRYPTION_FLAG_ENCRYPT, crypto, buf, ebuf, buf_len);
 }
 
-bool decrypt_event(uint32 offs, const Binlog_crypt_data *crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
+bool decrypt_event(uint32 offs, const Binlog_crypt_data &crypto, uchar* buf, uchar *ebuf, size_t buf_len) 
 {
   return encrypt_event(offs, ENCRYPTION_FLAG_DECRYPT, crypto, buf, ebuf, buf_len);
 }
 
 
-int Event_encrypter::init(IO_CACHE *output_cache, uchar* &header, size_t &buf_len)
+bool Event_encrypter::init(IO_CACHE *output_cache, uchar* &header, size_t &buf_len)
 {
   uchar iv[BINLOG_IV_LENGTH];
   crypto->set_iv(iv, my_b_safe_tell(output_cache));
 
-  //int res= 0;
+  //int res = 0;
 
-  //if ((res= my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+  //if ((res = my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
                               //crypto->key, crypto->key_length, iv, sizeof(iv))))
 
   if (my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                        crypto->key, crypto->key_length, iv, sizeof(iv)))
+                        crypto->get_key(), crypto->get_key_length(), iv, sizeof(iv)))
   {
     if (ctx != NULL)
     {
       delete ctx;
-      ctx= NULL;
+      ctx = NULL;
     }
     //return res;
     return true;
@@ -62,11 +62,11 @@ int Event_encrypter::init(IO_CACHE *output_cache, uchar* &header, size_t &buf_le
   //ctx.reset(ctx_raw);
 
   DBUG_ASSERT(buf_len >= LOG_EVENT_HEADER_LEN);
-  event_len= uint4korr(header + EVENT_LEN_OFFSET);
+  event_len = uint4korr(header + EVENT_LEN_OFFSET);
   DBUG_ASSERT(event_len >= buf_len);
   memcpy(header + EVENT_LEN_OFFSET, header, 4);
-  header+= 4;
-  buf_len-= 4;
+  header += 4;
+  buf_len -= 4;
 
   //return res;
   return false;
@@ -80,7 +80,7 @@ bool Event_encrypter::maybe_write_event_len(IO_CACHE *output_cache, uchar *pos, 
     if (my_b_safe_write(output_cache, pos + EVENT_LEN_OFFSET - 4, 4)) 
       return true;
     int4store(pos + EVENT_LEN_OFFSET - 4, event_len);
-    event_len= 0;
+    event_len = 0;
   }
   return false;
 }
@@ -89,13 +89,13 @@ bool Event_encrypter::encrypt_and_write(IO_CACHE *output_cache, const uchar *pos
 {
   DBUG_ASSERT(output_cache != NULL);
 
-  uchar *dst= NULL;
-  size_t dstsize= 0;
+  uchar *dst = NULL;
+  size_t dstsize = 0;
 
   if(crypto)
   {
-    dstsize= my_aes_crypt_get_size(MY_AES_ECB, len);
-    if (!(dst= reinterpret_cast<uchar*>(my_safe_alloca(dstsize, 512))))
+    dstsize = my_aes_crypt_get_size(MY_AES_ECB, len);
+    if (!(dst = reinterpret_cast<uchar*>(my_safe_alloca(dstsize, 512))))
       return true;
 
     uint dstlen;
@@ -104,8 +104,8 @@ bool Event_encrypter::encrypt_and_write(IO_CACHE *output_cache, const uchar *pos
 
     if (maybe_write_event_len(output_cache, dst, dstlen))
       return true;
-    pos= dst;
-    len= dstlen;
+    pos = dst;
+    len = dstlen;
   }
   else
   {

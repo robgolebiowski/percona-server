@@ -605,14 +605,8 @@ int Relay_log_info::init_relay_log_pos(const char* log,
         Format_description_log_event *old= rli_description_event;
         DBUG_PRINT("info",("found Format_description_log_event"));
         Format_description_log_event *new_fdev=
-          dynamic_cast<Format_description_log_event*>(ev);
-        if (new_fdev == NULL)
-        {
-          *errmsg= "Invalid FORMAT_DESCRIPTION_EVENT.";
-          delete ev;
-          goto err;
-        }
-        new_fdev->copy_crypto_data(old);
+          static_cast<Format_description_log_event*>(ev);
+        new_fdev->copy_crypto_data(*old);
         set_rli_description_event(new_fdev);
         /*
           As ev was returned by read_log_event, it has passed is_valid(), so
@@ -639,15 +633,7 @@ int Relay_log_info::init_relay_log_pos(const char* log,
       }
       else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT)
       {
-        Start_encryption_log_event *start_enc_event=
-          dynamic_cast<Start_encryption_log_event*>(ev);
-        if (start_enc_event == NULL)
-        {
-          *errmsg= "Invalid START_ENCRYPTION_EVENT.";
-          delete start_enc_event;
-          goto err;
-        }
-        if (rli_description_event->start_decryption(start_enc_event))
+        if (rli_description_event->start_decryption(static_cast<Start_encryption_log_event*>(ev)))
         {
           *errmsg= "Unable to set up decryption of binlog.";
           delete ev;

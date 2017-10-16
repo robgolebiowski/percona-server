@@ -77,17 +77,17 @@ static const size_t ENCRYPTION_KEY_LEN = 32;
 #define BINLOG_IV_OFFS_LENGTH       4
 #define BINLOG_NONCE_LENGTH         (BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH)
 
-struct Binlog_crypt_data {
-  uint  scheme;
-  uint  key_version, key_length;//, ctx_size;
-  uchar *key;
-  uchar nonce[BINLOG_NONCE_LENGTH];
-  uint dst_len;
-  uchar iv[BINLOG_IV_LENGTH];
-
+class Binlog_crypt_data {
+  //uint  key_version, key_length;
+  //uchar *key;
+  //uchar nonce[BINLOG_NONCE_LENGTH];
+  //uint dst_len;
+  //uchar iv[BINLOG_IV_LENGTH];
+public:
   Binlog_crypt_data()
-    : scheme(0)
-    , key(NULL) 
+    : key(NULL)
+    , enabled(false)  
+    , scheme(0)
   {}
 
   void free_key()
@@ -109,11 +109,10 @@ struct Binlog_crypt_data {
 
   Binlog_crypt_data& operator=(const Binlog_crypt_data &b)
   {
-    if (b.scheme == 1)
+    if (b.is_enabled())
     {
       this->scheme= b.scheme;
       this->key_version = b.key_version;
-      //this->ctx_size= b.ctx_size;
       free_key();
       if (b.key_length && b.key != NULL)
       {
@@ -125,11 +124,10 @@ struct Binlog_crypt_data {
       this->dst_len = b.dst_len;
       memcpy(this->nonce, b.nonce, BINLOG_NONCE_LENGTH);
     }
-
     return *this;
   }
 
-  bool init(uint sch, uint kv)
+  bool init(uint sch, uint kv, const uchar* nonce)
   {
     scheme= sch;
     //ctx_size= my_aes_ctx_size(MY_AES_ECB);
@@ -138,6 +136,9 @@ struct Binlog_crypt_data {
     key_length= 16;
 
 #ifdef MYSQL_SERVER
+    DBUG_ASSERT(nonce != NULL);
+    memcpy(this->nonce, nonce, BINLOG_NONCE_LENGTH);
+
     char *key_type= NULL;
     size_t key_len;
 
@@ -171,8 +172,35 @@ struct Binlog_crypt_data {
       DBUG_ASSERT(strncmp(key_type, "AES", 3) == 0);
     }
     my_free(key_type);
-#endif    
+#endif
+    enabled= true;
     return false;
+  }
+
+  bool is_enabled() const
+  {
+    return enabled;
+  }
+
+  void disable()
+  {
+    enabled= false; 
+  }
+
+  //void set_nonce(uchar *nonce)
+  //{
+    //DBUG_ASSERT(nonce != NULL);
+    //memcpy(this->nonce, nonce, BINLOG_NONCE_LENGTH);
+  //}
+
+  uchar *get_key() const
+  {
+    return key;
+  }
+
+  size_t get_key_length() const
+  {
+    return key_length;
   }
 
   void set_iv(uchar* iv, uint32 offs) const
@@ -186,6 +214,17 @@ struct Binlog_crypt_data {
     my_aes_encrypt(iv_plain, BINLOG_IV_LENGTH, iv,
                    key, key_length, my_aes_128_ecb, NULL, false);
   }
+
+private:
+  uint  key_version;
+  size_t key_length;//, ctx_size;
+  uchar *key;
+  uchar nonce[BINLOG_NONCE_LENGTH];
+  uint dst_len;
+  uchar iv[BINLOG_IV_LENGTH];
+
+  bool enabled;
+  uint scheme;
 };
 
 

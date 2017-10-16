@@ -5157,11 +5157,9 @@ int mysqld_main(int argc, char **argv)
 
     Binlog_crypt_data *crypto_data= mysql_bin_log.get_crypto_data();
 
-    if (crypto_data->scheme == 1)
-    {
-      prev_gtids_ev.event_encrypter.crypto= crypto_data;
-      //prev_gtids_ev.event_encrypter.ctx= alloca(crypto_data->ctx_size);
-    }
+    if (crypto_data->is_enabled())
+      prev_gtids_ev.event_encrypter.enable_encryption(crypto_data);
+
     if (prev_gtids_ev.write(mysql_bin_log.get_log_file()))
       unireg_abort(MYSQLD_ABORT_EXIT);
     mysql_bin_log.add_bytes_written(

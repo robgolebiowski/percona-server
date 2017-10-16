@@ -1700,7 +1700,7 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
     }
     case binary_log::START_ENCRYPTION_EVENT:
     {
-      glob_description_event->start_decryption((Start_encryption_log_event*)ev);
+      glob_description_event->start_decryption(static_cast<Start_encryption_log_event*>(ev));
       ev->print(result_file, print_event_info);
       if (head->error == -1)
         goto err;

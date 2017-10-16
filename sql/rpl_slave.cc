@@ -864,14 +864,14 @@ read_rotate_from_relay_log(char *filename, char *master_log_file,
     switch (ev->get_type_code())
     {
     case binary_log::FORMAT_DESCRIPTION_EVENT:
-      new_fdle= (Format_description_log_event*) ev;
-      new_fdle->copy_crypto_data(fd_ev_p);
+      new_fdle= static_cast<Format_description_log_event*>(ev);
+      new_fdle->copy_crypto_data(*fd_ev_p);
       if (fd_ev_p != &fd_ev)
         delete fd_ev_p;
-      fd_ev_p= (Format_description_log_event *)new_fdle;
+      fd_ev_p= new_fdle;
       break;
     case binary_log::START_ENCRYPTION_EVENT:
-      if (fd_ev_p->start_decryption((Start_encryption_log_event*) ev))
+      if (fd_ev_p->start_decryption(static_cast<Start_encryption_log_event*>(ev)))
       {
         sql_print_error("Could not initialize decryption of binlog.");
         done= true;
@@ -8418,7 +8418,7 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
                  "could not queue event from master");
       goto err;
     }
-    new_fdle->copy_crypto_data(mi->get_mi_description_event());
+    new_fdle->copy_crypto_data(*(mi->get_mi_description_event()));
 
     if (new_fdle->common_footer->checksum_alg ==
                                  binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
@@ -8483,9 +8483,9 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
       we update only the positions and not the file names, as a ROTATE
       EVENT from the master prior to this will update the file name.
 
-      When master's binlog is encrypted it will also send heartbeat
+      When master's binlog is encrypted it will also sent heartbeat
       event after reading Start_encryption_event from the binlog.
-      As Start_encryption_event is not send to slave, the master
+      As Start_encryption_event is not sent to slave, the master
       informs the slave to update it's master_log_pos by sending
       heartbeat event.
     */

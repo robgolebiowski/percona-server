@@ -20,6 +20,7 @@
 
 --source encryption_algorithms.inc
 --source include/have_innodb.inc
+--source include/have_myisam.inc
 --enable_connect_log
 
 --echo #################

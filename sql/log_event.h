@@ -1887,24 +1887,25 @@ public:
   Binlog_crypt_data crypto_data;
   bool start_decryption(Start_encryption_log_event* sele)
   {
-    DBUG_ASSERT(crypto_data.scheme == 0);
+    DBUG_ASSERT(crypto_data.is_enabled() == false);
 
     if (!sele->is_valid())
       return true;
 
-    memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
-    return crypto_data.init(sele->crypto_scheme, sele->key_version);
+    //memcpy(crypto_data.nonce, sele->nonce, BINLOG_NONCE_LENGTH);
+    
+    return crypto_data.init(sele->crypto_scheme, sele->key_version, sele->nonce);
   }
 
-  void copy_crypto_data(const Format_description_log_event* o)
+  void copy_crypto_data(const Format_description_log_event& o)
   {
     DBUG_PRINT("info", ("Copying crypto data"));
-    crypto_data= o->crypto_data;
+    crypto_data= o.crypto_data;
   }
 
   void reset_crypto()
   {
-    crypto_data.scheme= 0;
+    crypto_data.disable();
   }
 
 protected:

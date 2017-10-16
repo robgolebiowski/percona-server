@@ -1064,7 +1064,7 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
     DBUG_RETURN(1);
 
   // peek_event_header actually moves the log_cache->read_pos, thus we need to rewind
-  log_cache->read_pos -= LOG_EVENT_MINIMAL_HEADER_LEN;
+  log_cache->read_pos-= LOG_EVENT_MINIMAL_HEADER_LEN;
 
   if (static_cast<uchar>(header_buffer[EVENT_TYPE_OFFSET]) == binary_log::START_ENCRYPTION_EVENT)
   {

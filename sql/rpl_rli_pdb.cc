@@ -2039,7 +2039,7 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
           {
             delete ev;
             goto end;
-            error=true;
+            error= true;
           }
           delete ev;
         }

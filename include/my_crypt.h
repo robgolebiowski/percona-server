@@ -58,14 +58,14 @@ enum my_aes_mode {
 
 //struct EVP_CIPHER;
 
-class MyCTX
+class MyEncryptionCTX
 {
 public:
   //char ctx_buf[EVP_CIPHER_CTX_SIZE];
   //EVP_CIPHER_CTX *ctx;
 
-  MyCTX();
-  virtual ~MyCTX();
+  MyEncryptionCTX();
+  virtual ~MyEncryptionCTX();
 
   virtual int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
   //virtual int init(int encrypt, const uchar *key, size_t klen,
@@ -78,13 +78,13 @@ protected:
   Impl* pimpl;
 };
 
-int my_aes_crypt_init(MyCTX* &ctx, enum my_aes_mode mode, int flags,
+int my_aes_crypt_init(MyEncryptionCTX* &ctx, enum my_aes_mode mode, int flags,
                       const unsigned char* key, size_t klen,
                       const unsigned char* iv, size_t ivlen);
-int my_aes_crypt_update(MyCTX *ctx, const unsigned char *src, size_t slen,
+int my_aes_crypt_update(MyEncryptionCTX *ctx, const unsigned char *src, size_t slen,
                         unsigned char *dst, size_t *dlen);
-int my_aes_crypt_finish(MyCTX* &ctx, uchar *dst, size_t *dlen);
-//int my_aes_crypt_finish(MyCTX *ctx, unsigned char *dst, size_t *dlen);
+int my_aes_crypt_finish(MyEncryptionCTX* &ctx, uchar *dst, size_t *dlen);
+//int my_aes_crypt_finish(MyEncryptionCTX *ctx, unsigned char *dst, size_t *dlen);
 int my_aes_crypt(enum my_aes_mode mode, int flags,
                  const unsigned char *src, size_t slen, unsigned char *dst, size_t *dlen,
                  const unsigned char *key, size_t klen, const unsigned char *iv, size_t ivlen);
