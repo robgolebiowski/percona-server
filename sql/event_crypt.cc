@@ -6,14 +6,14 @@ static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data &crypt
   DBUG_ASSERT(crypto.is_enabled() && crypto.get_key() != NULL);
 
   size_t elen;
-  uchar iv[BINLOG_IV_LENGTH];
+  uchar iv[Binlog_crypt_data::BINLOG_IV_LENGTH];
 
   crypto.set_iv(iv, offs);
   memcpy(buf + EVENT_LEN_OFFSET, buf, 4);
 
  if (my_aes_crypt(MY_AES_CBC, flags | ENCRYPTION_FLAG_NOPAD,
                   buf + 4, buf_len - 4, ebuf + 4, &elen,
-                  crypto.get_key(), crypto.get_key_length(), iv, sizeof(iv)))
+                  crypto.get_key(), crypto.get_keys_length(), iv, sizeof(iv)))
   {
     memcpy(buf, buf + EVENT_LEN_OFFSET, 4);
     return true;
@@ -39,7 +39,7 @@ bool decrypt_event(uint32 offs, const Binlog_crypt_data &crypto, uchar* buf, uch
 
 bool Event_encrypter::init(IO_CACHE *output_cache, uchar* &header, size_t &buf_len)
 {
-  uchar iv[BINLOG_IV_LENGTH];
+  uchar iv[Binlog_crypt_data::BINLOG_IV_LENGTH];
   crypto->set_iv(iv, my_b_safe_tell(output_cache));
 
   //int res = 0;
@@ -48,7 +48,7 @@ bool Event_encrypter::init(IO_CACHE *output_cache, uchar* &header, size_t &buf_l
                               //crypto->key, crypto->key_length, iv, sizeof(iv))))
 
   if (my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                        crypto->get_key(), crypto->get_key_length(), iv, sizeof(iv)))
+                        crypto->get_key(), crypto->get_keys_length(), iv, sizeof(iv)))
   {
     if (ctx != NULL)
     {

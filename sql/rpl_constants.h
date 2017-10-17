@@ -67,15 +67,24 @@ enum ExtraRowInfoFormat {
   ERIF_MULTI        =  255
 };
 
-static const size_t ENCRYPTION_MASTER_KEY_NAME_MAX_LEN = 100;
-static const size_t ENCRYPTION_SERVER_UUID_LEN = 36;
-static const size_t ENCRYPTION_KEY_LEN = 32;
+//static const size_t ENCRYPTION_MASTER_KEY_NAME_MAX_LEN = 100;
+//static const size_t ENCRYPTION_SERVER_UUID_LEN = 36;
+//static const size_t ENCRYPTION_KEY_LEN = 32;
 
-#define BINLOG_CRYPTO_SCHEME_LENGTH 1
-#define BINLOG_KEY_VERSION_LENGTH   4
-#define BINLOG_IV_LENGTH            MY_AES_BLOCK_SIZE
-#define BINLOG_IV_OFFS_LENGTH       4
-#define BINLOG_NONCE_LENGTH         (BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH)
+//#define BINLOG_CRYPTO_SCHEME_LENGTH 1
+//#define BINLOG_KEY_VERSION_LENGTH   4
+//#define BINLOG_IV_LENGTH            MY_AES_BLOCK_SIZE
+//#define BINLOG_IV_OFFS_LENGTH       4
+//#define BINLOG_NONCE_LENGTH         (BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH)
+
+//enum Binlog_crypt_consts
+//{
+  //BINLOG_CRYPTO_SCHEME_LENGTH= 1,
+  //BINLOG_KEY_VERSION_LENGTH= 4,
+  //BINLOG_IV_LENGTH= MY_AES_BLOCK_SIZE,
+  //BINLOG_IV_OFFS_LENGTH= 4,
+  //BINLOG_NONCE_LENGTH= BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH
+//};
 
 class Binlog_crypt_data {
   //uint  key_version, key_length;
@@ -84,6 +93,24 @@ class Binlog_crypt_data {
   //uint dst_len;
   //uchar iv[BINLOG_IV_LENGTH];
 public:
+ 
+  //static const size_t binlog_crypto_scheme_length;
+  //static const size_t binlog_key_version_length;
+  //static const size_t binlog_iv_length;
+  //static const size_t binlog_iv_offs_length;
+  //static const size_t binlog_nonce_length;
+
+  enum Binlog_crypt_consts
+  {
+    BINLOG_CRYPTO_SCHEME_LENGTH= 1,
+    BINLOG_KEY_VERSION_LENGTH= 4,
+    BINLOG_IV_LENGTH= MY_AES_BLOCK_SIZE,
+    BINLOG_IV_OFFS_LENGTH= 4,
+    BINLOG_NONCE_LENGTH= BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH
+  };
+
+
+
   Binlog_crypt_data()
     : key(NULL)
     , enabled(false)  
@@ -107,25 +134,57 @@ public:
     free_key();
   }
 
-  Binlog_crypt_data& operator=(const Binlog_crypt_data &b)
+  Binlog_crypt_data(const Binlog_crypt_data &b)
   {
-    if (b.is_enabled())
+    enabled = b.enabled;
+    key_version = b.key_version; 
+    if (b.key_length && b.key != NULL)
     {
-      this->scheme= b.scheme;
-      this->key_version = b.key_version;
-      free_key();
-      if (b.key_length && b.key != NULL)
-      {
-        this->key= reinterpret_cast<uchar*>(my_malloc(PSI_NOT_INSTRUMENTED, b.key_length, MYF(MY_WME)));
-        memcpy(this->key, b.key, b.key_length);
-      }
-      this->key_length= b.key_length;
-      memcpy(this->iv, b.iv, BINLOG_IV_LENGTH);
-      this->dst_len = b.dst_len;
-      memcpy(this->nonce, b.nonce, BINLOG_NONCE_LENGTH);
+      key= reinterpret_cast<uchar*>(my_malloc(PSI_NOT_INSTRUMENTED, b.key_length, MYF(MY_WME)));
+      memcpy(key, b.key, b.key_length);
     }
+    else
+      key= NULL;
+
+    key_length= b.key_length;
+    memcpy(iv, b.iv, BINLOG_IV_LENGTH);
+    dst_len = b.dst_len;
+    memcpy(nonce, b.nonce, BINLOG_NONCE_LENGTH);
+  }
+
+  Binlog_crypt_data& operator=(Binlog_crypt_data b)
+  {
+    enabled= b.enabled;
+    key_version= b.key_version;
+    key_length= b.key_length;
+    std::swap(this->key, b.key);
+    key_length= b.key_length;
+    memcpy(iv, b.iv, BINLOG_IV_LENGTH);
+    dst_len= b.dst_len;
+    memcpy(nonce, b.nonce, BINLOG_NONCE_LENGTH);
+
     return *this;
   }
+
+  //Binlog_crypt_data& operator=(const Binlog_crypt_data &b)
+  //{
+    //if (b.is_enabled())
+    //{
+      //this->scheme= b.scheme;
+      //this->key_version = b.key_version;
+      //free_key();
+      //if (b.key_length && b.key != NULL)
+      //{
+        //this->key= reinterpret_cast<uchar*>(my_malloc(PSI_NOT_INSTRUMENTED, b.key_length, MYF(MY_WME)));
+        //memcpy(this->key, b.key, b.key_length);
+      //}
+      //this->key_length= b.key_length;
+      //memcpy(this->iv, b.iv, BINLOG_IV_LENGTH);
+      //this->dst_len = b.dst_len;
+      //memcpy(this->nonce, b.nonce, BINLOG_NONCE_LENGTH);
+    //}
+    //return *this;
+  //}
 
   bool init(uint sch, uint kv, const uchar* nonce)
   {
@@ -198,7 +257,7 @@ public:
     return key;
   }
 
-  size_t get_key_length() const
+  size_t get_keys_length() const
   {
     return key_length;
   }
@@ -227,5 +286,17 @@ private:
   uint scheme;
 };
 
+
+//#define BINLOG_CRYPTO_SCHEME_LENGTH 1
+//#define BINLOG_KEY_VERSION_LENGTH   4
+//#define BINLOG_IV_LENGTH            MY_AES_BLOCK_SIZE
+//#define BINLOG_IV_OFFS_LENGTH       4
+//#define BINLOG_NONCE_LENGTH         (BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH)
+
+//const size_t Binlog_crypt_data::binlog_crypto_scheme_length= 1;
+//const size_t Binlog_crypt_data::binlog_key_version_length= 4;
+//const size_t Binlog_crypt_data::binlog_iv_length= MY_AES_BLOCK_SIZE;
+//const size_t Binlog_crypt_data::binlog_iv_offs_length= 4;
+//const size_t Binlog_crypt_data::binlog_nonce_length= Binlog_crypt_data::binlog_iv_length - Binlog_crypt_data::binlog_iv_offs_length;
 
 #endif /* RPL_CONSTANTS_H */

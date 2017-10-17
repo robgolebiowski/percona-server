@@ -1362,18 +1362,18 @@ end:
 Log_event* Log_event::read_log_event(IO_CACHE* file,
                                      mysql_mutex_t* log_lock,
                                      const Format_description_log_event
-                                     *fdle,
+                                     *description_event,
                                      my_bool crc_check)
 #else
 Log_event* Log_event::read_log_event(IO_CACHE* file,
                                      const Format_description_log_event
-                                     *fdle,
+                                     *description_event,
                                      my_bool crc_check,
                                      read_log_event_filter_function f)
 #endif
 {
   DBUG_ENTER("Log_event::read_log_event(IO_CACHE *[, mysql_mutex_t *], Format_description_log_event *, my_bool)");
-  DBUG_ASSERT(fdle != 0);
+  DBUG_ASSERT(description_event != 0);
   char head[LOG_EVENT_MINIMAL_HEADER_LEN];
   /*
     First we only want to read at most LOG_EVENT_MINIMAL_HEADER_LEN, just to
@@ -1382,7 +1382,7 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     of 13 bytes, whereas LOG_EVENT_MINIMAL_HEADER_LEN is 19 bytes (it's
     "minimal" over the set {MySQL >=4.0}).
   */
-  uint header_size= min<uint>(fdle->common_header_len,
+  uint header_size= min<uint>(description_event->common_header_len,
                               LOG_EVENT_MINIMAL_HEADER_LEN);
 
   LOCK_MUTEX;
@@ -1443,7 +1443,7 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     goto err;
   }
 
-  if (fdle->crypto_data.is_enabled())
+  if (description_event->crypto_data.is_enabled())
   {
 #if defined(MYSQL_CLIENT)
     // Clients do not have access to keyring and thus cannot decrypt
@@ -1457,7 +1457,7 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     dst_buf[data_len]=0;
     memcpy(dst_buf, buf, data_len);
     
-    if (decrypt_event(my_b_tell(file) - data_len, fdle->crypto_data, (uchar*)buf, (uchar*)dst_buf, data_len))
+    if (decrypt_event(my_b_tell(file) - data_len, description_event->crypto_data, (uchar*)buf, (uchar*)dst_buf, data_len))
     {
       my_free(dst_buf);
       error= "decryption error";
@@ -1469,13 +1469,13 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
   }
 
 #if defined(MYSQL_CLIENT)
-  if (f && f(&buf, &data_len, fdle))
+  if (f && f(&buf, &data_len, description_event))
   {
     error = "Error applying filter while reading event";
     goto err;
   }
 #endif
-  if ((res= read_log_event(buf, data_len, &error, fdle, crc_check)))
+  if ((res= read_log_event(buf, data_len, &error, description_event, crc_check)))
     res->register_temp_buf(buf);
 
 err:
@@ -1517,20 +1517,20 @@ err:
 
 
 /**
-  Binlog format tolerance is in (buf, event_len, fdle)
+  Binlog format tolerance is in (buf, event_len, description_event)
   constructors.
 */
 
 Log_event* Log_event::read_log_event(const char* buf, uint event_len,
 				     const char **error,
-                                     const Format_description_log_event *fdle,
+                                     const Format_description_log_event *description_event,
                                      my_bool crc_check)
 {
   Log_event* ev= NULL;
   enum_binlog_checksum_alg  alg;
   DBUG_ENTER("Log_event::read_log_event(char *, uint, char **, Format_description_log_event *, my_bool)");
-  DBUG_ASSERT(fdle != 0);
-  DBUG_PRINT("info", ("binlog_version: %d", fdle->binlog_version));
+  DBUG_ASSERT(description_event != 0);
+  DBUG_PRINT("info", ("binlog_version: %d", description_event->binlog_version));
   DBUG_DUMP("data", (unsigned char*) buf, event_len);
 
   /* Check the integrity */
@@ -1550,7 +1550,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
   uint event_type= static_cast<const uchar>(buf[EVENT_TYPE_OFFSET]);
   // all following START events in the current file are without checksum
   if (event_type == binary_log::START_EVENT_V3)
-    (const_cast<Format_description_log_event *>(fdle))->
+    (const_cast<Format_description_log_event*>(description_event))->
             common_footer->checksum_alg= binary_log::BINLOG_CHECKSUM_ALG_OFF;
   // Sanity check for Format description event
   if (event_type == binary_log::FORMAT_DESCRIPTION_EVENT)
@@ -1588,7 +1588,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
     Notice, a pre-checksum FD version forces alg := BINLOG_CHECKSUM_ALG_UNDEF.
   */
   alg= (event_type != binary_log::FORMAT_DESCRIPTION_EVENT) ?
-       fdle->common_footer->checksum_alg :
+       description_event->common_footer->checksum_alg :
        Log_event_footer::get_checksum_alg(buf, event_len);
   // Emulate the corruption during reading an event
   DBUG_EXECUTE_IF("corrupt_read_log_event_char",
@@ -1623,7 +1623,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
     DBUG_RETURN(NULL);
   }
 
-  if (event_type > fdle->number_of_event_types &&
+  if (event_type > description_event->number_of_event_types &&
       event_type != binary_log::FORMAT_DESCRIPTION_EVENT &&
       /*
         Skip the event type check when simulating an
@@ -1638,7 +1638,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
     DBUG_PRINT("error", ("event type %d found, but the current "
                          "Format_description_log_event supports only %d event "
                          "types", event_type,
-                         fdle->number_of_event_types));
+                         description_event->number_of_event_types));
     ev= NULL;
   }
   else
@@ -1653,14 +1653,14 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       array, which was set up when the Format_description_log_event
       was read.
     */
-    if (fdle->event_type_permutation)
+    if (description_event->event_type_permutation)
     {
       uint new_event_type;
       if (event_type >= EVENT_TYPE_PERMUTATION_NUM)
         /* Safe guard for read out of bounds of event_type_permutation. */
         new_event_type= binary_log::UNKNOWN_EVENT;
       else
-        new_event_type= fdle->event_type_permutation[event_type];
+        new_event_type= description_event->event_type_permutation[event_type];
 
       DBUG_PRINT("info", ("converting event type %d to %d (%s)",
                  event_type, new_event_type,
@@ -1679,7 +1679,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       binary_log_debug::debug_query_mts_corrupt_db_names=
         DBUG_EVALUATE_IF("query_log_event_mts_corrupt_db_names", true, false);
 #endif
-      ev  = new Query_log_event(buf, event_len, fdle,
+      ev  = new Query_log_event(buf, event_len, description_event,
                                 binary_log::QUERY_EVENT);
       break;
     case binary_log::LOAD_EVENT:
@@ -1688,116 +1688,116 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       binary_log_debug::debug_simulate_invalid_address=
         DBUG_EVALUATE_IF("simulate_invalid_address", true, false);
 #endif
-      ev = new Load_log_event(buf, event_len, fdle);
+      ev = new Load_log_event(buf, event_len, description_event);
       break;
     case binary_log::ROTATE_EVENT:
-      ev = new Rotate_log_event(buf, event_len, fdle);
+      ev = new Rotate_log_event(buf, event_len, description_event);
       break;
     case binary_log::CREATE_FILE_EVENT:
 #ifndef DBUG_OFF
       binary_log_debug::debug_simulate_invalid_address=
         DBUG_EVALUATE_IF("simulate_invalid_address", true, false);
 #endif
-      ev = new Create_file_log_event(buf, event_len, fdle);
+      ev = new Create_file_log_event(buf, event_len, description_event);
       break;
     case binary_log::APPEND_BLOCK_EVENT:
-      ev = new Append_block_log_event(buf, event_len, fdle);
+      ev = new Append_block_log_event(buf, event_len, description_event);
       break;
     case binary_log::DELETE_FILE_EVENT:
-      ev = new Delete_file_log_event(buf, event_len, fdle);
+      ev = new Delete_file_log_event(buf, event_len, description_event);
       break;
     case binary_log::EXEC_LOAD_EVENT:
-      ev = new Execute_load_log_event(buf, event_len, fdle);
+      ev = new Execute_load_log_event(buf, event_len, description_event);
       break;
     case binary_log::START_EVENT_V3: /* this is sent only by MySQL <=4.x */
-      ev = new Start_log_event_v3(buf, event_len, fdle);
+      ev = new Start_log_event_v3(buf, event_len, description_event);
       break;
     case binary_log::STOP_EVENT:
-      ev = new Stop_log_event(buf, fdle);
+      ev = new Stop_log_event(buf, description_event);
       break;
     case binary_log::INTVAR_EVENT:
-      ev = new Intvar_log_event(buf, fdle);
+      ev = new Intvar_log_event(buf, description_event);
       break;
     case binary_log::XID_EVENT:
-      ev = new Xid_log_event(buf, fdle);
+      ev = new Xid_log_event(buf, description_event);
       break;
     case binary_log::RAND_EVENT:
-      ev = new Rand_log_event(buf, fdle);
+      ev = new Rand_log_event(buf, description_event);
       break;
     case binary_log::USER_VAR_EVENT:
-      ev = new User_var_log_event(buf, event_len, fdle);
+      ev = new User_var_log_event(buf, event_len, description_event);
       break;
     case binary_log::FORMAT_DESCRIPTION_EVENT:
-      ev = new Format_description_log_event(buf, event_len, fdle);
+      ev = new Format_description_log_event(buf, event_len, description_event);
       break;
 #if defined(HAVE_REPLICATION)
     case binary_log::PRE_GA_WRITE_ROWS_EVENT:
-      ev = new Write_rows_log_event_old(buf, event_len, fdle);
+      ev = new Write_rows_log_event_old(buf, event_len, description_event);
       break;
     case binary_log::PRE_GA_UPDATE_ROWS_EVENT:
-      ev = new Update_rows_log_event_old(buf, event_len, fdle);
+      ev = new Update_rows_log_event_old(buf, event_len, description_event);
       break;
     case binary_log::PRE_GA_DELETE_ROWS_EVENT:
-      ev = new Delete_rows_log_event_old(buf, event_len, fdle);
+      ev = new Delete_rows_log_event_old(buf, event_len, description_event);
       break;
     case binary_log::WRITE_ROWS_EVENT_V1:
-      if (!(fdle->post_header_len.empty()))
-        ev = new Write_rows_log_event(buf, event_len, fdle);
+      if (!(description_event->post_header_len.empty()))
+        ev = new Write_rows_log_event(buf, event_len, description_event);
       break;
     case binary_log::UPDATE_ROWS_EVENT_V1:
-      if (!(fdle->post_header_len.empty()))
-        ev = new Update_rows_log_event(buf, event_len, fdle);
+      if (!(description_event->post_header_len.empty()))
+        ev = new Update_rows_log_event(buf, event_len, description_event);
       break;
     case binary_log::DELETE_ROWS_EVENT_V1:
-      if (!(fdle->post_header_len.empty()))
-        ev = new Delete_rows_log_event(buf, event_len, fdle);
+      if (!(description_event->post_header_len.empty()))
+        ev = new Delete_rows_log_event(buf, event_len, description_event);
       break;
     case binary_log::TABLE_MAP_EVENT:
-      if (!(fdle->post_header_len.empty()))
-        ev = new Table_map_log_event(buf, event_len, fdle);
+      if (!(description_event->post_header_len.empty()))
+        ev = new Table_map_log_event(buf, event_len, description_event);
       break;
 #endif
     case binary_log::BEGIN_LOAD_QUERY_EVENT:
-      ev = new Begin_load_query_log_event(buf, event_len, fdle);
+      ev = new Begin_load_query_log_event(buf, event_len, description_event);
       break;
     case binary_log::EXECUTE_LOAD_QUERY_EVENT:
-      ev= new Execute_load_query_log_event(buf, event_len, fdle);
+      ev= new Execute_load_query_log_event(buf, event_len, description_event);
       break;
     case binary_log::INCIDENT_EVENT:
-      ev = new Incident_log_event(buf, event_len, fdle);
+      ev = new Incident_log_event(buf, event_len, description_event);
       break;
     case binary_log::START_ENCRYPTION_EVENT:
-      ev = new Start_encryption_log_event(buf, event_len, fdle);
+      ev = new Start_encryption_log_event(buf, event_len, description_event);
       break;
     case binary_log::ROWS_QUERY_LOG_EVENT:
-      ev= new Rows_query_log_event(buf, event_len, fdle);
+      ev= new Rows_query_log_event(buf, event_len, description_event);
       break;
     case binary_log::GTID_LOG_EVENT:
     case binary_log::ANONYMOUS_GTID_LOG_EVENT:
-      ev= new Gtid_log_event(buf, event_len, fdle);
+      ev= new Gtid_log_event(buf, event_len, description_event);
       break;
     case binary_log::PREVIOUS_GTIDS_LOG_EVENT:
-      ev= new Previous_gtids_log_event(buf, event_len, fdle);
+      ev= new Previous_gtids_log_event(buf, event_len, description_event);
       break;
 #if defined(HAVE_REPLICATION)
     case binary_log::WRITE_ROWS_EVENT:
-      ev = new Write_rows_log_event(buf, event_len, fdle);
+      ev = new Write_rows_log_event(buf, event_len, description_event);
       break;
     case binary_log::UPDATE_ROWS_EVENT:
-      ev = new Update_rows_log_event(buf, event_len, fdle);
+      ev = new Update_rows_log_event(buf, event_len, description_event);
       break;
     case binary_log::DELETE_ROWS_EVENT:
-      ev = new Delete_rows_log_event(buf, event_len, fdle);
+      ev = new Delete_rows_log_event(buf, event_len, description_event);
       break;
     case binary_log::TRANSACTION_CONTEXT_EVENT:
-      ev = new Transaction_context_log_event(buf, event_len, fdle);
+      ev = new Transaction_context_log_event(buf, event_len, description_event);
       break;
     case binary_log::VIEW_CHANGE_EVENT:
-      ev = new View_change_log_event(buf, event_len, fdle);
+      ev = new View_change_log_event(buf, event_len, description_event);
       break;
 #endif
     case binary_log::XA_PREPARE_LOG_EVENT:
-      ev= new XA_prepare_log_event(buf, fdle);
+      ev= new XA_prepare_log_event(buf, description_event);
       break;
     default:
       /*
@@ -1806,7 +1806,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       */
       if (uint2korr(buf + FLAGS_OFFSET) & LOG_EVENT_IGNORABLE_F)
       {
-        ev= new Ignorable_log_event(buf, fdle);
+        ev= new Ignorable_log_event(buf, description_event);
       }
       else
       {
@@ -1852,7 +1852,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       *error= "Found invalid event in binary log";
       DBUG_RETURN(0);
     }
-    ev= new Unknown_log_event(buf, fdle);
+    ev= new Unknown_log_event(buf, description_event);
 #else
     *error= "Found invalid event in binary log";
     DBUG_RETURN(0);
@@ -5437,10 +5437,10 @@ Start_encryption_log_event::Start_encryption_log_event(
      (int)LOG_EVENT_MINIMAL_HEADER_LEN + (int)Start_encryption_log_event::get_data_size())
   {
     crypto_scheme = *(uchar*)buf;
-    key_version = uint4korr(buf + BINLOG_CRYPTO_SCHEME_LENGTH);
+    key_version = uint4korr(buf + Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH);
     memcpy(nonce,
-           buf + BINLOG_CRYPTO_SCHEME_LENGTH + BINLOG_KEY_VERSION_LENGTH,
-           BINLOG_NONCE_LENGTH);
+           buf + Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH + Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH,
+           Binlog_crypt_data::BINLOG_NONCE_LENGTH);
   }
   else
     crypto_scheme= ~0; // invalid

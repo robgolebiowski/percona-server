@@ -1752,17 +1752,17 @@ public:
   {
     DBUG_ASSERT(crypto_scheme == 1);
     is_valid_param= crypto_scheme == 1;
-    memcpy(nonce, nonce_arg, BINLOG_NONCE_LENGTH);
+    memcpy(nonce, nonce_arg, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
   }
 
   bool write_data_body(IO_CACHE* file)
   {
     uchar scheme_buf= crypto_scheme;
-    uchar key_version_buf[BINLOG_KEY_VERSION_LENGTH];
+    uchar key_version_buf[Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH];
     int4store(key_version_buf, key_version);
     return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
            wrapper_my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
-           wrapper_my_b_safe_write(file, (uchar*)nonce, BINLOG_NONCE_LENGTH);
+           wrapper_my_b_safe_write(file, (uchar*)nonce, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
   }
 #else
   void print(FILE* file, PRINT_EVENT_INFO* print_event_info);
@@ -1776,13 +1776,14 @@ public:
 
   size_t get_data_size()
   {
-    return BINLOG_CRYPTO_SCHEME_LENGTH + BINLOG_KEY_VERSION_LENGTH +
-           BINLOG_NONCE_LENGTH;
+    return Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH +
+           Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH +
+           Binlog_crypt_data::BINLOG_NONCE_LENGTH;
   }
 
   uint crypto_scheme;
   uint key_version;
-  uchar nonce[BINLOG_NONCE_LENGTH];
+  uchar nonce[Binlog_crypt_data::BINLOG_NONCE_LENGTH];
 
 protected:
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)

@@ -5105,7 +5105,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
   {
     //if (my_rand_buffer(crypto.nonce, sizeof(crypto.nonce)))
       //goto err;
-    uchar nonce[BINLOG_NONCE_LENGTH];
+    uchar nonce[Binlog_crypt_data::BINLOG_NONCE_LENGTH];
     if (my_rand_buffer(nonce, sizeof(nonce)))
       goto err;
 
