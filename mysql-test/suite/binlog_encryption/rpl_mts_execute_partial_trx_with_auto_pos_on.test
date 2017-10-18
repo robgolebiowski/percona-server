@@ -6,7 +6,7 @@
 #
 # ==== Implementation ====
 #
-# See extra/rpl_tests/rpl_mts_execute_partial_trx_in_relay_log.inc
+# See suite/rpl/trpl_mts_execute_partial_trx_in_relay_log.inc
 #
 # ==== References ====
 #
@@ -24,4 +24,4 @@
 change master to master_auto_position=1;
 --source include/start_slave.inc
 
---source extra/rpl_tests/rpl_mts_execute_partial_trx_in_relay_log.inc
+--source suite/rpl/trpl_mts_execute_partial_trx_in_relay_log.inc

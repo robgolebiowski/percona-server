@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_parallel_show_binlog_events_purge_logs.test
+--source suite/rpl/trpl_parallel_show_binlog_events_purge_logs.test

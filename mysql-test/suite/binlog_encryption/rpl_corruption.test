@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_corruption.test
+--source suite/rpl/trpl_corruption.test

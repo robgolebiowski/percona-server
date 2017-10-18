@@ -9,4 +9,4 @@
 # correctly when the IO thread is restarted in the middle of a transaction.
 #
 
---source extra/rpl_tests/rpl_gtids_restart_slave_io_lost_trx.test
+--source suite/rpl/trpl_gtids_restart_slave_io_lost_trx.test

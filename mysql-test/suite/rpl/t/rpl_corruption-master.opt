@@ -1,1 +1,2 @@
---binlog-checksum=CRC32 --master-verify-checksum=1
+--binlog-checksum=CRC32 --master-verify-checksum=1 --plugin_dir=KEYRING_PLUGIN_DIR --early-plugin-load=KEYRING_PLUGIN --keyring_file_data=../../tmp/keyring1
+

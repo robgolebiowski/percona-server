@@ -46,22 +46,22 @@ SET @@global.log_error_verbosity=1;
 # Checking strict interpretation of type conversions
 connection slave;
 SET GLOBAL SLAVE_TYPE_CONVERSIONS='';
-source extra/rpl_tests/type_conversions.test;
+source suite/rpl/ttype_conversions.test;
 
 # Checking lossy integer type conversions
 connection slave;
 SET GLOBAL SLAVE_TYPE_CONVERSIONS='ALL_NON_LOSSY';
-source extra/rpl_tests/type_conversions.test;
+source suite/rpl/ttype_conversions.test;
 
 # Checking non-lossy integer type conversions
 connection slave;
 SET GLOBAL SLAVE_TYPE_CONVERSIONS='ALL_LOSSY';
-source extra/rpl_tests/type_conversions.test;
+source suite/rpl/ttype_conversions.test;
 
 # Checking all type conversions
 connection slave;
 SET GLOBAL SLAVE_TYPE_CONVERSIONS='ALL_LOSSY,ALL_NON_LOSSY';
-source extra/rpl_tests/type_conversions.test;
+source suite/rpl/ttype_conversions.test;
 
 # reinstate the log_error_verbosity value
 --replace_result $saved_log_error_verbosity SAVED_LOG_ERROR_VERBOSITY

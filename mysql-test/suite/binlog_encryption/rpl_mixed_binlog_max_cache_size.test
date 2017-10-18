@@ -5,5 +5,5 @@
 --source include/have_binlog_format_mixed.inc
 --source include/not_gtid_enabled.inc
 
---source extra/rpl_tests/rpl_binlog_max_cache_size.test
+--source suite/rpl/trpl_binlog_max_cache_size.test
 --source include/rpl_end.inc

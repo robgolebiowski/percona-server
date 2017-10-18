@@ -32,6 +32,6 @@
 --source include/master-slave.inc
 
 connection master;
-source extra/rpl_tests/rpl_parallel_load.test;
+source suite/rpl/trpl_parallel_load.test;
 
 --source include/rpl_end.inc

@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_gtid_transaction_split_across_relay_logs.test
+--source suite/rpl/trpl_gtid_transaction_split_across_relay_logs.test

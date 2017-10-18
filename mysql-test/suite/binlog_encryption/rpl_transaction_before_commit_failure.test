@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_transaction_before_commit_failure.test
+--source suite/rpl/trpl_transaction_before_commit_failure.test

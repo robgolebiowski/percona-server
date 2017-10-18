@@ -3327,7 +3327,7 @@ bool show_binlog_events(THD *thd, MYSQL_BIN_LOG *binary_log)
         {
           if (description_event->start_decryption(static_cast<Start_encryption_log_event*>(ev)))
           {
-            errmsg = "Error starting decryption";
+            errmsg= "Error starting decryption";
             delete ev;
             goto err;
           }

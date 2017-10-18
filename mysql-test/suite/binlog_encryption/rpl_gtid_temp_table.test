@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_gtid_temp_table.test
+--source suite/rpl/trpl_gtid_temp_table.test

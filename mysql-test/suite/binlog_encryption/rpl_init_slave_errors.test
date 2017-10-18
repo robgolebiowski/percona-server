@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_init_slave_errors.test
+--source suite/rpl/trpl_init_slave_errors.test

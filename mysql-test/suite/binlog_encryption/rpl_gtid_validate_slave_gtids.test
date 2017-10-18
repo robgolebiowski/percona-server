@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_gtid_validate_slave_gtids.test
+--source suite/rpl/trpl_gtid_validate_slave_gtids.test

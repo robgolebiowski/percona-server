@@ -12,7 +12,7 @@
 SET DEBUG = "d,set_commit_parent_100";
 
 --let $mts_parallel_type= "LOGICAL_CLOCK"
---source extra/rpl_tests/rpl_mts_transaction_retry.inc
+--source suite/rpl/trpl_mts_transaction_retry.inc
 
 --source include/rpl_end.inc
 

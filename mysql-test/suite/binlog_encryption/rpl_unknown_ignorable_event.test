@@ -1,1 +1,1 @@
---source extra/rpl_tests/rpl_unknown_ignorable_event.test
+--source suite/rpl/trpl_unknown_ignorable_event.test

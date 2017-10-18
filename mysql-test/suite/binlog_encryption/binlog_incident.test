@@ -6,4 +6,4 @@ source include/have_log_bin.inc;
 source include/have_debug.inc;
 
 --let $use_remote_mysqlbinlog= 1
---source extra/binlog_tests/binlog_incident.test
+--source suite/binlog/binlog_incident.test

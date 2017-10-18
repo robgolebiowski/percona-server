@@ -31,11 +31,11 @@
 
 --echo # Using MyISAM storage engine
 --let $storage_engine= MyISAM
---source extra/rpl_tests/rpl_trx_boundary_parser.inc
+--source suite/rpl/trpl_trx_boundary_parser.inc
 
 --echo # Using InnoDB storage engine
 --let $storage_engine= InnoDB
---source extra/rpl_tests/rpl_trx_boundary_parser.inc
+--source suite/rpl/trpl_trx_boundary_parser.inc
 
 #
 # As we are going to use GTID related checks for the IO thread after
@@ -58,11 +58,11 @@ CHANGE MASTER TO MASTER_AUTO_POSITION= 0;
 
 --echo # Using MyISAM storage engine without auto positioning
 --let $storage_engine= MyISAM
---source extra/rpl_tests/rpl_trx_boundary_parser.inc
+--source suite/rpl/trpl_trx_boundary_parser.inc
 
 --echo # Using InnoDB storage engine without auto positioning
 --let $storage_engine= InnoDB
---source extra/rpl_tests/rpl_trx_boundary_parser.inc
+--source suite/rpl/trpl_trx_boundary_parser.inc
 
 #
 # Enabling slave's auto positioning again

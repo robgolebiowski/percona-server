@@ -19,4 +19,4 @@
 change master to master_auto_position=0;
 --source include/start_slave.inc
 
---source extra/rpl_tests/rpl_mts_execute_partial_trx_in_relay_log.inc
+--source suite/rpl/trpl_mts_execute_partial_trx_in_relay_log.inc
