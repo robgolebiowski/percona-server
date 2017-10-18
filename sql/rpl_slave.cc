@@ -5794,7 +5794,7 @@ requesting master dump") ||
       DBUG_EXECUTE_IF("relay_xid_trigger",
         if (event_len != packet_error)
         {
-          const char* event_buf= (const char*)mysql->net.read_pos + 1;
+          const uchar* event_buf= (const uchar*)mysql->net.read_pos + 1;
           Log_event_type event_type= (Log_event_type)
                                         event_buf[EVENT_TYPE_OFFSET];
           if (event_type == binary_log::XID_EVENT)

@@ -55,7 +55,7 @@ Log_event_footer::get_checksum_alg(const char* buf, unsigned long len)
   enum_binlog_checksum_alg ret;
   char version[ST_SERVER_VER_LEN];
   unsigned char version_split[3];
-  BAPI_ASSERT(buf[EVENT_TYPE_OFFSET] == FORMAT_DESCRIPTION_EVENT);
+  BAPI_ASSERT(static_cast<unsigned char>(buf[EVENT_TYPE_OFFSET]) == FORMAT_DESCRIPTION_EVENT);
   memcpy(version, buf +
          buf[LOG_EVENT_MINIMAL_HEADER_LEN + ST_COMMON_HEADER_LEN_OFFSET]
          + ST_SERVER_VER_OFFSET, ST_SERVER_VER_LEN);
@@ -137,7 +137,7 @@ Log_event_header(const char* buf, uint16_t binlog_version)
       Format_desc (remember that mysqlbinlog starts by assuming that 5.0
       logs are in 4.0 format, until it finds a Format_desc).
     */
-    if (buf[EVENT_TYPE_OFFSET] < FORMAT_DESCRIPTION_EVENT && log_pos)
+    if (static_cast<unsigned char>(buf[EVENT_TYPE_OFFSET]) < FORMAT_DESCRIPTION_EVENT && log_pos)
     {
       /*
         If log_pos=0, don't change it. log_pos==0 is a marker to mean
@@ -174,8 +174,8 @@ Log_event_header(const char* buf, uint16_t binlog_version)
     memcpy(&flags, buf + FLAGS_OFFSET, sizeof(flags));
     flags= le16toh(flags);
 
-     if ((buf[EVENT_TYPE_OFFSET] == FORMAT_DESCRIPTION_EVENT) ||
-         (buf[EVENT_TYPE_OFFSET] == ROTATE_EVENT))
+     if ((static_cast<unsigned char>(buf[EVENT_TYPE_OFFSET]) == FORMAT_DESCRIPTION_EVENT) ||
+         (static_cast<unsigned char>(buf[EVENT_TYPE_OFFSET]) == ROTATE_EVENT))
      {
        /*
          These events always have a header which stops here (i.e. their

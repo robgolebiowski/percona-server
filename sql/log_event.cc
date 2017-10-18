@@ -1616,7 +1616,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
 #ifdef MYSQL_CLIENT
     if (force_opt)
     {
-      ev= new Unknown_log_event(buf, fdle);
+      ev= new Unknown_log_event(buf, description_event);
       DBUG_RETURN(ev);
     }
 #endif
@@ -5471,9 +5471,9 @@ void Start_encryption_log_event::print(FILE* file,
                                        PRINT_EVENT_INFO* print_event_info)
 {
     // Need 2 characters per one hex + 2 for 0x + 1 for \0
-    char nonce_buf[BINLOG_NONCE_LENGTH * 2 + 2 + 1];
+    char nonce_buf[Binlog_crypt_data::BINLOG_NONCE_LENGTH * 2 + 2 + 1];
     str_to_hex(nonce_buf, reinterpret_cast<char*>(nonce),
-               BINLOG_NONCE_LENGTH);
+               Binlog_crypt_data::BINLOG_NONCE_LENGTH);
 
     IO_CACHE *const head= &print_event_info->head_cache;
     print_header(head, print_event_info, FALSE);
