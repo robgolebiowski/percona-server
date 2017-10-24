@@ -5980,7 +5980,7 @@ ignore_log_space_limit=%d",
           thd->killed= THD::KILLED_NO_VALUE;
       );
       DBUG_EXECUTE_IF("stop_io_after_reading_unknown_event",
-        if (static_cast<uchar>(event_buf[EVENT_TYPE_OFFSET]) >= binary_log::ENUM_END_EVENT)
+        if (static_cast<uchar>(event_buf[EVENT_TYPE_OFFSET]) >= binary_log::MYSQL_END_EVENT)
           thd->killed= THD::KILLED_NO_VALUE;
       );
       DBUG_EXECUTE_IF("stop_io_after_queuing_event",

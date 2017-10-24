@@ -1625,6 +1625,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
 
   if (event_type > description_event->number_of_event_types &&
       event_type != binary_log::FORMAT_DESCRIPTION_EVENT &&
+      event_type != binary_log::START_ENCRYPTION_EVENT &&
       /*
         Skip the event type check when simulating an
         unknown ignorable log event.

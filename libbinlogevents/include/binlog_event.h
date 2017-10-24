@@ -328,7 +328,7 @@ enum Log_event_type
   XA_PREPARE_LOG_EVENT= 38,
 
   /* New MySQL events are to be added right above this comment */
-  MYSQL_EVENTS_END,
+  MYSQL_END_EVENT,
 
   //PERCONA_EVENTS_BEGIN= 100,
   MARIA_EVENTS_BEGIN= 160,
@@ -753,9 +753,11 @@ public:
   /*
      The number of types we handle in Format_description_event (UNKNOWN_EVENT
      is not to be handled, it does not exist in binlogs, it does not have a
-     format).
+     format - unless it's START_ENCRYPTION_EVENT - then Format_description_event
+     is not aware of it. That's OK as this event never leaves the server -
+     it's not sent to slave).
   */
-  static const int LOG_EVENT_TYPES= (ENUM_END_EVENT - 1);
+  static const int LOG_EVENT_TYPES= (MYSQL_END_EVENT - 1);
 
   /**
     The lengths for the fixed data part of each event.
