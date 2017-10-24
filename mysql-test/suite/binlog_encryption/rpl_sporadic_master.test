@@ -1,1 +1,1 @@
---source suite/rpl/trpl_sporadic_master.test
+--source suite/rpl/t/rpl_sporadic_master.test

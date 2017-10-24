@@ -120,9 +120,7 @@ while ($restarts > 0)
 
 --source include/start_slave.inc
 --source include/rpl_connection_master.inc
-
 --source include/sync_slave_io_with_master.inc
-
 # At this point, the Retrieved_Gtid_Set should have three GTIDs
 --let $retrieved_gtids= query_get_value(SHOW SLAVE STATUS, Retrieved_Gtid_Set, 1)
 --let $assert_text= Exactly two GTIDs should have been retrieved from master after restarting

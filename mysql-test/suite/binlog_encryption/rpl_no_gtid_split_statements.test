@@ -1,4 +1,1 @@
---source include/no_valgrind_without_big.inc
---source include/not_gtid_enabled.inc
---source include/not_mts_slave_parallel_workers.inc
---source suite/rpl/trpl_split_statements.test
+--source suite/rpl/t/rpl_no_gtid_split_statements.test

@@ -1,1 +1,1 @@
---encrypt-binlog=0 --binlog-checksum=CRC32 --slave-sql-verify-checksum=1 --master-verify-checksum=1
+--binlog-checksum=CRC32 --slave-sql-verify-checksum=1

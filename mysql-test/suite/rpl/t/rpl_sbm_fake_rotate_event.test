@@ -49,7 +49,7 @@ while ($iter < 2)
 SET DEBUG_SYNC="now wait_for signal.reached";
 let $sbm= query_get_value("SHOW SLAVE STATUS", Seconds_Behind_Master, 1);
 --let $assert_text= Seconds Behind Master should be less than IO_THREAD's time.
---let $assert_cond= $sbm < 190
+--let $assert_cond= $sbm < 180
 --source include/assert.inc
 SET DEBUG_SYNC="now signal signal.done_sbm_calculation";
 --inc $iter
