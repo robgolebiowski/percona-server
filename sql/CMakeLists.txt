@@ -249,6 +249,7 @@ SET(SQL_SHARED_SOURCES
   uniques.cc
   unireg.cc
   xa.cc
+  binlog_crypt_data.cc
 )
 
 IF(WIN32)

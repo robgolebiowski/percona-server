@@ -3523,3 +3523,4 @@ int main(int argc, char** argv)
 #include "rpl_gtid_set.cc"
 #include "rpl_gtid_specification.cc"
 #include "rpl_tblmap.cc"
+#include "binlog_crypt_data.cc"

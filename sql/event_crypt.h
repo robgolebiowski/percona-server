@@ -6,6 +6,7 @@
 #include "rpl_constants.h"
 #include "binlog_event.h"
 #include "boost/move/unique_ptr.hpp"
+#include "binlog_crypt_data.h"
 
 bool encrypt_event(uint32 offs, const Binlog_crypt_data &crypto, uchar* buf, uchar *ebuf, size_t buf_len);
 bool decrypt_event(uint32 offs, const Binlog_crypt_data &crypto, uchar* buf, uchar *ebuf, size_t buf_len);

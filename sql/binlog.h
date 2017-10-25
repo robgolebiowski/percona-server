@@ -25,6 +25,7 @@
 #include "atomic_class.h"
 #include "rpl_gtid.h"                  // Gtid_set, Sid_map
 #include "rpl_constants.h"
+#include "binlog_crypt_data.h"
 
 class Relay_log_info;
 class Master_info;
