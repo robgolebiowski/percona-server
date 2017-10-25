@@ -44,31 +44,13 @@ enum my_aes_mode {
 #endif
 };
 
-//#ifdef HAVE_YASSL
-//#include "yassl.cc"
-//#else
-//#include <openssl/evp.h>
-//#endif
-
-//#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-//#define EVP_CIPHER_CTX_SIZE 168
-//#else
-//#define EVP_CIPHER_CTX_SIZE sizeof(EVP_CIPHER_CTX)
-//#endif
-
-//struct EVP_CIPHER;
-
 class MyEncryptionCTX
 {
 public:
-  //char ctx_buf[EVP_CIPHER_CTX_SIZE];
-  //EVP_CIPHER_CTX *ctx;
-
   MyEncryptionCTX();
   virtual ~MyEncryptionCTX();
 
   virtual int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
-  //virtual int init(int encrypt, const uchar *key, size_t klen,
                    const uchar *iv, size_t ivlen);
   virtual int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen);
   virtual int finish(uchar *dst, size_t *dlen);
@@ -76,6 +58,9 @@ public:
 protected:
   struct Impl;
   Impl* pimpl;
+
+private:
+  MyEncryptionCTX(const MyEncryptionCTX &enc);
 };
 
 int my_aes_crypt_init(MyEncryptionCTX* &ctx, enum my_aes_mode mode, int flags,
@@ -84,13 +69,11 @@ int my_aes_crypt_init(MyEncryptionCTX* &ctx, enum my_aes_mode mode, int flags,
 int my_aes_crypt_update(MyEncryptionCTX *ctx, const unsigned char *src, size_t slen,
                         unsigned char *dst, size_t *dlen);
 int my_aes_crypt_finish(MyEncryptionCTX* &ctx, uchar *dst, size_t *dlen);
-//int my_aes_crypt_finish(MyEncryptionCTX *ctx, unsigned char *dst, size_t *dlen);
 int my_aes_crypt(enum my_aes_mode mode, int flags,
                  const unsigned char *src, size_t slen, unsigned char *dst, size_t *dlen,
                  const unsigned char *key, size_t klen, const unsigned char *iv, size_t ivlen);
 
 int my_random_bytes(unsigned char* buf, int num);
 size_t my_aes_crypt_get_size(enum my_aes_mode mode, size_t source_length);
-//size_t my_aes_ctx_size(enum my_aes_mode mode);
 
 #endif /* MY_CRYPT_INCLUDED */
