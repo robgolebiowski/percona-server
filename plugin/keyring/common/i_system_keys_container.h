@@ -9,9 +9,9 @@ namespace keyring
   class ISystem_keys_container : public Keyring_alloc
   {
   public:
-    virtual std::string get_latest_key_id_version_if_system_key(IKey *key) = 0;
+    virtual IKey* get_latest_key_if_system_key(IKey *key) = 0;
     virtual void update_if_system_key(IKey *key) = 0;
-    virtual bool get_key_with_rotated_id_if_system_key(IKey *key) = 0;
+    virtual void rotate_key_id_if_system_key(IKey *key) = 0;
     virtual bool is_system_key(IKey *key) = 0;
 
     virtual ~ISystem_keys_container()

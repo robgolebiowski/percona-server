@@ -223,6 +223,8 @@ namespace keyring__api_unittest
                               sample_key_data.length() + 1), 1);
   }
 
+  /*
+
   TEST_F(Keyring_api_test, RotateFetchRotateFetchRotateFetchSystemKey)
   {
     std::string percona_binlog_key_1("key1");
@@ -327,7 +329,7 @@ namespace keyring__api_unittest
     delete sample_key; //unused in this test
   }
 
-
+*/
 
   TEST_F(Keyring_api_test, KeyGenerate)
   {

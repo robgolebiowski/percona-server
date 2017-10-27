@@ -24,6 +24,7 @@ SET(
     common/keyring_key.cc
     common/keys_container.cc
     common/system_keys_container.cc
+    common/system_key.cc
     common/keyring_impl.cc
     keyring.cc
     hash_to_buffer_serializer.cc
