@@ -38,55 +38,59 @@ SET(TESTS
   file_io
 )
 
-IF (MERGE_UNITTESTS)
-  SET(merge_keyring_file_tests ${CMAKE_CURRENT_BINARY_DIR}/merge_keyring_file_tests-t.cc)
-  SET_SOURCE_FILES_PROPERTIES(merge_keyring_file_tests PROPERTIES GENERATED 1)
+#SET(TESTS
+  #system_keys_container
+#)
 
-  INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+#IF (MERGE_UNITTESTS)
+  #SET(merge_keyring_file_tests ${CMAKE_CURRENT_BINARY_DIR}/merge_keyring_file_tests-t.cc)
+  #SET_SOURCE_FILES_PROPERTIES(merge_keyring_file_tests PROPERTIES GENERATED 1)
 
-  FILE(WRITE ${merge_keyring_file_tests} "// Merging Keyring_file unit tests\n")
-  FILE(APPEND ${merge_keyring_file_tests} "#include \"my_config.h\"\n")
-  FILE(APPEND ${merge_keyring_file_tests} "#define MERGE_UNITTESTS\n")
+  #INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
-  FOREACH(test ${TESTS})
-    FILE(APPEND ${merge_keyring_file_tests} "#include \"${test}-t.cc\"\n")
-  ENDFOREACH()
+  #FILE(WRITE ${merge_keyring_file_tests} "// Merging Keyring_file unit tests\n")
+  #FILE(APPEND ${merge_keyring_file_tests} "#include \"my_config.h\"\n")
+  #FILE(APPEND ${merge_keyring_file_tests} "#define MERGE_UNITTESTS\n")
 
-  SET(SRC_FILES ${merge_keyring_file_tests})
-  LIST(APPEND SRC_FILES
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
-       )
+  #FOREACH(test ${TESTS})
+    #FILE(APPEND ${merge_keyring_file_tests} "#include \"${test}-t.cc\"\n")
+  #ENDFOREACH()
 
-  IF(WIN32)
-    LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
-  ENDIF()
+  #SET(SRC_FILES ${merge_keyring_file_tests})
+  #LIST(APPEND SRC_FILES
+       #${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
+       #${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
+       #${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
+       #${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
+       #${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
+       #${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
+       #${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
+       #)
 
-  ADD_EXECUTABLE(merge_keyring_file_tests-t ${SRC_FILES})
+  #IF(WIN32)
+    #LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
+  #ENDIF()
 
-  TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t gunit_large strings dbug regex mysys sql)
-  TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t sql binlog rpl master slave sql)
+  #ADD_EXECUTABLE(merge_keyring_file_tests-t ${SRC_FILES})
 
-  IF(WITH_PERFSCHEMA_STORAGE_ENGINE)
-    TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t perfschema)
-  ENDIF()
+  #TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t gunit_large strings dbug regex mysys sql)
+  #TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t sql binlog rpl master slave sql)
 
-  ADD_DEPENDENCIES(merge_keyring_file_tests-t GenError)
+  #IF(WITH_PERFSCHEMA_STORAGE_ENGINE)
+    #TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t perfschema)
+  #ENDIF()
 
-  ADD_TEST(merge_keyring_file_tests merge_keyring_file_tests-t)
+  #ADD_DEPENDENCIES(merge_keyring_file_tests-t GenError)
 
-ENDIF(MERGE_UNITTESTS)
+  #ADD_TEST(merge_keyring_file_tests merge_keyring_file_tests-t)
+
+#ENDIF(MERGE_UNITTESTS)
 
   FOREACH(test ${TESTS})
     SET(SRC_FILES ${test}-t.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
-       ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc

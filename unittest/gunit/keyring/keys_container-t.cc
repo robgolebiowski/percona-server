@@ -275,6 +275,7 @@ namespace keyring__keys_container_unittest
     my_free(fetched_key->release_key_data());
   }
 
+  /*
   TEST_F(Keys_container_test, StoreStoreStoreFetchSystemKey)
   {
     IKeyring_io *keyring_io= new Buffered_file_io(logger);
@@ -473,7 +474,7 @@ namespace keyring__keys_container_unittest
     my_free(fetched_regular_key->release_key_data());
     delete sample_key; //unused in this test
 
-  }
+  }*/
 
   TEST_F(Keys_container_test, StoreTwiceTheSame)
   {
