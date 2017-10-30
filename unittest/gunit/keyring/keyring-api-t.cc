@@ -223,8 +223,33 @@ namespace keyring__api_unittest
                               sample_key_data.length() + 1), 1);
   }
 
-  /*
+  TEST_F(Keyring_api_test, StoreFetchRemoveSystemKey)
+  {
+    EXPECT_EQ(mysql_key_store("percona_binlog", "AES", NULL, sample_key_data.c_str(),
+                              sample_key_data.length() + 1), 0);
+    char *key_type;
+    size_t key_len;
+    void *key;
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    std::string key_data_with_version = "0:" + sample_key_data;
+    EXPECT_EQ(key_len, key_data_with_version.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+    EXPECT_EQ(mysql_key_remove("percona_binlog", NULL), 1);
+    //make sure the key was not removed - fetch it
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, key_data_with_version.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
+  }
 
+/*
   TEST_F(Keyring_api_test, RotateFetchRotateFetchRotateFetchSystemKey)
   {
     std::string percona_binlog_key_1("key1");
@@ -327,9 +352,7 @@ namespace keyring__api_unittest
     my_free(fetched_key_3->release_key_data());
     
     delete sample_key; //unused in this test
-  }
-
-*/
+  }*/
 
   TEST_F(Keyring_api_test, KeyGenerate)
   {
