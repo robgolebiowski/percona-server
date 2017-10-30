@@ -18,6 +18,8 @@ IF(NOT GMOCK_FOUND)
   RETURN()
 ENDIF()
 
+message("building keyring_tests")
+
 INCLUDE_DIRECTORIES(${BOOST_PATCHES_DIR})
 INCLUDE_DIRECTORIES(SYSTEM ${BOOST_INCLUDE_DIR})
 
@@ -38,54 +40,6 @@ SET(TESTS
   file_io
 )
 
-#SET(TESTS
-  #system_keys_container
-#)
-
-#IF (MERGE_UNITTESTS)
-  #SET(merge_keyring_file_tests ${CMAKE_CURRENT_BINARY_DIR}/merge_keyring_file_tests-t.cc)
-  #SET_SOURCE_FILES_PROPERTIES(merge_keyring_file_tests PROPERTIES GENERATED 1)
-
-  #INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
-
-  #FILE(WRITE ${merge_keyring_file_tests} "// Merging Keyring_file unit tests\n")
-  #FILE(APPEND ${merge_keyring_file_tests} "#include \"my_config.h\"\n")
-  #FILE(APPEND ${merge_keyring_file_tests} "#define MERGE_UNITTESTS\n")
-
-  #FOREACH(test ${TESTS})
-    #FILE(APPEND ${merge_keyring_file_tests} "#include \"${test}-t.cc\"\n")
-  #ENDFOREACH()
-
-  #SET(SRC_FILES ${merge_keyring_file_tests})
-  #LIST(APPEND SRC_FILES
-       #${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
-       #${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
-       #${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
-       #${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
-       #${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
-       #${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
-       #${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
-       #)
-
-  #IF(WIN32)
-    #LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
-  #ENDIF()
-
-  #ADD_EXECUTABLE(merge_keyring_file_tests-t ${SRC_FILES})
-
-  #TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t gunit_large strings dbug regex mysys sql)
-  #TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t sql binlog rpl master slave sql)
-
-  #IF(WITH_PERFSCHEMA_STORAGE_ENGINE)
-    #TARGET_LINK_LIBRARIES(merge_keyring_file_tests-t perfschema)
-  #ENDIF()
-
-  #ADD_DEPENDENCIES(merge_keyring_file_tests-t GenError)
-
-  #ADD_TEST(merge_keyring_file_tests merge_keyring_file_tests-t)
-
-#ENDIF(MERGE_UNITTESTS)
-
   FOREACH(test ${TESTS})
     SET(SRC_FILES ${test}-t.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
@@ -96,6 +50,7 @@ SET(TESTS
         ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
         )
+      message ("${test}")
     IF(WIN32)
       LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
     ENDIF()
@@ -109,13 +64,15 @@ SET(TESTS
       TARGET_LINK_LIBRARIES(${test}-t perfschema pfs_server_stubs)
     ENDIF()
 
-    IF(MERGE_UNITTESTS)
-      SET_PROPERTY(TARGET ${test}-t PROPERTY EXCLUDE_FROM_ALL TRUE)
-      IF(WIN32)
-        SET_PROPERTY(TARGET ${test}-t PROPERTY EXCLUDE_FROM_DEFAULT_BUILD TRUE)
-      ENDIF()
-    ELSE()
-      ADD_TEST(${test} ${test}-t)
-    ENDIF()
+    ADD_TEST(${test} ${test}-t)
+
+    #IF(MERGE_UNITTESTS)
+      #SET_PROPERTY(TARGET ${test}-t PROPERTY EXCLUDE_FROM_ALL TRUE)
+      #IF(WIN32)
+        #SET_PROPERTY(TARGET ${test}-t PROPERTY EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+      #ENDIF()
+    #ELSE()
+      #ADD_TEST(${test} ${test}-t)
+    #ENDIF()
   ENDFOREACH()
 

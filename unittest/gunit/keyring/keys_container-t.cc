@@ -275,7 +275,6 @@ namespace keyring__keys_container_unittest
     my_free(fetched_key->release_key_data());
   }
 
-  /*
   TEST_F(Keys_container_test, StoreStoreStoreFetchSystemKey)
   {
     IKeyring_io *keyring_io= new Buffered_file_io(logger);
@@ -301,13 +300,15 @@ namespace keyring__keys_container_unittest
     IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
 
     ASSERT_TRUE(fetched_key != NULL);
-    std::string expected_key_signature= "percona_binlog:2";
+    std::string expected_key_signature= "percona_binlog";
     EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
-    uchar *key_data_fetched= fetched_key->get_key_data();
+    uchar* key_data_fetched= fetched_key->get_key_data();
     size_t key_data_fetched_size= fetched_key->get_key_data_size();
-    EXPECT_STREQ(key_data3.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data3.length()+1 == key_data_fetched_size);
+    std::string key_data_with_version = "2:" + key_data3;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
 
     my_free(fetched_key->release_key_data());
     delete sample_key; //unused in this test
@@ -333,13 +334,15 @@ namespace keyring__keys_container_unittest
     IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
 
     ASSERT_TRUE(fetched_key != NULL);
-    std::string expected_key_signature= "percona_binlog:1";
+    std::string expected_key_signature= "percona_binlog";
     EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
-    uchar *key_data_fetched= fetched_key->get_key_data();
+    uchar* key_data_fetched= fetched_key->get_key_data();
     size_t key_data_fetched_size= fetched_key->get_key_data_size();
-    EXPECT_STREQ(key_data2.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data2.length()+1 == key_data_fetched_size);
+    std::string key_data_with_version = "1:" + key_data2;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
 
     std::string key_data3("system_key_data_3");
     Key *percona_binlog_rotation1_to_2= new Key("percona_binlog", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
@@ -350,13 +353,15 @@ namespace keyring__keys_container_unittest
     IKey* fetched_key_2= keys_container->fetch_key(&latest_percona_binlog_key_2);
 
     ASSERT_TRUE(fetched_key_2 != NULL);
-    expected_key_signature= "percona_binlog:2";
+    expected_key_signature= "percona_binlog";
     EXPECT_STREQ(fetched_key_2->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key_2->get_key_signature()->length(), expected_key_signature.length());
     key_data_fetched= fetched_key_2->get_key_data();
     key_data_fetched_size= fetched_key_2->get_key_data_size();
-    EXPECT_STREQ(key_data3.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data3.length()+1 == key_data_fetched_size);
+    key_data_with_version = "2:" + key_data3;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key_2->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
 
     std::string key_data4("system_key_data_4");
     Key *percona_binlog_rotation2_to_3= new Key("percona_binlog", "AES", NULL, key_data4.c_str(), key_data4.length()+1);
@@ -367,13 +372,16 @@ namespace keyring__keys_container_unittest
     IKey* fetched_key_3= keys_container->fetch_key(&latest_percona_binlog_key_3);
 
     ASSERT_TRUE(fetched_key_3 != NULL);
-    expected_key_signature= "percona_binlog:3";
+    expected_key_signature= "percona_binlog";
     EXPECT_STREQ(fetched_key_3->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key_3->get_key_signature()->length(), expected_key_signature.length());
+
     key_data_fetched= fetched_key_3->get_key_data();
     key_data_fetched_size= fetched_key_3->get_key_data_size();
-    EXPECT_STREQ(key_data4.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data4.length()+1 == key_data_fetched_size);
+    key_data_with_version = "3:" + key_data4;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key_3->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
 
     my_free(fetched_key->release_key_data());
     my_free(fetched_key_2->release_key_data());
@@ -414,7 +422,6 @@ namespace keyring__keys_container_unittest
     delete sample_key; //unused in this test
   }
 
-
   TEST_F(Keys_container_test, StoreStoreStoreRemoveFetchSystemKeyFetchRegularKey)
   {
     IKeyring_io *keyring_io= new Buffered_file_io(logger);
@@ -449,13 +456,16 @@ namespace keyring__keys_container_unittest
     IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
 
     ASSERT_TRUE(fetched_key != NULL);
-    std::string expected_key_signature= "percona_binlog:1";
+    std::string expected_key_signature= "percona_binlog";
     EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
     EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
+
     uchar *key_data_fetched= fetched_key->get_key_data();
     size_t key_data_fetched_size= fetched_key->get_key_data_size();
-    EXPECT_STREQ(key_data2.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data2.length()+1 == key_data_fetched_size);
+    std::string key_data_with_version = "1:" + key_data2;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
 
     my_free(fetched_key->release_key_data());
 
@@ -474,7 +484,7 @@ namespace keyring__keys_container_unittest
     my_free(fetched_regular_key->release_key_data());
     delete sample_key; //unused in this test
 
-  }*/
+  }
 
   TEST_F(Keys_container_test, StoreTwiceTheSame)
   {

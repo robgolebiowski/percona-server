@@ -50,7 +50,6 @@ public:
 protected:
   Keys_container(const Keys_container &);
   virtual void allocate_and_set_data_for_key(IKey *key,
-                                             std::string key_id,
                                              std::string *source_key_type,
                                              uchar *source_key_data,
                                              size_t source_key_data_size);

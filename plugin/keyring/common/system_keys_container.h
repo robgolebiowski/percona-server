@@ -17,7 +17,7 @@ public:
   IKey* get_latest_key_if_system_key(IKey *key);
   //virtual std::string get_latest_key_id_version_if_system_key(IKey *key);
   virtual void update_if_system_key(IKey *key);
-  virtual void rotate_key_id_if_system_key(IKey *key);
+  virtual bool rotate_key_id_if_system_key(IKey *key);
   virtual bool is_system_key(IKey *key);
 
 protected:
