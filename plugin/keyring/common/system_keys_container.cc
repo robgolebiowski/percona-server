@@ -52,7 +52,7 @@ bool System_keys_container::parse_key_id(std::string &key_id, std::string &syste
 
   system_key_id = key_id.substr(0, colon_position);
   std::string version = key_id.substr(colon_position+1,
-                       key_id.length() - colon_position);
+                                      key_id.length() - colon_position);
 
   return str2int(version.c_str(), 10, 0, LONG_MAX, &key_version) == NullS;
 }
@@ -68,9 +68,9 @@ bool System_keys_container::is_system_key_with_version(IKey *key, std::string &s
   //std::size_t colon_position= std::string::npos;
   std::string *key_id = key->get_key_id();
 
-  if (key->get_user_id()->empty() != true &&
-      (parse_key_id(*key_id, system_key_id, key_version) ||
-      system_key_id_to_system_key.count(system_key_id) == 0))
+  if (key->get_user_id()->empty() == false ||
+      parse_key_id(*key_id, system_key_id, key_version) ||
+      system_key_id_to_system_key.count(system_key_id) == 0)
     return false;
   
   //if ((*key->get_user_id()).empty() != true ||
@@ -104,12 +104,18 @@ template <> struct NumberOfDigits<0>
   enum { value = 1 };
 };
 
-void System_keys_container::rotate_key_id_if_system_key(IKey *key)
+bool System_keys_container::rotate_key_id_if_system_key(IKey *key)
 {
   if (is_system_key_without_version(key) == false)
-    return;
+    return false;
 
   long key_version = system_key_id_to_system_key[*key->get_key_id()]->get_key_version();
+
+  if (key_version == LONG_MAX)
+  {
+    //log_error, that max version has been reached
+    return true;
+  }
   key_version++;
 
   std::ostringstream system_key_id_with_inc_version_ss;
@@ -117,6 +123,7 @@ void System_keys_container::rotate_key_id_if_system_key(IKey *key)
   system_key_id_with_inc_version_ss << key_version;
 
   *(key->get_key_id()) = system_key_id_with_inc_version_ss.str();
+  return false;
 }
 
 void System_keys_container::update_if_system_key(IKey *key)

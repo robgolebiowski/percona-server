@@ -86,18 +86,20 @@ std::string Keys_container::get_keyring_storage_url()
 
 my_bool Keys_container::store_key_in_hash(IKey *key)
 {
-  system_keys_container->update_if_system_key(key); //rename it to .._with_version
-
   if (my_hash_insert(keys_hash, (uchar *) key))
     return TRUE;
+
+  system_keys_container->update_if_system_key(key); //rename it to .._with_version
   return FALSE;
 }
 
 my_bool Keys_container::store_key(IKey* key)
 {
-  system_keys_container->rotate_key_id_if_system_key(key); //rename it to ..._if_system_key_without_version
+  ////system_keys_container->rotate_key_id_if_system_key(key); 
 
-  if (flush_to_backup() || store_key_in_hash(key))
+  if (system_keys_container->rotate_key_id_if_system_key(key) || //rename it to ..._if_system_key_without_version
+      flush_to_backup() ||
+      store_key_in_hash(key))
     return TRUE;
   if (flush_to_storage(key, STORE_KEY))
   {
@@ -114,16 +116,14 @@ IKey* Keys_container::get_key_from_hash(IKey *key)
   return system_key ? system_key 
     : reinterpret_cast<IKey*>(my_hash_search(keys_hash,
         reinterpret_cast<const uchar*>(key->get_key_signature()->c_str()),
-        key->get_key_signature()->length()));
+                                       key->get_key_signature()->length()));
 }
 
 void Keys_container::allocate_and_set_data_for_key(IKey *key,
-                                                   std::string key_id, 
                                                    std::string *source_key_type,
                                                    uchar *source_key_data,
                                                    size_t source_key_data_size)
 {
-  *(key->get_key_id())= key_id;
   key->set_key_type(source_key_type);
   uchar *key_data= keyring_malloc<uchar*>(source_key_data_size);
   memcpy(key_data, source_key_data, source_key_data_size);
@@ -143,9 +143,7 @@ IKey*Keys_container::fetch_key(IKey *key)
   if (fetched_key->get_key_type()->empty())
     return NULL;
 
-  allocate_and_set_data_for_key(key,
-                                *(fetched_key->get_key_id()), 
-                                fetched_key->get_key_type(),
+  allocate_and_set_data_for_key(key, fetched_key->get_key_type(),
                                 fetched_key->get_key_data(),
                                 fetched_key->get_key_data_size());
   return key;

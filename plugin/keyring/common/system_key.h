@@ -13,6 +13,7 @@ public:
 
   void set_keyring_key(IKey *key, long key_version)
   {
+    system_key_data.reset(NULL);
     this->keyring_key = key;
     this->key_version = key_version;
   }
@@ -136,16 +137,33 @@ public:
 private:
   void construct_system_key_data()
   {
-    system_key_data_length = key_version + keyring_key->get_key_data_size();
-    system_key_data.reset(new uchar[system_key_data_length]);
-
     std::ostringstream system_key_version_ss;
     system_key_version_ss << key_version << ':';
     std::string system_key_version = system_key_version_ss.str(); 
 
+    system_key_data_length = system_key_version.length() +
+                             keyring_key->get_key_data_size();
+
+    system_key_data.reset(new uchar[system_key_data_length]);
+
+    //key data stored in system_key_addapter is not xored
+    keyring_key->xor_data();
     memcpy(system_key_data.get(), system_key_version.c_str(), system_key_version.length());
     memcpy(system_key_data.get() + system_key_version.length(), keyring_key->get_key_data(),
            keyring_key->get_key_data_size());
+
+    size_t keyring_key_data_size = keyring_key->get_key_data_size();
+    uchar *keyring_key_data = keyring_key->release_key_data();
+
+    // Using keyring_key's xor function to xor system key data, next
+    // restoring keyring key data
+    keyring_key->set_key_data(system_key_data.get(), system_key_data_length);
+    keyring_key->xor_data();
+
+    keyring_key->release_key_data();
+    keyring_key->set_key_data(keyring_key_data, keyring_key_data_size);
+
+    keyring_key->xor_data();
   }
 
   boost::movelib::unique_ptr<uchar[]> system_key_data;
