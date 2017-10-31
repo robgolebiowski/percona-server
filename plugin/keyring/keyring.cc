@@ -106,7 +106,8 @@ static int keyring_init(MYSQL_PLUGIN plugin_info)
     }
     keys.reset(new Keys_container(logger.get()));
     IKeyring_io *keyring_io= new Buffered_file_io(logger.get());
-    if (keys->init(keyring_io, keyring_file_data_value))
+    if (keys->init(keyring_io, keyring_file_data_value) ||
+        init_system_keys())
     {
       is_keys_container_initialized = FALSE;
       logger->log(MY_ERROR_LEVEL, "keyring_file initialization failure. Please check"

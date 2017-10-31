@@ -19,12 +19,7 @@ namespace keyring__system_keys_container_unittest
 {
   using namespace keyring;
   using keyring::Key;
-  //using ::testing::Return;
-  //using ::testing::InSequence;
-  //using ::testing::_;
   using ::testing::StrEq;
-  //using ::testing::DoAll;
-  //using ::testing::SetArgPointee;
 
   class System_keys_container_test : public ::testing::Test
   {
@@ -36,6 +31,7 @@ namespace keyring__system_keys_container_unittest
   {
     std::string key_data1("system_key_data_1");
     Key *key1 = new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data();
 
     sys_keys_container.update_if_system_key(key1);
 
@@ -43,13 +39,15 @@ namespace keyring__system_keys_container_unittest
 
     IKey* system_key = sys_keys_container.get_latest_key_if_system_key(&key_id);
 
-    EXPECT_STREQ(system_key->get_key_id()->c_str(), "percona_binlog:0");
-
-    uchar* key_data_fetched= system_key->get_key_data();
-    size_t key_data_fetched_size= system_key->get_key_data_size();
     std::string key_data_with_version = "0:" + key_data1;
+    Key key(system_key->get_key_id()->c_str(), system_key->get_key_type()->c_str(), system_key->get_user_id()->c_str(),
+            system_key->get_key_data(), system_key->get_key_data_size());
+    key.xor_data();        
+    uchar* key_data_fetched= key.get_key_data();
+    size_t key_data_fetched_size= key.get_key_data_size();
+    EXPECT_STREQ(key.get_key_id()->c_str(), "percona_binlog:0");
     EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    EXPECT_STREQ("AES", system_key->get_key_type()->c_str());
+    EXPECT_STREQ("AES", key.get_key_type()->c_str());
     ASSERT_TRUE(key_data_with_version.length() + 1 == key_data_fetched_size);
 
     delete key1;
@@ -60,11 +58,13 @@ namespace keyring__system_keys_container_unittest
   {
     std::string key_data1("system_key_data_1");
     Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data();
 
     sys_keys_container.update_if_system_key(key1);
 
     std::string key_data2("system_key_data_2");
     Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    key2->xor_data();
 
     sys_keys_container.update_if_system_key(key2);
 
@@ -72,14 +72,16 @@ namespace keyring__system_keys_container_unittest
 
     IKey* system_key = sys_keys_container.get_latest_key_if_system_key(&key_id);
 
-    EXPECT_STREQ(system_key->get_key_id()->c_str(), "percona_binlog:1");
-
-    uchar* key_data_fetched= system_key->get_key_data();
-    size_t key_data_fetched_size= system_key->get_key_data_size();
+    Key key(system_key->get_key_id()->c_str(), system_key->get_key_type()->c_str(), system_key->get_user_id()->c_str(),
+            system_key->get_key_data(), system_key->get_key_data_size());
+    key.xor_data();        
+    uchar* key_data_fetched= key.get_key_data();
+    size_t key_data_fetched_size= key.get_key_data_size();
     std::string key_data_with_version = "1:" + key_data2;
+    EXPECT_STREQ(key.get_key_id()->c_str(), "percona_binlog:1");
     EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    EXPECT_STREQ("AES", system_key->get_key_type()->c_str());
-    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+    EXPECT_STREQ("AES", key.get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length() + 1 == key_data_fetched_size);
 
     delete key1;
     delete key2;
@@ -89,16 +91,19 @@ namespace keyring__system_keys_container_unittest
   {
     std::string key_data1("system_key_data_1");
     Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data();
 
     sys_keys_container.update_if_system_key(key1);
 
     std::string key_data2("system_key_data_2");
     Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    key2->xor_data();
 
     sys_keys_container.update_if_system_key(key2);
 
     std::string key_data3("system_key_data_3");
     Key *key3= new Key("percona_binlog:2", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+    key3->xor_data();
 
     sys_keys_container.update_if_system_key(key3);
 
@@ -106,14 +111,16 @@ namespace keyring__system_keys_container_unittest
 
     IKey* system_key = sys_keys_container.get_latest_key_if_system_key(&key_id);
 
-    EXPECT_STREQ(system_key->get_key_id()->c_str(), "percona_binlog:2");
-
-    uchar* key_data_fetched= system_key->get_key_data();
-    size_t key_data_fetched_size= system_key->get_key_data_size();
+    Key key(system_key->get_key_id()->c_str(), system_key->get_key_type()->c_str(), system_key->get_user_id()->c_str(),
+            system_key->get_key_data(), system_key->get_key_data_size());
+    key.xor_data();        
+    uchar* key_data_fetched= key.get_key_data();
+    size_t key_data_fetched_size= key.get_key_data_size();
     std::string key_data_with_version = "2:" + key_data3;
+    EXPECT_STREQ(key.get_key_id()->c_str(), "percona_binlog:2");
     EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    EXPECT_STREQ("AES", system_key->get_key_type()->c_str());
-    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+    EXPECT_STREQ("AES", key.get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length() + 1 == key_data_fetched_size);
 
     delete key1;
     delete key2;
@@ -125,11 +132,13 @@ namespace keyring__system_keys_container_unittest
   {
     std::string key_data1("system_key_data_1");
     Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data();
 
     sys_keys_container.update_if_system_key(key1);
 
     std::string key_data2("system_key_data_2");
     Key *key2= new Key("percona_binlog:0", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    key2->xor_data();
 
     sys_keys_container.update_if_system_key(key2);
 
@@ -137,14 +146,16 @@ namespace keyring__system_keys_container_unittest
 
     IKey* system_key = sys_keys_container.get_latest_key_if_system_key(&key_id);
 
-    EXPECT_STREQ(system_key->get_key_id()->c_str(), "percona_binlog:0");
-
-    uchar* key_data_fetched= system_key->get_key_data();
-    size_t key_data_fetched_size= system_key->get_key_data_size();
+    Key key(system_key->get_key_id()->c_str(), system_key->get_key_type()->c_str(), system_key->get_user_id()->c_str(),
+            system_key->get_key_data(), system_key->get_key_data_size());
+    key.xor_data();        
+    uchar* key_data_fetched= key.get_key_data();
+    size_t key_data_fetched_size= key.get_key_data_size();
     std::string key_data_with_version = "0:" + key_data1;
+    EXPECT_STREQ(key.get_key_id()->c_str(), "percona_binlog:0");
     EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    EXPECT_STREQ("AES", system_key->get_key_type()->c_str());
-    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+    EXPECT_STREQ("AES", key.get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length() + 1 == key_data_fetched_size);
 
     delete key1;
     delete key2;
@@ -154,16 +165,19 @@ namespace keyring__system_keys_container_unittest
   {
     std::string key_data1("system_key_data_1");
     Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data();
 
     sys_keys_container.update_if_system_key(key1);
 
     std::string key_data2("system_key_data_2");
     Key *key2= new Key("percona_binlog:0", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    key2->xor_data();
 
     sys_keys_container.update_if_system_key(key2);
 
     std::string key_data3("system_key_data_3");
     Key *key3= new Key("percona_binlog:1", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+    key3->xor_data();
 
     sys_keys_container.update_if_system_key(key3);
 
@@ -171,14 +185,16 @@ namespace keyring__system_keys_container_unittest
 
     IKey* system_key = sys_keys_container.get_latest_key_if_system_key(&key_id);
 
-    EXPECT_STREQ(system_key->get_key_id()->c_str(), "percona_binlog:1");
-
-    uchar* key_data_fetched= system_key->get_key_data();
-    size_t key_data_fetched_size= system_key->get_key_data_size();
+    Key key(system_key->get_key_id()->c_str(), system_key->get_key_type()->c_str(), system_key->get_user_id()->c_str(),
+            system_key->get_key_data(), system_key->get_key_data_size());
+    key.xor_data();        
+    uchar* key_data_fetched= key.get_key_data();
+    size_t key_data_fetched_size= key.get_key_data_size();
     std::string key_data_with_version = "1:" + key_data3;
+    EXPECT_STREQ(key.get_key_id()->c_str(), "percona_binlog:1");
     EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    EXPECT_STREQ("AES", system_key->get_key_type()->c_str());
-    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+    EXPECT_STREQ("AES", key.get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length() + 1 == key_data_fetched_size);
 
     delete key1;
     delete key2;
@@ -189,16 +205,19 @@ namespace keyring__system_keys_container_unittest
   {
     std::string key_data1("system_key_data_1");
     Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data();
 
     sys_keys_container.update_if_system_key(key1);
 
     std::string key_data2("system_key_data_2");
     Key *key2= new Key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    key2->xor_data();
 
     sys_keys_container.update_if_system_key(key2);
 
     std::string key_data3("system_key_data_3");
     Key *key3= new Key("percona_binlog:2", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+    key3->xor_data();
 
     sys_keys_container.update_if_system_key(key3);
 
@@ -206,14 +225,16 @@ namespace keyring__system_keys_container_unittest
 
     IKey* system_key = sys_keys_container.get_latest_key_if_system_key(&key_id);
 
-    EXPECT_STREQ(system_key->get_key_id()->c_str(), "percona_binlog:2");
-
-    uchar* key_data_fetched= system_key->get_key_data();
-    size_t key_data_fetched_size= system_key->get_key_data_size();
+    Key key(system_key->get_key_id()->c_str(), system_key->get_key_type()->c_str(), system_key->get_user_id()->c_str(),
+            system_key->get_key_data(), system_key->get_key_data_size());
+    key.xor_data();        
+    uchar* key_data_fetched= key.get_key_data();
+    size_t key_data_fetched_size= key.get_key_data_size();
     std::string key_data_with_version = "2:" + key_data3;
+    EXPECT_STREQ(key.get_key_id()->c_str(), "percona_binlog:2");
     EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    EXPECT_STREQ("AES", system_key->get_key_type()->c_str());
-    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+    EXPECT_STREQ("AES", key.get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length() + 1 == key_data_fetched_size);
 
     delete key1;
     delete key2;
@@ -330,5 +351,15 @@ namespace keyring__system_keys_container_unittest
 
     delete key1;
   }
+
+  TEST_F(System_keys_container_test, FetchOnEmptyContainer)
+  {
+    Key key_id("percona_binlog", NULL, NULL, NULL,0);
+
+    IKey* system_key = sys_keys_container.get_latest_key_if_system_key(&key_id);
+
+    ASSERT_TRUE(system_key == NULL);
+  }
+
 
 } //namespace keyring__system_keys_container_unittest
