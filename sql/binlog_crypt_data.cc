@@ -8,7 +8,7 @@
 
 Binlog_crypt_data::Binlog_crypt_data()
   : key(NULL)
-  , enabled(false)  
+  , enabled(false)
   , scheme(0)
 {}
 
@@ -20,7 +20,7 @@ Binlog_crypt_data::~Binlog_crypt_data()
 Binlog_crypt_data::Binlog_crypt_data(const Binlog_crypt_data &b)
 {
   enabled = b.enabled;
-  key_version = b.key_version; 
+  key_version = b.key_version;
   if (b.key_length && b.key != NULL)
   {
     key= reinterpret_cast<uchar*>(my_malloc(PSI_NOT_INSTRUMENTED, b.key_length, MYF(MY_WME)));
@@ -64,7 +64,6 @@ Binlog_crypt_data& Binlog_crypt_data::operator=(Binlog_crypt_data b)
 bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce)
 {
   scheme= sch;
-  //ctx_size= my_aes_ctx_size(MY_AES_ECB);
   key_version= kv;
   free_key();
   key_length= 16;
@@ -118,7 +117,7 @@ bool Binlog_crypt_data::is_enabled() const
 
 void Binlog_crypt_data::disable()
 {
-  enabled= false; 
+  enabled= false;
 }
 
 uchar* Binlog_crypt_data::get_key() const

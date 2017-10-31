@@ -5103,8 +5103,6 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
 
   if (encrypt_binlog)
   {
-    //if (my_rand_buffer(crypto.nonce, sizeof(crypto.nonce)))
-      //goto err;
     uchar nonce[Binlog_crypt_data::BINLOG_NONCE_LENGTH];
     if (my_rand_buffer(nonce, sizeof(nonce)))
       goto err;
@@ -5119,7 +5117,6 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     }
     bytes_written+= sele.common_header->data_written;
 
-    // Start_encryption_log_event is written, enable the encryption
     if (crypto.init(sele.crypto_scheme, 0, nonce))
     {
       sql_print_error("Failed to fetch percona_binlog key from keyring and thus "
