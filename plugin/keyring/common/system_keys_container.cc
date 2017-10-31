@@ -31,8 +31,10 @@ bool System_keys_container::is_system_key(IKey *key)
 IKey* System_keys_container::get_latest_key_if_system_key(IKey *key)
 {
   std::string *key_id = key->get_key_id();
-  return key->get_user_id()->empty() == false || system_key_id_to_system_key.count(*key_id) == 0 ?
-         NULL : system_key_id_to_system_key[*key_id];
+  return (key->get_user_id()->empty() == false || system_key_id_to_system_key.count(*key_id) == 0 ||
+          system_key_id_to_system_key[*key_id]->get_key_version() == -1)
+         ? NULL
+         : system_key_id_to_system_key[*key_id];
 }
 
 //std::string System_keys_container::get_latest_key_id_version_if_system_key(IKey *key)

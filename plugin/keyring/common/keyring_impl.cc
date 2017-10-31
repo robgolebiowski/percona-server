@@ -224,3 +224,83 @@ my_bool mysql_key_remove(boost::movelib::unique_ptr<IKey> key_to_remove)
   mysql_rwlock_unlock(&LOCK_keyring);
   return retval;
 }
+
+struct System_key_info
+{
+  System_key_info(const char *id, const char *type,
+                  size_t length)
+  : id(id), type(type), length(length)
+  {}
+               
+  std::string id;
+  std::string type;
+  size_t length;
+};
+
+my_bool mysql_key_generate(const char *key_id, const char *key_type,
+                           const char *user_id, size_t key_len);
+my_bool mysql_key_fetch(const char *key_id, char **key_type, const char *user_id,
+                        void **key, size_t *key_len);
+
+static bool generate_system_key_if_doesnot_exist(System_key_info &key_info)
+{
+  char *key_type= NULL, *key= NULL;
+  size_t key_length;
+  
+  bool failure= mysql_key_fetch(key_info.id.c_str(), &key_type, NULL, (void**)&key, &key_length);
+  failure= failure || (key != NULL && (key_type == NULL || key_info.type != key_type));
+  if (!failure && key == NULL) //no failure, but key does not exist
+    failure= mysql_key_generate(key_info.id.c_str(), key_info.type.c_str(), NULL, key_info.length);
+
+  if (key != NULL)
+    my_free(key);
+  if (key_type != NULL)
+    my_free(key_type);
+
+  return failure;
+}
+
+bool init_system_keys()
+{
+  std::vector<System_key_info> system_keys_info;
+  System_key_info percona_binlog_key("percona_binlog", "AES", 16);
+  system_keys_info.push_back(percona_binlog_key);
+  bool failure = false;
+
+  // This is last step of initialization, so we need to trick the container that it is
+  // fully initialized so it would allow us to store system keys
+  is_keys_container_initialized = TRUE;
+  for (std::vector<System_key_info>::iterator iter = system_keys_info.begin();
+       iter != system_keys_info.end() && failure == false;
+       ++iter)
+    failure = generate_system_key_if_doesnot_exist(*iter);
+
+  is_keys_container_initialized = FALSE;
+  return failure;
+  
+  //char *key_type= NULL, *key= NULL;
+  //size_t key_length;
+  //const size_t percona_binlog_key_length= 16;
+
+  //uchar percona_binlog_key[percona_binlog_key_length];
+  //my_rand_buffer(percona_binlog_key, percona_binlog_key_length);
+  
+
+
+
+
+  //bool failure= mysql_key_fetch("percona_binlog", &key_type, NULL, (void**)&key, &key_length) == TRUE;
+  //failure= failure || (key != NULL && (key_type == NULL || strncmp(key_type, "AES", 3) != 0 ||
+           //key_length != percona_binlog_key_length));
+  //if (!failure && key == NULL) //no failure, but key does not exist
+    //failure= mysql_key_store("percona_binlog", "AES", NULL, percona_binlog_key, percona_binlog_key_length);
+  is_keys_container_initialized = FALSE;
+
+  //if (key != NULL)
+    //my_free(key);
+  //if (key_type != NULL)
+    //my_free(key_type);
+
+  return failure;
+}
+

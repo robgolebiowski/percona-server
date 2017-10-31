@@ -186,7 +186,7 @@ namespace keyring__api_unittest
     my_free(key);
     key= NULL;
     EXPECT_EQ(mysql_key_remove("Robert_key2", "Robert"), 0);
-    //make sure the key was removed - fetch it
+    // make sure the key was removed - fetch it
     EXPECT_EQ(mysql_key_fetch("Robert_key2", &key_type, "Robert", &key,
                               &key_len), 0);
     ASSERT_TRUE(key == NULL);
@@ -233,7 +233,7 @@ namespace keyring__api_unittest
     EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
-    std::string key_data_with_version = "0:" + sample_key_data;
+    std::string key_data_with_version = "1:" + sample_key_data;
     EXPECT_EQ(key_len, key_data_with_version.length()+1);
     ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
     my_free(key_type);
@@ -247,112 +247,81 @@ namespace keyring__api_unittest
     EXPECT_STREQ("AES", key_type);
     EXPECT_EQ(key_len, key_data_with_version.length()+1);
     ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
+    my_free(key_type);
+    my_free(key);
   }
 
-/*
+
   TEST_F(Keyring_api_test, RotateFetchRotateFetchRotateFetchSystemKey)
   {
-    std::string percona_binlog_key_1("key1");
+    std::string percona_binlog_key_data_1("key1");
 
-    EXPECT_EQ(mysql_key_store("percona_binlog", "AES", "Robert", percona_binlog_key_1.c_str(),
-                              percona_binlog_key_1.length() + 1), 0);
-
+    EXPECT_EQ(mysql_key_store("percona_binlog", "AES", NULL, percona_binlog_key_data_1.c_str(),
+                              percona_binlog_key_data_1.length() + 1), 0);
     char *key_type;
     size_t key_len;
     void *key;
-    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, "Robert", &key,
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
-    EXPECT_EQ(key_len, percona_binlog_key_1.length()+1);
-    ASSERT_TRUE(memcmp((char *)key, percona_binlog_key_1.c_str(), key_len) == 0);
+    std::string key_data_with_version = "1:" + percona_binlog_key_data_1;
+    EXPECT_EQ(key_len, key_data_with_version.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
     my_free(key_type);
     key_type= NULL;
     my_free(key);
     key= NULL;
 
-    std::string percona_binlog_key_2("key2");
+    std::string percona_binlog_key_data_2("key2");
 
-    EXPECT_EQ(mysql_key_store("percona_binlog", "AES", "Robert", percona_binlog_key_2.c_str(),
-                              percona_binlog_key_2.length() + 1), 0);
+    EXPECT_EQ(mysql_key_store("percona_binlog", "AES", NULL, percona_binlog_key_data_2.c_str(),
+                              percona_binlog_key_data_2.length() + 1), 0);
 
-    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, "Robert", &key,
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
-    EXPECT_EQ(key_len, percona_binlog_key_1.length()+1);
-    ASSERT_TRUE(memcmp((char *)key, percona_binlog_key_1.c_str(), key_len) == 0);
+    key_data_with_version = "2:" + percona_binlog_key_data_2;
+    EXPECT_EQ(key_len, key_data_with_version.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
     my_free(key_type);
     key_type= NULL;
     my_free(key);
     key= NULL;
 
+    std::string percona_binlog_key_data_3("key3___");
 
+    EXPECT_EQ(mysql_key_store("percona_binlog", "AES", NULL, percona_binlog_key_data_3.c_str(),
+                              percona_binlog_key_data_3.length() + 1), 0);
 
-    IKeyring_io *keyring_io= new Buffered_file_io(logger);
-    EXPECT_EQ(keys_container->init(keyring_io, file_name), FALSE);
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    key_data_with_version = "3:" + percona_binlog_key_data_3;
+    EXPECT_EQ(key_len, key_data_with_version.length()+1);
+    ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+  }
 
-    std::string key_data1("system_key_data_1");
-    Key *key1= new Key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+  TEST_F(Keyring_api_test, FetchSystemKeyOnJustInitializedContainer)
+  {
+    char *key_type;
+    size_t key_len;
+    void *key;
 
-    EXPECT_EQ(keys_container->store_key(key1), FALSE);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
-
-    std::string key_data2("system_key_data_2");
-    Key *percona_binlog_rotation= new Key("percona_binlog", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
-    EXPECT_EQ(keys_container->store_key(percona_binlog_rotation), FALSE);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 2);
-
-    Key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
-    IKey* fetched_key= keys_container->fetch_key(&latest_percona_binlog_key);
-
-    ASSERT_TRUE(fetched_key != NULL);
-    std::string expected_key_signature= "percona_binlog:1";
-    EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
-    EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
-    uchar *key_data_fetched= fetched_key->get_key_data();
-    size_t key_data_fetched_size= fetched_key->get_key_data_size();
-    EXPECT_STREQ(key_data2.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data2.length()+1 == key_data_fetched_size);
-
-    std::string key_data3("system_key_data_3");
-    Key *percona_binlog_rotation1_to_2= new Key("percona_binlog", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
-    EXPECT_EQ(keys_container->store_key(percona_binlog_rotation1_to_2), FALSE);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 3);
-
-    Key latest_percona_binlog_key_2("percona_binlog", NULL, NULL, NULL, 0);
-    IKey* fetched_key_2= keys_container->fetch_key(&latest_percona_binlog_key_2);
-
-    ASSERT_TRUE(fetched_key_2 != NULL);
-    expected_key_signature= "percona_binlog:2";
-    EXPECT_STREQ(fetched_key_2->get_key_signature()->c_str(), expected_key_signature.c_str());
-    EXPECT_EQ(fetched_key_2->get_key_signature()->length(), expected_key_signature.length());
-    key_data_fetched= fetched_key_2->get_key_data();
-    key_data_fetched_size= fetched_key_2->get_key_data_size();
-    EXPECT_STREQ(key_data3.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data3.length()+1 == key_data_fetched_size);
-
-    std::string key_data4("system_key_data_4");
-    Key *percona_binlog_rotation2_to_3= new Key("percona_binlog", "AES", NULL, key_data4.c_str(), key_data4.length()+1);
-    EXPECT_EQ(keys_container->store_key(percona_binlog_rotation2_to_3), FALSE);
-    ASSERT_TRUE(keys_container->get_number_of_keys() == 4);
-
-    Key latest_percona_binlog_key_3("percona_binlog", NULL, NULL, NULL, 0);
-    IKey* fetched_key_3= keys_container->fetch_key(&latest_percona_binlog_key_3);
-
-    ASSERT_TRUE(fetched_key_3 != NULL);
-    expected_key_signature= "percona_binlog:3";
-    EXPECT_STREQ(fetched_key_3->get_key_signature()->c_str(), expected_key_signature.c_str());
-    EXPECT_EQ(fetched_key_3->get_key_signature()->length(), expected_key_signature.length());
-    key_data_fetched= fetched_key_3->get_key_data();
-    key_data_fetched_size= fetched_key_3->get_key_data_size();
-    EXPECT_STREQ(key_data4.c_str(), reinterpret_cast<const char*>(key_data_fetched));
-    ASSERT_TRUE(key_data4.length()+1 == key_data_fetched_size);
-
-    my_free(fetched_key->release_key_data());
-    my_free(fetched_key_2->release_key_data());
-    my_free(fetched_key_3->release_key_data());
-    
-    delete sample_key; //unused in this test
-  }*/
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, static_cast<size_t>(18));
+    ASSERT_TRUE(key != NULL);
+    ASSERT_TRUE(memcmp((char *)key, "0:", 2) == 0); //version 0
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+  }
 
   TEST_F(Keyring_api_test, KeyGenerate)
   {
