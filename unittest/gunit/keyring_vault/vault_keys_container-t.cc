@@ -187,6 +187,7 @@ namespace keyring__vault_keys_container_unittest
 
   TEST_F(Vault_keys_container_test, StoreStoreStoreFetchRemove)
   {
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 0);
     IKeyring_io *keyring_io = new Vault_io(logger, vault_curl, vault_parser);
     EXPECT_FALSE(vault_keys_container->init(keyring_io, credential_file_url));
     EXPECT_FALSE(vault_keys_container->store_key(sample_key));
@@ -297,6 +298,210 @@ namespace keyring__vault_keys_container_unittest
     ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 0);
 
     my_free(fetched_key->release_key_data());
+  }
+
+  TEST_F(Vault_keys_container_test, StoreStoreStoreFetchSystemKey)
+  {
+    IKeyring_io *keyring_io = new Vault_io(logger, vault_curl, vault_parser);
+    EXPECT_FALSE(vault_keys_container->init(keyring_io, credential_file_url));
+
+    std::string key_data1("system_key_data_1");
+    Vault_key *key1= new Vault_key("percona_binlog:0", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data(); // This should be NOP for Vault_key
+    EXPECT_EQ(vault_keys_container->store_key(key1), 0);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 1);
+
+    std::string key_data2("system_key_data_2");
+    Vault_key *key2= new Vault_key("percona_binlog:1", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    key2->xor_data(); // This should be NOP for Vault_key
+    EXPECT_EQ(vault_keys_container->store_key(key2), 0);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 2);
+
+    std::string key_data3("system_key_data_3");
+    Vault_key *key3= new Vault_key("percona_binlog:2", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+    key3->xor_data(); // This should be NOP for Vault_key
+    EXPECT_EQ(vault_keys_container->store_key(key3), 0);
+    ASSERT_TRUE(vault_keys_container->get_number_of_keys() == 3);
+
+    Vault_key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+
+    IKey *fetched_key= vault_keys_container->fetch_key(&latest_percona_binlog_key);
+    ASSERT_TRUE(fetched_key != NULL);
+
+    std::string expected_key_signature = get_key_signature("","percona_binlog","");
+    EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
+    uchar* key_data_fetched= fetched_key->get_key_data();
+    size_t key_data_fetched_size= fetched_key->get_key_data_size();
+    std::string key_data_with_version = "2:" + key_data3;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+
+    my_free(fetched_key->release_key_data());
+    delete sample_key; //unused in this test
+  }
+
+  TEST_F(Vault_keys_container_test, StoreRotateFetchRotateFetchRotateFetchSystemKey)
+  {
+    IKeyring_io *keyring_io = new Vault_io(logger, vault_curl, vault_parser);
+    EXPECT_FALSE(vault_keys_container->init(keyring_io, credential_file_url));
+
+    std::string key_data1("system_key_data_1");
+    Vault_key *key1= new Vault_key("percona_binlog:3", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+    key1->xor_data();
+
+    EXPECT_EQ(vault_keys_container->store_key(key1), FALSE);
+
+    std::string key_data2("system_key_data_2");
+    Vault_key *percona_binlog_rotation= new Vault_key("percona_binlog", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    percona_binlog_rotation->xor_data();
+    EXPECT_EQ(vault_keys_container->store_key(percona_binlog_rotation), FALSE);
+
+    Vault_key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+    IKey* fetched_key= vault_keys_container->fetch_key(&latest_percona_binlog_key);
+
+    ASSERT_TRUE(fetched_key != NULL);
+
+    std::string expected_key_signature = get_key_signature("","percona_binlog","");
+    EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
+    uchar* key_data_fetched= fetched_key->get_key_data();
+    size_t key_data_fetched_size= fetched_key->get_key_data_size();
+    std::string key_data_with_version = "4:" + key_data2;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+
+    std::string key_data3("system_key_data_3");
+    Vault_key *percona_binlog_rotation4_to_5= new Vault_key("percona_binlog", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+    percona_binlog_rotation4_to_5->xor_data();
+    EXPECT_EQ(vault_keys_container->store_key(percona_binlog_rotation4_to_5), FALSE);
+
+    Vault_key latest_percona_binlog_key_2("percona_binlog", NULL, NULL, NULL, 0);
+    IKey* fetched_key_2= vault_keys_container->fetch_key(&latest_percona_binlog_key_2);
+
+    ASSERT_TRUE(fetched_key_2 != NULL);
+
+    EXPECT_STREQ(fetched_key_2->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key_2->get_key_signature()->length(), expected_key_signature.length());
+    key_data_fetched= fetched_key_2->get_key_data();
+    key_data_fetched_size= fetched_key_2->get_key_data_size();
+    key_data_with_version = "5:" + key_data3;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key_2->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+
+    std::string key_data4("system_key_data_4");
+    Vault_key *percona_binlog_rotation5_to_6= new Vault_key("percona_binlog", "AES", NULL, key_data4.c_str(), key_data4.length()+1);
+    percona_binlog_rotation5_to_6->xor_data();
+    EXPECT_EQ(vault_keys_container->store_key(percona_binlog_rotation5_to_6), FALSE);
+
+    Vault_key latest_percona_binlog_key_3("percona_binlog", NULL, NULL, NULL, 0);
+    IKey* fetched_key_3= vault_keys_container->fetch_key(&latest_percona_binlog_key_3);
+
+    ASSERT_TRUE(fetched_key_3 != NULL);
+
+    EXPECT_STREQ(fetched_key_3->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key_3->get_key_signature()->length(), expected_key_signature.length());
+    key_data_fetched= fetched_key_3->get_key_data();
+    key_data_fetched_size= fetched_key_3->get_key_data_size();
+    key_data_with_version = "6:" + key_data4;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key_3->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+
+    my_free(fetched_key->release_key_data());
+    my_free(fetched_key_2->release_key_data());
+    my_free(fetched_key_3->release_key_data());
+    
+    delete sample_key; //unused in this test
+  }
+
+  TEST_F(Vault_keys_container_test, StoreStoreStoreSystemKeyAndTryRemovingSystemKey)
+  {
+    IKeyring_io *keyring_io = new Vault_io(logger, vault_curl, vault_parser);
+    EXPECT_FALSE(vault_keys_container->init(keyring_io, credential_file_url));
+
+    std::string key_data1("system_key_data_1");
+    IKey *key1= new Vault_key("percona_binlog:7", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+
+    EXPECT_EQ(vault_keys_container->store_key(key1), 0);
+
+    std::string key_data2("system_key_data_2");
+    Vault_key *key2= new Vault_key("percona_binlog:8", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    EXPECT_EQ(vault_keys_container->store_key(key2), 0);
+
+    std::string key_data3("system_key_data_3");
+    Vault_key *key3= new Vault_key("percona_binlog:9", "AES", NULL, key_data3.c_str(), key_data3.length()+1);
+    EXPECT_EQ(vault_keys_container->store_key(key3), 0);
+
+    Vault_key latest_percona_binlog_key("percona_binlog:9", NULL, NULL, NULL, 0);
+    ASSERT_TRUE(vault_keys_container->remove_key(&latest_percona_binlog_key) == TRUE);
+
+    Vault_key percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+    ASSERT_TRUE(vault_keys_container->remove_key(&percona_binlog_key) == TRUE);
+
+    delete sample_key; //unused in this test
+  }
+
+  TEST_F(Vault_keys_container_test, StoreStoreStoreRemoveFetchSystemKeyFetchRegularKey)
+  {
+    IKeyring_io *keyring_io = new Vault_io(logger, vault_curl, vault_parser);
+    EXPECT_FALSE(vault_keys_container->init(keyring_io, credential_file_url));
+
+    std::string key_data1("system_key_data_1");
+    IKey *key1= new Vault_key("percona_binlog:10", "AES", NULL, key_data1.c_str(), key_data1.length()+1);
+
+    EXPECT_EQ(vault_keys_container->store_key(key1), 0);
+
+    std::string key_data2("system_key_data_2");
+    Vault_key *key2= new Vault_key("percona_binlog:11", "AES", NULL, key_data2.c_str(), key_data2.length()+1);
+    key2->xor_data();
+    EXPECT_EQ(vault_keys_container->store_key(key2), 0);
+
+    std::string key_data3("Robi3");
+    Vault_key *key3= new Vault_key("Roberts_key3", "AES", "Robert", key_data3.c_str(), key_data3.length()+1);
+    EXPECT_EQ(vault_keys_container->store_key(key3), 0);
+
+    std::string key_data4("Robi4");
+    Vault_key *key4= new Vault_key("Roberts_key4", "AES", "Robert", key_data4.c_str(), key_data4.length()+1);
+    EXPECT_EQ(vault_keys_container->store_key(key4), 0);
+
+    Vault_key key3_id("Roberts_key3", "AES", "Robert",NULL,0);
+    vault_keys_container->remove_key(&key3_id);
+
+    Vault_key latest_percona_binlog_key("percona_binlog", NULL, NULL, NULL, 0);
+    IKey* fetched_key= vault_keys_container->fetch_key(&latest_percona_binlog_key);
+
+    ASSERT_TRUE(fetched_key != NULL);
+
+    std::string expected_key_signature = get_key_signature("","percona_binlog","");
+    EXPECT_STREQ(fetched_key->get_key_signature()->c_str(), expected_key_signature.c_str());
+    EXPECT_EQ(fetched_key->get_key_signature()->length(), expected_key_signature.length());
+    uchar *key_data_fetched= fetched_key->get_key_data();
+    size_t key_data_fetched_size= fetched_key->get_key_data_size();
+    std::string key_data_with_version = "11:" + key_data2;
+    EXPECT_STREQ(key_data_with_version.c_str(), reinterpret_cast<const char*>(key_data_fetched));
+    EXPECT_STREQ("AES", fetched_key->get_key_type()->c_str());
+    ASSERT_TRUE(key_data_with_version.length()+1 == key_data_fetched_size);
+
+    my_free(fetched_key->release_key_data());
+
+    Vault_key regular_key("Roberts_key4", NULL, "Robert", NULL, 0);
+    IKey *fetched_regular_key= vault_keys_container->fetch_key(&regular_key);
+
+    ASSERT_TRUE(fetched_regular_key != NULL);
+    std::string expected_regular_key_signature= get_key_signature("","Roberts_key4","Robert");
+    EXPECT_STREQ(fetched_regular_key->get_key_signature()->c_str(), expected_regular_key_signature.c_str());
+    EXPECT_EQ(fetched_regular_key->get_key_signature()->length(), expected_regular_key_signature.length());
+    uchar *regular_key_data_fetched= fetched_regular_key->get_key_data();
+    size_t regular_key_data_fetched_size= fetched_regular_key->get_key_data_size();
+    EXPECT_STREQ(key_data4.c_str(), reinterpret_cast<const char*>(regular_key_data_fetched));
+    ASSERT_TRUE(key_data4.length()+1 == regular_key_data_fetched_size);
+
+    my_free(fetched_regular_key->release_key_data());
+    delete sample_key; //unused in this test
   }
 
   class Mock_vault_io : public IVault_io
