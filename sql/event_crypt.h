@@ -5,7 +5,6 @@
 #include "my_crypt.h"
 #include "rpl_constants.h"
 #include "binlog_event.h"
-#include <boost/move/unique_ptr.hpp>
 #include "binlog_crypt_data.h"
 
 bool encrypt_event(uint32 offs, const Binlog_crypt_data &crypto, uchar* buf, uchar *ebuf, size_t buf_len);
@@ -41,16 +40,10 @@ public:
     return crypto != NULL;
   }
 
-  /**
-     Encryption context or 0 if no encryption is needed
-  */
-  //MyCTX *ctx;
-
 private:
   bool maybe_write_event_len(IO_CACHE *output_cache, uchar *pos, size_t len);
   uint event_len;
 
-  //boost::movelib::unique_ptr<MyCTX> ctx;
   MyEncryptionCTX *ctx;
   /**
      Encryption data (key, nonce). Only used if ctx != 0.
