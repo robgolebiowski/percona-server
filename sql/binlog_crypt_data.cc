@@ -5,6 +5,7 @@
 #ifdef MYSQL_SERVER
 #include <mysql/service_mysql_keyring.h>
 #endif
+#include <algorithm>
 
 Binlog_crypt_data::Binlog_crypt_data()
   : key(NULL)
