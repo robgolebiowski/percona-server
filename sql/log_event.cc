@@ -1400,7 +1400,7 @@ Log_event* Log_event::read_log_event(IO_CACHE* file,
     */
     DBUG_RETURN(0);
   }
-  size_t data_len = uint4korr(head + EVENT_LEN_OFFSET);
+  ulong data_len = uint4korr(head + EVENT_LEN_OFFSET);
   char *buf= 0;
   const char *error= 0;
   Log_event *res=  0;
