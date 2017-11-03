@@ -251,7 +251,6 @@ namespace keyring__api_unittest
     my_free(key);
   }
 
-
   TEST_F(Keyring_api_test, RotateFetchRotateFetchRotateFetchSystemKey)
   {
     std::string percona_binlog_key_data_1("key1");

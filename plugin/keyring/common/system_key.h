@@ -11,6 +11,11 @@ public:
     , keyring_key(NULL)
   {}
 
+  System_key_adapter(long key_version, IKey *keyring_key)
+    : key_version(key_version)
+    , keyring_key(keyring_key)
+  {}  
+
   void set_keyring_key(IKey *key, long key_version)
   {
     system_key_data.reset(NULL);
