@@ -3,11 +3,12 @@
 
 namespace keyring {
 
+const std::string System_keys_container::system_key_prefix = "percona_";
 
 System_keys_container::System_keys_container()
 {
   System_key_adapter *percona_binlog_key = new System_key_adapter; 
-  system_key_id_to_system_key.insert(std::make_pair("percona_binlog", percona_binlog_key));
+  system_key_id_to_system_key.insert(std::make_pair<std::string, System_key_adapter*>("percona_binlog", percona_binlog_key));
 }
 
 System_keys_container::~System_keys_container()
@@ -48,7 +49,8 @@ bool System_keys_container::parse_key_id(std::string &key_id, std::string &syste
 {
   std::size_t colon_position = std::string::npos;
 
-  if ((colon_position = key_id.find(':')) == std::string::npos ||
+  //if ((colon_position = key_id.find(':')) == std::string::npos ||
+  if ((colon_position = key_id.find_last_of(':')) == std::string::npos ||
       colon_position == key_id.length() - 1)
     return true;
 
@@ -62,7 +64,9 @@ bool System_keys_container::parse_key_id(std::string &key_id, std::string &syste
 bool System_keys_container::is_system_key_without_version(IKey *key)
 {
   return key->get_user_id()->empty() &&
-         system_key_id_to_system_key.count(*key->get_key_id());
+         key->get_key_id()->compare(0, system_key_prefix.length(),
+                                    system_key_prefix) == 0;
+         //system_key_id_to_system_key.count(*key->get_key_id());
 }
 
 bool System_keys_container::is_system_key_with_version(IKey *key, std::string &system_key_id, long &key_version)
@@ -72,7 +76,8 @@ bool System_keys_container::is_system_key_with_version(IKey *key, std::string &s
 
   if (key->get_user_id()->empty() == false ||
       parse_key_id(*key_id, system_key_id, key_version) ||
-      system_key_id_to_system_key.count(system_key_id) == 0)
+      key->get_key_id()->compare(0, system_key_prefix.length(),
+                                    system_key_prefix) != 0)
     return false;
   
   //if ((*key->get_user_id()).empty() != true ||
@@ -90,8 +95,19 @@ bool System_keys_container::is_system_key_with_version(IKey *key, std::string &s
   return true;
 }
 
+void System_keys_container::store_or_update_system_key(IKey* key, std::string &system_key_id, long key_version)
+{
+  if (system_key_id_to_system_key.count(system_key_id) == 0)
+    system_key_id_to_system_key.insert(std::make_pair<std::string, System_key_adapter*>(system_key_id, new System_key_adapter(key_version, key)));
+  else
+    update_system_key(key, system_key_id, key_version);
+}
+
 void System_keys_container::update_system_key(IKey* key, std::string &system_key_id, long key_version)
 {
+  //if (system_key_id_to_system_key.count(system_key_id) == 0)
+    //system_key_id_to_system_key.insert(std::make_pair<std::string, System_key_adapter*>(system_key_id, new System_key_adapter));
+
   if (system_key_id_to_system_key[system_key_id]->get_key_version() < key_version)
     system_key_id_to_system_key[system_key_id]->set_keyring_key(key, key_version);
 }
@@ -106,9 +122,10 @@ template <> struct NumberOfDigits<0>
   enum { value = 1 };
 };
 
-bool System_keys_container::rotate_key_id_if_system_key(IKey *key)
+bool System_keys_container::rotate_key_id_if_existing_system_key(IKey *key)
 {
-  if (is_system_key_without_version(key) == false)
+  if (is_system_key_without_version(key) == false ||
+      system_key_id_to_system_key.count(*key->get_key_id()) == 0)
     return false;
 
   long key_version = system_key_id_to_system_key[*key->get_key_id()]->get_key_version();
@@ -128,13 +145,14 @@ bool System_keys_container::rotate_key_id_if_system_key(IKey *key)
   return false;
 }
 
-void System_keys_container::update_if_system_key(IKey *key)
+//void System_keys_container::update_if_system_key(IKey *key)
+void System_keys_container::store_or_update_if_system_key(IKey *key)
 {
   std::string system_key_id;
   long key_version;
   
   if (is_system_key_with_version(key, system_key_id, key_version))
-    update_system_key(key, system_key_id, key_version);
+    store_or_update_system_key(key, system_key_id, key_version);
 }
 
 } //namespace keyring
