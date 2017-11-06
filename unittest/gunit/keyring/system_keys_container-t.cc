@@ -371,6 +371,9 @@ namespace keyring__system_keys_container_unittest
     delete key2;
     delete key3;
     delete key1_sk;
+    delete percona_binlog_key;
+    delete percona_binlog_key2;
+    delete percona_binlog_key3;
     delete percona_key;
   }
 
@@ -430,6 +433,8 @@ namespace keyring__system_keys_container_unittest
 
     delete key1;
     delete key2;
+    delete percona_binlog_key;
+    delete percona_key;
   }
 
   TEST_F(System_keys_container_test, RotateFromMaxKeyId)
@@ -462,6 +467,9 @@ namespace keyring__system_keys_container_unittest
     EXPECT_STREQ(percona_key->get_key_id()->c_str(), "percona_key");
 
     delete key1;
+    delete key2;
+    delete percona_binlog_key;
+    delete percona_key;
   }
 
   TEST_F(System_keys_container_test, FetchFromEmptyContainer)
