@@ -89,7 +89,7 @@ my_bool Keys_container::store_key_in_hash(IKey *key)
   if (my_hash_insert(keys_hash, (uchar *) key))
     return TRUE;
 
-  system_keys_container->store_or_update_if_system_key(key); //rename it to .._with_version
+  system_keys_container->store_or_update_if_system_key(key); //rename it to .._with_version //TODO:Needs to be moved to store_key function
   return FALSE;
 }
 
