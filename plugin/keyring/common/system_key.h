@@ -98,13 +98,11 @@ public:
   }
   virtual void set_key_data(uchar *key_data, size_t key_data_size)
   {
-    (void)key_data; (void)key_data_size;
-    DBUG_ASSERT(FALSE);
+    keyring_key->set_key_data(key_data, key_data_size);
   }
   virtual void set_key_type(const std::string *key_type)
   {
-    (void)key_type;
-    DBUG_ASSERT(FALSE);
+    keyring_key->set_key_type(key_type);
   }
   virtual my_bool load_from_buffer(uchar* buffer, size_t *buffer_position,
                                    size_t input_buffer_size)

@@ -150,9 +150,11 @@ void System_keys_container::store_or_update_if_system_key(IKey *key)
 {
   std::string system_key_id;
   long key_version;
-  
+
   if (is_system_key_with_version(key, system_key_id, key_version))
     store_or_update_system_key(key, system_key_id, key_version);
+  else if (is_system_key_without_version(key))
+    store_or_update_system_key(key, *key->get_key_id(), 0);
 }
 
 } //namespace keyring
