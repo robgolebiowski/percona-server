@@ -278,28 +278,7 @@ bool init_system_keys()
   is_keys_container_initialized = FALSE;
   return failure;
   
-  //char *key_type= NULL, *key= NULL;
-  //size_t key_length;
-  //const size_t percona_binlog_key_length= 16;
-
-  //uchar percona_binlog_key[percona_binlog_key_length];
-  //my_rand_buffer(percona_binlog_key, percona_binlog_key_length);
-  
-
-
-
-
-  //bool failure= mysql_key_fetch("percona_binlog", &key_type, NULL, (void**)&key, &key_length) == TRUE;
-  //failure= failure || (key != NULL && (key_type == NULL || strncmp(key_type, "AES", 3) != 0 ||
-           //key_length != percona_binlog_key_length));
-  //if (!failure && key == NULL) //no failure, but key does not exist
-    //failure= mysql_key_store("percona_binlog", "AES", NULL, percona_binlog_key, percona_binlog_key_length);
   is_keys_container_initialized = FALSE;
-
-  //if (key != NULL)
-    //my_free(key);
-  //if (key_type != NULL)
-    //my_free(key_type);
 
   return failure;
 }
