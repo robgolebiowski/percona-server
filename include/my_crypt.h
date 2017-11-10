@@ -19,7 +19,7 @@
 #ifndef MY_CRYPT_INCLUDED
 #define MY_CRYPT_INCLUDED
 
-#include <my_config.h> /* HAVE_EncryptAes128{Ctr,Gcm} */
+#include <my_config.h>
 #include "my_aes.h"
 
 #define MY_AES_OK                     0
@@ -46,23 +46,6 @@ enum my_aes_mode {
 };
 
 class MyEncryptionCTX;
-//{
-//public:
-  //MyEncryptionCTX();
-  //virtual ~MyEncryptionCTX();
-
-  //virtual int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
-                   //const uchar *iv, size_t ivlen);
-  //virtual int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen);
-  //virtual int finish(uchar *dst, size_t *dlen);
-
-//protected:
-  //struct Impl;
-  //Impl* pimpl;
-
-//private:
-  //MyEncryptionCTX(const MyEncryptionCTX &enc);
-//};
 
 int my_aes_crypt_init(MyEncryptionCTX* &ctx, enum my_aes_mode mode, int flags,
                       const unsigned char* key, size_t klen,
