@@ -235,7 +235,7 @@ namespace keyring__api_unittest
     EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
-    std::string key_data_with_version = "1:" + sample_key_data;
+    std::string key_data_with_version = "0:" + sample_key_data;
     EXPECT_EQ(key_len, key_data_with_version.length()+1);
     ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
     my_free(key_type);
@@ -271,7 +271,7 @@ namespace keyring__api_unittest
     EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
-    std::string key_data_with_version = "1:" + percona_binlog_key_data_1;
+    std::string key_data_with_version = "0:" + percona_binlog_key_data_1;
     EXPECT_EQ(key_len, key_data_with_version.length()+1);
     ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
     my_free(key_type);
@@ -287,7 +287,7 @@ namespace keyring__api_unittest
     EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
-    key_data_with_version = "2:" + percona_binlog_key_data_2;
+    key_data_with_version = "1:" + percona_binlog_key_data_2;
     EXPECT_EQ(key_len, key_data_with_version.length()+1);
     ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
     my_free(key_type);
@@ -308,7 +308,7 @@ namespace keyring__api_unittest
     EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
-    key_data_with_version = "3:" + percona_binlog_key_data_3;
+    key_data_with_version = "2:" + percona_binlog_key_data_3;
     EXPECT_EQ(key_len, key_data_with_version.length()+1);
     ASSERT_TRUE(memcmp((char *)key, key_data_with_version.c_str(), key_len) == 0);
     my_free(key_type);
@@ -337,14 +337,7 @@ namespace keyring__api_unittest
 
     EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key,
                               &key_len), 0);
-    EXPECT_STREQ("AES", key_type);
-    EXPECT_EQ(key_len, static_cast<size_t>(18));
-    ASSERT_TRUE(key != NULL);
-    ASSERT_TRUE(memcmp((char *)key, "0:", 2) == 0); //version 0
-    my_free(key_type);
-    key_type= NULL;
-    my_free(key);
-    key= NULL;
+    ASSERT_TRUE(key == NULL);
   }
 
   TEST_F(Keyring_api_test, KeyGenerate)

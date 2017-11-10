@@ -140,8 +140,7 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
                                           vault_parser.get());
     vault_curl.release();
     vault_parser.release();
-    if (keys->init(keyring_io, keyring_vault_config_file) ||
-        init_system_keys())
+    if (keys->init(keyring_io, keyring_vault_config_file))
     {
       is_keys_container_initialized = FALSE;
       logger->log(MY_ERROR_LEVEL, "keyring_vault initialization failure. Please check that"
