@@ -11,7 +11,7 @@ namespace keyring {
 class System_keys_container : public ISystem_keys_container
 {
 public:
-  System_keys_container();
+  //System_keys_container();
   ~System_keys_container();
 
   IKey* get_latest_key_if_system_key(IKey *key);

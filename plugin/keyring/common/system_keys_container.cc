@@ -5,11 +5,11 @@ namespace keyring {
 
 const std::string System_keys_container::system_key_prefix = "percona_";
 
-System_keys_container::System_keys_container()
-{
-  System_key_adapter *percona_binlog_key = new System_key_adapter; 
-  system_key_id_to_system_key.insert(std::make_pair<std::string, System_key_adapter*>("percona_binlog", percona_binlog_key));
-}
+//System_keys_container::System_keys_container()
+//{
+  //System_key_adapter *percona_binlog_key = new System_key_adapter; 
+  //system_key_id_to_system_key.insert(std::make_pair<std::string, System_key_adapter*>("percona_binlog", percona_binlog_key));
+//}
 
 System_keys_container::~System_keys_container()
 {
@@ -32,8 +32,7 @@ bool System_keys_container::is_system_key(IKey *key)
 IKey* System_keys_container::get_latest_key_if_system_key(IKey *key)
 {
   std::string *key_id = key->get_key_id();
-  return (key->get_user_id()->empty() == false || system_key_id_to_system_key.count(*key_id) == 0 ||
-          system_key_id_to_system_key[*key_id]->get_key_version() == -1)
+  return (key->get_user_id()->empty() == false || system_key_id_to_system_key.count(*key_id) == 0)
          ? NULL
          : system_key_id_to_system_key[*key_id];
 }
