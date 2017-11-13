@@ -10,7 +10,7 @@
 # Author : Robert Golebiowski                                                 #
 #                                                                             #
 #                                                                             #
-# Description:Test Cases of Statcc System Variable encrypt_binlog             #
+# Description:Test Cases of Static System Variable encrypt_binlog             #
 #             that checks the behavior of this variable in the following ways #
 #              * Value Check                                                  #
 #              * Scope Check                                                  #

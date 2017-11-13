@@ -2809,7 +2809,10 @@ public:
     is_valid_param= true;
   }
 
-  /* constructor for hopelessly corrupted events */
+  /* There is no way of differentiate between hopelessly corrupted events
+   * and encrypted events. Because of that we assume that corrupted events
+   * that lands here are just encrypted events.
+   * */
   Unknown_log_event() : Log_event(header(), footer()), what(ENCRYPTED)
   {}
 

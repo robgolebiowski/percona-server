@@ -1570,13 +1570,13 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
   }
   /*
     CRC verification by SQL and Show-Binlog-Events master side.
-    The caller has to provide @fdle->checksum_alg to
+    The caller has to provide @description_event->checksum_alg to
     be the last seen FD's (A) descriptor.
     If event is FD the descriptor is in it.
     Notice, FD of the binlog can be only in one instance and therefore
     Show-Binlog-Events executing master side thread needs just to know
     the only FD's (A) value -  whereas RL can contain more.
-    In the RL case, the alg is kept in FD_e (@fdle) which is reset 
+    In the RL case, the alg is kept in FD_e (@description_event) which is reset 
     to the newer read-out event after its execution with possibly new alg descriptor.
     Therefore in a typical sequence of RL:
     {FD_s^0, FD_m, E_m^1} E_m^1 
@@ -1633,7 +1633,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       !DBUG_EVALUATE_IF("simulate_unknown_ignorable_log_event", 1, 0))
   {
     /*
-      It is unsafe to use the fdle if its post_header_len
+      It is unsafe to use the description_event if its post_header_len
       array does not include the event type.
     */
     DBUG_PRINT("error", ("event type %d found, but the current "

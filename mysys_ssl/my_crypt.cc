@@ -184,8 +184,10 @@ public:
       uchar mask[MY_AES_BLOCK_SIZE];
       size_t mlen;
 
-      my_aes_crypt(MY_AES_ECB, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                   oiv, sizeof(mask), mask, &mlen, key, klen, 0, 0);
+      int result= my_aes_crypt(MY_AES_ECB, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                               oiv, sizeof(mask), mask, &mlen, key, klen, 0, 0);
+      if (result != MY_AES_OK)
+        return result;
       DBUG_ASSERT(mlen == sizeof(mask));
 
       for (uint i=0; i < buf_len; i++)
