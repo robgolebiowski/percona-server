@@ -1044,13 +1044,11 @@ int Binlog_sender::send_format_description_event(IO_CACHE *log_cache,
 
   Format_description_log_event *new_fdle= NULL;
 
-  try 
+  new_fdle= new Format_description_log_event(reinterpret_cast<char*>(event_ptr), event_len, m_fdle.get());
+  
+  if (new_fdle == NULL)
   {
-    new_fdle= new Format_description_log_event(reinterpret_cast<char*>(event_ptr), event_len, m_fdle.get());
-  }
-  catch(...)
-  {
-    set_fatal_error("Corrupt Format_description event found or out-of-memory");
+    set_fatal_error("Out-of-memory");
     DBUG_RETURN(1);
   }
   m_fdle.reset(new_fdle);

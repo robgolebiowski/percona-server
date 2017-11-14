@@ -1,21 +1,19 @@
 #
-# The test checks that basic DDL and DML events are encrypted 
+# The test checks that basic DDL and DML events are encrypted
 # in the binary log on master.
-# The test is to be run with all binlog formats 
+# The test is to be run with all binlog formats
 # (combinations for rpl_init.inc take care of that).
 #
 #
-# The test runs with the encrypted master and non-encrypted slave. 
+# The test runs with the encrypted master and non-encrypted slave.
 # It generates a sequence of events on master, and checks that
 # - all events are encrypted on master;
 # - slave is able to replicate from the master;
 # - relay logs and binary logs are not encrypted on slave.
 #
-# The same exercise is repeated 
-# - without annotated binlog events and without binlog checksums;
+# The same exercise is repeated
 # - with binlog checksums;
-# - with annotated events and binlog checksums;
-# - with annotated events, default checksums and minimal binlog row image
+# - with default checksums and minimal binlog row image
 #
 
 --source include/have_innodb.inc
@@ -44,7 +42,7 @@ SET @master_verify_checksum.save= @@global.master_verify_checksum;
 SET @binlog_row_image.save= @@global.binlog_row_image;
 
 --echo ####################################################
---echo # Test 1: simple binlog, no checksum, no annotation
+--echo # Test 1: simple binlog, no checksum
 --echo ####################################################
 
 --connection server_1
@@ -55,7 +53,7 @@ SET GLOBAL master_verify_checksum= 0;
 --source testdata.inc
 
 --echo ####################################################
---echo # Test 2: binlog with checksum, no annotated events
+--echo # Test 2: binlog with checksum
 --echo ####################################################
 
 --connection server_1
@@ -66,18 +64,7 @@ SET GLOBAL master_verify_checksum= 1;
 --source testdata.inc
 
 --echo ####################################################
---echo # Test 3: binlog with checksum and annotated events
---echo ####################################################
-
---connection server_1
-
-SET GLOBAL binlog_checksum= CRC32;
-SET GLOBAL master_verify_checksum= 1;
-
---source testdata.inc
-
---echo ####################################################
---echo # Test 4: binlog with annotated events and binlog_row_image=minimal
+--echo # Test 3: binlog with binlog_row_image=minimal
 --echo ####################################################
 
 --connection server_1
