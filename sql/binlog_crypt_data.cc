@@ -51,12 +51,6 @@ void Binlog_crypt_data::free_key()
 
 Binlog_crypt_data& Binlog_crypt_data::operator=(Binlog_crypt_data b)
 {
-  this->swap(b);
-  return *this;
-}
-
-void Binlog_crypt_data::swap(Binlog_crypt_data &b)
-{
   enabled= b.enabled;
   key_version= b.key_version;
   key_length= b.key_length;
@@ -65,6 +59,7 @@ void Binlog_crypt_data::swap(Binlog_crypt_data &b)
   memcpy(iv, b.iv, BINLOG_IV_LENGTH);
   dst_len= b.dst_len;
   memcpy(nonce, b.nonce, BINLOG_NONCE_LENGTH);
+  return *this;
 }
 
 bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce)
@@ -83,7 +78,7 @@ bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce)
   size_t key_len;
 
   DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
-                  { return 1; } );
+                  { return true; } );
 
   int fetch_result = my_key_fetch("percona_binlog", &key_type_raw, NULL,
                                   reinterpret_cast<void**>(&key), &key_len);

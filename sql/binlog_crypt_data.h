@@ -20,7 +20,6 @@ public:
   ~Binlog_crypt_data();
   Binlog_crypt_data(const Binlog_crypt_data &b);
   Binlog_crypt_data& operator=(Binlog_crypt_data b);
-  void swap(Binlog_crypt_data &b);
 
   bool is_enabled() const
   {

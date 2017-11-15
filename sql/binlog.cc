@@ -3275,9 +3275,9 @@ bool show_binlog_events(THD *thd, MYSQL_BIN_LOG *binary_log)
       {
         delete description_event;
         description_event= (Format_description_log_event*) ev;
-	if (!description_event->is_valid())
+        if (!description_event->is_valid())
         {
-      	  errmsg="Invalid Format_description event; could be out of memory";
+          errmsg="Invalid Format_description event; could be out of memory";
           goto err;
         }
       }
