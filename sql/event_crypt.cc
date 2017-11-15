@@ -11,9 +11,9 @@ static bool encrypt_event(uint32 offs, int flags, const Binlog_crypt_data &crypt
   crypto.set_iv(iv, offs);
   memcpy(buf + EVENT_LEN_OFFSET, buf, 4);
 
- if (my_aes_crypt(MY_AES_CBC, flags | ENCRYPTION_FLAG_NOPAD,
-                  buf + 4, buf_len - 4, ebuf + 4, &elen,
-                  crypto.get_key(), crypto.get_keys_length(), iv, sizeof(iv)))
+  if (my_aes_crypt(MY_AES_CBC, flags | ENCRYPTION_FLAG_NOPAD,
+                   buf + 4, buf_len - 4, ebuf + 4, &elen,
+                   crypto.get_key(), crypto.get_keys_length(), iv, sizeof(iv)))
   {
     memcpy(buf, buf + EVENT_LEN_OFFSET, 4);
     return true;
@@ -41,17 +41,14 @@ bool Event_encrypter::init(IO_CACHE *output_cache, uchar* &header, size_t &buf_l
 {
   uchar iv[Binlog_crypt_data::BINLOG_IV_LENGTH];
   crypto->set_iv(iv, my_b_safe_tell(output_cache));
-
-  if (my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
-                        crypto->get_key(), crypto->get_keys_length(), iv, sizeof(iv)))
+  if (ctx != NULL)
   {
-    if (ctx != NULL)
-    {
       my_aes_crypt_free_ctx(ctx);
       ctx = NULL;
-    }
-    return true;
   }
+  if (my_aes_crypt_init(ctx, MY_AES_CBC, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
+                        crypto->get_key(), crypto->get_keys_length(), iv, sizeof(iv)))
+    return true;
 
   DBUG_ASSERT(buf_len >= LOG_EVENT_HEADER_LEN);
   event_len = uint4korr(header + EVENT_LEN_OFFSET);

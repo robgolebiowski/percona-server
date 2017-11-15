@@ -278,7 +278,6 @@ private:
 #endif
 
 int my_aes_crypt_init(MyEncryptionCTX* &ctx, const my_aes_mode mode, int flags,
-
                       const unsigned char* key, size_t klen,
                       const unsigned char* iv, size_t ivlen)
 {
@@ -298,7 +297,13 @@ int my_aes_crypt_init(MyEncryptionCTX* &ctx, const my_aes_mode mode, int flags,
     ctx= (flags & ENCRYPTION_FLAG_NOPAD) ? new MyEncryptionCTX_nopad()
                                          : new MyEncryptionCTX();
 
-  return ctx->init(mode, flags & 1, key, klen, iv, ivlen);
+  int ctx_init_result= ctx->init(mode, flags & 1, key, klen, iv, ivlen);
+  if (ctx_init_result != MY_AES_OK)
+  {
+    delete ctx;
+    ctx= NULL;
+  }
+  return ctx_init_result;
 }
 
 int my_aes_crypt_update(MyEncryptionCTX *ctx, const uchar *src, size_t slen,

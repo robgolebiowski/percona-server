@@ -26,11 +26,6 @@
 #define MY_AES_OPENSSL_ERROR          -101
 #define MY_AES_BAD_KEYSIZE            -102
 
-/* The max key length of all supported algorithms */
-#define MY_AES_MAX_KEY_LENGTH 32
-
-#define MY_AES_CTX_SIZE 512
-
 #define ENCRYPTION_FLAG_DECRYPT     0
 #define ENCRYPTION_FLAG_ENCRYPT     1
 #define ENCRYPTION_FLAG_NOPAD       2
