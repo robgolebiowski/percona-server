@@ -35,7 +35,7 @@ int check_keyring_file_data(MYSQL_THD thd  MY_ATTRIBUTE((unused)),
                             struct st_mysql_sys_var *var  MY_ATTRIBUTE((unused)),
                             void *save, st_mysql_value *value)
 {
-  char            buff[FN_REFLEN+1];
+  char            buff[FN_REFLEN_SE+1];
   const char      *keyring_filename;
   int             len = sizeof(buff);
   boost::movelib::unique_ptr<IKeys_container> new_keys(new Keys_container(logger.get()));

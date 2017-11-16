@@ -98,7 +98,7 @@ my_bool create_keyring_dir_if_does_not_exist(const char *keyring_file_path)
 {
   if (!keyring_file_path || strlen(keyring_file_path) == 0)
     return TRUE;
-  char keyring_dir[FN_REFLEN];
+  char keyring_dir[FN_REFLEN_SE];
   size_t keyring_dir_length;
   dirname_part(keyring_dir, keyring_file_path, &keyring_dir_length);
   if (keyring_dir_length > 1 && (keyring_dir[keyring_dir_length-1] == FN_LIBCHAR))
