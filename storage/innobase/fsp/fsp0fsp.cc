@@ -906,10 +906,15 @@ fsp_header_fill_encryption_info(
 #endif
 
 	/* Get master key from key ring */
-	Encryption::get_master_key(&master_key_id, &master_key, &version);
-	if (master_key == NULL) {
-		return(false);
-	}
+
+        //TODO:Przecież ja tu nie mam ptr
+        if (memcmp(ptr, "percona_innodb_", 15) != 0)
+        {
+          Encryption::get_master_key(&master_key_id, &master_key, &version);
+          if (master_key == NULL) {
+                  return(false);
+          }
+        }
 
 	memset(encrypt_info, 0, ENCRYPTION_INFO_SIZE_V2);
 	memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
@@ -963,28 +968,36 @@ fsp_header_fill_encryption_info(
 		fprintf(stderr, "%02lx", (ulong)*data++);
 	fprintf(stderr, "\n");
 #endif
-	/* Encrypt tablespace key and iv. */
-	elen = my_aes_encrypt(
-		key_info,
-		ENCRYPTION_KEY_LEN * 2,
-		ptr,
-		master_key,
-		ENCRYPTION_KEY_LEN,
-		my_aes_256_ecb,
-		NULL, false);
+        if (memcmp(ptr, "percona_innodb_", 15) != 0)
+        {
+          /* Encrypt tablespace key and iv. */
+          elen = my_aes_encrypt(
+                  key_info,
+                  ENCRYPTION_KEY_LEN * 2,
+                  ptr,
+                  master_key,
+                  ENCRYPTION_KEY_LEN,
+                  my_aes_256_ecb,
+                  NULL, false);
 
-	if (elen == MY_AES_BAD_DATA) {
-		my_free(master_key);
-		return(false);
-	}
+          if (elen == MY_AES_BAD_DATA) {
+                  my_free(master_key);
+                  return(false);
+          }
 
-	ptr += ENCRYPTION_KEY_LEN * 2;
+          ptr += ENCRYPTION_KEY_LEN * 2;
 
-	/* Write checksum bytes. */
-	crc = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
-	mach_write_to_4(ptr, crc);
+          /* Write checksum bytes. */
+          crc = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
+          mach_write_to_4(ptr, crc);
 
-	my_free(master_key);
+          my_free(master_key);
+        }
+        else 
+        {
+          //do not encrypt anything
+          memcpy(ptr, key_info, ENCRYPTION_KEY_LEN * 2); 
+        }
 	return(true);
 }
 
@@ -1247,6 +1260,25 @@ fsp_header_decode_encryption_info(
 		memcpy(srv_uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
 		ptr += ENCRYPTION_SERVER_UUID_LEN;
 	}
+
+        /* Now the ptr points to key in tablespace, let's check if this is not innodb key id
+         * of the key stored inside innodb TODO:Make this comment better */
+        if (memcmp(ptr, "percona_innodb_", 15) == 0)
+        {
+	  byte*	percona_innodb_key= NULL; //TODO: Czy to nie powinno wylądować na początku pliku, tam gdzie jest reszta zmiennych?
+          //ptr += 15; //skip percona_innodb
+	  ulint space_id = mach_read_from_4(ptr + 15); //skip percona_innodb prefix
+          Encryption::get_master_key(space_id, srv_uuid, &percona_innodb_key); //To jest tymczasowe, będzie musiało być całe, tj. percona_innodb_spaceid
+          //TODO: jeszcze trzeba pomyśleć o key id z wersją
+          if (percona_innodb_key == NULL)
+            return (false);
+	  memcpy(key, percona_innodb_key, ENCRYPTION_KEY_LEN);
+          my_free(percona_innodb_key);
+          memcpy(iv, ptr + ENCRYPTION_KEY_LEN,
+	         ENCRYPTION_KEY_LEN);
+          return (true);
+        }
+
 
 	/* Get master key by key id. */
 	memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);

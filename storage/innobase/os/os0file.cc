@@ -9041,6 +9041,8 @@ Encryption::to_string(Type type)
                 return("N");
         case AES:
                 return("Y");
+        case ROTATED_KEYS:
+                return("ROTATED_KEYS");
         }
 
         ut_ad(0);
@@ -9060,13 +9062,16 @@ void Encryption::random_value(byte* value)
 /** Create new master key for key rotation.
 @param[in,out]	master_key	master key */
 void
-Encryption::create_master_key(byte** master_key)
+Encryption::create_master_key(byte** master_key,
+                              ulint space_id)
 {
 #ifndef UNIV_INNOCHECKSUM
 	char*	key_type = NULL;
 	size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 	int	ret;
+
+        ulint master_key_id = space_id == 0 ? this->master_key_id : space_id;
 
 	/* If uuid does not match with current server uuid,
 	set uuid as current server uuid. */
