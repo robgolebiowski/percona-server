@@ -58,9 +58,13 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
+<<<<<<< HEAD
 #ifdef UNIV_DEBUG
 static int number_of_t1_pages_rotated = 0;
 #endif
+=======
+static int number_of_t1_pages_rotated = 0; //TODO:Robert - Can this be moved to some DEBUG ifdef together with DBUG_EXECUTE_IF ?
+>>>>>>> PS-3829 : Innodb key rotation. ALPHA
 
 /** Mutex for keys */
 static ib_mutex_t fil_crypt_key_mutex;
@@ -524,9 +528,14 @@ fil_space_destroy_crypt_data(
 			c->~fil_space_crypt_t();
 			ut_free(c);
 		}
+<<<<<<< HEAD
 		else {
 			ut_ad(0);
 		}
+=======
+		else
+			ut_ad(0);
+>>>>>>> PS-3829 : Innodb key rotation. ALPHA
 	}
 }
 
