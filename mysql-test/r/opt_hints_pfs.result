@@ -8,8 +8,8 @@ SELECT        * FROM t1;
 SELECT /*+ */ * FROM t1;
 SELECT digest, digest_text FROM performance_schema.events_statements_history ORDER BY timer_start DESC LIMIT 2;
 digest	digest_text
-533c0a9cf0cf92d2c26e7fe8821735eb4a72c409aaca24f9f281d137427bfa9a	SELECT * FROM `t1`
-533c0a9cf0cf92d2c26e7fe8821735eb4a72c409aaca24f9f281d137427bfa9a	SELECT * FROM `t1`
+7813b9aec0c09117f127053b466bb3e0	SELECT * FROM `t1` 
+7813b9aec0c09117f127053b466bb3e0	SELECT * FROM `t1` 
 # Digests should be different:
 SELECT * FROM t1, t2;
 SELECT /*+
@@ -33,20 +33,20 @@ SUBQUERY(t1)
 */ * FROM t1, t2;
 SELECT digest, digest_text FROM performance_schema.events_statements_history ORDER BY timer_start DESC LIMIT 2;
 digest	digest_text
-03c23b7b6d0b10547ae67b64b3dd4230b929d6e482cf78644b441fc642285c70	SELECT /*+ BKA ( `t1`@`qb1` ) BNL ( @`qb1` `t1` ) DUPSWEEDOUT FIRSTMATCH INTOEXISTS LOOSESCAN MATERIALIZATION MRR ( `t1` ) NO_BKA ( `t2` ) NO_BNL ( `t2` ) NO_ICP ( `t2` ) NO_MRR ( `t2` ) NO_RANGE_OPTIMIZATION ( `t2` ) NO_SEMIJOIN ( `t2` ) QB_NAME ( `qb1` ) SEMIJOIN ( `t1` ) SUBQUERY ( `t1` ) */ * FROM `t1` , `t2`
-7c833a03681c8d9ce4afd30de8498e2a4df55e33e991770e5377e18d3c87da7f	SELECT * FROM `t1` , `t2`
+5873dbf27c6f838d5ce06c692ee7f2b1	SELECT /*+ BKA ( `t1`@`qb1` ) BNL ( @`qb1` `t1` ) DUPSWEEDOUT FIRSTMATCH INTOEXISTS LOOSESCAN MATERIALIZATION MRR ( `t1` ) NO_BKA ( `t2` ) NO_BNL ( `t2` ) NO_ICP ( `t2` ) NO_MRR ( `t2` ) NO_RANGE_OPTIMIZATION ( `t2` ) NO_SEMIJOIN ( `t2` ) QB_NAME ( `qb1` ) SEMIJOIN ( `t1` ) SUBQUERY ( `t1` ) */ * FROM `t1` , `t2` 
+c2eecd9ef952755ec648eb7406354e72	SELECT * FROM `t1` , `t2` 
 SELECT * FROM t2, t1;
 SELECT /*+ MAX_EXECUTION_TIME(4294967295) */ * FROM t2, t1;
 SELECT digest, digest_text FROM performance_schema.events_statements_history ORDER BY timer_start DESC LIMIT 2;
 digest	digest_text
-49499e28818da99558537467bea1d841b2810139fbf30ff708d3c1e252a17ed1	SELECT /*+ MAX_EXECUTION_TIME (?) */ * FROM `t2` , `t1`
-568bc14e215806a52933675c3be556c33b88d67162e61aab6ea1bc329e0995ab	SELECT * FROM `t2` , `t1`
+c58f25464cd266d708f88b7a3c48a166	SELECT /*+ MAX_EXECUTION_TIME (?) */ * FROM `t2` , `t1` 
+531f2cca2dc0bca50a1208c81e130676	SELECT * FROM `t2` , `t1` 
 SELECT 1;
 SELECT /*+ bad_hint_also_goes_to_digest */ 1;
 SELECT digest, digest_text FROM performance_schema.events_statements_history ORDER BY timer_start DESC LIMIT 2;
 digest	digest_text
-660eaaac8babcd7c6964f8930126fb336f78fae088ed4b15047e66e849b10722	SELECT /*+ `bad_hint_also_goes_to_digest` */ ?
-d1b44b0c19af710b5a679907e284acd2ddc285201794bc69a2389d77baedddae	SELECT ?
+9c363c2243b369eb9d9d8130a7b278d9	SELECT /*+ `bad_hint_also_goes_to_digest` */ ? 
+24e5a8c19fe8009f403640dabf2a9e0f	SELECT ? 
 DROP TABLE t1, t2;
 #
 # WL#681: Hint to temporarily set session variable for current statement

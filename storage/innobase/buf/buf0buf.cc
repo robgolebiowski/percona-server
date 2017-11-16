@@ -79,7 +79,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "sync0sync.h"
 #include "trx0trx.h"
 #include "ut0new.h"
-#endif /* !UNIV_HOTBACKUP */
+#include "fil0crypt.h"
 
 #ifdef HAVE_LIBNUMA
 #include <numa.h>
@@ -3214,7 +3214,8 @@ buf_block_t *buf_page_get_gen(const page_id_t &page_id,
                               const page_size_t &page_size, ulint rw_latch,
                               buf_block_t *guess, ulint mode, const char *file,
                               ulint line, mtr_t *mtr,
-                              bool dirty_with_no_latch) {
+                              bool dirty_with_no_latch,
+                              dberr_t* err) {
   buf_block_t *block;
   unsigned access_time;
   rw_lock_t *hash_lock;
@@ -3226,6 +3227,11 @@ buf_block_t *buf_page_get_gen(const page_id_t &page_id,
   ut_ad(mtr->is_active());
   ut_ad((rw_latch == RW_S_LATCH) || (rw_latch == RW_X_LATCH) ||
         (rw_latch == RW_SX_LATCH) || (rw_latch == RW_NO_LATCH));
+
+  if (err) {
+    *err = DB_SUCCESS;
+  }
+
 #ifdef UNIV_DEBUG
   switch (mode) {
     case BUF_GET_NO_LATCH:
@@ -3339,7 +3345,9 @@ loop:
       return (NULL);
     }
 
-    if (buf_read_page(page_id, page_size, trx)) {
+    dberr_t local_err = buf_read_page(page_id, page_size, trx);
+    
+    if (local_err == DB_SUCCESS) {
       buf_read_ahead_random(page_id, page_size, ibuf_inside(mtr), trx);
 
       retries = 0;
@@ -3348,6 +3356,21 @@ loop:
       DBUG_EXECUTE_IF("innodb_page_corruption_retries",
                       retries = BUF_PAGE_READ_MAX_RETRIES;);
     } else {
+      if (err) {
+        *err = local_err;
+      }
+
+      /* Pages whose encryption key is unavailable or used
+      key, encryption algorithm or encryption method is
+      incorrect are marked as encrypted in
+      buf_page_check_corrupt(). Unencrypted page could be
+      corrupted in a way where the key_id field is
+      nonzero. There is no checksum on field
+      FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION. */
+      if (local_err == DB_DECRYPTION_FAILED) {
+        return (NULL);
+      }
+
       ib::fatal(ER_IB_MSG_74)
           << "Unable to read page " << page_id << " into the buffer pool after "
           << BUF_PAGE_READ_MAX_RETRIES
@@ -4103,6 +4126,7 @@ void buf_page_init_low(buf_page_t *bpage) /*!< in: block to init */
   bpage->oldest_modification = 0;
   HASH_INVALIDATE(bpage, hash);
   bpage->is_corrupt = false;
+	bpage->encrypted = false;
 
   ut_d(bpage->file_page_was_freed = FALSE);
 }
@@ -4707,8 +4731,17 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
   if (io_type == BUF_IO_READ) {
     page_no_t read_page_no;
     space_id_t read_space_id;
+    uint key_version = 0;
     byte *frame;
     bool compressed_page;
+
+    fil_space_t* space = fil_space_acquire_for_io(
+      bpage->id.space());
+    if (!space) {
+      return DB_TABLESPACE_DELETED;
+    }
+
+    dberr_t>err = DB_SUCCESS;
 
     if (bpage->size.is_compressed()) {
       frame = bpage->zip.data;
@@ -4717,6 +4750,7 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
         os_atomic_decrement_ulint(&buf_pool->n_pend_unzip, 1);
 
         compressed_page = false;
+        err = DB_PAGE_CORRUPTED;
         goto corrupt;
       }
       os_atomic_decrement_ulint(&buf_pool->n_pend_unzip, 1);
@@ -4730,6 +4764,8 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
     should be the same as in block. */
     read_page_no = mach_read_from_4(frame + FIL_PAGE_OFFSET);
     read_space_id = mach_read_from_4(frame + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+    key_version = mach_read_from_4(
+      frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
 
     if (bpage->id.space() == TRX_SYS_SPACE &&
         buf_dblwr_page_inside(bpage->id.page_no())) {
@@ -4770,15 +4806,22 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
 
       /* From version 3.23.38 up we store the page checksum
       to the 4 first bytes of the page end lsn field */
-      bool is_corrupted;
       {
         BlockReporter reporter =
             BlockReporter(true, frame, bpage->size,
                           fsp_is_checksum_disabled(bpage->id.space()));
-        is_corrupted = reporter.is_corrupted();
+        err = reporter.is_corrupted_or_encrypted();
       }
 
-      if (compressed_page || is_corrupted) {
+      if (compressed_page || err != DB_SUCCESS) {
+        // Here bpage should not be encrypted. If it is still encrypted it means
+        // that decryption failed and whole space is not readable
+        if (bpage->encrypted) {
+          ib::error() << "Page is still encrypted - which means decryption failed. "
+                         "Marking whole space as encrypted";
+          fil_space_set_encrypted(bpage->id.space());
+        }
+
         /* Not a real corruption if it was triggered by
         error injection */
         DBUG_EXECUTE_IF("buf_page_import_corrupt_failure",
@@ -4787,7 +4830,7 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
       corrupt:
         /* Compressed pages are basically gibberish avoid
         printing the contents. */
-        if (!compressed_page) {
+        if (!compressed_page && err == DB_PAGE_CORRUPTED) {
           ib::error(ER_IB_MSG_81)
               << "Database page corruption on disk"
                  " or a failed file read of page "
@@ -4832,7 +4875,8 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
           so we will mark it later in upper layer */
 
           buf_read_page_handle_error(bpage);
-          return (false);
+          fil_space_release_for_io(space);
+          return(err);
         }
       }
     }
@@ -4857,6 +4901,19 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
       if (UNIV_UNLIKELY(bpage->is_corrupt && srv_pass_corrupt_table)) {
         block = nullptr;
         update_ibuf_bitmap = false;
+      } else if (UNIV_UNLIKELY(bpage->encrypted)) {
+        ib::warn()
+        << "Table in tablespace "
+        << bpage->id.space()
+        << " encrypted. However key "
+           "management plugin or used "
+        << "key_version " << key_version
+        << "is not found or"
+           " used encryption algorithm or method does not match."
+           " Can't continue opening the table.";
+
+        block = reinterpret_cast<buf_block_t *>(bpage);
+        update_ibuf_bitmap = true;
       } else {
         block = reinterpret_cast<buf_block_t *>(bpage);
         update_ibuf_bitmap = true;
@@ -4864,6 +4921,7 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
       ibuf_merge_or_delete_for_page(block, bpage->id, &bpage->size,
                                     update_ibuf_bitmap);
     }
+    fil_space_release_for_io(space);
   }
 
   mutex_enter(&buf_pool->LRU_list_mutex);
@@ -4966,7 +5024,7 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
                         io_type == BUF_IO_READ ? "read" : "wrote",
                         bpage->id.space(), bpage->id.page_no()));
 
-  return (true);
+  return DB_SUCCESS;
 }
 
 /** Asserts that all file pages in the buffer are in a replaceable state.

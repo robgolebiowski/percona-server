@@ -1711,6 +1711,14 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
     mem_heap_empty(row_heap);
 
+    /* Do not continue if table pages are still encrypted */
+    if (!old_table->is_readable() ||
+        !new_table->is_readable()) {
+      err = DB_DECRYPTION_FAILED;
+      trx->error_key_num = 0;
+      goto func_exit;
+    }
+
     page_cur_move_to_next(cur);
 
     stage->n_pk_recs_inc();
@@ -3496,10 +3504,14 @@ dict_index_t *row_merge_create_index(trx_t *trx, dict_table_t *table,
   index->is_ngram = index_def->is_ngram;
   index->has_new_v_col = has_new_v_col;
 
-  /* Note the id of the transaction that created this
-  index, we use it to restrict readers from accessing
-  this index, to ensure read consistency. */
-  ut_ad(index->trx_id == trx->id);
+	/* Update SYS_TABLESPACES and SYS_DATAFILES if the old table being
+	renamed is a single-table tablespace, which must be implicitly
+	renamed along with the table. */
+	if (err == DB_SUCCESS
+	    && dict_table_is_file_per_table(old_table)
+	    && !old_table->ibd_file_missing) {
+		/* Make pathname to update SYS_DATAFILES. */
+		char* tmp_path = row_make_new_pathname(old_table, tmp_name);
 
   index->table->def_trx_id = trx->id;
 
@@ -3692,6 +3704,15 @@ dberr_t row_merge_build_indexes(
   /* Reset the MySQL row buffer that is used when reporting
   duplicate keys. */
   innobase_rec_reset(table);
+
+  if (!old_table->is_readable() ||
+      !new_table->is_readable()) {
+    error = DB_DECRYPTION_FAILED;
+    ib::warn() << "Table %s is encrypted but encryption service or"
+                  " used key_id is not available. "
+                  " Can't continue reading table.";
+    goto func_exit;
+  }
 
   /* Read clustered index of the table and create files for
   secondary index entries for merge sort */

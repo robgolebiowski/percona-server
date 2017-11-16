@@ -2625,6 +2625,11 @@ void HA_CREATE_INFO::init_create_options_from_share(const TABLE_SHARE *share,
     DBUG_ASSERT(!encrypt_type.str);
     encrypt_type = share->encrypt_type;
   }
+
+  if (!(used_fields & HA_CREATE_USED_ENCRYPTION_KEY_ID)) {
+    create_info->encryption_key_id= table->s->encryption_key_id;
+    create_info->was_encryption_key_id_set= table->s->was_encryption_key_id_set;
+  }
 }
 
 /****************************************************************************

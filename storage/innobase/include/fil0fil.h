@@ -1771,4 +1771,8 @@ void fil_space_update_name(fil_space_t *space, const char *name);
 @param space_id	space id */
 void fil_space_set_corrupt(space_id_t space_id);
 
+// TODO: Check if can get encryption threads start without this
+void fil_system_acquire();
+void fil_system_release();
+
 #endif /* fil0fil_h */
