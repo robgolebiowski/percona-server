@@ -333,12 +333,33 @@ fsp_header_decode_encryption_info(
 	byte*		iv,
 	byte*		encryption_info);
 
+/*
+bool
+fsp_header_decode_encryption_info(
+	byte*		key,
+	byte*		iv,
+	uint8_t		*type,
+	ulint*		key_version,
+	byte*		encryption_info);*/
+
+
 /** Reads the encryption key from the first page of a tablespace.
 @param[in]	fsp_flags	tablespace flags
 @param[in/out]	key		tablespace key
 @param[in/out]	iv		tablespace iv
 @param[in]	page	first page of a tablespace
 @return true if success */
+/*
+bool
+fsp_header_get_encryption_key(
+	ulint		fsp_flags,
+	byte*		key,
+	byte*		iv,
+	page_t*		page,
+	uint8_t *type,
+	ulint*		key_version = NULL,
+	fil_encryption_t *encryption = NULL);*/
+
 bool
 fsp_header_get_encryption_key(
 	ulint		fsp_flags,
