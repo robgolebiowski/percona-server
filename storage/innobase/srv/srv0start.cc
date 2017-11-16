@@ -60,6 +60,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "data0type.h"
 #include "dict0dict.h"
 #include "fil0fil.h"
+#include "fil0crypt.h"
 #include "fsp0fsp.h"
 #include "fsp0sysspace.h"
 #include "ha_prototypes.h"
@@ -197,6 +198,8 @@ mysql_pfs_key_t srv_log_tracking_thread_key;
 mysql_pfs_key_t srv_worker_thread_key;
 mysql_pfs_key_t trx_recovery_rollback_thread_key;
 #endif /* UNIV_PFS_THREAD */
+
+int unlock_keyrings(THD *thd);
 
 #ifdef HAVE_PSI_STAGE_INTERFACE
 /** Array of all InnoDB stage events for monitoring activities via
@@ -385,7 +388,7 @@ static dberr_t create_log_files(char *logfilename, size_t dirnamelen, lsn_t lsn,
 
   fil_space_t *log_space = fil_space_create(
       "innodb_redo_log", dict_sys_t::s_log_space_first_id,
-      fsp_flags_set_page_size(0, univ_page_size), FIL_TYPE_LOG);
+      fsp_flags_set_page_size(0, univ_page_size), FIL_TYPE_LOG, nullptr);
 
   ut_ad(fil_validate());
   ut_a(log_space != nullptr);
@@ -805,7 +808,7 @@ static dberr_t srv_undo_tablespace_open(space_id_t space_id) {
     /* Load the tablespace into InnoDB's internal data structures.
     Set the compressed page size to 0 (non-compressed) */
     flags = fsp_flags_init(univ_page_size, false, false, false, false);
-    space = fil_space_create(undo_name, space_id, flags, FIL_TYPE_TABLESPACE);
+    space = fil_space_create(undo_name, space_id, flags, FIL_TYPE_TABLESPACE, nullptr);
 
     ut_a(space != nullptr);
     ut_ad(fil_validate());
@@ -1482,6 +1485,10 @@ void srv_shutdown_all_bg_threads() {
         /* d. Wakeup purge threads. */
         srv_purge_wakeup();
       }
+
+      if (srv_n_fil_crypt_threads_started) {
+        os_event_set(fil_crypt_threads_event);
+      }
     }
 
     if (srv_start_state_is_set(SRV_START_STATE_IO)) {
@@ -2110,7 +2117,8 @@ dberr_t srv_start(bool create_new_db, const std::string &scan_directories) {
     /* Disable the doublewrite buffer for log files. */
     fil_space_t *log_space = fil_space_create(
         "innodb_redo_log", dict_sys_t::s_log_space_first_id,
-        fsp_flags_set_page_size(0, univ_page_size), FIL_TYPE_LOG);
+        fsp_flags_set_page_size(0, univ_page_size), FIL_TYPE_LOG,
+        NULL /* no encryption yet */);
 
     ut_ad(fil_validate());
     ut_a(log_space != nullptr);
@@ -2811,6 +2819,10 @@ void srv_start_threads(bool bootstrap) {
   /* Create the thread that will optimize the FTS sub-system. */
   fts_optimize_init();
 
+  fil_system_acquire();
+  fil_crypt_threads_init();
+  fil_system_release();
+
   srv_start_state_set(SRV_START_STATE_STAT);
 }
 
@@ -2926,7 +2938,11 @@ void srv_pre_dd_shutdown() {
 
   if (srv_start_state_is_set(SRV_START_STATE_STAT)) {
     dict_stats_thread_deinit();
+    /* Shutdown key rotation threads */
+    fil_crypt_threads_cleanup();
   }
+
+  unlock_keyrings(NULL);
 
   srv_is_being_shutdown = true;
 }

@@ -5407,6 +5407,19 @@ void dict_set_corrupted(dict_index_t *index) {
   }
 }
 
+/** Flags a table with specified space_id encrypted in the data dictionary
+cache
+@param[in] space_id Tablespace id */
+void
+dict_table_set_encrypted_by_space(ulint space_id) {
+  dict_table_t*   table;
+
+  table = dict_find_single_table_by_space(space_id);
+
+  if (table)
+    table->set_file_unreadable();
+}
+
 #ifndef UNIV_HOTBACKUP
 /** Write the dirty persistent dynamic metadata for a table to
 DD TABLE BUFFER table. This is the low level function to write back.
@@ -5620,6 +5633,7 @@ void dict_table_set_corrupt_by_space(space_id_t space_id,
   while (table) {
     if (table->space == space_id) {
       table->is_corrupt = true;
+      table->file_unreadable = true;
       found = true;
     }
 

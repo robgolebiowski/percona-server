@@ -1778,4 +1778,8 @@ This is used only at startup to fix the empty UUIDs.
 @param[in]	space_ids	vector of space_ids
 @return true on success, false on failure */
 bool fil_encryption_rotate_global(const space_id_vec &space_ids);
+
+// TODO: Check if can get encryption threads start without this
+void fil_system_acquire();
+void fil_system_release();
 #endif /* fil0fil_h */

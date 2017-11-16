@@ -886,7 +886,7 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
 
     no_tablespace = false;
 
-  } else if (ib_table->ibd_file_missing) {
+  } else if (ib_table->file_unreadable) {
     ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_TABLESPACE_MISSING, norm_name);
 
     /* This means we have no idea what happened to the tablespace
@@ -1051,7 +1051,7 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
   stats.block_size = UNIV_PAGE_SIZE;
 
   /* Only if the table has an AUTOINC column. */
-  if (m_prebuilt->table != NULL && !m_prebuilt->table->ibd_file_missing &&
+  if (m_prebuilt->table != NULL && !m_prebuilt->table->file_unreadable &&
       table->found_next_number_field != NULL) {
     int error;
 
