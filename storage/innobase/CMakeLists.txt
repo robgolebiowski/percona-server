@@ -17,6 +17,8 @@
 
 INCLUDE(innodb.cmake)
 
+#ADD_DEFINITIONS(-DUNIV_ENCRYPT_DEBUG)
+
 SET(INNOBASE_SOURCES
 	api/api0api.cc
 	api/api0misc.cc
@@ -45,6 +47,7 @@ SET(INNOBASE_SOURCES
 	eval/eval0eval.cc
 	eval/eval0proc.cc
 	fil/fil0fil.cc
+	fil/fil0crypt.cc
 	fsp/fsp0fsp.cc
 	fsp/fsp0file.cc
 	fsp/fsp0space.cc

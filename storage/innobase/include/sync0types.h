@@ -28,6 +28,7 @@ Created 9/5/1995 Heikki Tuuri
 
 #include <vector>
 #include <iostream>
+#include <set>
 
 #include "ut0new.h"
 #include "ut0counter.h"
@@ -397,6 +398,10 @@ enum latch_id_t {
 	LATCH_ID_BUF_CHUNK_MAP_LATCH,
 	LATCH_ID_SYNC_DEBUG_MUTEX,
 	LATCH_ID_MASTER_KEY_ID_MUTEX,
+	LATCH_ID_FIL_CRYPT_MUTEX,
+	LATCH_ID_FIL_CRYPT_STAT_MUTEX,
+	LATCH_ID_FIL_CRYPT_DATA_MUTEX,
+	LATCH_ID_FIL_CRYPT_THREADS_MUTEX,
 	LATCH_ID_TEST_MUTEX,
 	LATCH_ID_MAX = LATCH_ID_TEST_MUTEX
 };
@@ -604,6 +609,13 @@ public:
 
 			Count*	count = *it;
 
+                        static std::set<size_t> pointers;
+                        if (pointers.count((size_t)count) == 1)
+                         ut_ad(false); 
+                        pointers.insert((size_t)count);
+
+                        //std::err << "Deleting latch: " << count-> << std::endl;
+	                //`ut_ad(id == latch_meta[id]->get_id());
 			UT_DELETE(count);
 		}
 	}

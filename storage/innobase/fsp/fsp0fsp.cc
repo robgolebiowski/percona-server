@@ -36,6 +36,7 @@ Created 11/29/1995 Heikki Tuuri
 #else /* UNIV_HOTBACKUP */
 #include "buf0buf.h"
 #include "fil0fil.h"
+#include "fil0crypt.h"
 #include "mtr0log.h"
 #include "ut0byte.h"
 #include "page0page.h"
@@ -231,6 +232,7 @@ fsp_flags_is_valid(
 	bool	has_data_dir = FSP_FLAGS_HAS_DATA_DIR(flags);
 	bool	is_shared = FSP_FLAGS_GET_SHARED(flags);
 	bool	is_temp = FSP_FLAGS_GET_TEMPORARY(flags);
+        //bool    is_rotated_keys = FSP_FLAGS_GET_ROTATED_KEYS(flags);
 
 	ulint	unused = FSP_FLAGS_GET_UNUSED(flags);
 
@@ -253,7 +255,7 @@ fsp_flags_is_valid(
 	}
 
 	/* Make sure there are no bits that we do not know about. */
-	if (unused != 0) {
+	if (unused != 0 ) {
 		return(false);
 	}
 
@@ -276,6 +278,10 @@ fsp_flags_is_valid(
 	if (has_data_dir && (is_shared || is_temp)) {
 		return(false);
 	}
+
+        //if (is_rotated_keys && !is_encryption) {
+                //return(false);
+        //}
 
 #if UNIV_FORMAT_MAX != UNIV_FORMAT_B
 # error UNIV_FORMAT_MAX != UNIV_FORMAT_B, Add more validations.
@@ -899,6 +905,7 @@ fsp_header_fill_encryption_info(
 	const byte*		data;
 	ulint			i;
 #endif
+        ib::error() << "Robert: Filling encryption info for space id = " << space->id << " name = " << space->name;
 
 	/* Get master key from key ring */
 	Encryption::get_master_key(&master_key_id, &master_key, &version);
@@ -1157,7 +1164,15 @@ fsp_header_init(
 
 	/* For encryption tablespace, we need to save the encryption
 	info to the page 0. */
-	if (FSP_FLAGS_GET_ENCRYPTION(space->flags)) {
+	if (FSP_FLAGS_GET_ENCRYPTION(space->flags) &&
+            !space->crypt_data) {
+
+                if (space_id == 23)
+                {
+                  int x = 1;
+                  (void)x;
+                }
+
 		ulint	offset = fsp_header_get_encryption_offset(page_size);
 		byte	encryption_info[ENCRYPTION_INFO_SIZE_V2];
 
@@ -1177,6 +1192,21 @@ fsp_header_init(
 				  ENCRYPTION_INFO_SIZE_V2,
 				  mtr);
 	}
+
+        if (space->crypt_data)
+        {
+          DBUG_ASSERT(FSP_FLAGS_GET_ENCRYPTION(space->flags) ||
+                      space->crypt_data->encryption == FIL_ENCRYPTION_OFF ||
+                      (space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && !srv_encrypt_tables)); // Force no encryption
+          /* Write encryption metadata to page 0 if tablespace is
+	  encrypted or encryption is disabled by table option. */
+	  if (space->crypt_data &&
+	    (space->crypt_data->should_encrypt() ||
+	     space->crypt_data->not_encrypted())) {
+		space->crypt_data->write_page0(space, page, mtr, space->crypt_data->min_key_version, space->crypt_data->type,
+                                                                 space->crypt_data->encryption_rotation);
+	  }
+        }
 
 	if (space_id == srv_sys_space.space_id()) {
 		if (btr_create(DICT_CLUSTERED | DICT_IBUF,

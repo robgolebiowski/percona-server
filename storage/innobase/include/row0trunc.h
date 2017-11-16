@@ -357,6 +357,12 @@ private:
 	/** Log file name. */
 	char*			m_log_file_name;
 
+        //TODO:Robert:TO JEST POTRZEBNE BO REDO LOG MOZE COFNAC TRUNCATE'A i trzeba umiec odczytac tabele
+	/** Encryption information of the table */
+	fil_encryption_t	m_encryption; 
+                                             
+        uint32_t m_encryption_key_id;
+
 	/** Vector of tables to truncate. */
 	typedef	std::vector<truncate_t*, ut_allocator<truncate_t*> >
 		tables_t;

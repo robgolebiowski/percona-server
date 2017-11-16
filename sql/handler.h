@@ -603,6 +603,8 @@ class st_alter_tablespace : public Sql_alloc
   enum tablespace_access_mode ts_access_mode;
   bool encrypt;
   LEX_STRING encrypt_type;
+  uint32_t encryption_key_id;
+  bool was_encryption_key_id_set;
   bool is_tablespace_command()
   {
     return ts_cmd_type == CREATE_TABLESPACE      ||
@@ -635,6 +637,8 @@ class st_alter_tablespace : public Sql_alloc
     ts_access_mode= TS_NOT_DEFINED;
     encrypt= false;
     encrypt_type = LEX_STRING();
+    encryption_key_id = 0; // Change to default?
+    was_encryption_key_id_set= false;
   }
 };
 
@@ -1061,6 +1065,14 @@ struct handlerton
   */
   bool (*rotate_encryption_master_key)(void);
 
+  struct KeyringEncryptionVariables
+  {
+    bool global_encrypt_tables;
+    uint session_default_encryption_key_id; 
+  };
+
+  KeyringEncryptionVariables (*get_keyring_encryption_variables)(THD *thd);
+
   /**
     Creates a new compression dictionary with the specified data for this SE.
 
@@ -1224,6 +1236,8 @@ typedef struct st_ha_create_information
   and ignored by the Server layer. */
 
   LEX_STRING encrypt_type;
+  uint32_t encryption_key_id;
+  bool was_encryption_key_id_set;
 
   const char *data_file_name, *index_file_name;
   const char *alias;

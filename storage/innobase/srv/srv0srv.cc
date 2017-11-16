@@ -76,6 +76,7 @@ Created 10/8/1995 Heikki Tuuri
 #include "ut0mem.h"
 #include "handler.h"
 #include "ha_innodb.h"
+#include "fil0crypt.h"
 
 
 #ifndef UNIV_PFS_THREAD
@@ -1584,6 +1585,7 @@ srv_export_innodb_status(void)
 	ulint			LRU_len;
 	ulint			free_len;
 	ulint			flush_list_len;
+        fil_crypt_stat_t	crypt_stat;
 	ulint			mem_adaptive_hash, mem_dictionary;
 	ReadView*		oldest_view;
 	ulint			i;
@@ -1591,6 +1593,11 @@ srv_export_innodb_status(void)
 	buf_get_total_stat(&stat);
 	buf_get_total_list_len(&LRU_len, &free_len, &flush_list_len);
 	buf_get_total_list_size_in_bytes(&buf_pools_list_size);
+	if (!srv_read_only_mode) {
+		fil_crypt_total_stat(&crypt_stat);
+                //TODO:Robert temporary disabled
+		//btr_scrub_total_stat(&scrub_stat);
+	}
 
 	os_rmb;
 	mem_adaptive_hash
@@ -1741,6 +1748,7 @@ srv_export_innodb_status(void)
 	export_vars.innodb_pages_created = stat.n_pages_created;
 
 	export_vars.innodb_pages_read = stat.n_pages_read;
+	export_vars.innodb_page0_read = srv_stats.page0_read;
 
 	export_vars.innodb_pages_written = stat.n_pages_written;
 
@@ -1778,6 +1786,9 @@ srv_export_innodb_status(void)
 		srv_truncated_status_writes;
 
 	export_vars.innodb_available_undo_logs = srv_available_undo_logs;
+
+        export_vars.innodb_pages_decrypted = srv_stats.pages_decrypted;
+	export_vars.innodb_pages_encrypted = srv_stats.pages_encrypted;
 
 	export_vars.innodb_n_merge_blocks_encrypted =
 		srv_stats.n_merge_blocks_encrypted;
@@ -1833,6 +1844,23 @@ srv_export_innodb_status(void)
 	thd_get_fragmentation_stats(current_thd,
 		&export_vars.innodb_fragmentation_stats);
 
+	if (!srv_read_only_mode) {
+	export_vars.innodb_encryption_rotation_pages_read_from_cache =
+		crypt_stat.pages_read_from_cache;
+	export_vars.innodb_encryption_rotation_pages_read_from_disk =
+		crypt_stat.pages_read_from_disk;
+	export_vars.innodb_encryption_rotation_pages_modified =
+		crypt_stat.pages_modified;
+	export_vars.innodb_encryption_rotation_pages_flushed =
+		crypt_stat.pages_flushed;
+	export_vars.innodb_encryption_rotation_estimated_iops =
+		crypt_stat.estimated_iops;
+	export_vars.innodb_encryption_key_requests =
+		srv_stats.n_key_requests;
+	export_vars.innodb_key_rotation_list_length =
+		srv_stats.key_rotation_list_length;
+        }
+
 	mutex_exit(&srv_innodb_monitor_mutex);
 }
 
@@ -1870,7 +1898,8 @@ DECLARE_THREAD(srv_monitor_thread)(
 #ifdef UNIV_PFS_THREAD
 	pfs_register_thread(srv_monitor_thread_key);
 #endif /* UNIV_PFS_THREAD */
-	srv_monitor_active = TRUE;
+        //TODO:Robert: Changed by me
+	//srv_monitor_active = TRUE;
 
 	UT_NOT_USED(arg);
 	srv_last_monitor_time = last_monitor_time = ut_time();
@@ -1991,7 +2020,7 @@ DECLARE_THREAD(srv_error_monitor_thread)(
 #ifdef UNIV_PFS_THREAD
 	pfs_register_thread(srv_error_monitor_thread_key);
 #endif /* UNIV_PFS_THREAD */
-	srv_error_monitor_active = TRUE;
+	//srv_error_monitor_active = TRUE;
 
 loop:
 	/* Try to track a strange bug reported by Harald Fuchs and others,
@@ -2115,41 +2144,41 @@ srv_get_active_thread_type(void)
 Check whether any background thread are active. If so print which thread
 is active. Send the threads wakeup signal.
 @return name of thread that is active or NULL */
-const char*
-srv_any_background_threads_are_active(void)
-/*=======================================*/
-{
-	const char*	thread_active = NULL;
+//const char*
+//srv_any_background_threads_are_active(void)
+//[>=======================================<]
+//{
+	//const char*	thread_active = NULL;
 
-	if (srv_read_only_mode) {
-		if (srv_buf_resize_thread_active) {
-			thread_active = "buf_resize_thread";
-		}
-		os_event_set(srv_buf_resize_event);
-		return(thread_active);
-	} else if (srv_error_monitor_active) {
-		thread_active = "srv_error_monitor_thread";
-	} else if (lock_sys->timeout_thread_active) {
-		thread_active = "srv_lock_timeout thread";
-	} else if (srv_monitor_active) {
-		thread_active = "srv_monitor_thread";
-	} else if (srv_buf_dump_thread_active) {
-		thread_active = "buf_dump_thread";
-	} else if (srv_buf_resize_thread_active) {
-		thread_active = "buf_resize_thread";
-	} else if (srv_dict_stats_thread_active) {
-		thread_active = "dict_stats_thread";
-	}
+	//if (srv_read_only_mode) {
+		//if (srv_buf_resize_thread_active) {
+			//thread_active = "buf_resize_thread";
+		//}
+		//os_event_set(srv_buf_resize_event);
+		//return(thread_active);
+	//} else if (srv_error_monitor_active) {
+		//thread_active = "srv_error_monitor_thread";
+	//} else if (lock_sys->timeout_thread_active) {
+		//thread_active = "srv_lock_timeout thread";
+	//} else if (srv_monitor_active) {
+		//thread_active = "srv_monitor_thread";
+	//} else if (srv_buf_dump_thread_active) {
+		//thread_active = "buf_dump_thread";
+	//} else if (srv_buf_resize_thread_active) {
+		//thread_active = "buf_resize_thread";
+	//} else if (srv_dict_stats_thread_active) {
+		//thread_active = "dict_stats_thread";
+	//}
 
-	os_event_set(srv_error_event);
-	os_event_set(srv_monitor_event);
-	os_event_set(srv_buf_dump_event);
-	os_event_set(lock_sys->timeout_event);
-	os_event_set(dict_stats_event);
-	os_event_set(srv_buf_resize_event);
+	//os_event_set(srv_error_event);
+	//os_event_set(srv_monitor_event);
+	//os_event_set(srv_buf_dump_event);
+	//os_event_set(lock_sys->timeout_event);
+	//os_event_set(dict_stats_event);
+	//os_event_set(srv_buf_resize_event);
 
-	return(thread_active);
-}
+	//return(thread_active);
+//}
 
 /******************************************************************//**
 A thread which follows the redo log and outputs the changed page bitmap.

@@ -1003,6 +1003,7 @@ dict_tf_to_fsp_flags(
 	ulint	table_flags,
 	bool	is_temp,
 	bool	is_encrypted = false)
+        //bool    is_rotated_keys = false)
 	MY_ATTRIBUTE((const));
 
 /** Extract the page size from table flags.
@@ -1873,6 +1874,13 @@ ibool
 dict_set_corrupted_by_space(
 /*========================*/
 	ulint		space_id);	/*!< in: space ID */
+
+/** Flag a table with specified space_id encrypted in the data dictionary
+cache
+@param[in]	space_id	Tablespace id */
+void
+dict_set_encrypted_by_space(
+	ulint	space_id);
 
 /** Sets merge_threshold in the SYS_INDEXES
 @param[in,out]	index		index

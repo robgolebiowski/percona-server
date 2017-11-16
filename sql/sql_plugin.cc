@@ -1042,7 +1042,11 @@ static void plugin_deinitialize(st_plugin_int *plugin, bool ref_check)
     deinitialization to deadlock if plugins have worker threads
     with plugin locks
   */
+
   mysql_mutex_assert_not_owner(&LOCK_plugin);
+
+
+  sql_print_error("0. Deinitializing plugin: '%s'", plugin->name.str);
 
   if (plugin->plugin->status_vars)
   {
@@ -1056,10 +1060,13 @@ static void plugin_deinitialize(st_plugin_int *plugin, bool ref_check)
       sql_print_error("Plugin '%s' of type %s failed deinitialization",
                       plugin->name.str, plugin_type_names[plugin->plugin->type].str);
     }
+    sql_print_error("1. Deinitializing plugin: '%s'", plugin->name.str);
   }
   else if (plugin->plugin->deinit)
   {
     DBUG_PRINT("info", ("Deinitializing plugin: '%s'", plugin->name.str));
+    //TODO:Robert - remove
+    sql_print_error("2. Deinitializing plugin: '%s'", plugin->name.str);
     if (plugin->plugin->deinit(plugin))
     {
       DBUG_PRINT("warning", ("Plugin '%s' deinit function returned error.",
@@ -1126,15 +1133,40 @@ static void reap_plugins(void)
     }
   }
 
+  //for (size_t idx= 0; idx < count; idx++)
+  //{
+    //plugin= plugin_array->at(idx);
+    //if (plugin->state == PLUGIN_IS_DELETED && !plugin->ref_count && plugin->plugin->type == MYSQL_KEYRING_PLUGIN)
+    //{
+      //[> change the status flag to prevent reaping by another thread <]
+      //plugin->state= PLUGIN_IS_DYING;
+      //*(reap++)= plugin;
+    //}
+  //}
+
   mysql_mutex_unlock(&LOCK_plugin);
 
   list= reap;
   while ((plugin= *(--list)))
   {
-    if (!opt_bootstrap)
-      sql_print_information("Shutting down plugin '%s'", plugin->name.str);
-    plugin_deinitialize(plugin, true);
+    //if (plugin->plugin->type != MYSQL_KEYRING_PLUGIN)
+    //{
+      if (!opt_bootstrap)
+        sql_print_information("Shutting down plugin '%s'", plugin->name.str);
+      plugin_deinitialize(plugin, true);
+    //}
   }
+
+  //list= reap;
+  //while ((plugin= *(--list)))
+  //{
+    //if (plugin->state != PLUGIN_IS_UNINITIALIZED)
+    //{
+      //if (!opt_bootstrap)
+        //sql_print_information("Shutting down plugin '%s'", plugin->name.str);
+      //plugin_deinitialize(plugin, true);
+    //}
+  //}
 
   mysql_mutex_lock(&LOCK_plugin_delete);
   mysql_mutex_lock(&LOCK_plugin);
@@ -1821,6 +1853,7 @@ static void plugin_load(MEM_ROOT *tmp_root, int *argc, char **argv)
       mysql_mutex_unlock(&LOCK_plugin);
     mysql_rwlock_unlock(&LOCK_system_variables_hash);
     free_root(tmp_root, MYF(MY_MARK_BLOCKS_FREE));
+    mysql_mutex_unlock(&LOCK_plugin);
   }
   if (error > 0)
     sql_print_error(ER(ER_GET_ERRNO), my_errno);
@@ -2020,7 +2053,11 @@ void plugin_shutdown(void)
 	{
 		skip_binlog = false;
 
-	} else if (plugin->state == PLUGIN_IS_READY)
+	} else if (plugin->state == PLUGIN_IS_READY && plugin->plugin->type != MYSQL_KEYRING_PLUGIN)
+        {
+          plugin->state= PLUGIN_IS_DELETED;
+          reap_needed= true;
+        } else if (plugin_array->size() == 1)
         {
           plugin->state= PLUGIN_IS_DELETED;
           reap_needed= true;
@@ -2063,8 +2100,14 @@ void plugin_shutdown(void)
           We are forcing deinit on plugins so we don't want to do a ref_count
           check until we have processed all the plugins.
         */
-        plugin_deinitialize(plugins[i], false);
+        //if (plugins[i]->plugin->type != MYSQL_KEYRING_PLUGIN)
+          plugin_deinitialize(plugins[i], false);
       }
+
+      //for (i= 0; i < count; i++)
+        //if (!(plugins[i]->state & (PLUGIN_IS_UNINITIALIZED | PLUGIN_IS_FREED |
+                                   //PLUGIN_IS_DISABLED)))
+          //plugin_deinitialize(plugins[i], false);
 
     /*
       It's perfectly safe not to lock LOCK_plugin, LOCK_plugin_delete, as
@@ -2442,6 +2485,16 @@ static bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
              "Plugin is busy, it cannot be uninstalled. To force a"
              " stop run STOP GROUP_REPLICATION and then UNINSTALL"
              " PLUGIN group_replication.");
+    goto err;
+  }
+
+  if (plugin->ref_count && plugin->plugin->type == MYSQL_KEYRING_PLUGIN)
+  {
+    mysql_mutex_unlock(&LOCK_plugin);
+    
+    my_error(ER_PLUGIN_CANNOT_BE_UNINSTALLED, MYF(0), name->str,
+             "Plugin is busy, it cannot be uninstalled. ");
+   //TODO: Add more information why it is busy (srv_treads > 0 or binlog_encryption is ON ?
     goto err;
   }
 #endif

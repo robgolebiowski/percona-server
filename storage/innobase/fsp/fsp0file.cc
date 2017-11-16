@@ -7,7 +7,7 @@ the terms of the GNU General Public License as published by the Free Software
 Foundation; version 2 of the License.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS //TODO:Robert this should not be blocked for ROTATED_KEYS
 FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
@@ -32,9 +32,12 @@ Created 2013-7-26 by Kevin Lewis
 #include "page0page.h"
 #include "srv0start.h"
 #include "ut0new.h"
+#include "fil0crypt.h"
 #ifdef UNIV_HOTBACKUP
 #include "my_sys.h"
 #endif /* UNIV_HOTBACKUP */
+
+
 
 /** Initialize the name, size and order of this datafile
 @param[in]	name	tablespace name, will be copied
@@ -51,6 +54,9 @@ Datafile::init(
 	m_flags = flags;
 	m_encryption_key = NULL;
 	m_encryption_iv = NULL;
+        //if (m_crypt_data != NULL)
+          //fil_space_destroy_crypt_data(&m_crypt_data);
+        //m_crypt_data = NULL;
 }
 
 /** Release the resources. */
@@ -65,6 +71,12 @@ Datafile::shutdown()
 	free_filepath();
 
 	free_first_page();
+        
+        //if (m_crypt_data != NULL)
+        //{
+          //fil_space_destroy_crypt_data(&m_crypt_data);
+          //m_crypt_data = NULL;
+        //}
 
 	if (m_encryption_key != NULL) {
 		ut_free(m_encryption_key);
@@ -386,25 +398,50 @@ in order for this function to validate it.
 @param[in]	for_import	if it is for importing
 @retval DB_SUCCESS if tablespace is valid, DB_ERROR if not.
 m_is_valid is also set true on success, else false. */
-dberr_t
+Datafile::ValidateOutput
 Datafile::validate_to_dd(
 	ulint		space_id,
 	ulint		flags,
 	bool		for_import)
 {
-	dberr_t err;
+        ib::error() << "Validating to dd space_id = " << space_id << '\n';
+	//dberr_t err;
+        ValidateOutput output;
 
 	if (!is_open()) {
-		return DB_ERROR;
+                output.error = DB_ERROR;
+		return output;
 	}
 
 	/* Validate this single-table-tablespace with the data dictionary,
 	but do not compare the DATA_DIR flag, in case the tablespace was
 	remotely located. */
-	err = validate_first_page(0, for_import);
-	if (err != DB_SUCCESS) {
-		return(err);
+	output = validate_first_page(0, for_import);
+	if (output.error != DB_SUCCESS) {
+		return(output);
 	}
+
+        // in case or RK it can so happen that there will be a crash after all pages of tablespace is rotated
+        // and DD is updated, but page0 of the tablespace has not been yet update. We handle this here.
+
+        if (output.encryption_type == ValidateOutput::ROTATED_KEYS &&
+              (
+                (FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_info.rotated_keys_min_key_version == 0) ||
+                (!FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_info.rotated_keys_min_key_version != 0)
+              ) && FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags) 
+           )
+        {
+             ib::warn() << "In file '" << m_filepath << "' (tablespace id = " << m_space_id
+                        << ") encryption flag is " << (FSP_FLAGS_GET_ENCRYPTION(m_flags) ? "ON" : "OFF")
+                        << ". However the encryption flag in the data dictionary is " 
+                        << (FSP_FLAGS_GET_ENCRYPTION(flags) ? "ON" : "OFF")
+                        << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
+                        << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
+                        << " could finish up the rotation.";
+              // exclude encryption flag from validation
+              m_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+              flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+        }
 
 	/* Make sure the datafile we found matched the space ID.
 	If the datafile is a file-per-table tablespace then also match
@@ -414,7 +451,8 @@ Datafile::validate_to_dd(
 	        || (m_flags & ~FSP_FLAGS_MASK_DATA_DIR)
 	            == (flags & ~FSP_FLAGS_MASK_DATA_DIR))) {
 		/* Datafile matches the tablespace expected. */
-		return(DB_SUCCESS);
+                output.error = DB_SUCCESS;
+		return(output);
 	}
 
 	/* else do not use this tablespace. */
@@ -427,7 +465,8 @@ Datafile::validate_to_dd(
 		" using the commands DISCARD TABLESPACE and IMPORT TABLESPACE?"
 		" " << TROUBLESHOOT_DATADICT_MSG;
 
-	return(DB_ERROR);
+        output.error = DB_ERROR;
+	return(output);
 }
 
 /** Validates this datafile for the purpose of recovery.  The file should
@@ -437,17 +476,20 @@ corrupt and needs to be restored from the doublewrite buffer, we will
 reopen it in write mode and ry to restore that page.
 @retval DB_SUCCESS if tablespace is valid, DB_ERROR if not.
 m_is_valid is also set true on success, else false. */
-dberr_t
+Datafile::ValidateOutput
 Datafile::validate_for_recovery()
 {
-	dberr_t err;
+	//dberr_t err;
+        ValidateOutput output;
 
 	ut_ad(is_open());
 	ut_ad(!srv_read_only_mode);
 
-	err = validate_first_page(0, false);
 
-	switch (err) {
+
+	output = validate_first_page(0, false);
+
+	switch (output.error) {
 	case DB_SUCCESS:
 	case DB_TABLESPACE_EXISTS:
 #ifdef UNIV_HOTBACKUP
@@ -457,22 +499,22 @@ Datafile::validate_for_recovery()
 		}
 		/* Free the previously read first page and then re-validate. */
 		free_first_page();
-		err = validate_first_page(0, false);
-		if (err == DB_SUCCESS) {
+		output = validate_first_page(0, false);
+		if (output.error == DB_SUCCESS) {
 			std::string filepath = fil_space_get_first_path(
 				m_space_id);
 			if (is_intermediate_file(filepath.c_str())) {
 				/* Existing intermediate file with same space
 				id is obsolete.*/
 				if (fil_space_free(m_space_id, FALSE)) {
-					err = DB_SUCCESS;
+					output.error = DB_SUCCESS;
 				}
 		} else {
 			filepath.assign(m_filepath);
 			if (is_intermediate_file(filepath.c_str())) {
 				/* New intermediate file with same space id
 				shall be ignored.*/
-				err = DB_TABLESPACE_EXISTS;
+				output.error = DB_TABLESPACE_EXISTS;
 				/* Set all bits of 'flags' as a special
 				indicator for "ignore tablespace". Hopefully
 				InnoDB will never use all bits or at least all
@@ -489,43 +531,43 @@ Datafile::validate_for_recovery()
 		/* For encryption tablespace, we skip the retry step,
 		since it is only because the keyring is not ready. */
 		if (FSP_FLAGS_GET_ENCRYPTION(m_flags)) {
-			return(err);
+			return(output);
 		}
 		/* Re-open the file in read-write mode  Attempt to restore
 		page 0 from doublewrite and read the space ID from a survey
 		of the first few pages. */
 		close();
-		err = open_read_write(srv_read_only_mode);
-		if (err != DB_SUCCESS) {
+		output.error = open_read_write(srv_read_only_mode);
+		if (output.error != DB_SUCCESS) {
 			ib::error() << "Datafile '" << m_filepath << "' could not"
 				" be opened in read-write mode so that the"
 				" doublewrite pages could be restored.";
-			return(err);
+			return(output);
 		};
 
-		err = find_space_id();
-		if (err != DB_SUCCESS || m_space_id == 0) {
+		output.error = find_space_id();
+		if (output.error != DB_SUCCESS || m_space_id == 0) {
 			ib::error() << "Datafile '" << m_filepath << "' is"
 				" corrupted. Cannot determine the space ID from"
 				" the first 64 pages.";
-			return(err);
+			return(output);
 		}
 
-		err = restore_from_doublewrite(0);
-		if (err != DB_SUCCESS) {
-			return(err);
+		output.error = restore_from_doublewrite(0);
+		if (output.error != DB_SUCCESS) {
+			return(output);
 		}
 
 		/* Free the previously read first page and then re-validate. */
 		free_first_page();
-		err = validate_first_page(0, false);
+		output = validate_first_page(0, false);
 	}
 
-	if (err == DB_SUCCESS) {
+	if (output.error == DB_SUCCESS) {
 		set_name(NULL);
 	}
 
-	return(err);
+	return(output);
 }
 
 /** Check the consistency of the first page of a datafile when the
@@ -538,13 +580,14 @@ m_is_valid is set true on success, else false.
 @retval DB_SUCCESS on if the datafile is valid
 @retval DB_CORRUPTION if the datafile is not readable
 @retval DB_TABLESPACE_EXISTS if there is a duplicate space_id */
-dberr_t
+Datafile::ValidateOutput
 Datafile::validate_first_page(lsn_t*	flush_lsn,
 			      bool	for_import)
 {
 	char*		prev_name;
 	char*		prev_filepath;
 	const char*	error_txt = NULL;
+        ValidateOutput  output;
 
 	m_is_valid = true;
 
@@ -562,6 +605,17 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 				m_first_page + FIL_PAGE_FILE_FLUSH_LSN);
 		}
 	}
+
+        ib::error() << "Validating first page of space_id = " << m_space_id << '\n';
+
+        if (m_space_id == 24)
+        {
+          int x = 1;
+          x=2;
+          (void)x;
+        }
+
+
 
 	/* Check if the whole page is blank. */
 	if (error_txt == NULL
@@ -596,8 +650,9 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			<< univ_page_size.logical();
 
 		free_first_page();
+                output.error = DB_ERROR;
 
-		return(DB_ERROR);
+		return(output);
 
 	} else if (page_get_page_no(m_first_page) != 0) {
 
@@ -625,14 +680,57 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 
 		free_first_page();
 
-		return(DB_CORRUPTION);
+                output.error = DB_CORRUPTION;
+		return(output);
 
 	}
+
+                  //crypt_data = first_page
+                          //? fil_space_read_crypt_data(page_size_t(flags),
+                                                      //first_page)
+                          //: NULL;
+ 
+
+
+        //ut_ad(m_crypt_data == NULL);
+        //if (m_crypt_data != NULL)
+          //m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
+          //fil_space_destroy_crypt_data(&m_crypt_data);
+        //m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
+
+        fil_space_crypt_t* crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page);
+
+
+        if (m_space_id == 24)
+        {
+          if (crypt_data)
+            ib::error() << "Table test/t2 has crypt data in validate first page";
+          else 
+            ib::error() << "Table test/t2 has NOT crypt data in validate first page";
+        }
+ 
+        //TODO:Robert: Based on this is_rotated_keys is set - but what about situation if we do not
+        //get here and ValidateOutput::DO_NOT_KNOW is set - will then an error be emited first
+        //and is_rotated_key will not be checked at all ?
+        if(crypt_data)
+        {
+          output.encryption_type = ValidateOutput::ROTATED_KEYS;
+          output.rotated_keys_info.page0_has_crypt_data = true; // TODO: Muszę się zdecydować, albo has_crypt_data, albo ROTATED_KEYS
+          output.rotated_keys_info.rotated_keys_min_key_version = crypt_data->min_key_version;
+          output.rotated_keys_info.type = crypt_data->type;
+        }
+        else if (FSP_FLAGS_GET_ENCRYPTION(m_flags))
+            output.encryption_type = ValidateOutput::MASTER_KEY;
+        else
+          output.encryption_type = ValidateOutput::NONE;
 
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
-	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import) {
+	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import)
+        { 
+            if(crypt_data == NULL)
+            {
 		m_encryption_key = static_cast<byte*>(
 			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 		m_encryption_iv = static_cast<byte*>(
@@ -640,6 +738,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 #ifdef	UNIV_ENCRYPT_DEBUG
                 fprintf(stderr, "Got from file %lu:", m_space_id);
 #endif
+                //TODO:Tutaj jest czytanie m_encryption_key - i tutaj powinieem dodać crypt_data i czytanie m_encryption
 		if (!fsp_header_get_encryption_key(m_flags,
 						   m_encryption_key,
 						   m_encryption_iv,
@@ -657,7 +756,8 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			ut_free(m_encryption_iv);
 			m_encryption_key = NULL;
 			m_encryption_iv = NULL;
-			return(DB_CORRUPTION);
+                        output.error = DB_CORRUPTION;
+			return(output);
 		}
 
 		if (recv_recovery_is_on()
@@ -669,7 +769,45 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			m_encryption_key = NULL;
 			m_encryption_iv = NULL;
 		}
+            }
+
+            // We do not validate if tablespace key exists for ROTATED_KEY here - it will be validated in
+            // ha_innobase::open and appropriate error that key is missing will be produceed
+            
+            else
+            {
+                if (Encryption::tablespace_key_exists(crypt_data->key_id) == false)
+                {
+                   ib::error() << "Table " << m_name << " in file " << m_filename << ' '
+                               << "is encrypted but encryption service or "
+                               << "used key_id " << crypt_data->key_id << " is not available. "
+                               << "Can't continue reading table.";
+                      //"Table %s in file %s is encrypted but encryption service or"
+                      //" used key_id %u is not available. "
+                      //" Can't continue reading table.",
+                      //table_share->table_name.str,
+                      //space()->chain.start->name,
+                      //space()->crypt_data->key_id);
+
+                   //ib::error()
+                     //<< "Cannot find encryption key for tablespace with SPACE ID = " << m_space_id
+                     //<< " please confirm that correct keyring is loaded.";
+
+                   m_is_valid = false;
+                   free_first_page();
+                   fil_space_destroy_crypt_data(&crypt_data);
+                   output.rotated_keys_info.rk_encryption_key_is_missing = true;
+                   output.error = DB_CORRUPTION;
+                   return output;
+                   //return (DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND);
+                }
+            }
 	}
+
+        if (crypt_data != NULL)
+        {
+          fil_space_destroy_crypt_data(&crypt_data);
+        }
 
 	if (fil_space_read_name_and_filepath(
 		m_space_id, &prev_name, &prev_filepath)) {
@@ -677,7 +815,8 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 		if (0 == strcmp(m_filepath, prev_filepath)) {
 			ut_free(prev_name);
 			ut_free(prev_filepath);
-			return(DB_SUCCESS);
+                        output.error = DB_SUCCESS;
+			return(output);
 		}
 
 		/* Make sure the space_id has not already been opened. */
@@ -695,12 +834,18 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 
 		free_first_page();
 
-		return(is_predefined_tablespace(m_space_id)
+                output.error = is_predefined_tablespace(m_space_id)
 		       ? DB_CORRUPTION
-		       : DB_TABLESPACE_EXISTS);
+		       : DB_TABLESPACE_EXISTS;
+
+		//return(is_predefined_tablespace(m_space_id)
+		       //? DB_CORRUPTION
+		       //: DB_TABLESPACE_EXISTS);
+                return output;
 	}
 
-	return(DB_SUCCESS);
+        output.error = DB_SUCCESS;
+	return(output);
 }
 
 /** Determine the space id of the given file descriptor by reading a few

@@ -39,8 +39,10 @@ Created 2011/12/19
 #include "page0zip.h"
 #include "trx0sys.h"
 #include "os0file.h"
+#include "fil0crypt.h"
 
 #ifndef UNIV_HOTBACKUP
+
 
 /** The doublewrite buffer */
 buf_dblwr_t*	buf_dblwr = NULL;
@@ -503,6 +505,13 @@ buf_dblwr_init_or_load_pages(
 		return(err);
 	}
 
+	err = buf_parallel_dblwr_make_path();
+	if (err != DB_SUCCESS) {
+
+		ut_free(unaligned_read_buf);
+		return(err);
+	}
+
 	doublewrite = read_buf + TRX_SYS_DOUBLEWRITE;
 
 	if (mach_read_from_4(doublewrite + TRX_SYS_DOUBLEWRITE_MAGIC)
@@ -622,12 +631,12 @@ buf_dblwr_init_or_load_pages(
 		page += univ_page_size.physical();
 	}
 
-	err = buf_parallel_dblwr_make_path();
-	if (err != DB_SUCCESS) {
+	//err = buf_parallel_dblwr_make_path();
+	//if (err != DB_SUCCESS) {
 
-		ut_free(unaligned_read_buf);
-		return(err);
-	}
+		//ut_free(unaligned_read_buf);
+		//return(err);
+	//}
 
 	ut_ad(parallel_dblwr_buf.file.is_closed());
 	bool success;
@@ -1125,7 +1134,11 @@ buf_dblwr_check_block(
 		return;
 	case FIL_PAGE_TYPE_ALLOCATED:
 		/* empty pages should never be flushed */
-		break;
+                //TODO:Robert w MariaDB tutaj jest return - sprawdz czy jezeli zmienisz w MariaDB na break to sie sypnie`
+                //ut_ad(0);
+                return;
+                //ut_ad(0);
+		//break;
 	}
 
 	buf_dblwr_assert_on_corrupt_block(block);
@@ -1285,6 +1298,28 @@ buf_dblwr_flush_buffered_writes(
 		block = (buf_block_t*)dblwr_shard->buf_block_arr[i];
 
 		page_t*	dblwr_page = write_buf + len2;
+
+
+                //TODO:Temporarily encrypt pages once for writing data into tablespace file and the second time when writing data to double write buffer
+                buf_page_t *bpage = &(((buf_block_t*)dblwr_shard->buf_block_arr[i])->page);
+                //FilSpace space (bpage->id.space()); // this is a guard
+                FilSpace space (TRX_SYS_SPACE); // this is a guard
+                                                // Temporarily encrypt all pages in doulbe write buffer with system's tablespace key
+                
+                //TODO:Those keys will need to be fried somewhere
+                if (space() && space()->crypt_data && space()->crypt_data->should_encrypt() && space()->crypt_data->encrypting_with_key_version != 0) //TODO:Robert Space might be already dropped - one more reason to
+                                                                                             //have encryption earlier
+                {
+                  bpage->encryption_key = space()->crypt_data->get_key_currently_used_for_encryption();
+                  bpage->encryption_key_version = space()->crypt_data->encrypting_with_key_version;
+                  //Encryption::get_latest_tablespace_key(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+                  ////It seems that it can reach here before variable encrypt_tables is validated - which is weird .. -
+                  //if (space()->crypt_data->key_id == 0 && bpage->encryption_key == NULL)
+                    //Encryption::get_latest_tablespace_key_or_create_new_one(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+                  ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
+                  bpage->encrypt = true; //TODO:Robert!: For now double write buffer stays unencrypted!
+                  bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
+                }
 
 		if (buf_block_get_state(block) != BUF_BLOCK_FILE_PAGE
 		    || block->page.zip.data) {
@@ -1542,7 +1577,8 @@ retry:
 		       page_id_t(TRX_SYS_SPACE, offset), univ_page_size, 0,
 		       univ_page_size.physical(),
 		       (void*) ((buf_block_t*) bpage)->frame,
-		       NULL);
+                       bpage);
+		       //NULL);
 	}
 
 	/* Now flush the doublewrite buffer data to disk */

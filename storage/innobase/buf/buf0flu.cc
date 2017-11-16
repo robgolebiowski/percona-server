@@ -53,6 +53,8 @@ Created 11/11/1995 Heikki Tuuri
 #include "fsp0sysspace.h"
 #include "ut0stage.h"
 
+#include "fil0crypt.h"
+
 #ifdef UNIV_LINUX
 /* include defs for CPU time priority settings */
 #include <unistd.h>
@@ -1005,8 +1007,18 @@ buf_flush_write_block_low(
 	buf_flush_t	flush_type,	/*!< in: type of flush */
 	bool		sync)		/*!< in: true if sync IO request */
 {
-	page_t*	frame = NULL;
+	fil_space_t* space = fil_space_acquire_for_io(bpage->id.space());
+	if (!space) {
+		return;
+	}
+        // TODO:Robert: czy to są napewno dobre warunki ? - skopiowane z MariaDB
+	ut_ad(space->purpose == FIL_TYPE_TEMPORARY
+	      || space->purpose == FIL_TYPE_IMPORT
+	      || space->purpose == FIL_TYPE_TABLESPACE);
+	ut_ad((space->purpose == FIL_TYPE_TEMPORARY)
+	      == fsp_is_system_temporary(space->id));
 
+	page_t*	frame = NULL;
 #ifdef UNIV_DEBUG
 	buf_pool_t*	buf_pool = buf_pool_from_bpage(bpage);
 	ut_ad(!mutex_own(&buf_pool->LRU_list_mutex));
@@ -1070,9 +1082,50 @@ buf_flush_write_block_low(
 		break;
 	}
 
+        //fil_io_set_encryption(
+	//IORequest&		req_type,
+	//const page_id_t&	page_id,
+	//fil_space_t*		space)
+
 	/* Disable use of double-write buffer for temporary tablespace.
 	Given the nature and load of temporary tablespace doublewrite buffer
 	adds an overhead during flushing. */
+
+       //fil_space_t* space = fil_space_get(bpage->id.space());
+       ut_ad(space != NULL);
+
+       //if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
+         
+       if (space->crypt_data != NULL && //space->encryption_type == Encryption::ROTATED_KEYS &&
+           space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
+           //(space->crypt_data->encryption == FIL_ENCRYPTION_ON ||
+            //(space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
+       {
+         //space->encryption_type = Encryption::ROTATED_KEYS;
+         ut_ad(space->crypt_data != NULL);// && space->crypt_data->iv[0] != '\0');
+         //Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
+         //Encryption::get_latest_tablespace_key_or_create_new_one(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
+         //Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+         bpage->encryption_key= space->crypt_data->get_key_currently_used_for_encryption();
+         bpage->encryption_key_version= space->crypt_data->encrypting_with_key_version;
+         //ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
+         ut_ad(bpage->encryption_key != NULL);
+         //TODO: Tutaj błąd, jeżeli klucz nie istnieje, albo przy ::decrypt zwrócić DB_IO_DECRYPT_FAILED
+         bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
+         bpage->encrypt= true;
+
+         //ut_ad(fil_page_get_type(reinterpret_cast<const buf_block_t*>(bpage)->frame) != 0);
+       }
+       else
+       {
+         ut_ad(space->crypt_data == NULL || !srv_encrypt_tables || space->crypt_data->encryption == FIL_ENCRYPTION_OFF ||
+               space->crypt_data->encrypting_with_key_version == 0);
+         //if (space->crypt_data != NULL)
+         //{
+           //space->encryption_type = Encryption::ROTATED_KEYS;
+         //}
+         bpage->encrypt= false;
+       }
 
 	if (!srv_use_doublewrite_buf
 	    || buf_dblwr == NULL
@@ -1085,6 +1138,8 @@ buf_flush_write_block_low(
 		ulint	type = IORequest::WRITE | IORequest::DO_NOT_WAKE;
 
 		IORequest	request(type);
+
+                //fil_io_set_encryption(request, bpage->id, space);
 
 		fil_io(request,
 		       sync, bpage->id, bpage->size, 0, bpage->size.physical(),
@@ -1104,10 +1159,17 @@ buf_flush_write_block_low(
 		ut_ad(flush_type == BUF_FLUSH_SINGLE_PAGE);
 		fil_flush(bpage->id.space());
 
+#ifdef UNIV_DEBUG
+		dberr_t err =
+#endif
 		/* true means we want to evict this page from the
 		LRU list as well. */
 		buf_page_io_complete(bpage, true);
+
+                ut_ad(err == DB_SUCCESS);
 	}
+
+        fil_space_release_for_io(space);
 
 	/* Increment the counter of I/O operations used
 	for selecting LRU policy. */
@@ -2178,7 +2240,6 @@ passed back to caller. Ignored if NULL.
 @return true if a batch was queued successfully for each buffer pool
 instance. false if another batch of same type was already running in
 at least one of the buffer pool instance */
-static
 bool
 buf_flush_lists(
 	ulint			min_n,

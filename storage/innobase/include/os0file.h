@@ -44,6 +44,7 @@ Created 10/21/1995 Heikki Tuuri
 #endif /* !_WIN32 */
 #include "page0types.h"
 
+
 /** File node of a tablespace or the log data space */
 struct fil_node_t;
 
@@ -310,6 +311,10 @@ struct Compression {
 	static bool is_none(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
+
+        static bool is_no(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
 	/** Decompress the page data contents. Page type must be
 	FIL_PAGE_COMPRESSED, if not then the source contents are
 	left unchanged and DB_SUCCESS is returned.
@@ -331,6 +336,12 @@ struct Compression {
 	Type		m_type;
 };
 
+static const uint ENCRYPTION_KEY_VERSION_INVALID = (~(uint)0);
+
+static const uint FIL_DEFAULT_ENCRYPTION_KEY = 0;
+
+static const uint ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED = 0;
+
 /** Encryption key length */
 static const ulint ENCRYPTION_KEY_LEN = 32;
 
@@ -345,17 +356,31 @@ static const char ENCRYPTION_KEY_MAGIC_V1[] = "lCA";
 version. */
 static const char ENCRYPTION_KEY_MAGIC_V2[] = "lCB";
 
+static const char ENCRYPTION_KEY_MAGIC_PS_V1[] = "PSA";
+
 /** Encryption master key prifix */
 static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
 
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = 9;
 
+static const char ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC[] = "RK";
+
+static const ulint ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN = 2;
+
+/** Encryption master key prifix */
+//TODO: Change this to percona_innodb_idb
+static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb";
+
+/** Encryption master key prifix size */
+static const ulint ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX_LEN = array_elements(ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX);
+
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_MASTER_KEY_NAME_MAX_LEN = 100;
 
 /** UUID of server instance, it's needed for composing master key name */
 static const ulint ENCRYPTION_SERVER_UUID_LEN = 36;
+
 
 /** Encryption information total size for 5.7.11: magic number + master_key_id +
 key + iv + checksum */
@@ -383,7 +408,16 @@ struct Encryption {
 
 		/** Use AES */
 		AES = 1,
+
+                ROTATED_KEYS = 2
 	};
+
+        enum Encryption_rotation
+        {
+           NO_ROTATION,
+           MASTER_KEY_TO_ROTATED_KEY
+        };
+
 
 	/** Encryption information format version */
 	enum Version {
@@ -396,13 +430,15 @@ struct Encryption {
 	};
 
 	/** Default constructor */
-	Encryption() : m_type(NONE) { };
+	Encryption() : m_type(NONE), m_encryption_rotation(NO_ROTATION) { } //, m_was_page_encrypted_when_read(false) { };
 
 	/** Specific constructor
 	@param[in]	type		Algorithm type */
 	explicit Encryption(Type type)
 		:
-		m_type(type)
+		m_type(type),
+                m_encryption_rotation(NO_ROTATION) 
+                //m_was_page_encrypted_when_read(false)
 	{
 #ifdef UNIV_DEBUG
 		switch (m_type) {
@@ -421,7 +457,13 @@ struct Encryption {
 		m_type(other.m_type),
 		m_key(other.m_key),
 		m_klen(other.m_klen),
-		m_iv(other.m_iv)
+		m_iv(other.m_iv),
+                m_tablespace_iv(other.m_tablespace_iv),
+                m_tablespace_key(other.m_tablespace_key),
+                m_key_version(other.m_key_version),
+		m_key_id(other.m_key_id),
+                m_encryption_rotation(other.m_encryption_rotation)
+                //m_was_page_encrypted_when_read(false)
 	{ };
 
 	/** Check if page is encrypted page or not
@@ -455,19 +497,56 @@ struct Encryption {
 	static bool is_none(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
-	/** Check if the NO algorithm was explicitly specified.
-	@param[in]      algorithm       Encryption algorithm to check
-	@return true if no algorithm explicitly requested */
-	static bool none_explicitly_specified(const char* algorithm)
+        static bool is_master_key_encryption(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
+	static bool is_no(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
+        static bool is_empty(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
+        static bool is_rotated_keys(const char *algoritm)
+		MY_ATTRIBUTE((warn_unused_result));
+//TODO:Robert, to nie jest obecnie używane!
+        static Type string_to_encryption_type(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
 
         /** Generate random encryption value for key and iv.
         @param[in,out]	value	Encryption value */
 	static void random_value(byte* value);
 
+        //TODO:Robert: Czy to powinno być tutaj robione ?
+        static void create_tablespace_key(byte** tablespace_key,
+                                          uint key_id);
+
 	/** Create new master key for key rotation.
         @param[in,out]	master_key	master key */
 	static void create_master_key(byte** master_key);
+
+        static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id);
+
+        static bool tablespace_key_exists(uint key_id);
+
+        static bool is_encrypted_and_compressed(const byte *page);
+
+        static uint encryption_get_latest_version(uint key_id);
+
+       //TODO:Robert: Te dwa są potrzebne.
+        static void get_latest_tablespace_key(uint key_id,
+                           uint *tablespace_key_version,
+			   byte** tablespace_key);
+
+
+        static void get_latest_tablespace_key_or_create_new_one(uint key_id,
+                                                                uint *tablespace_key_version,
+			                                        byte** tablespace_key);
+
+        static bool get_tablespace_key(uint key_id,
+                                       char* srv_uuid,
+                                       uint tablespace_key_version,
+                                       byte** tablespace_key,
+                                       size_t *key_len);
 
         /** Get master key by key id.
         @param[in]	master_key_id	master key id
@@ -484,6 +563,8 @@ struct Encryption {
 	static void get_master_key(ulint* master_key_id,
 				   byte** master_key,
 				   Encryption::Version*  version);
+
+        static bool is_keyring_alive();
 
 	/** Encrypt the page data contents. Page type can't be
 	FIL_PAGE_ENCRYPTED, FIL_PAGE_COMPRESSED_AND_ENCRYPTED,
@@ -538,11 +619,35 @@ struct Encryption {
 	/** Encrypt initial vector */
 	byte*			m_iv;
 
+        // We decide as the last step in decrypt (after reading the page)
+        // when re_encryption_type is MK_TO_RK whether page is 
+        // encrypted with MK or RK => thus we do not know which tablespace_iv we are
+        // going to use RK or MK
+        byte*                   m_tablespace_iv;
+
+        byte*                   m_tablespace_key;
+
+        uint                    m_key_version;
+
+        uint                    m_key_id;
+
+        uint32                  m_checksum;
+
+        //mutable bool            m_was_page_encrypted_when_read;
+
 	/** Current master key id */
 	static ulint		master_key_id;
 
 	/** Current uuid of server instance */
 	static char		uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
+
+        Encryption_rotation     m_encryption_rotation;
+private:
+//TODO: Robert: Is it needed here?
+        static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
+
+        static void get_latest_system_key(const char *system_key_name, byte **key, uint *key_version,
+                                          size_t *key_length);
 };
 
 /** Types for AIO operations @{ */
@@ -552,6 +657,13 @@ struct Encryption {
 #define IORequestWrite		IORequest(IORequest::WRITE)
 #define IORequestLogRead	IORequest(IORequest::LOG | IORequest::READ)
 #define IORequestLogWrite	IORequest(IORequest::LOG | IORequest::WRITE)
+
+struct Zip_compressed_info
+{
+  bool is_zip_compressed;
+
+
+};
 
 /**
 The IO Context that is passed down to the low level IO code */
@@ -608,7 +720,9 @@ public:
 		m_block_size(UNIV_SECTOR_SIZE),
 		m_type(READ),
 		m_compression(),
-		m_encryption()
+		m_encryption(),
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
 	{
 		/* No op */
 	}
@@ -621,7 +735,9 @@ public:
 		m_block_size(UNIV_SECTOR_SIZE),
 		m_type(static_cast<uint16_t>(type)),
 		m_compression(),
-		m_encryption()
+		m_encryption(),
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
 	{
 		if (is_log()) {
 			disable_compression();
@@ -784,6 +900,27 @@ public:
 		return(compression_algorithm().m_type != Compression::NONE);
 	}
 
+        void mark_page_zip_compressed()
+        {
+          m_is_page_zip_compressed = true;
+        }
+
+        bool is_page_zip_compressed() const
+                MY_ATTRIBUTE((warn_unused_result))
+        {
+           return m_is_page_zip_compressed; 
+        }
+        
+        ulint get_zip_page_physical_size() const
+        {
+          return m_zip_page_physical_size;
+        }
+
+        void set_zip_page_physical_size(ulint zip_page_physical_size)
+        {
+          m_zip_page_physical_size = zip_page_physical_size;
+        }
+
 	/** @return true if the page read should not be transformed. */
 	bool is_compression_enabled() const
 		MY_ATTRIBUTE((warn_unused_result))
@@ -826,12 +963,26 @@ public:
 	@param[in] iv		The encryption iv to use */
 	void encryption_key(byte* key,
 			    ulint key_len,
-			    byte* iv)
+			    byte* iv,
+                            uint key_version,
+                            uint key_id,
+                            byte *tablespace_iv,
+                            byte *tablespace_key)
 	{
+                //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
 		m_encryption.m_key = key;
 		m_encryption.m_klen = key_len;
 		m_encryption.m_iv = iv;
+                m_encryption.m_key_version = key_version;
+                m_encryption.m_key_id = key_id;
+                m_encryption.m_tablespace_iv = tablespace_iv;
+                m_encryption.m_tablespace_key = tablespace_key;
 	}
+
+        void encryption_rotation(Encryption::Encryption_rotation encryption_rotation)
+        {
+          m_encryption.m_encryption_rotation = encryption_rotation;
+        }
 
 	/** Get the encryption algorithm.
 	@return the encryption algorithm */
@@ -855,7 +1006,21 @@ public:
 		m_encryption.m_klen = 0;
 		m_encryption.m_iv = NULL;
 		m_encryption.m_type = Encryption::NONE;
+                m_encryption.m_encryption_rotation = Encryption::NO_ROTATION;
+                m_encryption.m_tablespace_iv = NULL;
+                m_encryption.m_key_id = 0;
+                m_encryption.m_tablespace_key = NULL;
 	}
+
+        //bool was_page_encrypted_when_read() const
+        //{
+               //return m_encryption.m_was_page_encrypted_when_read;
+        //}
+
+        //void set_that_page_was_encrypted_when_read() const
+        //{
+               //m_encryption.m_was_page_encrypted_when_read = true;
+        //}
 
 	/** Note that the IO is for double write recovery. */
 	void dblwr_recover()
@@ -888,6 +1053,11 @@ public:
 #endif /* HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE || _WIN32 */
 	}
 
+        //bool will_encrypt_page()
+        //{
+          //return m_encryption.key != NULL;
+        //}
+
 private:
 	/* File system best block size */
 	uint32_t		m_block_size;
@@ -900,6 +1070,10 @@ private:
 
 	/** Encryption algorithm */
 	Encryption		m_encryption;
+
+        bool m_is_page_zip_compressed;
+
+        ulint m_zip_page_physical_size;
 };
 
 /* @} */
@@ -2148,6 +2322,7 @@ os_aio_func(
 	ulint		space_id,
 	trx_t*		trx,
 	bool		should_buffer);
+        //bool            *was_page_read_encrypted = NULL);
 
 /** Wakes up all async i/o threads so that they know to exit themselves in
 shutdown. */
