@@ -2684,7 +2684,12 @@ Encryption::set_algorithm(
 
 		encryption->m_type = AES;
 
-	} else {
+	} else if (innobase_strcasecmp(option, "ROTATED_KEYS") == 0) {
+
+                encryption->m_type = ROTATED_KEYS;
+
+        } 
+        else {
 		return(DB_UNSUPPORTED);
 	}
 

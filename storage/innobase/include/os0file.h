@@ -382,6 +382,8 @@ struct Encryption {
 
 		/** Use AES */
 		AES = 1,
+
+                ROTATED_KEYS = 2
 	};
 
 	/** Encryption information format version */
@@ -460,7 +462,8 @@ struct Encryption {
 
 	/** Create new master key for key rotation.
         @param[in,out]	master_key	master key */
-	static void create_master_key(byte** master_key);
+	static void create_master_key(byte** master_key, 
+                                      ulint space_id=0);
 
         /** Get master key by key id.
         @param[in]	master_key_id	master key id
