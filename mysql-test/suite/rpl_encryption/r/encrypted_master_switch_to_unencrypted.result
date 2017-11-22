@@ -33,7 +33,7 @@ connection master;
 #####################################################
 # Part 2: restart master, now with binlog encryption
 #####################################################
-include/rpl_restart_server.inc [server_number=1 parameters: --encrypt-binlog=1 --early-plugin-load=keyring_file.so --keyring_file_data=/home/rob/git/5.7_binlog_encryption/mysql-test/std_data/keys.txt]
+include/rpl_restart_server.inc [server_number=1]
 connection server_1;
 connection master;
 connection server_1;
@@ -65,7 +65,7 @@ NOT FOUND /table2_to_encrypt/ in master-bin.0*
 #####################################################
 # Part 3: restart master again without encryption
 #####################################################
-include/rpl_restart_server.inc [server_number=1 parameters: --encrypt-binlog=0]
+include/rpl_restart_server.inc [server_number=1]
 connection server_1;
 connection master;
 connection server_1;

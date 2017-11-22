@@ -64,9 +64,9 @@ INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
 --echo # Part 2: restart master, now with binlog encryption
 --echo #####################################################
 
---replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
 --let $rpl_server_parameters= --encrypt-binlog=1 --early-plugin-load=$KEYRING_PLUGIN --keyring_file_data=$MYSQL_TEST_DIR/std_data/keys.txt
 --let $rpl_server_number= 1
+--let $rpl_omit_print_server_parameters= 1
 --source include/rpl_restart_server.inc
 
 CREATE TABLE table2_to_encrypt (
