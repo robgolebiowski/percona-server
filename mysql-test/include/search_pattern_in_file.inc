@@ -16,8 +16,6 @@
 #    - SEARCH_FILE does not contain SEARCH_PATTERN and PRINT_SEARCH_RESULT
 #    is not set the test will abort immediate.
 #    MTR will report something like
-#    - PRINT_SEARCH_RESULT is set - the result of the search will
-#    get printed.
 #    ....
 #    worker[1] Using MTR_BUILD_THREAD 300, with reserved ports 13000..13009
 #    main.1st                                 [ pass ]      3
@@ -34,6 +32,9 @@
 #    ...
 #    - saving '<some path>' to '<some path>'
 #    main.1st                                 [ pass ]      2
+#
+#    - PRINT_SEARCH_RESULT is set - the result of the search will
+#    get printed.
 #
 # Typical use case (check invalid server startup options):
 #    let $error_log= $MYSQLTEST_VARDIR/log/my_restart.err;

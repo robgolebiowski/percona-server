@@ -4135,11 +4135,9 @@ read_gtids_and_update_trx_parser_from_relaylog(
       break;
     }
     case binary_log::START_ENCRYPTION_EVENT:
-    {
       if (fd_ev_p->start_decryption((Start_encryption_log_event*) ev))
-        error= true;
-    }
-    break;
+        sql_print_warning("Error initializing decryption while reading GTIDs from relaylog");
+      break;
     case binary_log::ANONYMOUS_GTID_LOG_EVENT:
     default:
       /*
@@ -4413,7 +4411,9 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
     case binary_log::START_ENCRYPTION_EVENT:
     {
       if (fd_ev_p->start_decryption(static_cast<Start_encryption_log_event*>(ev)))
-        ret= ERROR;
+        sql_print_warning("Error initializing decryption while reading GTIDs from binary log");
+      // in case start_decryption failes next call to read_log_event will fail too
+      // this failure will be handled outside the loop
       break;
     }
 
@@ -9910,7 +9910,10 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
     }
     else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT &&
              fdle->start_decryption(static_cast<Start_encryption_log_event*>(ev)))
+    {
+      sql_print_warning("Error initializing decryption while crash_recovery.");
       goto err2;
+    }
   
     /*
       Recorded valid position for the crashed binlog file

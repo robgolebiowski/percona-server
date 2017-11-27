@@ -8,6 +8,13 @@
 # to the slave.
 #
 
+# This testcase is trying to use invalid key to decrypt binlog. The server should recognize that
+# decrypted event is invalid by checking the event's checksum (the event is ivalid as we get
+# garbage from decrypt function when invalid key is used). However, the "checksum checking code"
+# has some asserts that can fail when the code tries to interpret the garbage data as a valid event.
+# For instance it can happen that garbage data gets interpreted as Format_description_event
+# and for such event there is an assert that checksum is ON. That assert can fail.
+--source include/have_nodebug.inc
 --source include/have_binlog_format_mixed.inc
 
 --echo #################
@@ -64,7 +71,7 @@ INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
 --echo # Part 2: restart master, now with binlog encryption
 --echo #####################################################
 
---let $rpl_server_parameters= --encrypt-binlog=1 --early-plugin-load=$KEYRING_PLUGIN --keyring_file_data=$MYSQL_TEST_DIR/std_data/keys.txt
+--let $rpl_server_parameters= --encrypt-binlog=1 --early-plugin-load=$KEYRING_PLUGIN --keyring_file_data=$MYSQL_TMP_DIR/keyring/keys.txt
 --let $rpl_server_number= 1
 --let $rpl_omit_print_server_parameters= 1
 --source include/rpl_restart_server.inc
