@@ -4412,7 +4412,7 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
     {
       if (fd_ev_p->start_decryption(static_cast<Start_encryption_log_event*>(ev)))
         sql_print_warning("Error initializing decryption while reading GTIDs from binary log");
-      // in case start_decryption failes next call to read_log_event will fail too
+      // in case start_decryption fails next call to read_log_event will fail too
       // this failure will be handled outside the loop
       break;
     }
