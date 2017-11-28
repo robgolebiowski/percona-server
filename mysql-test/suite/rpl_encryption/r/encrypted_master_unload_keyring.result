@@ -23,10 +23,6 @@ FLUSH BINARY LOGS;
 SET binlog_format=ROW;
 INSERT INTO table1_encryption SELECT NULL,NOW(),b FROM table1_encryption;
 INSERT INTO table1_encryption SELECT NULL,NOW(),b FROM table1_encryption;
-ROBERT is my man
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000001 
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000002 
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000003 
 NOT FOUND /table1_encryption/ in master-bin.0*
 #################################################################################
 # Part 2: restart master, without binlog encryption and without keyring plugin
@@ -48,12 +44,6 @@ FLUSH BINARY LOGS;
 SET binlog_format=ROW;
 INSERT INTO table2_no_encryption SELECT NULL,NOW(),b FROM table2_no_encryption;
 INSERT INTO table2_no_encryption SELECT NULL,NOW(),b FROM table2_no_encryption;
-ROBERT is my man
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000001 
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000002 
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000003 
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000004 
-/home/rob/git/5.7_binlog_encryption_bld/mysql-test/var/mysqld.1/data//master-bin.000005 
 FOUND /table2_no_encryption/ in master-bin.0*
 include/assert_grep.inc [Found the expected warning "Error reading GTIDs from binary log: -1" in master's error log.]
 include/assert_grep.inc [Found the expected warning "Error initializing decryption while reading GTIDs from binary log" in slave's error log.]

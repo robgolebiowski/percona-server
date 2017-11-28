@@ -2,13 +2,19 @@
 !include include/default_client.cnf
 
 [mysqld.1]
+gtid-mode=ON
+enforce-gtid-consistency=ON
 log-bin
 
 [mysqld.2]
+gtid-mode=ON
+enforce-gtid-consistency=ON
 log-bin
 log-slave-updates
 
 [mysqld.3]
+gtid-mode=ON
+enforce-gtid-consistency=ON
 skip-log-bin
 
 [ENV]

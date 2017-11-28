@@ -27,7 +27,8 @@ FLUSH BINARY LOGS;
 SET binlog_format=ROW;
 INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
 INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
-NOT FOUND /table1_no_encryption/ in master-bin.0*
+# Make sure that binary logs are not encrypted
+FOUND /table1_no_encryption/ in master-bin.0*
 include/save_master_pos.inc
 connection master;
 #####################################################
@@ -61,6 +62,7 @@ FLUSH BINARY LOGS;
 SET binlog_format=ROW;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
+# Make sure that binary logs are encrypted
 NOT FOUND /table2_to_encrypt/ in master-bin.0*
 #####################################################
 # Part 3: restart master again without encryption

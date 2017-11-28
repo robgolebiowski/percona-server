@@ -42,6 +42,8 @@ call mtr.add_suppression("Got fatal error 1236 from master when reading data fro
 call mtr.add_suppression("Event crc check failed! Most likely there is event corruption");
 call mtr.add_suppression("Error reading GTIDs from binary log");
 
+--let $master_datadir= `SELECT @@datadir`
+
 CREATE TABLE table1_no_encryption (
   pk INT AUTO_INCREMENT PRIMARY KEY,
   ts TIMESTAMP NULL,
@@ -55,11 +57,11 @@ SET binlog_format=ROW;
 INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
 INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
 
-# Make sure that binary logs are not encrypted
+--echo # Make sure that binary logs are not encrypted
 
 --let PRINT_SEARCH_RESULT=1
 --let SEARCH_RANGE = 500000
---let SEARCH_FILE= master-bin.0*
+--let SEARCH_FILE= $master_datadir/master-bin.0*
 --let SEARCH_PATTERN= table1_no_encryption
 --source include/search_pattern_in_file.inc
 
@@ -89,15 +91,21 @@ SET binlog_format=ROW;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 
-# Make sure that binary logs are encrypted
+--echo # Make sure that binary logs are encrypted
 
---let SEARCH_FILE= master-bin.0*
+--let SEARCH_FILE= $master_datadir/master-bin.0*
 --let SEARCH_PATTERN= table2_to_encrypt
 --source include/search_pattern_in_file.inc
 
 --echo #####################################################
 --echo # Part 3: restart master again without encryption
 --echo #####################################################
+
+# After the restart master will look for Previous GTIDs in previous binlog files.
+# We are using incorrect key as we are fetching percona binlog key from different keyring than
+# before the restart. master-verify-checksum should help us detect that the encrypted events
+# are incorrect as checksum will not be correct. However the checksum algorithm is fetched
+# from the event itself
 
 --let $rpl_server_parameters= --encrypt-binlog=0
 --let $rpl_server_number= 1
