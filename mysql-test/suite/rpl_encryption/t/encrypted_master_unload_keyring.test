@@ -2,9 +2,6 @@
 # with encrypted binary log/relaylog. In both cases server will look for previous gtids in previous
 # binary logs/relaylogs - even when server cannot decrypt previous binary logs/relaylogs.
 
-# We do not allow this test to run in debug as misinterpreting encrypted events as Format description
-# event can cause some asserts to fail.
---source include/have_nodebug.inc
 --source include/not_gtid_enabled.inc
 # Different binlog formats can generate different number of binlog files. When we try to decrypt an encrypted binlog file
 # with invalid key we check if we got expected warning, expected number of times. For each binlog file we get a warning,
@@ -67,7 +64,7 @@ INSERT INTO table1_encryption SELECT NULL,NOW(),b FROM table1_encryption;
 call mtr.add_suppression("Error reading GTIDs from binary log");
 call mtr.add_suppression("Error initializing decryption while reading GTIDs from binary log");
 
---let $rpl_server_parameters= --encrypt-binlog=0
+--let $rpl_server_parameters= --encrypt-binlog=0 --log-error=$MYSQLTEST_VARDIR/tmp/mysqld_master.err
 --let $rpl_server_number= 1
 --let $rpl_omit_print_server_parameters= 1
 --source include/rpl_restart_server.inc
@@ -97,15 +94,15 @@ INSERT INTO table2_no_encryption SELECT NULL,NOW(),b FROM table2_no_encryption;
 
 # Makes sure we got the expected warnings
 
---let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.1.err
---let $assert_only_after = CURRENT_TEST: rpl.encrypted_master_unload_keyring
+--let $assert_file= $MYSQLTEST_VARDIR/tmp/mysqld_master.err
+--let $assert_only_after = CURRENT_TEST: rpl_encryption.encrypted_master_unload_keyring
 --let $assert_count = 1
 --let $assert_select = Error reading GTIDs from binary log: -1
 --let $assert_text = Found the expected warning "Error reading GTIDs from binary log: -1" in master's error log.
 --source include/assert_grep.inc
 
---let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.1.err
---let $assert_only_after = CURRENT_TEST: rpl.encrypted_master_unload_keyring
+--let $assert_file= $MYSQLTEST_VARDIR/tmp/mysqld_master.err
+--let $assert_only_after = CURRENT_TEST: rpl_encryption.encrypted_master_unload_keyring
 --let $assert_count = 1
 --let $assert_select = Error initializing decryption while reading GTIDs from binary log
 --let $assert_text = Found the expected warning "Error initializing decryption while reading GTIDs from binary log" in slave's error log.
@@ -148,13 +145,14 @@ INSERT INTO table2_no_encryption SELECT NULL,NOW(),b FROM table2_no_encryption;
 # encrypted relay logs. It will try to read Previous_gtid from encrypted relay log and will
 # fail to do that. However, this is not a fatal error, only a warning.
 
-# For Format description event - its checksum is veryfied only after creating Format_description_event
-# object, thus we can get error related to it
+# Legit Format description events is never encrypted - as it comes before Start encryption event and is the
+# first event in binlog. However garbage data can get interpreted as Format description event - in case of this event
+# there are additional checks before checking its checksum thus we can get error related to it:
 call mtr.add_suppression("Found invalid Format description event in binary log");
 call mtr.add_suppression("Error reading GTIDs from relaylog");
 call mtr.add_suppression("Error initializing decryption while reading GTIDs from relaylog");
 
---let $rpl_server_parameters= --encrypt-binlog=0 --master_verify_checksum=1
+--let $rpl_server_parameters= --encrypt-binlog=0 --master_verify_checksum=1 --log-error=$MYSQLTEST_VARDIR/tmp/mysqld_slave.err
 --let $rpl_server_number= 2
 --let $rpl_omit_print_server_parameters= 1
 --source include/rpl_restart_server.inc
@@ -167,15 +165,15 @@ FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_file';
 
 # Makes sure we got the expected warnings
 
---let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.2.err
---let $assert_only_after = CURRENT_TEST: rpl.encrypted_master_unload_keyring
+--let $assert_file= $MYSQLTEST_VARDIR/tmp/mysqld_slave.err
+--let $assert_only_after = CURRENT_TEST: rpl_encryption.encrypted_master_unload_keyring
 --let $assert_count = 2
 --let $assert_select = Error reading GTIDs from relaylog: -1
 --let $assert_text = Found the expected warning "Error reading GTIDs from relaylog: -1" in slave's error log.
 --source include/assert_grep.inc
 
---let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.2.err
---let $assert_only_after = CURRENT_TEST: rpl.encrypted_master_unload_keyring
+--let $assert_file= $MYSQLTEST_VARDIR/tmp/mysqld_slave.err
+--let $assert_only_after = CURRENT_TEST: rpl_encryption.encrypted_master_unload_keyring
 --let $assert_count = 2
 --let $assert_select = Error initializing decryption while reading GTIDs from relaylog
 --let $assert_text = Error initializing decryption while reading GTIDs from relaylog
@@ -206,4 +204,8 @@ FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_file';
 
 DROP TABLE table1_encryption;
 DROP TABLE table2_no_encryption;
+
+--remove_file $MYSQLTEST_VARDIR/tmp/mysqld_master.err
+--remove_file $MYSQLTEST_VARDIR/tmp/mysqld_slave.err
+
 --source include/rpl_end.inc

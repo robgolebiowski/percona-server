@@ -59,7 +59,7 @@ MAKE_AES_DISPATCHER(gcm)
 
 typedef const EVP_CIPHER* (*cipher_function)(uint);
 
-const cipher_function ciphers[]= {
+static const cipher_function ciphers[]= {
     aes_ecb, aes_cbc
 #ifdef HAVE_EncryptAes128Ctr
   , aes_ctr
