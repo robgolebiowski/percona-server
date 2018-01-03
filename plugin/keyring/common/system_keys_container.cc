@@ -65,6 +65,7 @@ bool System_keys_container::is_system_key_without_version(IKey *key)
   return key->get_user_id()->empty() &&
          key->get_key_id()->compare(0, system_key_prefix.length(),
                                     system_key_prefix) == 0;
+         //TODO: Tutaj dodać czy nie ma później dwukropka - w sensie czy to jest system key bez wersji ?
          //system_key_id_to_system_key.count(*key->get_key_id());
 }
 

@@ -94,6 +94,41 @@ protected:
   virtual bool calc_value(const String *arg) = 0;
 };
 
+class Item_func_rotate_system_key : public Item_bool_func
+{
+public:
+  Item_func_rotate_system_key(const POS &pos, Item *system_key_id)
+    : Item_bool_func(pos, system_key_id)
+  {
+    null_value= false;
+  }
+
+public:
+  virtual longlong val_int();
+  virtual const char *func_name() const
+  { return "rotate_system_key"; }
+
+
+protected:
+  virtual bool calc_value(const String *arg) = 0;
+};
+
+//class Item_func_is_ipv6 : public Item_func_inet_bool_base
+//{
+//public:
+  //Item_func_is_ipv6(const POS &pos, Item *ip_addr)
+    //: Item_func_inet_bool_base(pos, ip_addr)
+  //{ }
+
+//public:
+  //virtual const char *func_name() const
+  //{ return "is_ipv6"; }
+
+//protected:
+  //virtual bool calc_value(const String *arg);
+//};
+
+
 
 /*************************************************************************
   Item_func_inet_str_base implements common code for INET6/IP-related

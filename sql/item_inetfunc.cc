@@ -20,6 +20,8 @@
 #include <netinet/in.h>
 #endif
 
+#include <mysql/service_mysql_keyring.h>
+
 ///////////////////////////////////////////////////////////////////////////
 
 static const int IN_ADDR_SIZE= sizeof (in_addr);
@@ -834,6 +836,14 @@ bool Item_func_is_ipv6::calc_value(const String *arg)
   in6_addr ipv6_address;
 
   return str_to_ipv6(arg->ptr(), arg->length(), &ipv6_address);
+}
+
+bool Item_func_rotate_system_key::calc_value(const String *arg)
+{
+  //in6_addr ipv6_address;
+  //return str_to_ipv6(arg->ptr(), arg->length(), &ipv6_address);
+  //
+  return !(my_key_store("percona_binlog", "AES", NULL, arg->ptr(), arg->length()));
 }
 
 ///////////////////////////////////////////////////////////////////////////
