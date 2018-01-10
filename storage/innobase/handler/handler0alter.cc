@@ -575,9 +575,10 @@ ha_innobase::check_if_supported_inplace_alter(
 		DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 	}
 
-	/* We don't support change encryption attribute with
+	/* We don't support change Mater Key encryption attribute with
 	inplace algorithm. */
-	char*	old_encryption = this->table->s->encrypt_type.str;
+	//const bool currently_encrypted =
+		//m_prebuilt->table->flags2 & DICT_TF2_ENCRYPTION;
 	char*	new_encryption = altered_table->s->encrypt_type.str;
 
         if (Encryption::is_master_key_encryption(old_encryption) ||

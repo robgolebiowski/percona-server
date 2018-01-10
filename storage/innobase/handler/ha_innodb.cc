@@ -1205,6 +1205,12 @@ static SHOW_VAR innodb_status_variables[]= {
   (char*) &export_vars.innodb_n_rowlog_blocks_encrypted,  SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
   {"encryption_n_rowlog_blocks_decrypted",
   (char*) &export_vars.innodb_n_rowlog_blocks_decrypted,  SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
+  {"num_pages_encrypted",
+   (char*) &export_vars.innodb_pages_encrypted,
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL },
+  {"num_pages_decrypted",
+   (char*) &export_vars.innodb_pages_decrypted,
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL },  
   {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}
 };
 
@@ -12352,6 +12358,14 @@ create_table_info_t::create_option_encryption_is_valid() const
 		return(false);
 	}
 
+	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE
+	  && Encryption::none_explicitly_specified(m_create_info->encrypt_type.str)) {
+		my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
+			"InnoDB: Only ENCRYPTED tables can be created with "
+			"innodb_encrypt_tables=FORCE.", MYF(0));
+		return(false);
+	}
+
 	if (m_use_shared_space) {
 		space_id = fil_space_get_id_by_name(m_create_info->tablespace);
 
@@ -22964,11 +22978,11 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(ft_ignore_stopwords),
   /* Encryption feature */
   MYSQL_SYSVAR(encrypt_online_alter_logs),
-  MYSQL_SYSVAR(encrypt_tables),
   MYSQL_SYSVAR(encryption_threads),
   MYSQL_SYSVAR(encryption_rotate_key_age),
   MYSQL_SYSVAR(encryption_rotation_iops),
   MYSQL_SYSVAR(default_encryption_key_id),
+  MYSQL_SYSVAR(encrypt_tables),
   NULL
 };
 
