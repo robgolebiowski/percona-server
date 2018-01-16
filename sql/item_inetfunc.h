@@ -107,10 +107,10 @@ public:
   virtual longlong val_int();
   virtual const char *func_name() const
   { return "rotate_system_key"; }
-
+  virtual bool itemize(Parse_context *pc, Item **res);
 
 protected:
-  virtual bool calc_value(const String *arg) = 0;
+  virtual bool calc_value(const String *arg);
 };
 
 //class Item_func_is_ipv6 : public Item_func_inet_bool_base

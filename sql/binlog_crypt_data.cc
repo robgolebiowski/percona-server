@@ -82,9 +82,9 @@ bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce)
   int fetch_result = my_key_fetch("percona_binlog", &key_type_raw, NULL,
                                   reinterpret_cast<void**>(&key), &key_len);
   key_type.reset(key_type_raw);
-  if (fetch_result || (key != NULL && key_len != 16))
+  if (fetch_result)
   {
-    free_key();
+    free_key(); // just in case
     return true;
   }
   key_type.reset();
@@ -95,7 +95,7 @@ bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce)
     fetch_result = my_key_fetch("percona_binlog", &key_type_raw, NULL,
                                 reinterpret_cast<void**>(&key), &key_len);
     key_type.reset(key_type_raw);
-    if (fetch_result || key_len != 16)
+    if (fetch_result)
     {
       free_key();
       return true;

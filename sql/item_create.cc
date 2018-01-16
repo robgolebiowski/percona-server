@@ -2133,6 +2133,17 @@ protected:
   virtual ~Create_func_is_ipv6() {}
 };
 
+class Create_func_rotate_system_key : public Create_func_arg1
+{
+public:
+  virtual Item *create(THD *thd, Item *arg1);
+
+  static Create_func_rotate_system_key s_singleton;
+
+protected:
+  Create_func_rotate_system_key() {}
+  virtual ~Create_func_rotate_system_key() {}
+};
 
 class Create_func_is_ipv4_compat : public Create_func_arg1
 {
@@ -5509,6 +5520,13 @@ Create_func_is_ipv4::create(THD *thd, Item *arg1)
   return new (thd->mem_root) Item_func_is_ipv4(POS(), arg1);
 }
 
+Create_func_rotate_system_key Create_func_rotate_system_key::s_singleton;
+
+Item*
+Create_func_rotate_system_key::create(THD *thd, Item *arg1)
+{
+  return new (thd->mem_root) Item_func_rotate_system_key(POS(), arg1);
+}
 
 Create_func_is_ipv6 Create_func_is_ipv6::s_singleton;
 
