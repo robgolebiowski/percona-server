@@ -253,6 +253,39 @@ namespace keyring__api_unittest
     my_free(key);
   }
 
+  TEST_F(Keyring_api_test, GeneratePBFetchPBRotatePBFetchPB)
+  {
+    EXPECT_EQ(mysql_key_generate("percona_binlog", "AES", NULL, 16), 0);
+
+    char *key_type;
+    size_t key_len;
+    void *key_ver0;
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key_ver0,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, static_cast<size_t>(18));
+    ASSERT_TRUE(memcmp((char *)key_ver0, "0:", 2) == 0);
+    my_free(key_type);
+    key_type= NULL;
+
+    void *key_ver1;
+    EXPECT_EQ(mysql_key_generate("percona_binlog", "AES", NULL, 16), 0);
+
+    EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key_ver1,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, static_cast<size_t>(18));
+    ASSERT_TRUE(memcmp((char *)key_ver1, "1:", 2) == 0);
+    my_free(key_type);
+    key_type= NULL;
+
+    // make sure that rotated key is different than the original one
+    ASSERT_TRUE(memcmp((char *)key_ver0+2, (char *)key_ver1+2, 16) != 0);
+
+    my_free(key_ver0);
+    my_free(key_ver1);
+  }
+
   TEST_F(Keyring_api_test, RotatePBStoreSKFetchPBRotatePBFetchPBRotatePBRotateSKFetchPBFetchSK)
   {
     std::string percona_binlog_key_data_1("key1");
