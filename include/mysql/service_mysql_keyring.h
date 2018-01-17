@@ -16,10 +16,57 @@
 #ifndef MYSQL_SERVICE_MYSQL_PLUGIN_KEYRING_INCLUDED
 #define MYSQL_SERVICE_MYSQL_PLUGIN_KEYRING_INCLUDED
 
+#ifndef MYSQL_ABI_CHECK
+#include "m_string.h"
+// The caller must make sure this is properly formatted system key, i.e. it consist of 
+
+static uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
+                               uchar **key_data, size_t *key_data_length) MY_ATTRIBUTE((unused));
+
+static uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
+                               uchar **key_data, size_t *key_data_length)
+{
+  char *version = 0;
+  uint key_version_length = 0;
+  long key_version_long = 0;
+
+  for (; key[key_version_length] != ':' && key_version_length < key_length; ++key_version_length);
+  if (key_version_length == key_length)
+    return (uchar*)NullS; //no version found
+
+  version= (char*)(my_malloc(PSI_NOT_INSTRUMENTED, sizeof(char)*key_version_length+1, MYF(0)));
+  if (version == 0)
+    return (uchar*)NullS;
+
+  memcpy(version, key, key_version_length);
+  version[key_version_length]= '\0';
+
+  if (str2int(version, 10, 0, UINT_MAX, &key_version_long) == NullS)
+  {
+    my_free(version);
+    return (uchar*)NullS;
+  }
+  my_free(version);
+  DBUG_ASSERT(key_version_long >= 0 && key_version_long <= UINT_MAX); // sanity check
+  *key_version = (uint)key_version_long;
+
+  *key_data_length= key_length - (key_version_length + 1); // skip ':' after key version
+  if (*key_data_length == 0)
+    return (uchar*)NullS;
+  DBUG_ASSERT(*key_data_length < 512);
+
+  *key_data= (uchar*)(my_malloc(PSI_NOT_INSTRUMENTED, sizeof(uchar)*(*key_data_length), MYF(0)));
+  if (*key_data == 0)
+    return (uchar*)NullS;
+
+  memcpy(*key_data, key+key_version_length+1, *key_data_length); // skip ':' after key version
+  return *key_data;
+}
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 extern struct mysql_keyring_service_st
 {
   int (*my_key_store_func)(const char *, const char *, const char *,

@@ -1290,16 +1290,6 @@ public:
   String *val_str(String *) ZLIB_DEPENDED_FUNCTION
 };
 
-//class Item_func_rotate_system_key: public Item_bool_func
-//{
-  //String buffer;
-//public:
-  //Item_func_rotate_system_key(const POS &pos, Item *a):Item_str_func(pos, a){}
-  //void fix_length_and_dec(){max_length= (args[0]->max_length*120)/100+12;}
-  //const char *func_name() const{return "rotate_system_key";}
-  //bool val_str(String *);// ZLIB_DEPENDED_FUNCTION
-//};
-
 class Item_func_uncompress: public Item_str_func
 {
   String buffer;
