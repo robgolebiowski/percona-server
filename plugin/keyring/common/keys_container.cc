@@ -95,7 +95,7 @@ my_bool Keys_container::store_key_in_hash(IKey *key)
 
 my_bool Keys_container::store_key(IKey* key)
 {
-  if (system_keys_container->rotate_key_id_if_existing_system_key(key) || //rename it to ..._if_system_key_without_version
+  if (system_keys_container->rotate_key_id_if_system_key_without_version(key) ||
       flush_to_backup() ||
       store_key_in_hash(key))
     return TRUE;

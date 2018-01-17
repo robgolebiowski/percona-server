@@ -64,7 +64,8 @@ bool System_keys_container::is_system_key_without_version(IKey *key)
 {
   return key->get_user_id()->empty() &&
          key->get_key_id()->compare(0, system_key_prefix.length(),
-                                    system_key_prefix) == 0;
+                                    system_key_prefix) == 0 &&
+         key->get_key_id()->find_first_of(':') == std::string::npos;
          //TODO: Tutaj dodać czy nie ma później dwukropka - w sensie czy to jest system key bez wersji ?
          //system_key_id_to_system_key.count(*key->get_key_id());
 }
@@ -122,13 +123,14 @@ template <> struct NumberOfDigits<0>
   enum { value = 1 };
 };
 
-bool System_keys_container::rotate_key_id_if_existing_system_key(IKey *key)
+bool System_keys_container::rotate_key_id_if_system_key_without_version(IKey *key)
 {
-  if (is_system_key_without_version(key) == false ||
-      system_key_id_to_system_key.count(*key->get_key_id()) == 0)
+  if (is_system_key_without_version(key) == false)
     return false;
 
-  long key_version = system_key_id_to_system_key[*key->get_key_id()]->get_key_version();
+  long key_version =  system_key_id_to_system_key.count(*key->get_key_id())
+                        ? system_key_id_to_system_key[*key->get_key_id()]->get_key_version()
+                        : -1;
 
   if (key_version == LONG_MAX)
   {
