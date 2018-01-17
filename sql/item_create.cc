@@ -7530,6 +7530,7 @@ static Native_func_registry func_array[] =
   { { C_STRING_WITH_LEN("INET6_NTOA") }, BUILDER(Create_func_inet6_ntoa)},
   { { C_STRING_WITH_LEN("IS_IPV4") }, BUILDER(Create_func_is_ipv4)},
   { { C_STRING_WITH_LEN("IS_IPV6") }, BUILDER(Create_func_is_ipv6)},
+  { { C_STRING_WITH_LEN("ROTATE_SYSTEM_KEY") }, BUILDER(Create_func_rotate_system_key)},
   { { C_STRING_WITH_LEN("IS_IPV4_COMPAT") }, BUILDER(Create_func_is_ipv4_compat)},
   { { C_STRING_WITH_LEN("IS_IPV4_MAPPED") }, BUILDER(Create_func_is_ipv4_mapped)},
   { { C_STRING_WITH_LEN("INSTR") }, BUILDER(Create_func_instr)},

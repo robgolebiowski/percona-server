@@ -6,6 +6,7 @@
 //#include "plugin/keyring/common/key.h"
 #include "keyring_key.h"
 #include <sstream>
+#include "mysql/service_mysql_keyring.h"
 
 #if !defined(MERGE_UNITTESTS) && defined(HAVE_PSI_INTERFACE)
 namespace keyring
@@ -480,4 +481,84 @@ namespace keyring__system_keys_container_unittest
 
     ASSERT_TRUE(system_key == NULL);
   }
+
+  TEST_F(System_keys_container_test, ParseSystemKey)
+  {
+    std::string system_key("12:0123456789012345");
+    uchar *key_data = NULL;
+    uint key_version = 0;
+    size_t key_data_length = 0;
+    uchar *return_val = parse_system_key(reinterpret_cast<const uchar*>(system_key.c_str()), system_key.length(), &key_version,
+                                         &key_data, &key_data_length);
+    ASSERT_TRUE(return_val != reinterpret_cast<uchar*>(NullS));
+    EXPECT_EQ(key_data_length, static_cast<size_t>(16));
+    EXPECT_EQ(key_version, static_cast<long>(12));
+    EXPECT_TRUE(memcmp(key_data, "0123456789012345", key_data_length) == 0);
+    EXPECT_EQ(return_val, key_data);
+    my_free(key_data);
+  }
+
+  TEST_F(System_keys_container_test, ParseNotSystemKey)
+  {
+    std::string key("0123456789012345");
+    uchar *key_data = NULL;
+    uint key_version = 0;
+    size_t key_data_length = 0;
+    uchar *return_val = parse_system_key(reinterpret_cast<const uchar*>(key.c_str()), key.length(), &key_version,
+                                         &key_data, &key_data_length);
+    ASSERT_TRUE(key_data == reinterpret_cast<uchar*>(NullS));
+    ASSERT_TRUE(return_val == reinterpret_cast<uchar*>(NullS));
+    EXPECT_EQ(key_data_length, static_cast<size_t>(0));
+    EXPECT_EQ(key_version, static_cast<long>(0));
+  }
+
+  TEST_F(System_keys_container_test, ParseSystemKeyWithTwoColons)
+  {
+    std::string system_key("0:0123456:789012345");
+    uchar *key_data = NULL;
+    uint key_version = 0;
+    size_t key_data_length = 0;
+    uchar *return_val = parse_system_key(reinterpret_cast<const uchar*>(system_key.c_str()), system_key.length(), &key_version,
+                                  &key_data, &key_data_length);
+    ASSERT_TRUE(return_val != reinterpret_cast<uchar*>(NullS));
+    EXPECT_EQ(key_data_length, static_cast<size_t>(17));
+    EXPECT_EQ(key_version, static_cast<long>(0));
+    EXPECT_TRUE(memcmp(key_data, "0123456:789012345", key_data_length) == 0);
+    EXPECT_EQ(return_val, key_data);
+    my_free(key_data);
+  }
+
+  TEST_F(System_keys_container_test, ParseSystemKeyWithAlfaVersion)
+  {
+    std::string system_key("A:key01234567890123");
+    uchar *key_data = NULL;
+    uint key_version = 0;
+    size_t key_data_length = 0;
+    uchar *return_val = parse_system_key(reinterpret_cast<const uchar*>(system_key.c_str()), system_key.length(), &key_version,
+                                         &key_data, &key_data_length);
+    ASSERT_TRUE(key_data == reinterpret_cast<uchar*>(NullS));
+    ASSERT_TRUE(return_val == reinterpret_cast<uchar*>(NullS));
+    EXPECT_EQ(key_data_length, static_cast<size_t>(0));
+    EXPECT_EQ(key_version, static_cast<long>(0));
+  }
+
+//static uchar* parse_system_key(const uchar *key, const size_t key_length, long *key_version,
+                               //uchar **key_data, size_t *key_data_length)
+
+  TEST_F(System_keys_container_test, ParseSystemKeyWithAlfaKey)
+  {
+    std::string system_key("234:key01234567890123");
+    uchar *key_data = NULL;
+    uint key_version = 0;
+    size_t key_data_length = 0;
+    uchar *return_val = parse_system_key(reinterpret_cast<const uchar*>(system_key.c_str()), system_key.length(), &key_version,
+                                         &key_data, &key_data_length);
+    ASSERT_TRUE(return_val != reinterpret_cast<uchar*>(NullS));
+    EXPECT_EQ(key_data_length, static_cast<size_t>(17));
+    EXPECT_EQ(key_version, static_cast<long>(234));
+    EXPECT_TRUE(memcmp(key_data, "key01234567890123", key_data_length) == 0);
+    EXPECT_EQ(return_val, key_data);
+    my_free(key_data);
+  }
+
 } //namespace keyring__system_keys_container_unittest

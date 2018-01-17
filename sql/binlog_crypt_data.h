@@ -37,9 +37,15 @@ public:
   {
     return key_length;
   }
+  uint get_key_version() const
+  {
+    return key_version;
+  }
 
-  void free_key();
+  void free_key(uchar *&key, size_t &key_length);
   bool init(uint sch, uint kv, const uchar* nonce);
+  bool init_with_loaded_key(uint sch, const uchar* nonce);
+  bool load_latest_binlog_key();
   void set_iv(uchar* iv, uint32 offs) const;
 
 private:
