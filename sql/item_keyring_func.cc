@@ -35,8 +35,20 @@ bool Item_func_rotate_system_key::calc_value(const String *arg)
   //in6_addr ipv6_address;
   //return str_to_ipv6(arg->ptr(), arg->length(), &ipv6_address);
   if (memcmp("percona_binlog", arg->ptr(), arg->length()) != 0)
-    return false;
-  
+    return true;
   
   return !(my_key_generate(arg->ptr(), "AES", NULL, 16));
+}
+
+bool Item_func_rotate_system_key::fix_fields(THD *thd, Item **ref)
+{
+  bool res= Item_bool_func::fix_fields(thd, ref);
+#ifndef NO_EMBEDDED_ACCESS_CHECKS
+  if (!res && !thd->security_context()->check_access(SUPER_ACL))
+  {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
+    return true;
+  }
+#endif /*NO_EMBEDDED_ACCESS_CHECKS*/
+  return res;
 }
