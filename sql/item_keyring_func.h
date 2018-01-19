@@ -15,6 +15,7 @@ public:
   virtual const char *func_name() const
   { return "rotate_system_key"; }
   virtual bool itemize(Parse_context *pc, Item **res);
+  virtual bool fix_fields(THD *, Item **);
 
 protected:
   virtual bool calc_value(const String *arg);

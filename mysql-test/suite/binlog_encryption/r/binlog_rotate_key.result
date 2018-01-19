@@ -1,0 +1,48 @@
+# Currently binlog is disabled. After initializing check_consecutive_binlog_key_versions we will restart the
+# server with binlog enabled. check_consecutive_binlog_key_versions will make sure that a new version of
+# percona_binlog key is used after each rotate_system_key followed by FLUSH LOGS calls.
+SET SESSION debug="+d,check_consecutive_binlog_key_versions";
+# restart:--log-bin=master-bin
+# master-bin.000002
+SELECT 1;
+1
+1
+SELECT 2;
+2
+2
+SELECT rotate_system_key("percona_binlog");
+rotate_system_key("percona_binlog")
+1
+FLUSH LOGS;
+# master-bin.000003
+SELECT 3;
+3
+3
+SELECT 4;
+4
+4
+SELECT rotate_system_key("percona_binlog");
+rotate_system_key("percona_binlog")
+1
+FLUSH LOGS;
+# master-bin.000004
+FLUSH LOGS;
+SELECT 5;
+5
+5
+SELECT 6;
+6
+6
+FLUSH LOGS;
+# master-bin.000005
+SET SESSION debug="-d,check_consecutive_binlog_key_versions";
+# restart:--log-bin=master-bin --encrypt-binlog=0
+#master-bin.000006
+SELECT 7;
+7
+7
+SELECT 8;
+8
+8
+FLUSH LOGS;
+#master-bin.000007

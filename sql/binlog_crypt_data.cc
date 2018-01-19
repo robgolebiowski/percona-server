@@ -83,7 +83,7 @@ bool Binlog_crypt_data::load_latest_binlog_key()
   }
   system_key_type.reset();
 
-  if (key == NULL)
+  if (system_key == NULL)
   {
     my_key_generate("percona_binlog", "AES", NULL, 16);
     fetch_result = my_key_fetch("percona_binlog", &system_key_type_raw, NULL,
@@ -97,7 +97,7 @@ bool Binlog_crypt_data::load_latest_binlog_key()
     DBUG_ASSERT(strncmp(system_key_type.get(), "AES", 3) == 0);
   }
 
-  if (parse_system_key(system_key, system_key_len, &key_version, &key, &key_length))
+  if (parse_system_key(system_key, system_key_len, &key_version, &key, &key_length) == reinterpret_cast<uchar*>(NullS))
   {
     //something went terribly wrong - should I log some message here?
     return true;
@@ -125,7 +125,21 @@ bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce)
 {
   free_key(key, key_length);
 #ifdef MYSQL_SERVER
-
+  char *key_type = NULL;
+  std::ostringstream percona_binlog_with_ver_ss;
+  percona_binlog_with_ver_ss << "percona_binlog:" << kv;
+  int fetch_result = my_key_fetch(percona_binlog_with_ver_ss.str().c_str(), &key_type, NULL,
+                                  reinterpret_cast<void**>(&key), &key_length);
+  if (key_type != NULL)
+  {
+    DBUG_ASSERT(strncmp(key_type, "AES", 3) == 0);
+    my_free(key_type);
+  }
+  if(fetch_result != 0 || key == NULL || init_with_loaded_key(sch, nonce))
+  {
+    free_key(key, key_length);
+    return true; 
+  }
 #endif
   return false;
 }
