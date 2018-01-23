@@ -10,9 +10,7 @@ SELECT 1;
 SELECT 2;
 2
 2
-SELECT rotate_system_key("percona_binlog");
-rotate_system_key("percona_binlog")
-1
+include/assert.inc [Successfull rotation of percona_binlog]
 FLUSH LOGS;
 # master-bin.000003
 SELECT 3;
@@ -21,9 +19,7 @@ SELECT 3;
 SELECT 4;
 4
 4
-SELECT rotate_system_key("percona_binlog");
-rotate_system_key("percona_binlog")
-1
+include/assert.inc [Successfull rotation of percona_binlog]
 FLUSH LOGS;
 # master-bin.000004
 FLUSH LOGS;
@@ -46,3 +42,15 @@ SELECT 8;
 8
 FLUSH LOGS;
 #master-bin.000007
+# Check that only percona_binlog key can be rotated with rotate_system_key. This part of the test needs updating
+# each time a new system key is added.
+include/assert.inc [It should not be possible to rotate key percona_binlog:]
+include/assert.inc [It should not be possible to rotate key percona_key]
+include/assert.inc [It should not be possible to rotate key percona_123]
+include/assert.inc [It should not be possible to rotate key percona_bin]
+include/assert.inc [It should not be possible to rotate key percona_b]
+include/assert.inc [It should not be possible to rotate key percona_]
+include/assert.inc [It should not be possible to rotate key percona]
+include/assert.inc [It should not be possible to rotate key system_key]
+include/assert.inc [It should not be possible to rotate key system_key]
+include/assert.inc [It should not be possible to rotate key system_key]

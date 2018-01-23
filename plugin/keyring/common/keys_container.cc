@@ -42,17 +42,7 @@ Keys_container::Keys_container(ILogger *logger)
  , keyring_io(NULL)
 {
   my_hash_clear(keys_hash);
-  system_keys_container.reset(new System_keys_container());
-}
-
-Keys_container::Keys_container(ILogger *logger,
-                               ISystem_keys_container *system_keys_container)
- : keys_hash(new HASH)
- , logger(logger)
- , keyring_io(NULL)
- , system_keys_container(system_keys_container)
-{
-  my_hash_clear(keys_hash);
+  system_keys_container.reset(new System_keys_container(logger));
 }
 
 Keys_container::~Keys_container()
@@ -88,8 +78,6 @@ my_bool Keys_container::store_key_in_hash(IKey *key)
 {
   if (my_hash_insert(keys_hash, (uchar *) key))
     return TRUE;
-
-  system_keys_container->store_or_update_if_system_key(key); //rename it to .._with_version //TODO:Needs to be moved to store_key function
   return FALSE;
 }
 
@@ -104,12 +92,13 @@ my_bool Keys_container::store_key(IKey* key)
     remove_key_from_hash(key);
     return TRUE;
   }
+  system_keys_container->store_or_update_if_system_key_with_version(key);
   return FALSE;
 }
 
 IKey* Keys_container::get_key_from_hash(IKey *key)
 {
-  IKey* system_key = system_keys_container->get_latest_key_if_system_key(key);
+  IKey* system_key = system_keys_container->get_latest_key_if_system_key_without_version(key);
 
   return system_key ? system_key 
     : reinterpret_cast<IKey*>(my_hash_search(keys_hash,
@@ -159,7 +148,7 @@ my_bool Keys_container::remove_key_from_hash(IKey *key)
 my_bool Keys_container::remove_key(IKey *key)
 {
   IKey* fetched_key_to_delete= get_key_from_hash(key);
-  //removing system keys is forbidden
+  // removing system keys is forbidden
   if (fetched_key_to_delete == NULL ||
       system_keys_container->is_system_key(fetched_key_to_delete) ||
       flush_to_backup() ||
@@ -201,6 +190,7 @@ my_bool Keys_container::load_keys_from_keyring_storage()
         delete key_loaded;
         break;
       }
+      system_keys_container->store_or_update_if_system_key_with_version(key_loaded);
       key_loaded=NULL;
     }
     delete serialized_keys;

@@ -1,6 +1,8 @@
 #include <my_global.h>
 #include "item_keyring_func.h"
 #include <mysql/service_mysql_keyring.h>
+#include <algorithm>
+#include <cstring>
 #include "sql_class.h"           // THD
 
 bool Item_func_rotate_system_key::itemize(Parse_context *pc, Item **res)
@@ -32,12 +34,9 @@ longlong Item_func_rotate_system_key::val_int()
 
 bool Item_func_rotate_system_key::calc_value(const String *arg)
 {
-  //in6_addr ipv6_address;
-  //return str_to_ipv6(arg->ptr(), arg->length(), &ipv6_address);
-  if (memcmp("percona_binlog", arg->ptr(), arg->length()) != 0)
-    return true;
-  
-  return !(my_key_generate(arg->ptr(), "AES", NULL, 16));
+  return std::binary_search(valid_percona_system_keys, valid_percona_system_keys + 
+                            valid_percona_system_keys_size, arg->ptr(), strcmp)
+         && !(my_key_generate(arg->ptr(), "AES", NULL, 16));
 }
 
 bool Item_func_rotate_system_key::fix_fields(THD *thd, Item **ref)

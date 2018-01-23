@@ -9,8 +9,8 @@ namespace keyring
   class ISystem_keys_container : public Keyring_alloc
   {
   public:
-    virtual IKey* get_latest_key_if_system_key(IKey *key) = 0;
-    virtual void store_or_update_if_system_key(IKey *key) = 0;
+    virtual IKey* get_latest_key_if_system_key_without_version(IKey *key) = 0;
+    virtual void store_or_update_if_system_key_with_version(IKey *key) = 0;
     virtual bool rotate_key_id_if_system_key_without_version(IKey *key) = 0;
     virtual bool is_system_key(IKey *key) = 0;
 
