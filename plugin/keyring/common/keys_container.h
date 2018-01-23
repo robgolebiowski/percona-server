@@ -34,7 +34,6 @@ class Keys_container : public IKeys_container
 {
 public:
   Keys_container(ILogger* logger);
-  //Keys_container(ILogger *logger, ISystem_keys_container *system_keys_container);
   my_bool init(IKeyring_io* keyring_io, std::string keyring_storage_url);
   my_bool store_key(IKey *key);
   IKey* fetch_key(IKey *key);

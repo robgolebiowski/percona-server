@@ -1703,6 +1703,67 @@ namespace keyring__keys_container_unittest
     delete mock_serializer;
   }
 
+  class Mock_system_keys_container : public ISystem_keys_container
+  {
+  public:
+    MOCK_METHOD1(get_latest_key_if_system_key_without_version, IKey*(IKey *key));
+    MOCK_METHOD1(store_or_update_if_system_key_with_version, void(IKey *key));
+    MOCK_METHOD1(rotate_key_id_if_system_key_without_version, bool(IKey *key));
+    MOCK_METHOD1(is_system_key, bool(IKey *key));
+  };
+
+  class Keys_container_with_system_keys_container_setter : public Keys_container
+  {
+  public:
+    Keys_container_with_system_keys_container_setter(ILogger *logger)
+      : Keys_container(logger)
+    {}
+    void set_system_keys_container(ISystem_keys_container *system_keys_container)
+    {
+      this->system_keys_container.reset(system_keys_container);
+    }
+  };
+
+  class Keys_container_with_mocked_system_keys_container_test : public ::testing::Test
+  {
+  protected:
+    virtual void SetUp()
+    {
+      std::string sample_key_data("Robi");
+      sample_key= new Key("Roberts_key", "AES", "Robert", sample_key_data.c_str(), sample_key_data.length()+1);
+
+      file_name= "/home/rob/write_key";
+    }
+    virtual void TearDown()
+    {
+      remove(file_name.c_str());
+    }
+  protected:
+    Key *sample_key;
+    char* sample_key_data;
+    std::string file_name;
+  };
+
+  TEST_F(Keys_container_with_mocked_system_keys_container_test, ErrorFromRotateKeyWhenStoringKey)
+  {
+    Mock_logger *logger= new Mock_logger();
+    Keys_container_with_system_keys_container_setter *keys_container= new Keys_container_with_system_keys_container_setter(logger);
+    IKeyring_io *keyring_io= new Buffered_file_io(logger);
+    Mock_system_keys_container *system_keys_container = new Mock_system_keys_container;
+    keys_container->set_system_keys_container(system_keys_container); 
+    EXPECT_EQ(keys_container->init(keyring_io, file_name), 0);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 0);
+
+    EXPECT_CALL(*system_keys_container, rotate_key_id_if_system_key_without_version(sample_key))
+      .WillOnce(Return(true)); // error on key rotation 
+    EXPECT_EQ(keys_container->store_key(sample_key), 1);
+    ASSERT_TRUE(keys_container->get_number_of_keys() == 0);
+
+    delete logger;
+    delete sample_key;
+    delete keys_container; 
+  }
+
   int main(int argc, char **argv) {
     if (mysql_rwlock_init(key_LOCK_keyring, &LOCK_keyring))
       return TRUE;
