@@ -5576,6 +5576,21 @@ Format_description_log_event(const char* buf, uint event_len,
   reset_crypto();
 }
 
+bool Format_description_log_event::start_decryption(Start_encryption_log_event* sele)
+{
+  DBUG_ASSERT(!crypto_data.is_enabled());
+
+  if (!sele->is_valid())
+    return true;
+  if (crypto_data.init(sele->crypto_scheme, sele->key_version, sele->nonce))
+  {     
+    sql_print_error("Failed to fetch percona_binlog key (version %u) from keyring and thus "
+                     "failed to initialize binlog encryption.", sele->key_version);
+    return true;
+  }
+  return false;
+}
+
 #ifndef MYSQL_CLIENT
 bool Format_description_log_event::write(IO_CACHE* file)
 {

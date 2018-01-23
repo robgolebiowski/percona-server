@@ -11,7 +11,10 @@ SET SESSION debug="+d,check_consecutive_binlog_key_versions";
 SELECT 1;
 SELECT 2;
 
-SELECT rotate_system_key("percona_binlog");
+--let $assert_text= Successfull rotation of percona_binlog
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_binlog\\"\\) = 1]" = 1
+--source include/assert.inc
+
 FLUSH LOGS;
 
 --echo # master-bin.000003
@@ -19,7 +22,10 @@ FLUSH LOGS;
 SELECT 3;
 SELECT 4;
 
-SELECT rotate_system_key("percona_binlog");
+--let $assert_text= Successfull rotation of percona_binlog
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_binlog\\"\\) = 1]" = 1
+--source include/assert.inc
+
 FLUSH LOGS;
 
 --echo # master-bin.000004
@@ -102,3 +108,45 @@ let remote=--read-from-remote-server --protocol=tcp --host=127.0.0.1 --port=$MAS
 let outfile=$MYSQLTEST_VARDIR/tmp/binlog_master-000001;
 exec $MYSQL_BINLOG --hexdump $remote >> $outfile;
 
+--echo # Check that only percona_binlog key can be rotated with rotate_system_key. This part of the test needs updating
+--echo # each time a new system key is added.
+
+--let $assert_text= It should not be possible to rotate key percona_binlog:
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_binlog:\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key percona_key
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_key\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key percona_123
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_123\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key percona_bin
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_bin\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key percona_b
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_b\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key percona_
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key percona
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"percona\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key system_key
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"system_key\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key system_key
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"system_key\\"\\) = 0]" = 1
+--source include/assert.inc
+
+--let $assert_text= It should not be possible to rotate key system_key
+--let $assert_cond= "[SELECT rotate_system_key\\(\\"123\\"\\) = 0]" = 1
+--source include/assert.inc

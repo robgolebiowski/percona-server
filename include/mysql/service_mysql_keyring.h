@@ -18,8 +18,16 @@
 
 #ifndef MYSQL_ABI_CHECK
 #include "m_string.h"
-// The caller must make sure this is properly formatted system key, i.e. it consist of 
 
+// System keys cannot have ':' in their name. We use ':' as a separator between
+// system key's name and system key's verision
+// Keep adding keys' names to valid_percona_system_keys in sorted order. We later do binary_search
+// on this table. Also update valid_percona_system_keys_size.
+MY_ATTRIBUTE((unused)) static const uint valid_percona_system_keys_size = 1;
+MY_ATTRIBUTE((unused)) static const char* valid_percona_system_keys[] = {"percona_binlog"};
+
+// Unused attribute can only be used with declaration - thus first there is a declaration of 
+// parse_system_key and then the defintion follows.
 static uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
                                uchar **key_data, size_t *key_data_length) MY_ATTRIBUTE((unused));
 

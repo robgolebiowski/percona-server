@@ -5112,6 +5112,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     {
       sql_print_error("Failed to fetch percona_binlog key from keyring and thus "
                       "failed to initialize binlog encryption.");
+      goto err;
     }
     DBUG_EXECUTE_IF("check_consecutive_binlog_key_versions",
                     { static uint next_key_version = 0;
