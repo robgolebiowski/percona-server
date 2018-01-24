@@ -36,7 +36,8 @@ MYSQL_ADD_PLUGIN(keyring_vault
                  ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
                  ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_impl.cc
                  ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
-                 vault_io.cc
+                 ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_key_adapter.cc
+                 ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
                  vault_key.cc
                  vault_base64.cc
                  vault_parser.cc
