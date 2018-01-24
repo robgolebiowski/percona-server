@@ -1671,6 +1671,15 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
          alg != binary_log::BINLOG_CHECKSUM_ALG_OFF))
       event_len= event_len - BINLOG_CHECKSUM_LEN;
 
+#ifdef MYSQL_CLIENT
+    // We know that binlog is encrypted (as we read Start_encryption event) and we know that
+    // client applications cannot decrypt encrypted binlogs as they have no access to 
+    // keyring. Thus we return Unknown_event for all encrypted events when force is used
+    static bool was_start_encryption_event = false;
+    if (was_start_encryption_event && force_opt)
+      DBUG_RETURN(new Unknown_log_event);  
+#endif
+
     switch(event_type) {
     case binary_log::QUERY_EVENT:
 #ifndef DBUG_OFF
@@ -1766,6 +1775,9 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       break;
     case binary_log::START_ENCRYPTION_EVENT:
       ev = new Start_encryption_log_event(buf, event_len, description_event);
+#ifdef MYSQL_CLIENT
+      was_start_encryption_event= true;
+#endif
       break;
     case binary_log::ROWS_QUERY_LOG_EVENT:
       ev= new Rows_query_log_event(buf, event_len, description_event);

@@ -17,55 +17,62 @@
 #define MYSQL_SERVICE_MYSQL_PLUGIN_KEYRING_INCLUDED
 
 #ifndef MYSQL_ABI_CHECK
-#include "m_string.h"
+#include <stdlib.h>
 
 // System keys cannot have ':' in their name. We use ':' as a separator between
 // system key's name and system key's verision
 // Keep adding keys' names to valid_percona_system_keys in sorted order. We later do binary_search
 // on this table. Also update valid_percona_system_keys_size.
-MY_ATTRIBUTE((unused)) static const uint valid_percona_system_keys_size = 1;
+MY_ATTRIBUTE((unused)) static const size_t valid_percona_system_keys_size = 1;
 MY_ATTRIBUTE((unused)) static const char* valid_percona_system_keys[] = {"percona_binlog"};
 
 // Unused attribute can only be used with declaration - thus first there is a declaration of 
 // parse_system_key and then the defintion follows.
-static uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
-                               uchar **key_data, size_t *key_data_length) MY_ATTRIBUTE((unused));
+static uchar* parse_system_key(const unsigned char *key, const size_t key_length, unsigned int *key_version,
+                               unsigned char **key_data, size_t *key_data_length) MY_ATTRIBUTE((unused));
 
-static uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
-                               uchar **key_data, size_t *key_data_length)
+static uchar* parse_system_key(const unsigned char *key, const size_t key_length, unsigned int *key_version,
+                               unsigned char **key_data, size_t *key_data_length)
 {
-  char *version = 0;
-  uint key_version_length = 0;
-  long key_version_long = 0;
+  unsigned int key_version_length= 0;
+  unsigned long ulong_key_version= 0;
+  char *version= 0, *endptr= 0;
+
+  if (key_length == 0)
+    return 0;
 
   for (; key[key_version_length] != ':' && key_version_length < key_length; ++key_version_length);
-  if (key_version_length == key_length)
-    return (uchar*)NullS; //no version found
+  if (key_version_length == 0 || key_version_length == key_length)
+    return 0; //no version found
 
   version= (char*)(my_malloc(PSI_NOT_INSTRUMENTED, sizeof(char)*key_version_length+1, MYF(0)));
   if (version == 0)
-    return (uchar*)NullS;
+    return 0;
 
   memcpy(version, key, key_version_length);
   version[key_version_length]= '\0';
+  endptr= version;
 
-  if (str2int(version, 10, 0, UINT_MAX, &key_version_long) == NullS)
+  ulong_key_version= strtoul(version, &endptr, 10);
+  if (ulong_key_version > UINT_MAX || *endptr != '\0')
   {
     my_free(version);
-    return (uchar*)NullS;
+    return 0; // convertion failed
   }
+
+  DBUG_ASSERT(ulong_key_version <= UINT_MAX); // sanity check
+  *key_version= (unsigned int)ulong_key_version;
+
   my_free(version);
-  DBUG_ASSERT(key_version_long >= 0 && key_version_long <= UINT_MAX); // sanity check
-  *key_version = (uint)key_version_long;
 
   *key_data_length= key_length - (key_version_length + 1); // skip ':' after key version
   if (*key_data_length == 0)
-    return (uchar*)NullS;
-  DBUG_ASSERT(*key_data_length < 512);
+    return 0;
+  DBUG_ASSERT(*key_data_length <= 512);
 
   *key_data= (uchar*)(my_malloc(PSI_NOT_INSTRUMENTED, sizeof(uchar)*(*key_data_length), MYF(0)));
   if (*key_data == 0)
-    return (uchar*)NullS;
+    return 0;
 
   memcpy(*key_data, key+key_version_length+1, *key_data_length); // skip ':' after key version
   return *key_data;

@@ -1124,7 +1124,7 @@ namespace keyring__keys_container_unittest
       std::string sample_key_data("Robi");
       sample_key= new Key("Roberts_key", "AES", "Robert", sample_key_data.c_str(), sample_key_data.length()+1);
 
-      file_name= "/home/rob/write_key";
+      file_name= "./write_key";
     }
     virtual void TearDown()
     {
@@ -1732,7 +1732,7 @@ namespace keyring__keys_container_unittest
       std::string sample_key_data("Robi");
       sample_key= new Key("Roberts_key", "AES", "Robert", sample_key_data.c_str(), sample_key_data.length()+1);
 
-      file_name= "/home/rob/write_key";
+      file_name= "./write_key";
     }
     virtual void TearDown()
     {
