@@ -5,9 +5,8 @@
 #ifdef MYSQL_SERVER
 #include <mysql/service_mysql_keyring.h>
 #include "log.h"
+#include <sstream>
 #endif
-#include <algorithm>
-#include <boost/move/unique_ptr.hpp>
 
 Binlog_crypt_data::Binlog_crypt_data()
   : key_length(0)
