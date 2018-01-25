@@ -1530,6 +1530,24 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
   DBUG_PRINT("info", ("binlog_version: %d", description_event->binlog_version));
   DBUG_DUMP("data", (unsigned char*) buf, event_len);
 
+#ifdef MYSQL_CLIENT
+    static bool was_start_encryption_event = false;
+    if (was_start_encryption_event)
+    {
+      // We know that binlog is encrypted (as we read Start_encryption event) and we know that
+      // client applications cannot decrypt encrypted binlogs as they have no access to
+      // keyring. Thus we return Unknown_event for all encrypted events when force is used
+      // and close mysqlbinlog when no force.
+      if (!force_opt)
+      {
+        *error= "No point in reading encrypted binlog - quitting. "
+                "Start mysqlbinlog with --force if you want to read unencrypted content.";
+        DBUG_RETURN(0);
+      }
+      DBUG_RETURN(new Unknown_log_event);
+    }
+#endif
+
   /* Check the integrity */
   if (event_len < EVENT_LEN_OFFSET ||
       event_len != uint4korr(buf+EVENT_LEN_OFFSET))
@@ -1671,14 +1689,6 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
          alg != binary_log::BINLOG_CHECKSUM_ALG_OFF))
       event_len= event_len - BINLOG_CHECKSUM_LEN;
 
-#ifdef MYSQL_CLIENT
-    // We know that binlog is encrypted (as we read Start_encryption event) and we know that
-    // client applications cannot decrypt encrypted binlogs as they have no access to 
-    // keyring. Thus we return Unknown_event for all encrypted events when force is used
-    static bool was_start_encryption_event = false;
-    if (was_start_encryption_event && force_opt)
-      DBUG_RETURN(new Unknown_log_event);  
-#endif
 
     switch(event_type) {
     case binary_log::QUERY_EVENT:

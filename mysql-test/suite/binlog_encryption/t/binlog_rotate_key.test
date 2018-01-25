@@ -50,11 +50,11 @@ exec $MYSQL_BINLOG $local --hexdump > $outfile;
 let filename= master-bin.000003;
 let local=$datadir/$filename;
 --error 1
-exec $MYSQL_BINLOG $local --hexdump > $outfile;
+exec $MYSQL_BINLOG $local --hexdump >> $outfile;
 let filename= master-bin.000004;
 let local=$datadir/$filename;
 --error 1
-exec $MYSQL_BINLOG $local --hexdump > $outfile;
+exec $MYSQL_BINLOG $local --hexdump >> $outfile;
 
 # Check that each generated binlog can be read by the server by using mysqlbinlog  with --read-from-remote-server
 # option
