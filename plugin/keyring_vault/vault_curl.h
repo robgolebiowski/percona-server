@@ -9,7 +9,7 @@
 #include "i_vault_curl.h"
 #include "logger.h"
 #include "vault_credentials.h"
-#include "vault_secure_string.h"
+#include "secure_string.h"
 #include "i_keyring_key.h"
 
 namespace keyring

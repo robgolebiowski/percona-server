@@ -1,7 +1,8 @@
 #ifndef MYSQL_VAULT_SECURE_STRING
 #define MYSQL_VAULT_SECURE_STRING
 
-#include "vault_memory.h"
+#include "keyring_memory.h"
+#include <sstream>
 
 namespace keyring
 {

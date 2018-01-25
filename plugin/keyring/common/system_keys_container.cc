@@ -1,4 +1,5 @@
 #include "system_keys_container.h"
+#include <sstream>
 #include <climits>
 
 namespace keyring {

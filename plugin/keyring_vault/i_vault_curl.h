@@ -3,7 +3,7 @@
 
 #include "i_keyring_key.h"
 #include "vault_credentials.h"
-#include "vault_secure_string.h"
+#include "secure_string.h"
 
 namespace keyring {
 

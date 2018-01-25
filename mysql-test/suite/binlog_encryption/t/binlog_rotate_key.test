@@ -1,3 +1,5 @@
+--source include/have_debug.inc
+
 --echo # Currently binlog is disabled. After initializing check_consecutive_binlog_key_versions we will restart the
 --echo # server with binlog enabled. check_consecutive_binlog_key_versions will make sure that a new version of
 --echo # percona_binlog key is used after each rotate_system_key followed by FLUSH LOGS calls.

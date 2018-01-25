@@ -4,7 +4,7 @@
 #include "my_global.h"
 #include "i_vault_parser.h"
 #include "logger.h"
-#include "vault_memory.h"
+#include "secure_string.h"
 
 namespace keyring
 {

@@ -7,7 +7,7 @@
 #include "mysqld.h"
 #include "mysql/service_thd_wait.h"
 #include "vault_curl.h"
-#include "vault_memory.h"
+#include "secure_string.h"
 #include "vault_base64.h"
 
 namespace keyring

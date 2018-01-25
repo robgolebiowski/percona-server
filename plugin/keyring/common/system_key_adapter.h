@@ -6,11 +6,6 @@ namespace keyring {
 class System_key_adapter : public IKey
 {
 public:
-  //System_key_adapter()
-    //: key_version(-1)
-    //, keyring_key(NULL)
-  //{}
-
   System_key_adapter(uint key_version, IKey *keyring_key)
     : key_version(key_version)
     , keyring_key(keyring_key)
@@ -18,7 +13,7 @@ public:
 
   void set_keyring_key(IKey *key, uint key_version)
   {
-    system_key_data.reset(NULL);
+    system_key_data.free();
     this->keyring_key = key;
     this->key_version = key_version;
   }
@@ -58,19 +53,19 @@ public:
   {
     DBUG_ASSERT(keyring_key != NULL);
 
-    if (system_key_data == NULL)
+    if (system_key_data.get_key_data() == NULL)
       construct_system_key_data();
 
-    return system_key_data.get();
+    return system_key_data.get_key_data();
   }
   virtual size_t get_key_data_size()
   {
     DBUG_ASSERT(keyring_key != NULL);
 
-    if (system_key_data == NULL)
+    if (system_key_data.get_key_data() == NULL)
       construct_system_key_data();
 
-    return system_key_data_length;
+    return system_key_data.get_key_data_size();
   }
   virtual size_t get_key_pod_size() const
   {
@@ -128,10 +123,24 @@ public:
   }
 
 private:
+  class System_key_data
+  {
+  public:
+    System_key_data();
+    ~System_key_data();
+
+    bool allocate(size_t key_data_size);
+    void free();
+    uchar *get_key_data();
+    size_t get_key_data_size();
+  private:
+    uchar *key_data;
+    size_t key_data_size;
+  };
+
   void construct_system_key_data();
 
-  boost::movelib::unique_ptr<uchar[]> system_key_data;
-  uint system_key_data_length;
+  System_key_data system_key_data;
   uint key_version;
   IKey *keyring_key;
 };
