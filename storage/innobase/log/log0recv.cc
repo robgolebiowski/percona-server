@@ -275,7 +275,9 @@ fil_name_process(
 					if (it->space_id == space->id) {
 						err = fil_set_encryption(
 							space->id,
-							Encryption::AES,
+							FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                                                          ? Encryption::AES
+                                                          : Encryption::ROTATED_KEYS,
 							it->key,
 							it->iv);
 						if (err != DB_SUCCESS) {
@@ -1593,7 +1595,9 @@ fil_write_encryption_parse(
 	} else {
 		ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
 
-		space->encryption_type = Encryption::AES;
+		space->encryption_type = FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                                         ? Encryption::ROTATED_KEYS
+                                         : Encryption::AES;
 		space->encryption_klen = ENCRYPTION_KEY_LEN;
 	}
 

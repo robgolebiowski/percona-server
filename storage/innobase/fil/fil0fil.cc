@@ -850,7 +850,9 @@ retry:
 		encrytion key and iv(initial vector) is readed. */
 		if (FSP_FLAGS_GET_ENCRYPTION(flags)
 		    && !recv_recovery_is_on()) {
-			if (space->encryption_type != Encryption::AES) {
+                        // TODO:Robert tu chyba bardziej powinienem sprawdzić czy encryption_type != Encryption::NONE ?
+			if (space->encryption_type != Encryption::AES &&
+                            space->encryption_type != Encryption::ROTATED_KEYS) {
 				ib::error()
 					<< "Can't read encryption"
 					<< " key from file "
@@ -3772,7 +3774,9 @@ fil_ibd_create(
 	/* For encryption tablespace, initial encryption information. */
 	if (FSP_FLAGS_GET_ENCRYPTION(space->flags)) {
 		err = fil_set_encryption(space->id,
-					 Encryption::AES,
+                                         FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                                                   ? Encryption::ROTATED_KEYS
+                                                   : Encryption::AES,
 					 NULL,
 					 NULL);
 		ut_ad(err == DB_SUCCESS);
@@ -3855,6 +3859,7 @@ fil_ibd_open(
 	bool		link_file_is_bad = false;
 	bool		is_shared = FSP_FLAGS_GET_SHARED(flags);
 	bool		is_encrypted = FSP_FLAGS_GET_ENCRYPTION(flags);
+        bool            is_rotated_keys  = FSP_FLAGS_GET_ROTATED_KEYS(flags);
 	Datafile	df_default;	/* default location */
 	Datafile	df_dict;	/* dictionary location */
 	RemoteDatafile	df_remote;	/* remote location */
@@ -4191,7 +4196,9 @@ skip_validate:
 			byte*	iv = df_current.m_encryption_iv;
 			ut_ad(key && iv);
 
-			err = fil_set_encryption(space->id, Encryption::AES,
+			err = fil_set_encryption(space->id,
+                                                 is_rotated_keys ? Encryption::ROTATED_KEYS
+                                                                 : Encryption::AES,
 						 key, iv);
 			ut_ad(err == DB_SUCCESS);
 		}
@@ -4674,7 +4681,9 @@ fil_ibd_load(
 	if (FSP_FLAGS_GET_ENCRYPTION(space->flags)
 	    && file.m_encryption_key != NULL) {
 		dberr_t err = fil_set_encryption(space->id,
-						 Encryption::AES,
+						 FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                                                   ? Encryption::ROTATED_KEYS
+                                                   : Encryption::AES,
 						 file.m_encryption_key,
 						 file.m_encryption_iv);
 		if (err != DB_SUCCESS) {
@@ -6633,6 +6642,18 @@ fil_tablespace_iterate(
 					" tablespace, but the data file which"
 					" trying to import is an encrypted"
 					" tablespace";
+				err = DB_IO_NO_ENCRYPT_TABLESPACE;
+			}
+		}
+
+		if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags)) {
+			ut_ad(table->encryption_key != NULL);
+
+			if (!dict_table_is_rotated_keys(table)) {
+				ib::error() << "Table is not in an encrypted"
+					" tablespace with rotated keys, but the data file which"
+					" trying to import is an encrypted"
+					" tablespace with rotated keys";
 				err = DB_IO_NO_ENCRYPT_TABLESPACE;
 			}
 		}

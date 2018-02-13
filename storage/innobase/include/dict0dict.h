@@ -1002,7 +1002,8 @@ ulint
 dict_tf_to_fsp_flags(
 	ulint	table_flags,
 	bool	is_temp,
-	bool	is_encrypted = false)
+	bool	is_encrypted = false,
+        bool    is_rotated_keys = false)
 	MY_ATTRIBUTE((const));
 
 /** Extract the page size from table flags.

@@ -232,6 +232,7 @@ fsp_flags_is_valid(
 	bool	is_shared = FSP_FLAGS_GET_SHARED(flags);
 	bool	is_temp = FSP_FLAGS_GET_TEMPORARY(flags);
 	bool	is_encryption = FSP_FLAGS_GET_ENCRYPTION(flags);
+        bool    is_rotated_keys = FSP_FLAGS_GET_ROTATED_KEYS(flags);
 
 	ulint	unused = FSP_FLAGS_GET_UNUSED(flags);
 
@@ -254,7 +255,7 @@ fsp_flags_is_valid(
 	}
 
 	/* Make sure there are no bits that we do not know about. */
-	if (unused != 0) {
+	if (unused != 0 && !is_rotated_keys) {
 		return(false);
 	}
 
@@ -282,6 +283,10 @@ fsp_flags_is_valid(
 	if (is_encryption && is_temp) {
 		return(false);
 	}
+
+        if (is_rotated_keys && !is_encryption) {
+                return(false);
+        }
 
 #if UNIV_FORMAT_MAX != UNIV_FORMAT_B
 # error UNIV_FORMAT_MAX != UNIV_FORMAT_B, Add more validations.
@@ -884,12 +889,96 @@ fsp_header_get_encryption_offset(
 	return offset;
 }
 
+bool
+fsp_header_fill_encryption_info_for_rotated_keys(
+	fil_space_t*		space,
+	byte*			encrypt_info)
+{
+	byte*			ptr;
+        byte			key_info[ENCRYPTION_KEY_LEN * 2];
+	ulint			crc;
+//#ifdef	UNIV_ENCRYPT_DEBUG
+	//const byte*		data;
+	//ulint			i;
+//#endif
+
+	/* Get master key from key ring */
+
+        //TODO:Przecież ja tu nie mam ptr //TODO:Do zmiany
+        //if (memcmp(space->encryption_key, "percona_innodb_", 15) != 0)
+        //{
+          //Encryption::get_master_key(&master_key_id, &master_key, &version);
+          //if (master_key == NULL) {
+                  //return(false);
+          //}
+        //}
+
+	memset(encrypt_info, 0, ENCRYPTION_INFO_SIZE_V2);
+	//memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
+
+	/* Use the new master key to encrypt the tablespace
+	key. */
+	ut_ad(encrypt_info != NULL);
+	ptr = encrypt_info;
+
+	/* Write magic header. */
+	//if (version == Encryption::ENCRYPTION_VERSION_1) {
+		//memcpy(ptr, ENCRYPTION_KEY_MAGIC_V1, ENCRYPTION_MAGIC_SIZE);
+	//} else {
+		//memcpy(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE);
+	//}
+
+	memcpy(ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
+	ptr += ENCRYPTION_MAGIC_SIZE;
+
+	/* Write master key id. */
+	ptr += sizeof(ulint);//TODO:skip writting master_key_id, mach_write_to_4(ptr, master_key_id);
+	ptr += sizeof(ulint);//TODO:change this to ptr += 2*sizeof(ulint)
+
+	/* Write server uuid. */
+        memcpy(ptr, Encryption::uuid, ENCRYPTION_SERVER_UUID_LEN);
+        ptr += ENCRYPTION_SERVER_UUID_LEN;
+
+	/* Write tablespace key to temp space. */
+	memcpy(key_info, &space->id, 4);
+        memcpy(key_info + 4, &space->key_version, 4);
+               
+	/* Write tablespace iv to temp space. */
+	memcpy(key_info + ENCRYPTION_KEY_LEN,
+	       space->encryption_iv,
+	       ENCRYPTION_KEY_LEN);
+
+//#ifdef	UNIV_ENCRYPT_DEBUG
+	//fprintf(stderr, "Set %lu:%lu ",space->id,
+		//Encryption::master_key_id);
+	//for (data = (const byte*) master_key, i = 0;
+	     //i < ENCRYPTION_KEY_LEN; i++)
+		//fprintf(stderr, "%02lx", (ulong)*data++);
+	//fprintf(stderr, " ");
+	//for (data = (const byte*) space->encryption_key,
+	     //i = 0; i < ENCRYPTION_KEY_LEN; i++)
+		//fprintf(stderr, "%02lx", (ulong)*data++);
+	//fprintf(stderr, " ");
+	//for (data = (const byte*) space->encryption_iv,
+	     //i = 0; i < ENCRYPTION_KEY_LEN; i++)
+		//fprintf(stderr, "%02lx", (ulong)*data++);
+	//fprintf(stderr, "\n");
+//#endif
+
+       ptr += ENCRYPTION_KEY_LEN * 2;
+          /* Write checksum bytes. */
+       crc = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
+       mach_write_to_4(ptr, crc);
+
+       return(true);
+}
+
 /** Fill the encryption info.
 @param[in]	space		tablespace
 @param[in,out]	encrypt_info	buffer for encrypt key.
 @return true if success. */
 bool
-fsp_header_fill_encryption_info(
+fsp_header_fill_encryption_info_for_master_key(
 	fil_space_t*		space,
 	byte*			encrypt_info)
 {
@@ -906,15 +995,10 @@ fsp_header_fill_encryption_info(
 #endif
 
 	/* Get master key from key ring */
-
-        //TODO:Przecież ja tu nie mam ptr
-        if (memcmp(ptr, "percona_innodb_", 15) != 0)
-        {
-          Encryption::get_master_key(&master_key_id, &master_key, &version);
-          if (master_key == NULL) {
-                  return(false);
-          }
-        }
+	Encryption::get_master_key(&master_key_id, &master_key, &version);
+	if (master_key == NULL) {
+		return(false);
+	}
 
 	memset(encrypt_info, 0, ENCRYPTION_INFO_SIZE_V2);
 	memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
@@ -968,37 +1052,39 @@ fsp_header_fill_encryption_info(
 		fprintf(stderr, "%02lx", (ulong)*data++);
 	fprintf(stderr, "\n");
 #endif
-        if (memcmp(ptr, "percona_innodb_", 15) != 0)
-        {
-          /* Encrypt tablespace key and iv. */
-          elen = my_aes_encrypt(
-                  key_info,
-                  ENCRYPTION_KEY_LEN * 2,
-                  ptr,
-                  master_key,
-                  ENCRYPTION_KEY_LEN,
-                  my_aes_256_ecb,
-                  NULL, false);
+	/* Encrypt tablespace key and iv. */
+	elen = my_aes_encrypt(
+		key_info,
+		ENCRYPTION_KEY_LEN * 2,
+		ptr,
+		master_key,
+		ENCRYPTION_KEY_LEN,
+		my_aes_256_ecb,
+		NULL, false);
 
-          if (elen == MY_AES_BAD_DATA) {
-                  my_free(master_key);
-                  return(false);
-          }
+	if (elen == MY_AES_BAD_DATA) {
+		my_free(master_key);
+		return(false);
+	}
 
-          ptr += ENCRYPTION_KEY_LEN * 2;
+	ptr += ENCRYPTION_KEY_LEN * 2;
 
-          /* Write checksum bytes. */
-          crc = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
-          mach_write_to_4(ptr, crc);
+	/* Write checksum bytes. */
+	crc = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
+	mach_write_to_4(ptr, crc);
 
-          my_free(master_key);
-        }
-        else 
-        {
-          //do not encrypt anything
-          memcpy(ptr, key_info, ENCRYPTION_KEY_LEN * 2); 
-        }
+	my_free(master_key);
 	return(true);
+}
+
+bool
+fsp_header_fill_encryption_info(
+	fil_space_t*		space,
+	byte*			encrypt_info)
+{
+  return (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
+         ? fsp_header_fill_encryption_info_for_rotated_keys(space, encrypt_info)
+         : fsp_header_fill_encryption_info_for_master_key(space, encrypt_info);
 }
 
 /** Rotate the encryption info in the space header.
@@ -1199,14 +1285,8 @@ fsp_header_get_page_size(
 	return(page_size_t(fsp_header_get_flags(page)));
 }
 
-/** Decoding the encryption info
-from the first page of a tablespace.
-@param[in/out]	key		key
-@param[in/out]	iv		iv
-@param[in]	encryption_info	encrytion info.
-@return true if success */
 bool
-fsp_header_decode_encryption_info(
+fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 	byte*		key,
 	byte*		iv,
 	byte*		encryption_info)
@@ -1226,32 +1306,10 @@ fsp_header_decode_encryption_info(
 #endif
 
 	ptr = encryption_info;
-
-	/* For compatibility with 5.7.11, we need to handle the
-	encryption information which created in this old version. */
-	if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_V1,
-		     ENCRYPTION_MAGIC_SIZE) == 0) {
-		version = Encryption::ENCRYPTION_VERSION_1;
-	} else {
-		version = Encryption::ENCRYPTION_VERSION_2;
-	}
-
-	/* Check magic. */
-	if (version == Encryption::ENCRYPTION_VERSION_2
-	    && memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE) != 0) {
-		/* We ignore report error for recovery,
-		since the encryption info maybe hasn't writen
-		into datafile when the table is newly created. */
-		if (!recv_recovery_is_on()) {
-			return(false);
-		} else {
-			return(true);
-		}
-	}
-	ptr += ENCRYPTION_MAGIC_SIZE;
+	ptr += ENCRYPTION_MAGIC_SIZE; // skip magic, we already know what it is
 
 	/* Get master key id. */
-	master_key_id = mach_read_from_4(ptr);
+	ptr += sizeof(ulint); // skip master_key_id, we do not use it
 	ptr += sizeof(ulint);
 
 	/* Get server uuid. */
@@ -1260,25 +1318,6 @@ fsp_header_decode_encryption_info(
 		memcpy(srv_uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
 		ptr += ENCRYPTION_SERVER_UUID_LEN;
 	}
-
-        /* Now the ptr points to key in tablespace, let's check if this is not innodb key id
-         * of the key stored inside innodb TODO:Make this comment better */
-        if (memcmp(ptr, "percona_innodb_", 15) == 0)
-        {
-	  byte*	percona_innodb_key= NULL; //TODO: Czy to nie powinno wylądować na początku pliku, tam gdzie jest reszta zmiennych?
-          //ptr += 15; //skip percona_innodb
-	  ulint space_id = mach_read_from_4(ptr + 15); //skip percona_innodb prefix
-          Encryption::get_master_key(space_id, srv_uuid, &percona_innodb_key); //To jest tymczasowe, będzie musiało być całe, tj. percona_innodb_spaceid
-          //TODO: jeszcze trzeba pomyśleć o key id z wersją
-          if (percona_innodb_key == NULL)
-            return (false);
-	  memcpy(key, percona_innodb_key, ENCRYPTION_KEY_LEN);
-          my_free(percona_innodb_key);
-          memcpy(iv, ptr + ENCRYPTION_KEY_LEN,
-	         ENCRYPTION_KEY_LEN);
-          return (true);
-        }
-
 
 	/* Get master key by key id. */
 	memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
@@ -1351,6 +1390,152 @@ fsp_header_decode_encryption_info(
 	}
 
 	return(true);
+}
+
+/** Decoding the encryption info
+from the first page of a tablespace.
+@param[in/out]	key		key
+@param[in/out]	iv		iv
+@param[in]	encryption_info	encrytion info.
+@return true if success */
+bool
+fsp_header_decode_encryption_info_for_master_key_encryption(
+	byte*		key,
+	byte*		iv,
+	byte*		encryption_info)
+{
+	byte*			ptr;
+	ulint			master_key_id;
+	byte*			master_key = NULL;
+	lint			elen;
+	byte			key_info[ENCRYPTION_KEY_LEN * 2];
+	ulint			crc1;
+	ulint			crc2;
+	char			srv_uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
+	Encryption::Version	version;
+#ifdef	UNIV_ENCRYPT_DEBUG
+	const byte*		data;
+	ulint			i;
+#endif
+
+	ptr = encryption_info;
+
+	/* For compatibility with 5.7.11, we need to handle the
+	encryption information which created in this old version. */
+	if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_V1,
+		     ENCRYPTION_MAGIC_SIZE) == 0) {
+		version = Encryption::ENCRYPTION_VERSION_1;
+	} else {
+		version = Encryption::ENCRYPTION_VERSION_2;
+	}
+
+	/* Check magic. */
+	if (version == Encryption::ENCRYPTION_VERSION_2
+	    && memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE) != 0) {
+		/* We ignore report error for recovery,
+		since the encryption info maybe hasn't writen
+		into datafile when the table is newly created. */
+		if (!recv_recovery_is_on()) {
+			return(false);
+		} else {
+			return(true);
+		}
+	}
+	ptr += ENCRYPTION_MAGIC_SIZE;
+
+	/* Get master key id. */
+	master_key_id = mach_read_from_4(ptr);
+	ptr += sizeof(ulint);
+
+	/* Get server uuid. */
+	if (version == Encryption::ENCRYPTION_VERSION_2) {
+		memset(srv_uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
+		memcpy(srv_uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
+		ptr += ENCRYPTION_SERVER_UUID_LEN;
+	}
+
+	/* Get master key by key id. */
+	memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
+	if (version == Encryption::ENCRYPTION_VERSION_1) {
+		Encryption::get_master_key(master_key_id, NULL, &master_key);
+	} else {
+		Encryption::get_master_key(master_key_id, srv_uuid, &master_key);
+	}
+        if (master_key == NULL) {
+                return(false);
+        }
+
+#ifdef	UNIV_ENCRYPT_DEBUG
+	fprintf(stderr, "%lu ", master_key_id);
+	for (data = (const byte*) master_key, i = 0;
+	     i < ENCRYPTION_KEY_LEN; i++)
+		fprintf(stderr, "%02lx", (ulong)*data++);
+#endif
+
+	/* Decrypt tablespace key and iv. */
+	elen = my_aes_decrypt(
+		ptr,
+		ENCRYPTION_KEY_LEN * 2,
+		key_info,
+		master_key,
+		ENCRYPTION_KEY_LEN,
+		my_aes_256_ecb, NULL, false);
+
+	if (elen == MY_AES_BAD_DATA) {
+		my_free(master_key);
+		return(NULL);
+	}
+
+	/* Check checksum bytes. */
+	ptr += ENCRYPTION_KEY_LEN * 2;
+
+	crc1 = mach_read_from_4(ptr);
+	crc2 = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
+	if (crc1 != crc2) {
+		ib::error() << "Failed to decrpt encryption information,"
+			<< " please check key file is not changed!";
+		my_free(master_key);
+		return(false);
+	}
+
+	/* Get tablespace key */
+	memcpy(key, key_info, ENCRYPTION_KEY_LEN);
+
+	/* Get tablespace iv */
+	memcpy(iv, key_info + ENCRYPTION_KEY_LEN,
+	       ENCRYPTION_KEY_LEN);
+
+#ifdef	UNIV_ENCRYPT_DEBUG
+	fprintf(stderr, " ");
+	for (data = (const byte*) key,
+	     i = 0; i < ENCRYPTION_KEY_LEN; i++)
+		fprintf(stderr, "%02lx", (ulong)*data++);
+	fprintf(stderr, " ");
+	for (data = (const byte*) iv,
+	     i = 0; i < ENCRYPTION_KEY_LEN; i++)
+		fprintf(stderr, "%02lx", (ulong)*data++);
+	fprintf(stderr, "\n");
+#endif
+
+	my_free(master_key);
+
+	if (Encryption::master_key_id < master_key_id) {
+		Encryption::master_key_id = master_key_id;
+		memcpy(Encryption::uuid, srv_uuid, ENCRYPTION_SERVER_UUID_LEN);
+	}
+
+	return(true);
+}
+
+bool
+fsp_header_decode_encryption_info(
+	byte*		key,
+	byte*		iv,
+	byte*		encryption_info)
+{
+        return memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0 
+               ? fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, encryption_info)
+               : fsp_header_decode_encryption_info_for_master_key_encryption(key, iv, encryption_info);
 }
 
 /** Reads the encryption key from the first page of a tablespace.

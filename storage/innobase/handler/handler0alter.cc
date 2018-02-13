@@ -4604,6 +4604,9 @@ prepare_inplace_alter_table_dict(
 		    && !DICT_TF2_FLAG_SET(ctx->old_table,
 					  DICT_TF2_ENCRYPTION)) {
 
+                  //TODO:Robert to jest inplace rotation - jest niemożliwe, jeżeli obecnie tablica nie jest zaszyfrowana i zmieniamy
+                  //na szyfrowaną, powrócić do tego później.
+
 			dict_mem_table_free( ctx->new_table);
 			my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
 			goto new_clustered_failed;

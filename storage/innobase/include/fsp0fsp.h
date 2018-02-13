@@ -681,7 +681,8 @@ fsp_flags_init(
 	bool			has_data_dir,
 	bool			is_shared,
 	bool			is_temporary,
-	bool			is_encrypted = false);
+	bool			is_encrypted = false,
+        bool                    is_rotated_keys = false);
 
 /** Convert a 32 bit integer tablespace flags to the 32 bit table flags.
 This can only be done for a tablespace that was built as a file-per-table

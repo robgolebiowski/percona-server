@@ -251,7 +251,11 @@ it is for a single client and should be deleted upon startup if it exists. */
 /** Width of the encryption flag.  This flag indicates that the tablespace
 is a tablespace with encryption. */
 #define FSP_FLAGS_WIDTH_ENCRYPTION	1
+
+#define FSP_FLAGS_WIDTH_ROTATED_KEYS    1
+
 /** Width of all the currently known tablespace flags */
+// TODO:Robert change this to FSP_FLAGS_WIDTH_MYSQL
 #define FSP_FLAGS_WIDTH		(FSP_FLAGS_WIDTH_POST_ANTELOPE	\
 				+ FSP_FLAGS_WIDTH_ZIP_SSIZE	\
 				+ FSP_FLAGS_WIDTH_ATOMIC_BLOBS	\
@@ -262,6 +266,7 @@ is a tablespace with encryption. */
 				+ FSP_FLAGS_WIDTH_ENCRYPTION)
 
 /** A mask of all the known/used bits in tablespace flags */
+// TODO:Robert change to MYSQL
 #define FSP_FLAGS_MASK		(~(~0 << FSP_FLAGS_WIDTH))
 
 /** Zero relative shift position of the POST_ANTELOPE field */
@@ -290,6 +295,8 @@ is a tablespace with encryption. */
 /** Zero relative shift position of the start of the UNUSED bits */
 #define FSP_FLAGS_POS_UNUSED		(FSP_FLAGS_POS_ENCRYPTION	\
 					+ FSP_FLAGS_WIDTH_ENCRYPTION)
+
+#define FSP_FLAGS_POS_ROTATED_KEYS     31
 
 /** Bit mask of the POST_ANTELOPE field */
 #define FSP_FLAGS_MASK_POST_ANTELOPE				\
@@ -323,6 +330,10 @@ is a tablespace with encryption. */
 #define FSP_FLAGS_MASK_ENCRYPTION				\
 		((~(~0U << FSP_FLAGS_WIDTH_ENCRYPTION))		\
 		<< FSP_FLAGS_POS_ENCRYPTION)
+
+#define FSP_FLAGS_MASK_ROTATED_KEYS                             \
+		((~(~0U << FSP_FLAGS_WIDTH_ROTATED_KEYS))       \
+		<< FSP_FLAGS_POS_ROTATED_KEYS)
 
 /** Return the value of the POST_ANTELOPE field */
 #define FSP_FLAGS_GET_POST_ANTELOPE(flags)			\
@@ -359,6 +370,13 @@ is a tablespace with encryption. */
 /** Return the contents of the UNUSED bits */
 #define FSP_FLAGS_GET_UNUSED(flags)				\
 		(flags >> FSP_FLAGS_POS_UNUSED)
+
+//TODO: Robert ^^ rename this to FSP_FLAGS_GET_UNUSED_MYSQL ?
+
+#define FSP_FLAGS_GET_ROTATED_KEYS(flags)			\
+		((flags & FSP_FLAGS_MASK_ROTATED_KEYS)		\
+		>> FSP_FLAGS_POS_ROTATED_KEYS)
+
 
 /** Use an alias in the code for FSP_FLAGS_GET_SHARED() */
 #define fsp_is_shared_tablespace FSP_FLAGS_GET_SHARED
