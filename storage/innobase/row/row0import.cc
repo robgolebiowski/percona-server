@@ -3708,6 +3708,20 @@ row_import_for_mysql(
 			return(row_import_error(prebuilt, trx, err));
 		}
 
+		if (!dict_table_is_rotated_keys(table)
+		    && space_flags != 0
+		    && FSP_FLAGS_GET_ROTATED_KEYS(space_flags)) {
+
+			ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
+				 ER_TABLE_SCHEMA_MISMATCH,
+				 "Table is not marked as encrypted with rotated keys, but"
+				 " the tablespace is marked as encrypted with rotated keys");
+
+			err = DB_ERROR;
+			return(row_import_error(prebuilt, trx, err));
+		}
+
+
 		/* If table is set to encrypted, but can't find
 		cfp file, then return error. */
 		if (cfg.m_cfp_missing== true

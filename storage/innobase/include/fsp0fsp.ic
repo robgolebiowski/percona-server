@@ -181,6 +181,7 @@ fsp_flags_set_page_size(
 @param[in]	is_shared	This tablespace can be shared by many tables.
 @param[in]	is_temporary	This tablespace is temporary.
 @param[in]	is_encrypted	This tablespace is encrypted.
+@param[in]      is_rotated_keys This tablespace is encrypted with rotated keys (is_encrypted will be also true)
 @return tablespace flags after initialization */
 UNIV_INLINE
 ulint
@@ -190,10 +191,13 @@ fsp_flags_init(
 	bool			has_data_dir,
 	bool			is_shared,
 	bool			is_temporary,
-	bool			is_encrypted)
+	bool			is_encrypted,
+        bool                    is_rotated_keys)
 {
 	ut_ad(page_size.physical() <= page_size.logical());
 	ut_ad(!page_size.is_compressed() || atomic_blobs);
+        // when is_rotated_keys is true, also is_encrypted needs to be true
+        ut_ad(is_rotated_keys ? is_encrypted : true);
 
 	/* Page size should be a power of two between UNIV_PAGE_SIZE_MIN
 	and UNIV_PAGE_SIZE, but zip_size may be 0 if not compressed. */
@@ -227,6 +231,10 @@ fsp_flags_init(
 	if (is_encrypted) {
 		flags |= FSP_FLAGS_MASK_ENCRYPTION;
 	}
+
+        if (is_rotated_keys) {
+                flags |= FSP_FLAGS_MASK_ROTATED_KEYS;
+        }
 
 	return(flags);
 }

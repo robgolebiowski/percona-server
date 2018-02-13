@@ -2667,6 +2667,13 @@ Encryption::is_none(const char* algorithm)
 	return(false);
 }
 
+bool
+Encryption::is_rotated_keys(const char *algoritm)
+{
+       return (algoritm != NULL &&
+               innobase_strcasecmp(algoritm, "rotated_keys") == 0);
+}
+
 /** Check the encryption option and set it
 @param[in]	option		encryption option
 @param[in/out]	encryption	The encryption algorithm
@@ -2696,7 +2703,7 @@ Encryption::set_algorithm(
 	return(DB_SUCCESS);
 }
 
-/** Check for supported ENCRYPT := (Y | N) supported values
+/** Check for supported ENCRYPT := (Y | N | ROTATED_KEYS) supported values
 @param[in]	option		Encryption option
 @param[out]	encryption	The encryption algorithm
 @return DB_SUCCESS or DB_UNSUPPORTED */
@@ -11075,21 +11082,31 @@ err_col:
 			ulint			master_key_id;
 			Encryption::Version	version;
 
-			/* Check if keyring is ready. */
-			Encryption::get_master_key(&master_key_id,
-						   &master_key,
-						   &version);
+                        if (Encryption::is_rotated_keys(encrypt))
+                        {
+                              // TODO: Czy powininem tutaj już wygenerować klucz dla tablicy
+                              // i zapisać w keyringu ?
+                              DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+                              DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
+                        }
+                        else
+                        {
+                          /* Check if keyring is ready. */
+                          Encryption::get_master_key(&master_key_id,
+                                                     &master_key,
+                                                     &version);
 
-			if (master_key == NULL) {
-				my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
-					 MYF(0));
-				err = DB_UNSUPPORTED;
-				dict_mem_table_free(table);
-			} else {
-				my_free(master_key);
-				DICT_TF2_FLAG_SET(table,
-						  DICT_TF2_ENCRYPTION);
-			}
+                          if (master_key == NULL) {
+                                  my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+                                           MYF(0));
+                                  err = DB_UNSUPPORTED;
+                                  dict_mem_table_free(table);
+                          } else {
+                                  my_free(master_key);
+                                  DICT_TF2_FLAG_SET(table,
+                                                    DICT_TF2_ENCRYPTION);
+                          }
+                        }
 		}
 
 		if (err == DB_SUCCESS) {
@@ -11751,6 +11768,25 @@ create_table_info_t::create_option_encryption_is_valid() const
 		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
 			"InnoDB: Tablespace `%s` can contain only an"
 			" ENCRYPTED tables.", MYF(0), tablespace_name);
+		return(false);
+	}
+
+        //TODO:Robert, czy powinno być możliwe tworzenie rotated keys tables w rotated keys tablespace ?
+
+        bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
+        bool tablespace_is_rotated_keys = FSP_FLAGS_GET_ROTATED_KEYS(fsp_flags);
+
+	if (table_is_rotated_keys && !tablespace_is_rotated_keys) {
+		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+			"InnoDB: Tablespace `%s` cannot contain an"
+			" ENCRYPTED table with key rotation.", MYF(0), tablespace_name);
+		return(false);
+	}
+
+	if (!table_is_rotated_keys && tablespace_is_rotated_keys) {
+		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+			"InnoDB: Tablespace `%s` can contain only an"
+			" ENCRYPTED tables with key rotation.", MYF(0), tablespace_name);
 		return(false);
 	}
 

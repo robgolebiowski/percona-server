@@ -344,6 +344,8 @@ static const char ENCRYPTION_KEY_MAGIC_V1[] = "lCA";
 version. */
 static const char ENCRYPTION_KEY_MAGIC_V2[] = "lCB";
 
+static const char ENCRYPTION_KEY_MAGIC_PS_V1[] = "PSA";
+
 /** Encryption master key prifix */
 static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
 
@@ -454,6 +456,12 @@ struct Encryption {
         @param[in]      algorithm       Encryption algorithm to check
         @return true if no algorithm requested */
 	static bool is_none(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
+        static bool is_rotated_keys(const char *algoritm)
+		MY_ATTRIBUTE((warn_unused_result));
+
+        static Type string_to_encryption_type(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
 
         /** Generate random encryption value for key and iv.

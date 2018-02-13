@@ -268,6 +268,9 @@ it is not created by user and so not visible to end-user. */
 /** Encryption table bit. */
 #define DICT_TF2_ENCRYPTION		256
 
+/** Rotated keys bit, 2^31 */
+#define DICT_TF2_ROTATED_KEYS           2147483648
+
 /* @} */
 
 #define DICT_TF2_FLAG_SET(table, flag)		\

@@ -1608,9 +1608,11 @@ dict_check_sys_tables(
 		/* Check that the .ibd file exists. */
 		bool	is_temp = flags2 & DICT_TF2_TEMPORARY;
 		bool	is_encrypted = flags2 & DICT_TF2_ENCRYPTION;
+                bool    is_rotated_keys = flags2 & DICT_TF2_ROTATED_KEYS;
 		ulint	fsp_flags = dict_tf_to_fsp_flags(flags,
 							 is_temp,
-							 is_encrypted);
+							 is_encrypted,
+                                                         is_rotated_keys);
 
 		dberr_t	err = fil_ibd_open(
 			validate,
