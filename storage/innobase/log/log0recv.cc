@@ -276,8 +276,8 @@ fil_name_process(
 						err = fil_set_encryption(
 							space->id,
 							FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
-                                                          ? Encryption::AES
-                                                          : Encryption::ROTATED_KEYS,
+                                                          ? Encryption::ROTATED_KEYS
+                                                          : Encryption::AES,
 							it->key,
 							it->iv);
 						if (err != DB_SUCCESS) {

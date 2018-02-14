@@ -9059,6 +9059,67 @@ void Encryption::random_value(byte* value)
 	my_rand_buffer(value, ENCRYPTION_KEY_LEN);
 }
 
+/** Create tablespace key. 
+@param[in,out]	tablespace_key	tablespace key */
+// TODO:Robert może powinienem to zrefaktorować, create_master_key i to miały wspólne funkcje ?
+// TODO:z drugiej strony zmiany do code-base'u powinny być jak najmniejsze
+
+void
+Encryption::create_tablespace_key(byte** tablespace_key,
+                                  ulint tablespace_key_version,
+                                  ulint space_id)
+{
+#ifndef UNIV_INNOCHECKSUM
+	char*	key_type = NULL;
+	size_t	key_len;
+	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+	int	ret;
+
+        //ulint master_key_id = space_id == 0 ? this->master_key_id : space_id;
+
+	/* If uuid does not match with current server uuid,
+	set uuid as current server uuid. */
+	if (strcmp(uuid, server_uuid) != 0) {
+		memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
+	}
+	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+	/* Generate new tablespace key */
+        // key name should not contain version, as this is first version, it will get assigned version 0
+	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    "%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    uuid, space_id);
+
+	/* We call key ring API to generate master key here. */
+	ret = my_key_generate(key_name, "AES",
+			      NULL, ENCRYPTION_KEY_LEN);
+
+        if (ret)
+        {
+          ib::error() << "Encryption can't generate tablespace key";
+          *tablespace_key = NULL;
+        }
+
+        byte *system_tablespace_key = NULL;
+	/* We call key ring API to get tablespace key here. */
+	ret = my_key_fetch(key_name, &key_type, NULL,
+			   reinterpret_cast<void**>(system_tablespace_key),
+			   &key_len);
+
+	if (ret || *tablespace_key == NULL) {
+		ib::error() << "Encryption can't find tablespace key, please check"
+				" that the keyring plugin is loaded.";
+		*tablespace_key = NULL;
+	} 
+	if (key_type) {
+		my_free(key_type);
+	}
+        
+
+#endif
+}
+
+
 /** Create new master key for key rotation.
 @param[in,out]	master_key	master key */
 void
@@ -9108,6 +9169,61 @@ Encryption::create_master_key(byte** master_key,
 #endif
 }
 
+void
+Encryption::get_keyring_key(const char *key_name,
+                            byte** key, size_t *key_len)
+{
+        int ret;
+	char*	key_type = NULL;
+	//size_t	key_len;
+	/* We call key ring API to get master key here. */
+	ret = my_key_fetch(key_name, &key_type, NULL,
+			   reinterpret_cast<void**>(key), key_len);
+
+	if (key_type) {
+		my_free(key_type);
+	}
+
+	if (ret) {
+		*key = NULL;
+	}
+}
+                            
+
+void
+Encryption::get_tablespace_key(ulint space_id,
+			   char* srv_uuid,
+                           ulint tablespace_key_version,
+			   byte** tablespace_key)
+{
+#ifndef UNIV_INNOCHECKSUM
+	size_t	key_len;
+	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+
+	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    "%s-%s-%lu:%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    srv_uuid, space_id, tablespace_key_version);
+
+        get_keyring_key(key_name, tablespace_key, &key_len);
+
+	if (*tablespace_key == NULL) {
+		ib::error() << "Encryption can't find master key, please check"
+				" the keyring plugin is loaded.";
+	}
+
+#ifdef UNIV_ENCRYPT_DEBUG
+	if (*tablespace_key) {
+		fprintf(stderr, "Fetched tablespace key:%s ", key_name);
+		ut_print_buf(stderr, *tablespace_key, key_len);
+		fprintf(stderr, "\n");
+	}
+#endif /* DEBUG_TDE */
+
+#endif
+}
+
 /** Get master key by key id.
 @param[in]	master_key_id	master key id
 @param[in]	srv_uuid	uuid of server instance
@@ -9118,10 +9234,8 @@ Encryption::get_master_key(ulint master_key_id,
 			   byte** master_key)
 {
 #ifndef UNIV_INNOCHECKSUM
-	char*	key_type = NULL;
 	size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
-	int	ret;
 
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
@@ -9139,21 +9253,12 @@ Encryption::get_master_key(ulint master_key_id,
 	}
 
 	/* We call key ring API to get master key here. */
-	ret = my_key_fetch(key_name, &key_type, NULL,
-			   reinterpret_cast<void**>(master_key), &key_len);
-
-	if (key_type) {
-		my_free(key_type);
-	}
-
-	if (ret) {
-		*master_key = NULL;
-		ib::error() << "Encryption can't find master key, please check"
-				" the keyring plugin is loaded.";
-	}
-
+        get_keyring_key(key_name, master_key, &key_len);
+        if (*master_key == NULL)
+	  ib::error() << "Encryption can't find master key, please check"
+                         " the keyring plugin is loaded.";
 #ifdef UNIV_ENCRYPT_DEBUG
-	if (!ret && *master_key) {
+	if (*master_key) {
 		fprintf(stderr, "Fetched master key:%lu ", master_key_id);
 		ut_print_buf(stderr, *master_key, key_len);
 		fprintf(stderr, "\n");
