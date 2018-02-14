@@ -331,6 +331,7 @@ bool
 fsp_header_decode_encryption_info(
 	byte*		key,
 	byte*		iv,
+        ulint*          key_version,
 	byte*		encryption_info);
 
 /** Reads the encryption key from the first page of a tablespace.
@@ -344,6 +345,7 @@ fsp_header_get_encryption_key(
 	ulint		fsp_flags,
 	byte*		key,
 	byte*		iv,
+        ulint*          key_version,
 	page_t*		page);
 
 /** Check the encryption key from the first page of a tablespace.

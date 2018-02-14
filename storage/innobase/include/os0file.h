@@ -356,7 +356,7 @@ static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = 9;
 static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb_space";
 
 /** Encryption master key prifix size */
-static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = array_elements(ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX);
+static const ulint ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX_LEN = array_elements(ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX);
 
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_MASTER_KEY_NAME_MAX_LEN = 100;
@@ -475,7 +475,6 @@ struct Encryption {
 	static void random_value(byte* value);
 
         static void create_tablespace_key(byte** tablespace_key,
-                                          ulint tablespace_key_version,
                                           ulint space_id);
 
 	/** Create new master key for key rotation.

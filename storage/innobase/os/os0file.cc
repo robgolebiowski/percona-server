@@ -83,6 +83,7 @@ bool	innodb_calling_exit;
 #include <my_aes.h>
 #include <my_rnd.h>
 #include <mysqld.h>
+#include "system_key.h"
 #include <mysql/service_mysql_keyring.h>
 
 /** Insert buffer segment id */
@@ -9066,7 +9067,6 @@ void Encryption::random_value(byte* value)
 
 void
 Encryption::create_tablespace_key(byte** tablespace_key,
-                                  ulint tablespace_key_version,
                                   ulint space_id)
 {
 #ifndef UNIV_INNOCHECKSUM
@@ -9090,7 +9090,7 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 		    "%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 		    uuid, space_id);
 
-	/* We call key ring API to generate master key here. */
+	/* We call key ring API to generate tablespace key here. */
 	ret = my_key_generate(key_name, "AES",
 			      NULL, ENCRYPTION_KEY_LEN);
 
@@ -9106,16 +9106,31 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 			   reinterpret_cast<void**>(system_tablespace_key),
 			   &key_len);
 
-	if (ret || *tablespace_key == NULL) {
+	if (ret || system_tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
 				" that the keyring plugin is loaded.";
 		*tablespace_key = NULL;
+                my_free(key_type);
+                return;
 	} 
 	if (key_type) {
 		my_free(key_type);
 	}
-        
 
+        uint tablespace_key_version = 0;
+        size_t tablespace_key_data_length = 0;
+
+        //TODO : Robert, może można to rozwiązać trochę lepiej, bez tych my_free(system_tablespace_key)?
+        //Pobieranie z wersją może byłoby lepsze
+        if (parse_system_key(system_tablespace_key, key_len, &tablespace_key_version,
+                             tablespace_key, &tablespace_key_data_length) == NULL)
+        {
+          my_free(system_tablespace_key);
+          return;
+        }
+        my_free(system_tablespace_key);
+        // Newly created key should have 0 assigned as its key version
+        ut_ad(tablespace_key_version == 0 && tablespace_key_data_length == ENCRYPTION_KEY_LEN);
 #endif
 }
 

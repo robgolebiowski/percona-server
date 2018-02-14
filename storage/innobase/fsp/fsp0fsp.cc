@@ -942,7 +942,7 @@ fsp_header_fill_encryption_info_for_rotated_keys(
 
 	/* Write tablespace key to temp space. */
 	memcpy(key_info, &space->id, 4);
-        memcpy(key_info + 4, &space->key_version, 4);
+        memcpy(key_info + 4, &space->encryption_key_version, 4);
 
 	/* Write tablespace iv to temp space. */
 	memcpy(key_info + ENCRYPTION_KEY_LEN, // last 8 bytes of key are unused
@@ -1290,11 +1290,11 @@ bool
 fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 	byte*		tablespace_key,
 	byte*		tablespace_iv,
+        ulint*          tablespace_key_version,
 	byte*		encryption_info)
 {
 	byte*			ptr;
 	ulint			space_id;
-        ulint                   tablespace_key_version; //TODO:Should not it be uint ?
 	//byte*			master_key = NULL;
         byte			key_info[ENCRYPTION_KEY_LEN * 2];
 	ulint			crc1;
@@ -1337,10 +1337,13 @@ fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 
 	/* Get tablespace key */
 	memcpy(&space_id, key_info, 4);
-        memcpy(&tablespace_iv, key_info + 4, 4);
+        memcpy(&tablespace_key_version, key_info + 4, 4);
+        memcpy(&tablespace_iv, key_info + ENCRYPTION_KEY_LEN, 4);
 
         /* Get tablespace key */
-        Encryption::get_tablespace_key(space_id, srv_uuid, tablespace_key_version, &tablespace_key); 
+        Encryption::get_tablespace_key(space_id, srv_uuid, *tablespace_key_version, &tablespace_key); 
+
+        //TODO: Robert - it would be better if the arguments were not changed when there is an error
         if (tablespace_key == NULL)
           return (false);
 
@@ -1505,11 +1508,16 @@ bool
 fsp_header_decode_encryption_info(
 	byte*		key,
 	byte*		iv,
+        ulint*          key_version,
 	byte*		encryption_info)
 {
-        return memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0 
-               ? fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, encryption_info)
-               : fsp_header_decode_encryption_info_for_master_key_encryption(key, iv, encryption_info);
+        if (memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0) {
+          return fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, key_version, encryption_info);
+        }
+        else {
+          *key_version = 0; // for master key key_version has no sense
+          return fsp_header_decode_encryption_info_for_master_key_encryption(key, iv, encryption_info);
+        }
 }
 
 /** Reads the encryption key from the first page of a tablespace.
@@ -1523,6 +1531,7 @@ fsp_header_get_encryption_key(
 	ulint		fsp_flags,
 	byte*		key,
 	byte*		iv,
+        ulint*           key_version,
 	page_t*		page)
 {
 	ulint			offset;
@@ -1533,7 +1542,7 @@ fsp_header_get_encryption_key(
 		return(false);
 	}
 
-	return(fsp_header_decode_encryption_info(key, iv, page + offset));
+	return(fsp_header_decode_encryption_info(key, iv, key_version, page + offset));
 }
 
 #ifndef UNIV_HOTBACKUP

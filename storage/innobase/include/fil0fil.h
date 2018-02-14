@@ -233,7 +233,7 @@ struct fil_space_t {
 	/** Encrypt initial vector */
 	byte			encryption_iv[ENCRYPTION_KEY_LEN];
 
-        ulint                   key_version;
+        ulint                   encryption_key_version;
 
 	/** Release the reserved free extents.
 	@param[in]	n_reserved	number of reserved extents */

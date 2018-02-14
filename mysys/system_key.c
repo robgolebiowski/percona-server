@@ -41,19 +41,23 @@ uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_ver
   }
 
   DBUG_ASSERT(ulong_key_version <= UINT_MAX); // sanity check
-  *key_version= (uint)ulong_key_version;
-
-  my_free(version);
 
   *key_data_length= key_length - (key_version_length + 1); // skip ':' after key version
   if (*key_data_length == 0)
+  {
+    my_free(version);
     return NULL;
+  }
   DBUG_ASSERT(*key_data_length <= 512);
 
   *key_data= (uchar*)(my_malloc(PSI_NOT_INSTRUMENTED, sizeof(uchar)*(*key_data_length), MYF(0)));
   if (*key_data == NULL)
+  {
+    my_free(version);
     return NULL;
+  }
 
   memcpy(*key_data, key+key_version_length+1, *key_data_length); // skip ':' after key version
+  **key_version= (uint)ulong_key_version;
   return *key_data;
 }
