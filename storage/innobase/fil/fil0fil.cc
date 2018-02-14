@@ -7392,14 +7392,12 @@ fil_set_encryption(
 	ut_ad(algorithm != Encryption::NONE);
 	space->encryption_type = algorithm;
 	if (key == NULL) {
-           if (algorithm == Encryption::ROTATED_KEYS)
-           {
-             byte *percona_innodb_key = NULL;
-             Encryption::create_master_key(&percona_innodb_key, space_id);
-             if (percona_innodb_key == NULL)
+           if (algorithm == Encryption::ROTATED_KEYS) {
+             Encryption::create_tablespace_key(&key, &space->key_version, space_id);
+             if (key == NULL) //TODO: Muszę to przetestować, co się stanie w takiej sytuacji
                return(DB_NOT_FOUND); //TODO: brakuje mi odpowiedniego kodu błędu, na razie zwracam cokolwiek
-             memcpy(key, percona_innodb_key, ENCRYPTION_KEY_LEN);
-             my_free(percona_innodb_key); //use unique_ptr for percona_innodb_key? Chyba nie będę mógł, bo nie ma boosta tu wcale...
+             memcpy(space->encryption_key, key, ENCRYPTION_KEY_LEN);
+             my_free(key); //TODO: use unique_ptr for percona_innodb_key? Chyba nie będę mógł, bo nie ma boosta tu wcale...
            } else {
 	     Encryption::random_value(space->encryption_key);
            }

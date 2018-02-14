@@ -889,6 +889,8 @@ fsp_header_get_encryption_offset(
 	return offset;
 }
 
+// 16 bytes key = space_id | key_version | 8 bytes empty
+
 bool
 fsp_header_fill_encryption_info_for_rotated_keys(
 	fil_space_t*		space,
@@ -933,7 +935,6 @@ fsp_header_fill_encryption_info_for_rotated_keys(
 
 	/* Write master key id. */
 	ptr += sizeof(ulint);//TODO:skip writting master_key_id, mach_write_to_4(ptr, master_key_id);
-	ptr += sizeof(ulint);//TODO:change this to ptr += 2*sizeof(ulint)
 
 	/* Write server uuid. */
         memcpy(ptr, Encryption::uuid, ENCRYPTION_SERVER_UUID_LEN);
@@ -942,9 +943,9 @@ fsp_header_fill_encryption_info_for_rotated_keys(
 	/* Write tablespace key to temp space. */
 	memcpy(key_info, &space->id, 4);
         memcpy(key_info + 4, &space->key_version, 4);
-               
+
 	/* Write tablespace iv to temp space. */
-	memcpy(key_info + ENCRYPTION_KEY_LEN,
+	memcpy(key_info + ENCRYPTION_KEY_LEN, // last 8 bytes of key are unused
 	       space->encryption_iv,
 	       ENCRYPTION_KEY_LEN);
 
@@ -1284,19 +1285,18 @@ fsp_header_get_page_size(
 
 bool
 fsp_header_decode_encryption_info_for_rotated_keys_encryption(
-	byte*		key,
-	byte*		iv,
+	byte*		tablespace_key,
+	byte*		tablespace_iv,
 	byte*		encryption_info)
 {
 	byte*			ptr;
-	ulint			master_key_id;
-	byte*			master_key = NULL;
-	lint			elen;
-	byte			key_info[ENCRYPTION_KEY_LEN * 2];
+	ulint			space_id;
+        ulint                   tablespace_key_version; //TODO:Should not it be uint ?
+	//byte*			master_key = NULL;
+        byte			key_info[ENCRYPTION_KEY_LEN * 2];
 	ulint			crc1;
 	ulint			crc2;
 	char			srv_uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
-	Encryption::Version	version;
 #ifdef	UNIV_ENCRYPT_DEBUG
 	const byte*		data;
 	ulint			i;
@@ -1307,84 +1307,58 @@ fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 
 	/* Get master key id. */
 	ptr += sizeof(ulint); // skip master_key_id, we do not use it
-	ptr += sizeof(ulint);
 
-	/* Get server uuid. */
-	if (version == Encryption::ENCRYPTION_VERSION_2) {
-		memset(srv_uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
-		memcpy(srv_uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
-		ptr += ENCRYPTION_SERVER_UUID_LEN;
-	}
+        // Get server uuid
+	memset(srv_uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
+	memcpy(srv_uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
+	ptr += ENCRYPTION_SERVER_UUID_LEN;
 
-	/* Get master key by key id. */
-	memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
-	if (version == Encryption::ENCRYPTION_VERSION_1) {
-		Encryption::get_master_key(master_key_id, NULL, &master_key);
-	} else {
-		Encryption::get_master_key(master_key_id, srv_uuid, &master_key);
-	}
-        if (master_key == NULL) {
-                return(false);
-        }
+        memset(key_info, 0, sizeof(key_info));
+        memcpy(key_info, ptr, sizeof(key_info));
+        ptr += sizeof(key_info); 
 
-#ifdef	UNIV_ENCRYPT_DEBUG
-	fprintf(stderr, "%lu ", master_key_id);
-	for (data = (const byte*) master_key, i = 0;
-	     i < ENCRYPTION_KEY_LEN; i++)
-		fprintf(stderr, "%02lx", (ulong)*data++);
-#endif
-
-	/* Decrypt tablespace key and iv. */
-	elen = my_aes_decrypt(
-		ptr,
-		ENCRYPTION_KEY_LEN * 2,
-		key_info,
-		master_key,
-		ENCRYPTION_KEY_LEN,
-		my_aes_256_ecb, NULL, false);
-
-	if (elen == MY_AES_BAD_DATA) {
-		my_free(master_key);
-		return(NULL);
-	}
+	/* Get tablespace iv */
+	memcpy(tablespace_iv, ptr + ENCRYPTION_KEY_LEN,
+	       ENCRYPTION_KEY_LEN);
+        ptr += ENCRYPTION_KEY_LEN;
 
 	/* Check checksum bytes. */
-	ptr += ENCRYPTION_KEY_LEN * 2;
-
 	crc1 = mach_read_from_4(ptr);
-	crc2 = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
+	crc2 = ut_crc32(key_info, sizeof(key_info));
 	if (crc1 != crc2) {
-		ib::error() << "Failed to decrpt encryption information,"
-			<< " please check key file is not changed!";
-		my_free(master_key);
+		ib::error() << "The encryption information in tablespace header"
+                               " is corrupted!";
+		my_free(tablespace_key);
 		return(false);
 	}
 
 	/* Get tablespace key */
-	memcpy(key, key_info, ENCRYPTION_KEY_LEN);
+	memcpy(&space_id, key_info, 4);
+        memcpy(&tablespace_iv, key_info + 4, 4);
 
-	/* Get tablespace iv */
-	memcpy(iv, key_info + ENCRYPTION_KEY_LEN,
-	       ENCRYPTION_KEY_LEN);
+        /* Get tablespace key */
+        Encryption::get_tablespace_key(space_id, srv_uuid, tablespace_key_version, &tablespace_key); 
+        if (tablespace_key == NULL)
+          return (false);
+
+#ifdef	UNIV_ENCRYPT_DEBUG
+	fprintf(stderr, "%lu ", space_id);
+	for (data = (const byte*) key, i = 0;
+	     i < ENCRYPTION_KEY_LEN; i++)
+		fprintf(stderr, "%02lx", (ulong)*data++);
+#endif
 
 #ifdef	UNIV_ENCRYPT_DEBUG
 	fprintf(stderr, " ");
-	for (data = (const byte*) key,
+	for (data = (const byte*) tablespace_key,
 	     i = 0; i < ENCRYPTION_KEY_LEN; i++)
 		fprintf(stderr, "%02lx", (ulong)*data++);
 	fprintf(stderr, " ");
-	for (data = (const byte*) iv,
+	for (data = (const byte*) tablespace_iv,
 	     i = 0; i < ENCRYPTION_KEY_LEN; i++)
 		fprintf(stderr, "%02lx", (ulong)*data++);
 	fprintf(stderr, "\n");
 #endif
-
-	my_free(master_key);
-
-	if (Encryption::master_key_id < master_key_id) {
-		Encryption::master_key_id = master_key_id;
-		memcpy(Encryption::uuid, srv_uuid, ENCRYPTION_SERVER_UUID_LEN);
-	}
 
 	return(true);
 }

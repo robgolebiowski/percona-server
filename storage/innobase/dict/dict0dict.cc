@@ -6971,7 +6971,8 @@ dict_tf_to_fsp_flags(
 						   has_data_dir,
 						   is_shared,
 						   is_temp,
-						   is_encrypted);
+						   is_encrypted,
+                                                   is_rotated_keys);
 
 	return(fsp_flags);
 }

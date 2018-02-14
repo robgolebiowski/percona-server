@@ -352,6 +352,12 @@ static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = 9;
 
+/** Encryption master key prifix */
+static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb_space";
+
+/** Encryption master key prifix size */
+static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = array_elements(ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX);
+
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_MASTER_KEY_NAME_MAX_LEN = 100;
 
@@ -460,7 +466,7 @@ struct Encryption {
 
         static bool is_rotated_keys(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
-
+//TODO:Robert, to nie jest obecnie używane!
         static Type string_to_encryption_type(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
 
@@ -468,10 +474,19 @@ struct Encryption {
         @param[in,out]	value	Encryption value */
 	static void random_value(byte* value);
 
+        static void create_tablespace_key(byte** tablespace_key,
+                                          ulint tablespace_key_version,
+                                          ulint space_id);
+
 	/** Create new master key for key rotation.
         @param[in,out]	master_key	master key */
 	static void create_master_key(byte** master_key, 
                                       ulint space_id=0);
+
+        static void get_tablespace_key(ulint space_id,
+			               char* srv_uuid,
+                                       ulint tablespace_key_version,
+			               byte** tablespace_key);
 
         /** Get master key by key id.
         @param[in]	master_key_id	master key id
@@ -542,6 +557,9 @@ struct Encryption {
 
 	/** Current uuid of server instance */
 	static char		uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
+private:
+        static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
+
 };
 
 /** Types for AIO operations @{ */
