@@ -1513,6 +1513,7 @@ fil_write_encryption_parse(
 	ulint		len;
 	byte*		key = NULL;
 	byte*		iv = NULL;
+        ulint           key_version = 0;
 	bool		is_new = false;
 
 	space = fil_space_get(space_id);
@@ -1530,6 +1531,7 @@ fil_write_encryption_parse(
 			if (it->space_id == space_id) {
 				key = it->key;
 				iv = it->iv;
+                                key_version = it->key_version;
 			}
 		}
 
@@ -1538,6 +1540,7 @@ fil_write_encryption_parse(
 					ENCRYPTION_KEY_LEN));
 			iv = static_cast<byte*>(ut_malloc_nokey(
 					ENCRYPTION_KEY_LEN));
+                        key_version = 0;
 			is_new = true;
 		}
 	} else {
@@ -1569,6 +1572,7 @@ fil_write_encryption_parse(
 #endif
 	if (!fsp_header_decode_encryption_info(key,
 					       iv,
+                                               &key_version,
 					       ptr)) {
 		recv_sys->found_corrupt_log = TRUE;
 		ib::warn() << "Encryption information"
@@ -1589,6 +1593,7 @@ fil_write_encryption_parse(
 			info.space_id = space_id;
 			info.key = key;
 			info.iv = iv;
+                        info.key_version = key_version;
 
 			recv_sys->encryption_list->push_back(info);
 		}

@@ -644,7 +644,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 		if (!fsp_header_get_encryption_key(m_flags,
 						   m_encryption_key,
 						   m_encryption_iv,
-                                                   m_encryption_key_version,
+                                                   &m_encryption_key_version,
 						   m_first_page)) {
 			ib::error()
 				<< "Encryption information in"

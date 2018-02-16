@@ -58,6 +58,6 @@ uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_ver
   }
 
   memcpy(*key_data, key+key_version_length+1, *key_data_length); // skip ':' after key version
-  **key_version= (uint)ulong_key_version;
+  *key_version= (uint)ulong_key_version;
   return *key_data;
 }

@@ -9147,8 +9147,6 @@ Encryption::create_master_key(byte** master_key,
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 	int	ret;
 
-        ulint master_key_id = space_id == 0 ? this->master_key_id : space_id;
-
 	/* If uuid does not match with current server uuid,
 	set uuid as current server uuid. */
 	if (strcmp(uuid, server_uuid) != 0) {
@@ -9188,6 +9186,7 @@ void
 Encryption::get_keyring_key(const char *key_name,
                             byte** key, size_t *key_len)
 {
+#ifndef UNIV_INNOCHECKSUM
         int ret;
 	char*	key_type = NULL;
 	//size_t	key_len;
@@ -9202,6 +9201,7 @@ Encryption::get_keyring_key(const char *key_name,
 	if (ret) {
 		*key = NULL;
 	}
+#endif
 }
                             
 

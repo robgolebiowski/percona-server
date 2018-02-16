@@ -11110,8 +11110,28 @@ err_col:
                         {
                               // TODO: Czy powininem tutaj już wygenerować klucz dla tablicy
                               // i zapisać w keyringu ?
+                          /* Check if keyring is ready. */
+                          //TODO:Robert, duże kopiuj/wklej. Czy mogę tutaj utworzyć klucz dla tablicy?
+                          Encryption::get_master_key(&master_key_id,
+                                                     &master_key,
+                                                     &version);
+
+                          if (master_key == NULL) {
+                                  my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+                                           MYF(0));
+                                  err = DB_UNSUPPORTED;
+                                  dict_mem_table_free(table);
+                          } else {
+                                  my_free(master_key);
+
                               DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
                               DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
+                          }
+
+
+
+                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
                         }
                         else
                         {
