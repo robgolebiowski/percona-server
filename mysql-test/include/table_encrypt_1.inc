@@ -164,7 +164,7 @@ drop table t1;
 
 # Test compression + encryption.
 --disable_warnings
-CREATE TABLE t1(c1 INT PRIMARY KEY) COMPRESSION = "ZLIB" ENCRYPTION = "Y" ENGINE = InnoDB;
+eval CREATE TABLE t1(c1 INT PRIMARY KEY) COMPRESSION = "ZLIB" ENCRYPTION = "$encryption_type" ENGINE = InnoDB;
 let COMPR_ZIP_WARN= `SHOW WARNINGS`;
 --enable_warnings
 
@@ -187,7 +187,7 @@ SELECT * FROM t1 ORDER BY c1;
 DROP TABLE t1;
 
 # Test old compression + encryption.
-eval CREATE TABLE t1(c1 int null) ENCRYPTION='$encryption_type' ROW_FORMAT=compressed;
+eval CREATE TABLE t1(c1 int null)  ENCRYPTION='$encryption_type' ROW_FORMAT=compressed;
 
 INSERT INTO t1 VALUES(0), (1), (2), (3), (4), (5), (6), (7), (8), (9);
 

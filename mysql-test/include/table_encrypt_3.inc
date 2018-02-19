@@ -397,7 +397,7 @@ begin
                 set i = i + 1;
         end while;
 end|
-CREATE PROCEDURE tde_db.create_encrypt_table(encrypt VARCHAR(5))
+CREATE PROCEDURE tde_db.create_encrypt_table(encrypt VARCHAR(20))
 begin
         declare i int default 1;
         declare has_error int default 0;
@@ -685,7 +685,7 @@ DROP TABLE IF EXISTS tde_db.t_encrypt;
 let $innodb_file_per_table = `SELECT @@innodb_file_per_table`;
 SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
-eval CREATE TABLE tde_db.t_encrypt  (c2 INT NOT NULL AUTO_INCREMENT ,c3 VARCHAR(255), c4 JSON ,c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,c7 POINT NOT NULL,spatial INDEX idx2 (c7) , PRIMARY KEY (c2,c3(100))) ENCRYPTION="$encryption_type" ENGINE=InnoDB;
+eval CREATE TABLE tde_db.t_encrypt  (c2 INT NOT NULL AUTO_INCREMENT ,c3 VARCHAR(255), c4 JSON ,c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,c7 POINT NOT NULL,spatial INDEX idx2 (c7) , PRIMARY KEY (c2,c3(100))) ENCRYPTION="$encryption_type" ENGINE=InnoDB;
 
 DELIMITER |;
 CREATE PROCEDURE tde_db.txn_t_encrypt()

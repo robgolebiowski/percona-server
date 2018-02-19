@@ -52,24 +52,24 @@ SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 
 DELIMITER |;
-CREATE PROCEDURE tde_db.init_setup()
+eval CREATE PROCEDURE tde_db.init_setup()
 begin
    /*  Create encrypt table with encryption */
    CREATE TABLE tde_db.t_encrypt(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON , 
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)    
-                       ) ENCRYPTION="Y"  ENGINE = InnoDB;
+                       ) ENCRYPTION="$encryption_type"  ENGINE = InnoDB;
 
    /*  Create NON encrypt table with encryption */
    CREATE TABLE tde_db.t_non_encrypt(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -97,16 +97,16 @@ begin
    CREATE TABLE tde_db.t_encrypt_2(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                        )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
    CREATE TABLE tde_db.t_non_encrypt_2(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -154,20 +154,20 @@ ALTER INSTANCE ROTATE INNODB MASTER KEY;
 
 --echo # new encrypt table creation is blocked after uninstall
 --error ER_CANNOT_FIND_KEY_IN_KEYRING
-CREATE TABLE tde_db.t_encrypt_3(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+eval CREATE TABLE tde_db.t_encrypt_3(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                       )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
 --echo # new non encrypt table 
 CREATE TABLE tde_db.t_non_encrypt_3(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -222,19 +222,19 @@ DELETE FROM tde_db.t_non_encrypt_2 WHERE c2 = 1000 ;
 SELECT COUNT(*) FROM tde_db.t_non_encrypt_2 WHERE c2 = 1000 ;
 
 --echo # new table
-CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+eval CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                        )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
 CREATE TABLE tde_db.t_non_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -286,21 +286,21 @@ SELECT COUNT(*) FROM tde_db.t_non_encrypt_2;
 
 --echo # encrypt table not possible
 --error ER_CANNOT_FIND_KEY_IN_KEYRING
-CREATE TABLE tde_db.t_non_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+eval CREATE TABLE tde_db.t_non_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                       )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
 
 --echo # non encrypt table possible
 CREATE TABLE tde_db.t_non_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -341,24 +341,24 @@ SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 
 DELIMITER |;
-CREATE PROCEDURE tde_db.init_setup()
+eval CREATE PROCEDURE tde_db.init_setup()
 begin
    /*  Create encrypt table with encryption */
    CREATE TABLE tde_db.t_encrypt(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON , 
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)    
-                       ) ENCRYPTION="Y"  ENGINE = InnoDB;
+                       ) ENCRYPTION="$encryption_type"  ENGINE = InnoDB;
 
    /*  Create NON encrypt table with encryption */
    CREATE TABLE tde_db.t_non_encrypt(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -386,16 +386,16 @@ begin
    CREATE TABLE tde_db.t_encrypt_2(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                       )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
    CREATE TABLE tde_db.t_non_encrypt_2(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -469,19 +469,19 @@ DELETE FROM tde_db.t_non_encrypt_2 WHERE c2 = 1000 ;
 SELECT COUNT(*) FROM tde_db.t_non_encrypt_2 WHERE c2 = 1000 ;
 
 --echo # new table
-CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+eval CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                       )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
 CREATE TABLE tde_db.t_non_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
@@ -510,14 +510,14 @@ eval UNINSTALL PLUGIN $KEYRING_PLUGIN_NAME;
 
 
 --error ER_CANNOT_FIND_KEY_IN_KEYRING
-CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+eval CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                       )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
 
 --error ER_CANNOT_FIND_KEY_IN_KEYRING
 ALTER INSTANCE ROTATE INNODB MASTER KEY;
@@ -549,21 +549,21 @@ SELECT COUNT(*) FROM tde_db.t_non_encrypt;
 SELECT COUNT(*) FROM tde_db.t_non_encrypt_2;
 
 --echo # new encrypt table is possible
-CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+eval CREATE TABLE tde_db.t_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
-                       )  ENCRYPTION="Y" ENGINE = InnoDB;
+                        )  ENCRYPTION="$encryption_type" ENGINE = InnoDB;
 
 --echo # non encrypt table possible
 CREATE TABLE tde_db.t_non_encrypt_4(c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                        c3 CHAR(255) Default 'No text',
                        c4 JSON ,
-                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
-                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
+                       c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_a')) STORED,
+                       c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'\$.key_b')) VIRTUAL,
                        c7 POINT NOT NULL,
                        spatial INDEX idx2 (c7)
                        )  ENGINE = InnoDB;
