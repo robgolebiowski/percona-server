@@ -334,6 +334,16 @@ fsp_header_decode_encryption_info(
         ulint*          key_version,
 	byte*		encryption_info);
 
+
+enum fil_encryption_t {
+        /** Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) */
+        FIL_ENCRYPTION_DEFAULT,
+        /** Encrypted */  
+        FIL_ENCRYPTION_ON,
+        /** Not encrypted */
+        FIL_ENCRYPTION_OFF
+};
+
 /** Reads the encryption key from the first page of a tablespace.
 @param[in]	fsp_flags	tablespace flags
 @param[in/out]	key		tablespace key
@@ -345,8 +355,9 @@ fsp_header_get_encryption_key(
 	ulint		fsp_flags,
 	byte*		key,
 	byte*		iv,
-        ulint*          key_version,
-	page_t*		page);
+        page_t*		page
+        ulint*          key_version = NULL,
+	fil_encryption_t *encryption = NULL);
 
 /** Check the encryption key from the first page of a tablespace.
 @param[in]	fsp_flags	tablespace flags

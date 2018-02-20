@@ -217,6 +217,12 @@ struct fil_space_t {
 	bool		is_corrupt;
 	UT_LIST_NODE_T(fil_space_t) space_list;
 				/*!< list of all spaces */
+	UT_LIST_NODE_T(fil_space_t) rotation_list;
+	/** whether this tablespace needs key rotation */
+	bool		is_in_rotation_list;
+
+	/** MariaDB encryption data */
+	//fil_space_crypt_t* crypt_data;
 
 	/** Compression algorithm */
 	Compression::Type	compression_type;
@@ -233,13 +239,22 @@ struct fil_space_t {
 	/** Encrypt initial vector */
 	byte			encryption_iv[ENCRYPTION_KEY_LEN];
 
-        ulint                   encryption_key_version;
+        ulint                   encryption_key_version; //TODO: Should this be minimal key version?
+
+        fil_encryption_t        encryption;
 
 	/** Release the reserved free extents.
 	@param[in]	n_reserved	number of reserved extents */
 	void release_free_extents(ulint n_reserved);
 
 	ulint		magic_n;/*!< FIL_SPACE_MAGIC_N */
+
+	/** @return whether the tablespace is about to be dropped or
+	truncated */
+	bool is_stopping() const
+	{
+		return stop_new_ops || is_being_truncated;
+	}
 };
 
 /** Value of fil_space_t::magic_n */
@@ -818,6 +833,46 @@ fil_space_acquire_silent(
 void
 fil_space_release(
 	fil_space_t*	space);
+
+/** Acquire a tablespace for reading or writing a block,
+when it could be dropped concurrently.
+@param[in]	id	tablespace ID
+@return	the tablespace
+@retval	NULL if missing */
+fil_space_t*
+fil_space_acquire_for_io(ulint id);
+
+/** Release a tablespace acquired with fil_space_acquire_for_io().
+@param[in,out]	space	tablespace to release  */
+void
+fil_space_release_for_io(fil_space_t* space);
+
+/** Return the next fil_space_t.
+Once started, the caller must keep calling this until it returns NULL.
+fil_space_acquire() and fil_space_release() are invoked here which
+blocks a concurrent operation from dropping the tablespace.
+@param[in,out]	prev_space	Pointer to the previous fil_space_t.
+If NULL, use the first fil_space_t on fil_system->space_list.
+@return pointer to the next fil_space_t.
+@retval NULL if this was the last  */
+fil_space_t*
+fil_space_next(
+	fil_space_t*	prev_space)
+	MY_ATTRIBUTE((warn_unused_result));
+
+/** Return the next fil_space_t from key rotation list.
+Once started, the caller must keep calling this until it returns NULL.
+fil_space_acquire() and fil_space_release() are invoked here which
+blocks a concurrent operation from dropping the tablespace.
+@param[in,out]	prev_space	Pointer to the previous fil_space_t.
+If NULL, use the first fil_space_t on fil_system->space_list.
+@return pointer to the next fil_space_t.
+@retval NULL if this was the last*/
+fil_space_t*
+fil_space_keyrotate_next(
+	fil_space_t*	prev_space)
+	MY_ATTRIBUTE((warn_unused_result));
+
 
 /** Wrapper with reference-counting for a fil_space_t. */
 class FilSpace
@@ -1589,7 +1644,9 @@ fil_set_encryption(
 	ulint			space_id,
 	Encryption::Type	algorithm,
 	byte*			key,
-	byte*			iv)
+	byte*			iv,
+        ulint                   key_version,
+        fil_encryption_t        encryption)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /**

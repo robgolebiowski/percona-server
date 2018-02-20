@@ -1291,7 +1291,9 @@ fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 	byte*		tablespace_key,
 	byte*		tablespace_iv,
         ulint*          tablespace_key_version,
-	byte*		encryption_info)
+	byte*		encryption_info,
+	fil_encryption_t *encryption
+)
 {
 	byte*			ptr;
 	ulint			space_id;
@@ -1309,7 +1311,10 @@ fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 	ptr += ENCRYPTION_MAGIC_SIZE; // skip magic, we already know what it is
 
 	/* Get master key id. */
-	ptr += sizeof(ulint); // skip master_key_id, we do not use it
+        //We are using only one byte
+        memcpy(encryption, ptr, 1);
+	//ptr += sizeof(ulint); // skip master_key_id, we do not use it
+        ptr += 3;
 
         // Get server uuid
 	memset(srv_uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
@@ -1508,16 +1513,13 @@ bool
 fsp_header_decode_encryption_info(
 	byte*		key,
 	byte*		iv,
-        ulint*          key_version,
-	byte*		encryption_info)
+	byte*		encryption_info,
+        ulint*          key_version = NULL
+	fil_encryption_t *encryption = NULL
 {
-        if (memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0) {
-          return fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, key_version, encryption_info);
-        }
-        else {
-          *key_version = 0; // for master key key_version has no sense
-          return fsp_header_decode_encryption_info_for_master_key_encryption(key, iv, encryption_info);
-        }
+        return (memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0) ?
+                ? fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, key_version, encryption, encryption_info)
+                : fsp_header_decode_encryption_info_for_master_key_encryption(key, iv, encryption_info);
 }
 
 /** Reads the encryption key from the first page of a tablespace.
@@ -1527,12 +1529,15 @@ fsp_header_decode_encryption_info(
 @param[in]	page	first page of a tablespace
 @return true if success */
 bool
-fsp_header_get_encryption_key(
+fsp_header_get_encryption_key
+(
 	ulint		fsp_flags,
 	byte*		key,
 	byte*		iv,
-        ulint*           key_version,
-	page_t*		page)
+        page_t*		page
+        ulint*          key_version = NULL,
+	fil_encryption_t *encryption = NULL
+)
 {
 	ulint			offset;
 	const page_size_t	page_size(fsp_flags);
@@ -1542,7 +1547,7 @@ fsp_header_get_encryption_key(
 		return(false);
 	}
 
-	return(fsp_header_decode_encryption_info(key, iv, key_version, page + offset));
+	return(fsp_header_decode_encryption_info(key, iv, page + offset, key_version, encryption);
 }
 
 #ifndef UNIV_HOTBACKUP

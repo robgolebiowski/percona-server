@@ -199,6 +199,9 @@ struct fil_system_t {
 					record has been written since
 					the latest redo log checkpoint.
 					Protected only by log_sys->mutex. */
+	UT_LIST_BASE_NODE_T(fil_space_t) rotation_list;
+					/*!< list of all file spaces needing
+					key rotation.*/
 	bool		space_id_reuse_warned;
 					/* !< true if fil_space_create()
 					has issued a warning about
@@ -2039,6 +2042,65 @@ fil_space_release(
 	space->n_pending_ops--;
 	mutex_exit(&fil_system->mutex);
 }
+
+fil_space_t*
+fil_space_next(fil_space_t* prev_space)
+{
+	fil_space_t*		space=prev_space;
+
+	mutex_enter(&fil_system->mutex);
+
+	if (prev_space == NULL) {
+		space = UT_LIST_GET_FIRST(fil_system->space_list);
+
+		/* We can trust that space is not NULL because at least the
+		system tablespace is always present and loaded first. */
+		space->n_pending_ops++;
+	} else {
+		ut_ad(space->n_pending_ops > 0);
+
+		/* Move on to the next fil_space_t */
+		space->n_pending_ops--;
+		space = UT_LIST_GET_NEXT(space_list, space);
+
+		/* Skip spaces that are being created by
+		fil_ibd_create(), or dropped, or !tablespace. */
+		while (space != NULL
+			&& (UT_LIST_GET_LEN(space->chain) == 0
+			    || space->is_stopping()
+			    || space->purpose != FIL_TYPE_TABLESPACE)) {
+			space = UT_LIST_GET_NEXT(space_list, space);
+		}
+
+		if (space != NULL) {
+			space->n_pending_ops++;
+		}
+	}
+
+	mutex_exit(&fil_system->mutex);
+
+	return(space);
+}
+
+/**
+Remove space from key rotation list if there are no more
+pending operations.
+@param[in]	space		Tablespace */
+static
+void
+fil_space_remove_from_keyrotation(
+	fil_space_t* space)
+{
+	ut_ad(mutex_own(&fil_system->mutex));
+	ut_ad(space);
+
+	if (space->n_pending_ops == 0 && space->is_in_rotation_list) {
+		space->is_in_rotation_list = false;
+		ut_a(UT_LIST_GET_LEN(fil_system->rotation_list) > 0);
+		UT_LIST_REMOVE(fil_system->rotation_list, space);
+	}
+}
+
 #endif /* !UNIV_HOTBACKUP */
 
 /********************************************************//**
@@ -7373,7 +7435,9 @@ fil_set_encryption(
 	ulint			space_id,
 	Encryption::Type	algorithm,
 	byte*			key,
-	byte*			iv)
+	byte*			iv,
+        ulint key_version,
+        fil_encryption_t encryption)
 {
 	ut_ad(!is_system_or_undo_tablespace(space_id));
 
@@ -7400,12 +7464,21 @@ fil_set_encryption(
              memcpy(space->encryption_key, key, ENCRYPTION_KEY_LEN);
              space->encryption_key_version = 0; // new keys always have version 0 set
              my_free(key); //TODO: use unique_ptr for percona_innodb_key? Chyba nie będę mógł, bo nie ma boosta tu wcale...
+             space->encryption= FIL_ENCRYPTION_OFF;
            } else {
 	     Encryption::random_value(space->encryption_key);
            }
 	} else {
 		memcpy(space->encryption_key,
 		       key, ENCRYPTION_KEY_LEN);
+
+                if (algorithm == Encryption::ROTATED_KEYS)
+                {
+                  memcpy(space->encryption_iv, iv, ENCRYPTION_KEY_LEN);
+                  space->encryption= encryption;
+                  space->encryption_key_version= key_version;
+                
+                }
 	}
 
 	space->encryption_klen = ENCRYPTION_KEY_LEN;
