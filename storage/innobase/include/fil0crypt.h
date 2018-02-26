@@ -122,18 +122,11 @@ struct fil_space_crypt_t : st_encryption_scheme
 	/** Constructor. Does not initialize the members!
 	The object is expected to be placed in a buffer that
 	has been zero-initialized. */
-
-			//fil_space_crypt_t(
-				////type,
-				//min_key_version,
-				//key);
-				////encrypt_mode);
-
-
 	fil_space_crypt_t(
+		uint new_type,
 		uint new_min_key_version,
-		const uchar *key,
-                fil_encryption_t new_encryption)
+		uint new_key_id,
+		fil_encryption_t new_encryption)
 		: st_encryption_scheme(),
 		min_key_version(new_min_key_version),
 		page0_offset(0),
@@ -141,12 +134,12 @@ struct fil_space_crypt_t : st_encryption_scheme
 		key_found(0),
 		rotate_state()
 	{
-		//key_id = new_key_id;
+		key_id = new_key_id;
 		my_random_bytes(iv, sizeof(iv));
-		mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
+		mutex_create(fil_crypt_data_mutex_key,
+			&mutex, SYNC_NO_ORDER_CHECK);
 		locker = crypt_data_scheme_locker;
-		//type = new_type;
-                mempy(this->key, key, ENCRYPTION_SCHEME_BLOCK_LENGTH);
+		type = new_type;
 
 		if (new_encryption == FIL_ENCRYPTION_OFF ||
 			(!srv_encrypt_tables &&
@@ -201,14 +194,13 @@ struct fil_space_crypt_t : st_encryption_scheme
 	}
 
 	/** Write crypt data to a page (0)
-	@param[in]	space	tablespace
-	@param[in,out]	page0	first page of the tablespace
-	@param[in,out]	mtr	mini-transaction */
-	void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr);
+	@param[in,out]	page0		Page 0 where to write
+	@param[in,out]	mtr		Minitransaction */
+	void write_page0(byte* page0, mtr_t* mtr);
 
 	uint min_key_version; // min key version for this space
 	ulint page0_offset;   // byte offset on page 0 for crypt data
-        fil_encryption_t encryption; // Encryption setup
+	fil_encryption_t encryption; // Encryption setup
 
 	ib_mutex_t mutex;   // mutex protecting following variables
 
@@ -221,6 +213,114 @@ struct fil_space_crypt_t : st_encryption_scheme
 
 	fil_space_rotate_state_t rotate_state;
 };
+
+
+
+//struct fil_space_crypt_t : st_encryption_scheme
+//{
+ //public:
+	//[>* Constructor. Does not initialize the members!
+	//The object is expected to be placed in a buffer that
+	//has been zero-initialized. */
+
+			////fil_space_crypt_t(
+				//////type,
+				////min_key_version,
+				////key);
+				//////encrypt_mode);
+
+
+	//fil_space_crypt_t(
+		//uint new_min_key_version,
+		//const uchar *key,
+                //fil_encryption_t new_encryption)
+		//: st_encryption_scheme(),
+		//min_key_version(new_min_key_version),
+		//page0_offset(0),
+		//encryption(new_encryption),
+		//key_found(0),
+		//rotate_state()
+	//{
+		////key_id = new_key_id;
+		//my_random_bytes(iv, sizeof(iv));
+		//mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
+		//locker = crypt_data_scheme_locker;
+		////type = new_type;
+                //mempy(this->key, key, ENCRYPTION_SCHEME_BLOCK_LENGTH);
+
+		//if (new_encryption == FIL_ENCRYPTION_OFF ||
+			//(!srv_encrypt_tables &&
+			 //new_encryption == FIL_ENCRYPTION_DEFAULT)) {
+			//type = CRYPT_SCHEME_UNENCRYPTED;
+		//} else {
+			//type = CRYPT_SCHEME_1;
+			//min_key_version = key_get_latest_version();
+		//}
+
+		//key_found = min_key_version;
+	//}
+
+	//[>* Destructor <]
+	//~fil_space_crypt_t()
+	//{
+		//mutex_free(&mutex);
+	//}
+
+	//[>* Get latest key version from encryption plugin
+	//@retval key_version or
+	//@retval ENCRYPTION_KEY_VERSION_INVALID if used key_id
+	//is not found from encryption plugin. */
+	//uint key_get_latest_version(void);
+
+	//[>* Returns true if key was found from encryption plugin
+	//and false if not. */
+	//bool is_key_found() const {
+		//return key_found != ENCRYPTION_KEY_VERSION_INVALID;
+	//}
+
+	//[>* Returns true if tablespace should be encrypted <]
+	//bool should_encrypt() const {
+		//return ((encryption == FIL_ENCRYPTION_ON) ||
+			//(srv_encrypt_tables &&
+				//encryption == FIL_ENCRYPTION_DEFAULT));
+	//}
+
+	//[>* Return true if tablespace is encrypted. <]
+	//bool is_encrypted() const {
+		//return (encryption != FIL_ENCRYPTION_OFF);
+	//}
+
+	//[>* Return true if default tablespace encryption is used, <]
+	//bool is_default_encryption() const {
+		//return (encryption == FIL_ENCRYPTION_DEFAULT);
+	//}
+
+	//[>* Return true if tablespace is not encrypted. <]
+	//bool not_encrypted() const {
+		//return (encryption == FIL_ENCRYPTION_OFF);
+	//}
+
+	//[>* Write crypt data to a page (0)
+	//@param[in]	space	tablespace
+	//@param[in,out]	page0	first page of the tablespace
+	//@param[in,out]	mtr	mini-transaction */
+	//void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr);
+
+	//uint min_key_version; // min key version for this space
+	//ulint page0_offset;   // byte offset on page 0 for crypt data
+        //fil_encryption_t encryption; // Encryption setup
+
+	//ib_mutex_t mutex;   // mutex protecting following variables
+
+	//[>* Return code from encryption_key_get_latest_version.
+        //If ENCRYPTION_KEY_VERSION_INVALID encryption plugin
+	//could not find the key and there is no need to call
+	//get_latest_key_version again as keys are read only
+	//at startup. */
+	//uint key_found;
+
+	//fil_space_rotate_state_t rotate_state;
+//};
 
 /** Status info about encryption */
 struct fil_space_crypt_status_t {
@@ -304,7 +404,10 @@ fil_space_merge_crypt_data(
 //fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	//MY_ATTRIBUTE((nonnull, warn_unused_result));
 
-bool fil_space_read_crypt_data(const page_size_t& page_size, const byte* page, ulint space_id);
+fil_space_crypt_t*
+fil_space_read_crypt_data(const page_size_t& page_size, const byte* page, ulint space_id);
+  
+//bool fil_space_read_crypt_data(const page_size_t& page_size, const byte* page, ulint space_id);
 
 /**
 Free a crypt data object

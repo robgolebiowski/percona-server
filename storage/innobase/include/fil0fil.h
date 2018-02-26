@@ -222,7 +222,7 @@ struct fil_space_t {
 	bool		is_in_rotation_list;
 
 	/** MariaDB encryption data */
-	//fil_space_crypt_t* crypt_data;
+        fil_space_crypt_t* crypt_data;
 
 	/** Compression algorithm */
 	Compression::Type	compression_type;
@@ -237,11 +237,11 @@ struct fil_space_t {
 	ulint			encryption_klen;
 
 	/** Encrypt initial vector */
-	byte			encryption_iv[ENCRYPTION_KEY_LEN];
+        byte			encryption_iv[ENCRYPTION_KEY_LEN];
 
-        ulint                   encryption_key_version; //TODO: Should this be minimal key version?
+        //ulint                   encryption_key_version; //TODO: Should this be minimal key version?
 
-        fil_encryption_t        encryption;
+        //fil_encryption_t        encryption;
 
 	/** Release the reserved free extents.
 	@param[in]	n_reserved	number of reserved extents */

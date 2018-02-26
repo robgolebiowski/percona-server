@@ -1698,6 +1698,8 @@ os_file_read_string(
 	}
 }
 
+static void get_decryption_key(byte *page, 
+
 /** Decompress after a read and punch a hole in the file if it was a write
 @param[in]	type		IO context
 @param[in]	fh		Open file handle
@@ -1732,7 +1734,7 @@ os_file_io_complete(
 
 		ut_ad(!type.is_log());
 
-		ret = encryption.decrypt(type, buf, src_len, scratch, len);
+		ret = encryption.decrypt(type, buf, src_len, scratch, len);byte *page, 
 		if (ret == DB_SUCCESS) {
 			return(os_file_decompress_page(
 					type.is_dblwr_recover(),
@@ -2142,6 +2144,45 @@ os_file_compress_page(
 
 			type.clear_punch_hole();
 		}
+	}
+
+	return(block);
+}
+
+static
+Block*
+static
+Block*
+os_file_encrypt_page_for_rotated_keys(
+	const IORequest&	type,
+	void*&			buf,
+	ulint*			n)
+{
+
+	byte*		encrypted_page;
+	ulint		encrypted_len = *n;
+	byte*		buf_ptr;
+	Encryption	encryption(type.encryption_algorithm());
+
+	ut_ad(!type.is_log());
+	ut_ad(type.is_write());
+	ut_ad(type.is_encrypted());
+
+	Block*  block = os_alloc_block();
+
+	encrypted_page = static_cast<byte*>(
+		ut_align(block->m_ptr, os_io_ptr_align));
+
+	buf_ptr = encryption.encrypt(type,
+				     reinterpret_cast<byte*>(buf), *n,
+				     encrypted_page, &encrypted_len);
+
+	bool	encrypted = buf_ptr != buf;
+
+	if (encrypted) {
+
+		buf = buf_ptr;
+		*n = encrypted_len;
 	}
 
 	return(block);
@@ -9203,13 +9244,12 @@ Encryption::get_keyring_key(const char *key_name,
 	}
 #endif
 }
-                            
 
 void
-Encryption::get_tablespace_key(ulint space_id,
-			   char* srv_uuid,
-                           ulint tablespace_key_version,
-			   byte** tablespace_key)
+Encryption::get_latest_tablespace_key(ulint space_id,
+		                      char* srv_uuid,
+                                      uint tablespace_key_version,
+                		      byte** tablespace_key)
 {
 #ifndef UNIV_INNOCHECKSUM
 	size_t	key_len;
@@ -9222,6 +9262,58 @@ Encryption::get_tablespace_key(ulint space_id,
 		    srv_uuid, space_id, tablespace_key_version);
 
         get_keyring_key(key_name, tablespace_key, &key_len);
+
+	if (*tablespace_key == NULL) {
+		ib::error() << "Encryption can't find master key, please check"
+				" the keyring plugin is loaded.";
+	}
+
+#ifdef UNIV_ENCRYPT_DEBUG
+	if (*tablespace_key) {
+		fprintf(stderr, "Fetched tablespace key:%s ", key_name);
+		ut_print_buf(stderr, *tablespace_key, key_len);
+		fprintf(stderr, "\n");
+	}
+#endif /* DEBUG_TDE */
+
+#endif
+}
+                            
+
+void Encryption::get_system_key(const char *system_key_name,
+                                byte **key,
+                                uint *key_version,
+                                size_t *key_length)
+{
+  size_t system_key_len = 0;
+  uchar **system_key = NULL;
+  get_keyring_key(system_key_name, system_key, &system_key_len);
+  if (system_key == NULL)
+  {
+    key = NULL;
+    return;
+  }
+  parse_system_key(*system_key, system_key_len, key_version, (uchar**)key, key_length);
+}
+
+// tablespace_key_version as output parameter
+void
+Encryption::get_latest_tablespace_key(ulint space_id,
+			   const char* srv_uuid,
+                           uint *tablespace_key_version,
+			   byte** tablespace_key)
+{
+#ifndef UNIV_INNOCHECKSUM
+	size_t	key_len;
+	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+
+	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    "%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    srv_uuid, space_id);
+
+        get_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
 
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find master key, please check"
@@ -9428,9 +9520,11 @@ Encryption::encrypt(
 	ulint		remain_len;
 	byte		remain_buf[MY_AES_BLOCK_SIZE * 2];
 
-#ifdef UNIV_ENCRYPT_DEBUG
 	ulint space_id =
 		mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+#ifdef UNIV_ENCRYPT_DEBUG
+	//ulint space_id =
+		//mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 
 	fprintf(stderr, "Encrypting page:%lu.%lu len:%lu\n",
@@ -9455,6 +9549,10 @@ Encryption::encrypt(
 	case Encryption::NONE:
 		ut_error;
 
+        case Encryption::ROTATED_KEYS :
+           mach_write_to_4(src +  FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID, m_encryption_key_version);
+        
+
 	case Encryption::AES: {
 		lint			elen;
 
@@ -9473,8 +9571,8 @@ Encryption::encrypt(
 		if (elen == MY_AES_BAD_DATA) {
 			ulint	page_no =mach_read_from_4(
 				src + FIL_PAGE_OFFSET);
-			ulint	space_id = mach_read_from_4(
-				src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+			//ulint	space_id = mach_read_from_4(
+				//src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 			*dst_len = src_len;
 #ifndef UNIV_INNOCHECKSUM
 				ib::warn()
@@ -9515,8 +9613,8 @@ Encryption::encrypt(
 			if (elen == MY_AES_BAD_DATA) {
 				ulint	page_no =mach_read_from_4(
 					src + FIL_PAGE_OFFSET);
-				ulint	space_id = mach_read_from_4(
-					src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+				//ulint	space_id = mach_read_from_4(
+					//src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 #ifndef UNIV_INNOCHECKSUM
 				ib::warn()
 					<< " Can't encrypt data of page,"

@@ -482,6 +482,11 @@ struct Encryption {
 	static void create_master_key(byte** master_key, 
                                       ulint space_id=0);
 
+        static void get_latest_tablespace_key(ulint space_id,
+			   const char* srv_uuid,
+                           uint *tablespace_key_version,
+			   byte** tablespace_key);
+
         static void get_tablespace_key(ulint space_id,
 			               char* srv_uuid,
                                        ulint tablespace_key_version,
@@ -558,7 +563,8 @@ struct Encryption {
 	static char		uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 private:
         static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
-
+        static void get_system_key(const char *system_key_name, byte **key, uint *key_version,
+                                   size_t *key_length);
 };
 
 /** Types for AIO operations @{ */

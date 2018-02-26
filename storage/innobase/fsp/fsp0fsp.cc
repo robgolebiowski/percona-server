@@ -936,6 +936,13 @@ fsp_header_fill_encryption_info_for_rotated_keys(
 	/* Write master key id. */
 	ptr += sizeof(ulint);//TODO:skip writting master_key_id, mach_write_to_4(ptr, master_key_id);
 
+        memcpy(ptr, space->crypt_data->encryption, 1);
+        ptr+= 1;
+        memcpy(ptr, space->crypt_data->type, 1);
+	//ptr += sizeof(ulint); // skip master_key_id, we do not use it
+        ptr += 2;
+
+
 	/* Write server uuid. */
         memcpy(ptr, Encryption::uuid, ENCRYPTION_SERVER_UUID_LEN);
         ptr += ENCRYPTION_SERVER_UUID_LEN;
@@ -1290,8 +1297,9 @@ bool
 fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 	byte*		tablespace_key,
 	byte*		tablespace_iv,
-        ulint*          tablespace_key_version,
 	byte*		encryption_info,
+        uint8_t *type,
+        ulint*          tablespace_key_version,
 	fil_encryption_t *encryption
 )
 {
@@ -1313,8 +1321,10 @@ fsp_header_decode_encryption_info_for_rotated_keys_encryption(
 	/* Get master key id. */
         //We are using only one byte
         memcpy(encryption, ptr, 1);
+        ptr+= 1;
+        memcpy(type, ptr, 1);
 	//ptr += sizeof(ulint); // skip master_key_id, we do not use it
-        ptr += 3;
+        ptr += 2;
 
         // Get server uuid
 	memset(srv_uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
@@ -1514,11 +1524,12 @@ fsp_header_decode_encryption_info(
 	byte*		key,
 	byte*		iv,
 	byte*		encryption_info,
-        ulint*          key_version = NULL
-	fil_encryption_t *encryption = NULL
+        uint8_t *type = NULL,
+        ulint*          key_version = NULL,
+	fil_encryption_t *encryption = NULL)
 {
-        return (memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0) ?
-                ? fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, key_version, encryption, encryption_info)
+        return (memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0) 
+                ? fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, encryption_info, type, key_version, encryption)
                 : fsp_header_decode_encryption_info_for_master_key_encryption(key, iv, encryption_info);
 }
 
@@ -1529,15 +1540,14 @@ fsp_header_decode_encryption_info(
 @param[in]	page	first page of a tablespace
 @return true if success */
 bool
-fsp_header_get_encryption_key
-(
+fsp_header_get_encryption_key(
 	ulint		fsp_flags,
 	byte*		key,
 	byte*		iv,
-        page_t*		page
+        page_t*		page,
+        uint8_t *type = NULL,
         ulint*          key_version = NULL,
-	fil_encryption_t *encryption = NULL
-)
+	fil_encryption_t *encryption = NULL)
 {
 	ulint			offset;
 	const page_size_t	page_size(fsp_flags);
@@ -1547,7 +1557,7 @@ fsp_header_get_encryption_key
 		return(false);
 	}
 
-	return(fsp_header_decode_encryption_info(key, iv, page + offset, key_version, encryption);
+	return(fsp_header_decode_encryption_info(key, iv, page + offset, type, key_version, encryption);
 }
 
 #ifndef UNIV_HOTBACKUP

@@ -55,6 +55,8 @@ Created 10/25/1995 Heikki Tuuri
 #include "btr0sea.h"
 #include "log0log.h"
 
+#include "system_key.h"
+
 /** Tries to close a file in the LRU list. The caller must hold the fil_sys
 mutex.
 @return true if success, false if should retry later; since i/o's
@@ -5531,6 +5533,47 @@ fil_report_invalid_page_access(
 	_exit(1);
 }
 
+#define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
+
+bool encryption_get_latest_innodb_key(uint key_id, byte **key, ulint *key_len, uint *key_version)
+{
+  char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+
+  memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+  ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+	      "%s-%s-%u", "percona_",
+	      "dummy", key_id);
+
+  char *system_key_type = NULL;
+  size_t system_key_len = 0;
+  uchar *system_key = NULL;
+
+  //DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
+                  //{ return true; } );
+  if (my_key_fetch(key_name, &system_key_type, NULL,
+                   reinterpret_cast<void**>(&system_key), &system_key_len) ||
+      (system_key == NULL &&
+       (my_key_generate(key_name, "AES", NULL, 16) ||
+        my_key_fetch(key_name, &system_key_type, NULL,
+                     reinterpret_cast<void**>(&system_key), &system_key_len) ||
+        system_key == NULL)))
+         return false;
+
+  my_free(system_key_type);
+  //DBUG_ASSERT(strncmp(system_key_type, "AES", 3) == 0);
+
+  if (parse_system_key(system_key, system_key_len, key_version, key, key_len) == reinterpret_cast<uchar*>(NullS))
+  {
+    my_free(system_key);
+    return false;
+  }
+  my_free(system_key);
+  my_free(key);
+
+  return true;
+}
+
 /** Set encryption information for IORequest.
 @param[in,out]	req_type	IO request
 @param[in]	page_id		page id
@@ -5550,7 +5593,8 @@ fil_io_set_encryption(
 		req_type.encryption_key(space->encryption_key,
 					space->encryption_klen,
 					space->encryption_iv);
-		req_type.encryption_algorithm(Encryption::AES);
+		req_type.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space->flags) ? Encryption::ROTATED_KEYS
+                                                                                       : Encryption::AES);
 	} else {
 		req_type.clear_encrypted();
 	}
@@ -7430,6 +7474,7 @@ fil_get_compression(
 @param[in] key			Encryption key
 @param[in] iv			Encryption iv
 @return DB_SUCCESS or error code */
+//TODO:Robert - revet this to the original?
 dberr_t
 fil_set_encryption(
 	ulint			space_id,
@@ -7458,38 +7503,29 @@ fil_set_encryption(
 	space->encryption_type = algorithm;
 	if (key == NULL) {
            if (algorithm == Encryption::ROTATED_KEYS) {
-             Encryption::create_tablespace_key(&key, space_id);
+             uint latest_tablespace_key_version= 0;
+             Encryption::get_latest_tablespace_key(space_id, Encryption::uuid, &latest_tablespace_key_version,
+                                                   &key);
+             if (key == NULL)
+               Encryption::create_tablespace_key(&key, space_id);
              if (key == NULL) //TODO: Muszę to przetestować, co się stanie w takiej sytuacji
                return(DB_NOT_FOUND); //TODO: brakuje mi odpowiedniego kodu błędu, na razie zwracam cokolwiek
              memcpy(space->encryption_key, key, ENCRYPTION_KEY_LEN);
-             space->encryption_key_version = 0; // new keys always have version 0 set
              my_free(key); //TODO: use unique_ptr for percona_innodb_key? Chyba nie będę mógł, bo nie ma boosta tu wcale...
-             space->encryption= FIL_ENCRYPTION_OFF;
            } else {
 	     Encryption::random_value(space->encryption_key);
            }
 	} else {
 		memcpy(space->encryption_key,
 		       key, ENCRYPTION_KEY_LEN);
+        }
 
-                if (algorithm == Encryption::ROTATED_KEYS)
-                {
-                  memcpy(space->encryption_iv, iv, ENCRYPTION_KEY_LEN);
-                  space->encryption= encryption;
-                  space->encryption_key_version= key_version;
-                
-                }
-	}
-
-	space->encryption_klen = ENCRYPTION_KEY_LEN;
 	if (iv == NULL) {
 		Encryption::random_value(space->encryption_iv);
 	} else {
 		memcpy(space->encryption_iv,
 		       iv, ENCRYPTION_KEY_LEN);
 	}
-
-	mutex_exit(&fil_system->mutex);
 
 	return(DB_SUCCESS);
 }
