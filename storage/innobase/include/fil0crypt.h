@@ -42,6 +42,8 @@ static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {
 
 /* This key will be used if nothing else is given */
 #define FIL_DEFAULT_ENCRYPTION_KEY ENCRYPTION_KEY_SYSTEM_DATA
+#define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
+#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
 
 extern os_event_t fil_crypt_threads_event;
 
@@ -63,6 +65,12 @@ extern os_event_t fil_crypt_threads_event;
 #define CRYPT_SCHEME_1_IV_LEN 16
 #define CRYPT_SCHEME_UNENCRYPTED 0
 
+
+//TODO:Robert:Those are mine
+#define MY_AES_MAX_KEY_LENGTH 16
+#define ENCRYPTION_SCHEME_BLOCK_LENGTH 16
+
+
 /* Cached L or key for given key_version */
 struct key_struct
 {
@@ -70,6 +78,31 @@ struct key_struct
 	uint key_length;			/*!< Key length */
 	unsigned char key[MY_AES_MAX_KEY_LENGTH]; /*!< Cached key
                                                 (that is L in CRYPT_SCHEME_1) */
+};
+
+enum fil_encryption_t {
+	/** Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) */
+	FIL_ENCRYPTION_DEFAULT,
+	/** Encrypted */
+	FIL_ENCRYPTION_ON,
+	/** Not encrypted */
+	FIL_ENCRYPTION_OFF
+};
+
+struct st_encryption_scheme_key {
+  unsigned int version;
+  unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
+};
+
+struct st_encryption_scheme {
+  unsigned char iv[ENCRYPTION_SCHEME_BLOCK_LENGTH];
+  struct st_encryption_scheme_key key[3]; //TODO : Why do I need this ?
+  unsigned int keyserver_requests;
+  //unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
+  unsigned int key_id;
+  unsigned int type; 
+
+  //void (*locker)(struct st_encryption_scheme *self, int release);
 };
 
 /** is encryption enabled */
@@ -104,16 +137,7 @@ struct fil_space_rotate_state_t
 
 #ifndef UNIV_INNOCHECKSUM
 
-struct st_encryption_scheme {
-  unsigned char iv[ENCRYPTION_SCHEME_BLOCK_LENGTH];
-  struct st_encryption_scheme_key key[3];
-  unsigned int keyserver_requests;
-  unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
-  //unsigned int key_id;
-  unsigned int type; 
 
-  //void (*locker)(struct st_encryption_scheme *self, int release);
-};
 
 
 struct fil_space_crypt_t : st_encryption_scheme
@@ -136,9 +160,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 	{
 		key_id = new_key_id;
 		my_random_bytes(iv, sizeof(iv));
-		mutex_create(fil_crypt_data_mutex_key,
-			&mutex, SYNC_NO_ORDER_CHECK);
-		locker = crypt_data_scheme_locker;
+                mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
+		locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
 		type = new_type;
 
 		if (new_encryption == FIL_ENCRYPTION_OFF ||
@@ -194,9 +217,10 @@ struct fil_space_crypt_t : st_encryption_scheme
 	}
 
 	/** Write crypt data to a page (0)
-	@param[in,out]	page0		Page 0 where to write
-	@param[in,out]	mtr		Minitransaction */
-	void write_page0(byte* page0, mtr_t* mtr);
+	@param[in]	space	tablespace
+	@param[in,out]	page0	first page of the tablespace
+	@param[in,out]	mtr	mini-transaction */
+	void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr);
 
 	uint min_key_version; // min key version for this space
 	ulint page0_offset;   // byte offset on page 0 for crypt data
@@ -359,13 +383,11 @@ struct fil_space_scrub_status_t {
 
 /*********************************************************************
 Init space crypt */
-UNIV_INTERN
 void
 fil_space_crypt_init();
 
 /*********************************************************************
 Cleanup space crypt */
-UNIV_INTERN
 void
 fil_space_crypt_cleanup();
 
@@ -377,7 +399,6 @@ Create a fil_space_crypt_t object
 
 @param[in]	key_id		Encryption key id
 @return crypt object */
-UNIV_INTERN
 fil_space_crypt_t*
 fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
@@ -388,7 +409,6 @@ fil_space_create_crypt_data(
 Merge fil_space_crypt_t object
 @param[in,out]	dst		Destination cryp data
 @param[in]	src		Source crypt data */
-UNIV_INTERN
 void
 fil_space_merge_crypt_data(
 	fil_space_crypt_t* dst,
@@ -405,14 +425,13 @@ fil_space_merge_crypt_data(
 	//MY_ATTRIBUTE((nonnull, warn_unused_result));
 
 fil_space_crypt_t*
-fil_space_read_crypt_data(const page_size_t& page_size, const byte* page, ulint space_id);
+fil_space_read_crypt_data(const page_size_t& page_size, const byte* page);
   
 //bool fil_space_read_crypt_data(const page_size_t& page_size, const byte* page, ulint space_id);
 
 /**
 Free a crypt data object
 @param[in,out] crypt_data	crypt data to be freed */
-UNIV_INTERN
 void
 fil_space_destroy_crypt_data(
 	fil_space_crypt_t **crypt_data);
@@ -424,7 +443,6 @@ Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
 @param[in]	block		buffer block
 @param[out]	err		DB_SUCCESS or DB_DECRYPTION_FAILED
 @return position on log buffer */
-UNIV_INTERN
 byte*
 fil_parse_write_crypt_data(
 	byte*			ptr,
@@ -462,7 +480,6 @@ Encrypt a page.
 @param[in]		src_frame	Page to encrypt
 @param[in,out]		dst_frame	Output buffer
 @return encrypted buffer or NULL */
-UNIV_INTERN
 byte*
 fil_space_encrypt(
 	const fil_space_t* space,
@@ -480,7 +497,6 @@ Decrypt a page.
 @param[in,out]	src_frame		Page to decrypt
 @param[out]	err			DB_SUCCESS or error
 @return true if page decrypted, false if not.*/
-UNIV_INTERN
 bool
 fil_space_decrypt(
 	fil_space_crypt_t*	crypt_data,
@@ -497,7 +513,6 @@ Decrypt a page
 @param[out]	decrypted		true if page was decrypted
 @return decrypted page, or original not encrypted page if decryption is
 not needed.*/
-UNIV_INTERN
 byte*
 fil_space_decrypt(
 	const fil_space_t* space,
@@ -512,7 +527,6 @@ Calculate post encryption checksum
 @param[in]	dst_frame	Block where checksum is calculated
 @return page checksum or BUF_NO_CHECKSUM_MAGIC
 not needed. */
-UNIV_INTERN
 uint32_t
 fil_crypt_calculate_checksum(
 	const page_size_t&	page_size,
@@ -522,7 +536,6 @@ fil_crypt_calculate_checksum(
 /*********************************************************************
 Adjust thread count for key rotation
 @param[in]	enw_cnt		Number of threads to be used */
-UNIV_INTERN
 void
 fil_crypt_set_thread_cnt(
 	uint	new_cnt);
@@ -530,7 +543,6 @@ fil_crypt_set_thread_cnt(
 /*********************************************************************
 Adjust max key age
 @param[in]	val		New max key age */
-UNIV_INTERN
 void
 fil_crypt_set_rotate_key_age(
 	uint	val);
@@ -538,7 +550,6 @@ fil_crypt_set_rotate_key_age(
 /*********************************************************************
 Adjust rotation iops
 @param[in]	val		New max roation iops */
-UNIV_INTERN
 void
 fil_crypt_set_rotation_iops(
 	uint val);
@@ -546,27 +557,23 @@ fil_crypt_set_rotation_iops(
 /*********************************************************************
 Adjust encrypt tables
 @param[in]	val		New setting for innodb-encrypt-tables */
-UNIV_INTERN
 void
 fil_crypt_set_encrypt_tables(
 	uint val);
 
 /*********************************************************************
 Init threads for key rotation */
-UNIV_INTERN
 void
 fil_crypt_threads_init();
 
 /*********************************************************************
 Clean up key rotation threads resources */
-UNIV_INTERN
 void
 fil_crypt_threads_cleanup();
 
 /*********************************************************************
 Wait for crypt threads to stop accessing space
 @param[in]	space		Tablespace */
-UNIV_INTERN
 void
 fil_space_crypt_close_tablespace(
 	const fil_space_t*	space);
@@ -576,7 +583,6 @@ Get crypt status for a space (used by information_schema)
 @param[in]	space		Tablespace
 @param[out]	status		Crypt status
 return 0 if crypt data present */
-UNIV_INTERN
 void
 fil_space_crypt_get_status(
 	const fil_space_t*			space,
@@ -585,7 +591,6 @@ fil_space_crypt_get_status(
 /*********************************************************************
 Return crypt statistics
 @param[out]	stat		Crypt statistics */
-UNIV_INTERN
 void
 fil_crypt_total_stat(
 	fil_crypt_stat_t *stat);
@@ -596,13 +601,12 @@ Get scrub status for a space (used by information_schema)
 @param[in]	space		Tablespace
 @param[out]	status		Scrub status
 return 0 if data found */
-UNIV_INTERN
 void
 fil_space_get_scrub_status(
 	const fil_space_t*		space,
 	fil_space_scrub_status_t*	status);
 
-#include "fil0crypt.ic"
+//#include "fil0crypt.ic"
 #endif /* !UNIV_INNOCHECKSUM */
 
 /**
@@ -618,7 +622,6 @@ encrypted, or corrupted.
 @param[in]	space		tablespace identifier
 @param[in]	offset		page number
 @return true if page is encrypted AND OK, false otherwise */
-UNIV_INTERN
 bool
 fil_space_verify_crypt_checksum(
 	byte* 			page,

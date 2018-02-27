@@ -11040,7 +11040,7 @@ err_col:
 			dict_table_assign_new_id(table, m_trx);
 
 			/* Create temp tablespace if configured. */
-			err = dict_build_tablespace_for_table(table);
+			err = dict_build_tablespace_for_table(table, NULL);
 
 			if (err == DB_SUCCESS) {
 				/* Temp-table are maintained in memory and so

@@ -141,6 +141,15 @@ struct srv_stats_t {
 
 	/** Number of buffered aio requests submitted */
 	ulint_ctr_64_t		n_aio_submitted;
+
+	/** Number of encryption_get_latest_key_version calls */
+	ulint_ctr_64_t		n_key_requests;
+
+	/** Number of log scrub operations */
+	//ulint_ctr_64_t		n_log_scrubs;
+
+	/** Number of spaces in keyrotation list */
+	ulint_ctr_64_t		key_rotation_list_length;
 };
 
 extern const char*	srv_main_thread_op_info;

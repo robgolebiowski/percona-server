@@ -153,66 +153,13 @@ ulint	fil_n_file_opened			= 0;
 /** The null file address */
 fil_addr_t	fil_addr_null = {FIL_NULL, 0};
 
-/** The tablespace memory cache; also the totality of logs (the log
-data space) is stored here; below we talk about tablespaces, but also
-the ib_logfiles form a 'space' and it is handled here */
-struct fil_system_t {
-#ifndef UNIV_HOTBACKUP
-	ib_mutex_t	mutex;		/*!< The mutex protecting the cache */
-#endif /* !UNIV_HOTBACKUP */
-	hash_table_t*	spaces;		/*!< The hash table of spaces in the
-					system; they are hashed on the space
-					id */
-	hash_table_t*	name_hash;	/*!< hash table based on the space
-					name */
-	UT_LIST_BASE_NODE_T(fil_node_t) LRU;
-					/*!< base node for the LRU list of the
-					most recently used open files with no
-					pending i/o's; if we start an i/o on
-					the file, we first remove it from this
-					list, and return it to the start of
-					the list when the i/o ends;
-					log files and the system tablespace are
-					not put to this list: they are opened
-					after the startup, and kept open until
-					shutdown */
-	UT_LIST_BASE_NODE_T(fil_space_t) unflushed_spaces;
-					/*!< base node for the list of those
-					tablespaces whose files contain
-					unflushed writes; those spaces have
-					at least one file node where
-					modification_counter > flush_counter */
-	ulint		n_open;		/*!< number of files currently open */
-	ulint		max_n_open;	/*!< n_open is not allowed to exceed
-					this */
-	int64_t		modification_counter;/*!< when we write to a file we
-					increment this by one */
-	ulint		max_assigned_id;/*!< maximum space id in the existing
-					tables, or assigned during the time
-					mysqld has been up; at an InnoDB
-					startup we scan the data dictionary
-					and set here the maximum of the
-					space id's of the tables there */
-	UT_LIST_BASE_NODE_T(fil_space_t) space_list;
-					/*!< list of all file spaces */
-	UT_LIST_BASE_NODE_T(fil_space_t) named_spaces;
-					/*!< list of all file spaces
-					for which a MLOG_FILE_NAME
-					record has been written since
-					the latest redo log checkpoint.
-					Protected only by log_sys->mutex. */
-	UT_LIST_BASE_NODE_T(fil_space_t) rotation_list;
-					/*!< list of all file spaces needing
-					key rotation.*/
-	bool		space_id_reuse_warned;
-					/* !< true if fil_space_create()
-					has issued a warning about
-					potential space_id reuse */
-};
-
 /** The tablespace memory cache. This variable is NULL before the module is
 initialized. */
-static fil_system_t*	fil_system	= NULL;
+fil_system_t*	fil_system	= NULL;
+
+/** At this age or older a space/page will be rotated */
+extern uint srv_fil_crypt_rotate_key_age;
+extern ib_mutex_t fil_crypt_threads_mutex;
 
 #ifdef UNIV_HOTBACKUP
 static ulint	srv_data_read;
@@ -1223,6 +1170,12 @@ fil_space_detach(
 		UT_LIST_REMOVE(fil_system->unflushed_spaces, space);
 	}
 
+	if (space->is_in_rotation_list) {
+		space->is_in_rotation_list = false;
+
+		UT_LIST_REMOVE(fil_system->rotation_list, space);
+	}
+
 	UT_LIST_REMOVE(fil_system->space_list, space);
 
 	ut_a(space->magic_n == FIL_SPACE_MAGIC_N);
@@ -1326,10 +1279,12 @@ Error messages are issued to the server log.
 @retval NULL on failure (such as when the same tablespace exists) */
 fil_space_t*
 fil_space_create(
-	const char*	name,
-	ulint		id,
-	ulint		flags,
-	fil_type_t	purpose)
+	const char*		name,
+	ulint			id,
+	ulint			flags,
+	fil_type_t		purpose,
+	fil_space_crypt_t*	crypt_data,
+	fil_encryption_t	mode)
 {
 	fil_space_t*	space;
 
@@ -1393,6 +1348,7 @@ fil_space_create(
 	space->flags = flags;
 
 	space->magic_n = FIL_SPACE_MAGIC_N;
+        space->crypt_data = crypt_data;
 
 	space->encryption_type = Encryption::NONE;
 
@@ -1418,7 +1374,23 @@ fil_space_create(
 		fil_system->max_assigned_id = id;
 	}
 
-	mutex_exit(&fil_system->mutex);
+	/* Inform key rotation that there could be something
+	to do */
+	if (purpose == FIL_TYPE_TABLESPACE
+	    && !srv_fil_crypt_rotate_key_age && fil_crypt_threads_event &&
+	    (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
+		    srv_encrypt_tables)) {
+		/* Key rotation is not enabled, need to inform background
+		encryption threads. */
+		UT_LIST_ADD_LAST(fil_system->rotation_list, space);
+		space->is_in_rotation_list = true;
+		mutex_exit(&fil_system->mutex);
+		mutex_enter(&fil_crypt_threads_mutex);
+		os_event_set(fil_crypt_threads_event);
+		mutex_exit(&fil_crypt_threads_mutex);
+	} else {
+		mutex_exit(&fil_system->mutex);
+	}
 
 	return(space);
 }
@@ -1750,6 +1722,8 @@ fil_init(
 
 	UT_LIST_INIT(fil_system->LRU, &fil_node_t::LRU);
 	UT_LIST_INIT(fil_system->space_list, &fil_space_t::space_list);
+        UT_LIST_INIT(fil_system->rotation_list, &fil_space_t::rotation_list);
+
 	UT_LIST_INIT(fil_system->unflushed_spaces,
 		     &fil_space_t::unflushed_spaces);
 	UT_LIST_INIT(fil_system->named_spaces, &fil_space_t::named_spaces);
@@ -2070,7 +2044,9 @@ fil_space_next(fil_space_t* prev_space)
 		while (space != NULL
 			&& (UT_LIST_GET_LEN(space->chain) == 0
 			    || space->is_stopping()
-			    || space->purpose != FIL_TYPE_TABLESPACE)) {
+			    || space->purpose != FIL_TYPE_TABLESPACE
+                            || FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                           )) {
 			space = UT_LIST_GET_NEXT(space_list, space);
 		}
 
@@ -3593,7 +3569,8 @@ fil_ibd_create(
 	const char*	name,
 	const char*	path,
 	ulint		flags,
-	ulint		size)
+	ulint		size,
+        fil_encryption_t mode)
 {
 	pfs_os_file_t	file;
 	dberr_t		err;
@@ -3604,6 +3581,8 @@ fil_ibd_create(
 	bool		has_data_dir = FSP_FLAGS_HAS_DATA_DIR(flags);
 	bool		has_shared_space = FSP_FLAGS_GET_SHARED(flags);
 	fil_space_t*	space = NULL;
+        fil_space_crypt_t *crypt_data = NULL;
+
 
 	ut_ad(!is_system_tablespace(space_id));
 	ut_ad(!srv_read_only_mode);
@@ -3823,8 +3802,20 @@ fil_ibd_create(
 		}
 	}
 #endif /* !UNIV_HOTBACKUP */
+	/* Create crypt data if the tablespace is either encrypted or user has
+	requested it to remain unencrypted. */
+	if (FSP_FLAGS_GET_ROTATED_KEYS(flags))
+        {
+            if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
+		srv_encrypt_tables) {
+		//crypt_data = fil_space_create_crypt_data(mode, key_id);
+		crypt_data = fil_space_create_crypt_data(mode, 0);
+            }
+	}
+
 	space = fil_space_create(name, space_id, flags, is_temp
-				 ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE);
+				 ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
+                                 crypt_data, mode);
 
 	DEBUG_SYNC_C("fil_ibd_created_space");
 
@@ -4234,8 +4225,27 @@ fil_ibd_open(
 
 skip_validate:
 	if (err == DB_SUCCESS) {
+                fil_space_crypt_t* crypt_data = NULL;
+
+                if (is_rotated_keys)
+                {
+                  const byte* first_page =
+                          df_default.is_open() ? df_default.get_first_page() :
+                          df_dict.is_open() ? df_dict.get_first_page() :
+                          df_remote.get_first_page();
+
+                  //TODO:Robert tutaj jest robione czytanie informacji odnosnie encrypcji bezposrednio
+                  //ze strony, natomiast w przypadku MK czytanie jest z pól. Czyli informacje ze strony
+                  //zostały przeczytane już wcześniej. Może warto to przenieść, żeby było tak jak w MK?
+
+                  crypt_data = first_page
+                          ? fil_space_read_crypt_data(page_size_t(flags),
+                                                      first_page)
+                          : NULL;
+                }
+
 		fil_space_t*	space = fil_space_create(
-			space_name, id, flags, purpose);
+			space_name, id, flags, purpose, crypt_data); // TODO:Robert: mode nie jest wymagane?
 
 		/* We do not measure the size of the file, that is why
 		we pass the 0 below */
@@ -4251,7 +4261,7 @@ skip_validate:
 
 		/* For encryption tablespace, initialize encryption
 		information.*/
-		if (err == DB_SUCCESS && is_encrypted && !for_import) {
+		if (!is_rotated_keys && err == DB_SUCCESS && is_encrypted && !for_import) {
 			Datafile& df_current = df_remote.is_open() ?
 				df_remote: df_dict.is_open() ?
 				df_dict : df_default;
@@ -5590,11 +5600,23 @@ fil_io_set_encryption(
 	if (!req_type.is_log() && page_id.page_no() > 0
 	    && space->encryption_type != Encryption::NONE)
 	{
+                //TODO: Here I also need to get a key for encryption or move it deeper into os0file
+                //uint key_version = space->encryption_type == Encryption::ROTATED_KEYS
+                                     //? get_latest_tablespace_key_version()
+                                     //: 0;
+                                     //
+                uchar *iv = space->encryption_type == Encryption::ROTATED_KEYS 
+                             ? space->crypt_data->iv
+                             : space->encryption_iv;
+
 		req_type.encryption_key(space->encryption_key,
 					space->encryption_klen,
-					space->encryption_iv);
-		req_type.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space->flags) ? Encryption::ROTATED_KEYS
-                                                                                       : Encryption::AES);
+                                        iv);
+					//space->encryption_iv);
+                                        
+                if (space->encryption_type == Encryption::ROTATED_KEYS)
+
+		req_type.encryption_algorithm(space->encryption_type);
 	} else {
 		req_type.clear_encrypted();
 	}
@@ -7474,15 +7496,15 @@ fil_get_compression(
 @param[in] key			Encryption key
 @param[in] iv			Encryption iv
 @return DB_SUCCESS or error code */
-//TODO:Robert - revet this to the original?
+
+//TODO:Robert: For the time being I am reverting the ofiginal fil_set_encryption
+//I will not use it for now in ROTATED_KEYS
 dberr_t
 fil_set_encryption(
 	ulint			space_id,
 	Encryption::Type	algorithm,
 	byte*			key,
-	byte*			iv,
-        ulint key_version,
-        fil_encryption_t encryption)
+	byte*			iv)
 {
 	ut_ad(!is_system_or_undo_tablespace(space_id));
 
@@ -7502,24 +7524,13 @@ fil_set_encryption(
 	ut_ad(algorithm != Encryption::NONE);
 	space->encryption_type = algorithm;
 	if (key == NULL) {
-           if (algorithm == Encryption::ROTATED_KEYS) {
-             uint latest_tablespace_key_version= 0;
-             Encryption::get_latest_tablespace_key(space_id, Encryption::uuid, &latest_tablespace_key_version,
-                                                   &key);
-             if (key == NULL)
-               Encryption::create_tablespace_key(&key, space_id);
-             if (key == NULL) //TODO: Muszę to przetestować, co się stanie w takiej sytuacji
-               return(DB_NOT_FOUND); //TODO: brakuje mi odpowiedniego kodu błędu, na razie zwracam cokolwiek
-             memcpy(space->encryption_key, key, ENCRYPTION_KEY_LEN);
-             my_free(key); //TODO: use unique_ptr for percona_innodb_key? Chyba nie będę mógł, bo nie ma boosta tu wcale...
-           } else {
-	     Encryption::random_value(space->encryption_key);
-           }
+		Encryption::random_value(space->encryption_key);
 	} else {
 		memcpy(space->encryption_key,
 		       key, ENCRYPTION_KEY_LEN);
-        }
+	}
 
+	space->encryption_klen = ENCRYPTION_KEY_LEN;
 	if (iv == NULL) {
 		Encryption::random_value(space->encryption_iv);
 	} else {
@@ -7527,8 +7538,72 @@ fil_set_encryption(
 		       iv, ENCRYPTION_KEY_LEN);
 	}
 
+	mutex_exit(&fil_system->mutex);
+
 	return(DB_SUCCESS);
 }
+
+/** Set the encryption type for the tablespace
+@param[in] space_id		Space ID of tablespace for which to set
+@param[in] algorithm		Encryption algorithm
+@param[in] key			Encryption key
+@param[in] iv			Encryption iv
+@return DB_SUCCESS or error code */
+//TODO:Robert - revet this to the original?
+//dberr_t
+//fil_set_encryption(
+	//ulint			space_id,
+	//Encryption::Type	algorithm,
+	//byte*			key,
+	//byte*			iv,
+        //ulint key_version,
+        //fil_encryption_t encryption)
+//{
+	//ut_ad(!is_system_or_undo_tablespace(space_id));
+
+	//if (is_system_tablespace(space_id)) {
+		//return(DB_IO_NO_ENCRYPT_TABLESPACE);
+	//}
+
+	//mutex_enter(&fil_system->mutex);
+
+	//fil_space_t*	space = fil_space_get_by_id(space_id);
+
+	//if (space == NULL) {
+		//mutex_exit(&fil_system->mutex);
+		//return(DB_NOT_FOUND);
+	//}
+
+	//ut_ad(algorithm != Encryption::NONE);
+	//space->encryption_type = algorithm;
+	//if (key == NULL) {
+           //if (algorithm == Encryption::ROTATED_KEYS) {
+             //uint latest_tablespace_key_version= 0;
+             //Encryption::get_latest_tablespace_key(space_id, Encryption::uuid, &latest_tablespace_key_version,
+                                                   //&key);
+             //if (key == NULL)
+               //Encryption::create_tablespace_key(&key, space_id);
+             //if (key == NULL) //TODO: Muszę to przetestować, co się stanie w takiej sytuacji
+               //return(DB_NOT_FOUND); //TODO: brakuje mi odpowiedniego kodu błędu, na razie zwracam cokolwiek
+             //memcpy(space->encryption_key, key, ENCRYPTION_KEY_LEN);
+             //my_free(key); //TODO: use unique_ptr for percona_innodb_key? Chyba nie będę mógł, bo nie ma boosta tu wcale...
+           //} else {
+	     //Encryption::random_value(space->encryption_key);
+           //}
+	//} else {
+		//memcpy(space->encryption_key,
+		       //key, ENCRYPTION_KEY_LEN);
+        //}
+
+	//if (iv == NULL) {
+		//Encryption::random_value(space->encryption_iv);
+	//} else {
+		//memcpy(space->encryption_iv,
+		       //iv, ENCRYPTION_KEY_LEN);
+	//}
+
+	//return(DB_SUCCESS);
+//}
 
 /** Rotate the tablespace keys by new master key.
 @return true if the re-encrypt suceeds */

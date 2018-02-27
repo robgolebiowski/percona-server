@@ -9246,10 +9246,10 @@ Encryption::get_keyring_key(const char *key_name,
 }
 
 void
-Encryption::get_latest_tablespace_key(ulint space_id,
-		                      char* srv_uuid,
-                                      uint tablespace_key_version,
-                		      byte** tablespace_key)
+Encryption::get_tablespace_key(ulint space_id,
+		               char* srv_uuid,
+                               uint tablespace_key_version,
+                	       byte** tablespace_key)
 {
 #ifndef UNIV_INNOCHECKSUM
 	size_t	key_len;
@@ -9258,7 +9258,7 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%s-%lu:%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    "%s-%s-%lu:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 		    srv_uuid, space_id, tablespace_key_version);
 
         get_keyring_key(key_name, tablespace_key, &key_len);
@@ -9538,8 +9538,20 @@ Encryption::encrypt(
 
 	ut_ad(m_type != Encryption::NONE);
 
+        if (m_key != NULL)
+        {
+          memset(m_key, 0, MY_AES_BLOCK_SIZE);
+          my_free(m_key);
+        }
+
+        uint tablespace_key_version = 0; // TODO: Change it to not encrypted ?
+        get_latest_tablespace_key(space_id, uuid, &tablespace_key_version, &m_key);
+
 	/* This is data size which need to encrypt. */
-	data_len = src_len - FIL_PAGE_DATA;
+        if (m_type == Encryption::ROTATED_KEYS)
+	  data_len = src_len - FIL_PAGE_DATA - 4; // We need those 4 bytes for key_version
+        else
+	  data_len = src_len - FIL_PAGE_DATA;
 	main_len = (data_len / MY_AES_BLOCK_SIZE) * MY_AES_BLOCK_SIZE;
 	remain_len = data_len - main_len;
 
@@ -9550,7 +9562,8 @@ Encryption::encrypt(
 		ut_error;
 
         case Encryption::ROTATED_KEYS :
-           mach_write_to_4(src +  FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID, m_encryption_key_version);
+           //mach_write_to_4(src +  FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID, m_encryption_key_version);
+           //fall through
         
 
 	case Encryption::AES: {
@@ -9642,6 +9655,9 @@ Encryption::encrypt(
 		ut_error;
 	}
 
+        if (m_type == Encryption::ROTATED_KEYS)
+          memcpy(dst + FIL_PAGE_DATA + data_len, &tablespace_key_version, 4);
+
 	/* Copy the header as is. */
 	memmove(dst, src, FIL_PAGE_DATA);
 	ut_ad(memcmp(src, dst, FIL_PAGE_DATA) == 0);
@@ -9692,6 +9708,8 @@ Encryption::encrypt(
 	return(dst);
 }
 
+
+
 /** Decrypt the page data contents. Page type must be FIL_PAGE_ENCRYPTED,
 if not then the source contents are left unchanged and DB_SUCCESS is returned.
 @param[in]	type		IORequest
@@ -9733,9 +9751,11 @@ Encryption::decrypt(
 		src_len = ut_calc_align(src_len, type.block_size());
 #endif
 	}
-#ifdef UNIV_ENCRYPT_DEBUG
+
 	ulint space_id =
 		mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+
+#ifdef UNIV_ENCRYPT_DEBUG
 	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 
 	fprintf(stderr, "Decrypting page:%lu.%lu len:%lu\n",
@@ -9761,7 +9781,21 @@ Encryption::decrypt(
 		block = NULL;
 	}
 
-	data_len = src_len - FIL_PAGE_DATA;
+        if (m_type == Encryption::ROTATED_KEYS)
+        {
+          data_len = src_len - FIL_PAGE_DATA - 4;
+          uint key_version;
+          memcpy(&key_version, ptr + data_len, 4); // get the key_version
+
+          if (m_key != NULL)
+            memset(m_key, 0, MY_AES_BLOCK_SIZE);
+          m_key = NULL;
+          get_tablespace_key(space_id, uuid, key_version, &m_key);
+          if (m_key == NULL)
+            return (DB_IO_DECRYPT_FAIL);
+        }
+        else
+	  data_len = src_len - FIL_PAGE_DATA;
 	main_len = (data_len / MY_AES_BLOCK_SIZE) * MY_AES_BLOCK_SIZE;
 	remain_len = data_len - main_len;
 
@@ -9856,6 +9890,14 @@ Encryption::decrypt(
 	/* Restore the original page type. If it's a compressed and
 	encrypted page, just reset it as compressed page type, since
 	we will do uncompress later. */
+
+        if (m_type == Encryption::ROTATED_KEYS)
+        {
+          //restore LSN
+          uint last_4_bytes_of_fil_page_lsn;
+          memcpy(&last_4_bytes_of_fil_page_lsn, ptr + FIL_PAGE_LSN + 4, 4);
+          memcpy(ptr + data_len, &last_4_bytes_of_fil_page_lsn, 4); 
+        }
 
 	if (page_type == FIL_PAGE_ENCRYPTED) {
 		mach_write_to_2(src + FIL_PAGE_TYPE, original_type);

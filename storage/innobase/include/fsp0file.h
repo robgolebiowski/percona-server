@@ -348,6 +348,11 @@ public:
 	@return true if it is the same file, else false */
 	bool same_as(const Datafile&	other) const;
 
+	/** Get access to the first data page.
+	It is valid after open_read_only() succeeded.
+	@return the first data page */
+	const byte* get_first_page() const { return(m_first_page); }
+
 private:
 	/** Free the filepath buffer. */
 	void free_filepath();

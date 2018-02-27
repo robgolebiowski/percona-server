@@ -336,15 +336,6 @@ fsp_header_decode_encryption_info(
 	byte*		encryption_info);
 
 
-enum fil_encryption_t {
-        /** Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) */
-        FIL_ENCRYPTION_DEFAULT,
-        /** Encrypted */  
-        FIL_ENCRYPTION_ON,
-        /** Not encrypted */
-        FIL_ENCRYPTION_OFF
-};
-
 /** Reads the encryption key from the first page of a tablespace.
 @param[in]	fsp_flags	tablespace flags
 @param[in/out]	key		tablespace key
@@ -585,6 +576,7 @@ fseg_free_page(
 /**********************************************************************//**
 Checks if a single page of a segment is free.
 @return true if free */
+
 bool
 fseg_page_is_free(
 /*==============*/

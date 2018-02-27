@@ -365,7 +365,9 @@ dict_build_table_def_step(
 	trx_t*	trx = thr_get_trx(thr);
 	dict_table_assign_new_id(table, trx);
 
-	err = dict_build_tablespace_for_table(table);
+	//err = dict_build_tablespace_for_table(table);
+        //TODO: Robert added by me
+	err = dict_build_tablespace_for_table(table, node);
 	if (err != DB_SUCCESS) {
 		return(err);
 	}
@@ -415,7 +417,8 @@ dict_build_tablespace(
 		tablespace->name(),
 		datafile->filepath(),
 		tablespace->flags(),
-		FIL_IBD_FILE_INITIAL_SIZE);
+		FIL_IBD_FILE_INITIAL_SIZE,
+                node ? node->mode : FIL_ENCRYPTION_DEFAULT);
 	if (err != DB_SUCCESS) {
 		return(err);
 	}
@@ -451,7 +454,8 @@ dict_build_tablespace(
 @return DB_SUCCESS or error code */
 dberr_t
 dict_build_tablespace_for_table(
-	dict_table_t*	table)
+	dict_table_t*	table,
+        tab_node_t*	node) // TODO : change this parameter only to encryption mode
 {
 	dberr_t		err	= DB_SUCCESS;
 	mtr_t		mtr;
@@ -530,7 +534,8 @@ dict_build_tablespace_for_table(
 
 		err = fil_ibd_create(
 			space, table->name.m_name, filepath, fsp_flags,
-			FIL_IBD_FILE_INITIAL_SIZE);
+			FIL_IBD_FILE_INITIAL_SIZE,
+                        node ? node->mode : FIL_ENCRYPTION_DEFAULT);
 
 		ut_free(filepath);
 
