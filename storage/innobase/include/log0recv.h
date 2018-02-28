@@ -335,7 +335,7 @@ typedef	struct recv_encryption {
 	ulint		space_id;	/*!< the page number */
 	byte*		key;		/*!< encryption key */
 	byte*		iv;		/*!< encryption iv */
-        ulint           key_version;
+        //ulint           key_version; TODO:Robert: Jeszcze nie wiem co mam z tym zrobić
 } recv_encryption_t;
 
 typedef std::vector<recv_encryption_t, ut_allocator<recv_encryption_t> >

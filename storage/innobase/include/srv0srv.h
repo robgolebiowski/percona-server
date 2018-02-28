@@ -1116,6 +1116,28 @@ struct export_var_t{
 
 	fragmentation_stats_t innodb_fragmentation_stats;/*!< Fragmentation
 						statistics */
+	int64_t innodb_pages_encrypted;      /*!< Number of pages
+						encrypted */
+	int64_t innodb_pages_decrypted;      /*!< Number of pages
+						decrypted */
+
+	/*!< Number of merge blocks encrypted */
+	int64_t innodb_n_merge_blocks_encrypted;
+	/*!< Number of merge blocks decrypted */
+	int64_t innodb_n_merge_blocks_decrypted;
+	/*!< Number of row log blocks encrypted */
+	int64_t innodb_n_rowlog_blocks_encrypted;
+	/*!< Number of row log blocks decrypted */
+	int64_t innodb_n_rowlog_blocks_decrypted;
+
+	ulint innodb_encryption_rotation_pages_read_from_cache;
+	ulint innodb_encryption_rotation_pages_read_from_disk;
+	ulint innodb_encryption_rotation_pages_modified;
+	ulint innodb_encryption_rotation_pages_flushed;
+	ulint innodb_encryption_rotation_estimated_iops;
+	int64_t innodb_encryption_key_requests;
+	int64_t innodb_key_rotation_list_length;
+
 };
 
 /** Thread slot in the thread table.  */

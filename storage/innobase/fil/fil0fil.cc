@@ -4730,10 +4730,24 @@ fil_ibd_load(
 	}
 #endif /* UNIV_HOTBACKUP */
 
+	const byte* first_page = file.get_first_page();
+
+        fil_space_crypt_t *crypt_data = NULL;
+
+        if (FSP_FLAGS_GET_ROTATED_KEYS(file.flags()))
+        {
+          crypt_data = first_page
+                  ? fil_space_read_crypt_data(page_size_t(file.flags()), first_page)
+                  : NULL;
+          //space = fil_space_create(
+                  //file.name(), space_id, flags, FIL_TYPE_TABLESPACE, crypt_data);
+        }   
+
 	bool is_temp = FSP_FLAGS_GET_TEMPORARY(file.flags());
 	space = fil_space_create(
 		file.name(), space_id, file.flags(),
-		is_temp ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE);
+		is_temp ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE, crypt_data);
+		//is_temp ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE);
 
 	if (space == NULL) {
 		return(FIL_LOAD_INVALID);
@@ -5543,46 +5557,46 @@ fil_report_invalid_page_access(
 	_exit(1);
 }
 
-#define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
+//#define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
-bool encryption_get_latest_innodb_key(uint key_id, byte **key, ulint *key_len, uint *key_version)
-{
-  char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+//bool encryption_get_latest_innodb_key(uint key_id, byte **key, ulint *key_len, uint *key_version)
+//{
+  //char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-  memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+  //memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
-  ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      "%s-%s-%u", "percona_",
-	      "dummy", key_id);
+  //ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+	      //"%s-%s-%u", "percona_",
+	      //"dummy", key_id);
 
-  char *system_key_type = NULL;
-  size_t system_key_len = 0;
-  uchar *system_key = NULL;
+  //char *system_key_type = NULL;
+  //size_t system_key_len = 0;
+  //uchar *system_key = NULL;
 
-  //DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
-                  //{ return true; } );
-  if (my_key_fetch(key_name, &system_key_type, NULL,
-                   reinterpret_cast<void**>(&system_key), &system_key_len) ||
-      (system_key == NULL &&
-       (my_key_generate(key_name, "AES", NULL, 16) ||
-        my_key_fetch(key_name, &system_key_type, NULL,
-                     reinterpret_cast<void**>(&system_key), &system_key_len) ||
-        system_key == NULL)))
-         return false;
+  ////DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
+                  ////{ return true; } );
+  //if (my_key_fetch(key_name, &system_key_type, NULL,
+                   //reinterpret_cast<void**>(&system_key), &system_key_len) ||
+      //(system_key == NULL &&
+       //(my_key_generate(key_name, "AES", NULL, 16) ||
+        //my_key_fetch(key_name, &system_key_type, NULL,
+                     //reinterpret_cast<void**>(&system_key), &system_key_len) ||
+        //system_key == NULL)))
+         //return false;
 
-  my_free(system_key_type);
-  //DBUG_ASSERT(strncmp(system_key_type, "AES", 3) == 0);
+  //my_free(system_key_type);
+  ////DBUG_ASSERT(strncmp(system_key_type, "AES", 3) == 0);
 
-  if (parse_system_key(system_key, system_key_len, key_version, key, key_len) == reinterpret_cast<uchar*>(NullS))
-  {
-    my_free(system_key);
-    return false;
-  }
-  my_free(system_key);
-  my_free(key);
+  //if (parse_system_key(system_key, system_key_len, key_version, key, key_len) == reinterpret_cast<uchar*>(NullS))
+  //{
+    //my_free(system_key);
+    //return false;
+  //}
+  //my_free(system_key);
+  //my_free(key);
 
-  return true;
-}
+  //return true;
+//}
 
 /** Set encryption information for IORequest.
 @param[in,out]	req_type	IO request
@@ -5615,8 +5629,7 @@ fil_io_set_encryption(
 					//space->encryption_iv);
                                         
                 if (space->encryption_type == Encryption::ROTATED_KEYS)
-
-		req_type.encryption_algorithm(space->encryption_type);
+		  req_type.encryption_algorithm(space->encryption_type);
 	} else {
 		req_type.clear_encrypted();
 	}
@@ -6773,17 +6786,18 @@ fil_tablespace_iterate(
 				err = DB_IO_NO_ENCRYPT_TABLESPACE;
 			}
 		}
+//TODO: Robert: This will need to get changed enctyption_key jest nullem jeżeli jest rotated_keys
+//będzie trzeba zmienić na coś innego, jak zmienie na uzupełnianie encryption_key
+		//if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags)) {
+		//	ut_ad(table->encryption_key != NULL);
 
-		if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags)) {
-			ut_ad(table->encryption_key != NULL);
-
-			if (!dict_table_is_rotated_keys(table)) {
-				ib::error() << "Table is not in an encrypted"
-					" tablespace with rotated keys, but the data file which"
-					" trying to import is an encrypted"
-					" tablespace with rotated keys";
-				err = DB_IO_NO_ENCRYPT_TABLESPACE;
-			}
+		//	if (!dict_table_is_rotated_keys(table)) {
+		//		ib::error() << "Table is not in an encrypted"
+		//			" tablespace with rotated keys, but the data file which"
+		//			" trying to import is an encrypted"
+		//			" tablespace with rotated keys";
+		//		err = DB_IO_NO_ENCRYPT_TABLESPACE;
+		//	}
 		}
 
 		if (err == DB_SUCCESS) {

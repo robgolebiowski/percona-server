@@ -889,104 +889,12 @@ fsp_header_get_encryption_offset(
 	return offset;
 }
 
-// 16 bytes key = space_id | key_version | 8 bytes empty
-
-bool
-fsp_header_fill_encryption_info_for_rotated_keys(
-	fil_space_t*		space,
-	byte*			encrypt_info)
-{
-	byte*			ptr;
-        byte			key_info[ENCRYPTION_KEY_LEN * 2];
-	ulint			crc;
-//#ifdef	UNIV_ENCRYPT_DEBUG
-	//const byte*		data;
-	//ulint			i;
-//#endif
-
-	/* Get master key from key ring */
-
-        //TODO:Przecież ja tu nie mam ptr //TODO:Do zmiany
-        //if (memcmp(space->encryption_key, "percona_innodb_", 15) != 0)
-        //{
-          //Encryption::get_master_key(&master_key_id, &master_key, &version);
-          //if (master_key == NULL) {
-                  //return(false);
-          //}
-        //}
-
-	memset(encrypt_info, 0, ENCRYPTION_INFO_SIZE_V2);
-	//memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
-
-	/* Use the new master key to encrypt the tablespace
-	key. */
-	ut_ad(encrypt_info != NULL);
-	ptr = encrypt_info;
-
-	/* Write magic header. */
-	//if (version == Encryption::ENCRYPTION_VERSION_1) {
-		//memcpy(ptr, ENCRYPTION_KEY_MAGIC_V1, ENCRYPTION_MAGIC_SIZE);
-	//} else {
-		//memcpy(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE);
-	//}
-
-	memcpy(ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
-	ptr += ENCRYPTION_MAGIC_SIZE;
-
-	/* Write master key id. */
-	ptr += sizeof(ulint);//TODO:skip writting master_key_id, mach_write_to_4(ptr, master_key_id);
-
-        memcpy(ptr, space->crypt_data->encryption, 1);
-        ptr+= 1;
-        memcpy(ptr, space->crypt_data->type, 1);
-	//ptr += sizeof(ulint); // skip master_key_id, we do not use it
-        ptr += 2;
-
-
-	/* Write server uuid. */
-        memcpy(ptr, Encryption::uuid, ENCRYPTION_SERVER_UUID_LEN);
-        ptr += ENCRYPTION_SERVER_UUID_LEN;
-
-	/* Write tablespace key to temp space. */
-	memcpy(key_info, &space->id, 4);
-        memcpy(key_info + 4, &space->encryption_key_version, 4);
-
-	/* Write tablespace iv to temp space. */
-	memcpy(key_info + ENCRYPTION_KEY_LEN, // last 8 bytes of key are unused
-	       space->encryption_iv,
-	       ENCRYPTION_KEY_LEN);
-
-//#ifdef	UNIV_ENCRYPT_DEBUG
-	//fprintf(stderr, "Set %lu:%lu ",space->id,
-		//Encryption::master_key_id);
-	//for (data = (const byte*) master_key, i = 0;
-	     //i < ENCRYPTION_KEY_LEN; i++)
-		//fprintf(stderr, "%02lx", (ulong)*data++);
-	//fprintf(stderr, " ");
-	//for (data = (const byte*) space->encryption_key,
-	     //i = 0; i < ENCRYPTION_KEY_LEN; i++)
-		//fprintf(stderr, "%02lx", (ulong)*data++);
-	//fprintf(stderr, " ");
-	//for (data = (const byte*) space->encryption_iv,
-	     //i = 0; i < ENCRYPTION_KEY_LEN; i++)
-		//fprintf(stderr, "%02lx", (ulong)*data++);
-	//fprintf(stderr, "\n");
-//#endif
-
-       ptr += ENCRYPTION_KEY_LEN * 2;
-          /* Write checksum bytes. */
-       crc = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
-       mach_write_to_4(ptr, crc);
-
-       return(true);
-}
-
 /** Fill the encryption info.
 @param[in]	space		tablespace
 @param[in,out]	encrypt_info	buffer for encrypt key.
 @return true if success. */
 bool
-fsp_header_fill_encryption_info_for_master_key(
+fsp_header_fill_encryption_info(
 	fil_space_t*		space,
 	byte*			encrypt_info)
 {
@@ -1083,16 +991,6 @@ fsp_header_fill_encryption_info_for_master_key(
 
 	my_free(master_key);
 	return(true);
-}
-
-bool
-fsp_header_fill_encryption_info(
-	fil_space_t*		space,
-	byte*			encrypt_info)
-{
-  return (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
-         ? fsp_header_fill_encryption_info_for_rotated_keys(space, encrypt_info)
-         : fsp_header_fill_encryption_info_for_master_key(space, encrypt_info);
 }
 
 /** Rotate the encryption info in the space header.
@@ -1293,97 +1191,6 @@ fsp_header_get_page_size(
 	return(page_size_t(fsp_header_get_flags(page)));
 }
 
-bool
-fsp_header_decode_encryption_info_for_rotated_keys_encryption(
-	byte*		tablespace_key,
-	byte*		tablespace_iv,
-	byte*		encryption_info,
-        uint8_t *type,
-        ulint*          tablespace_key_version,
-	fil_encryption_t *encryption
-)
-{
-	byte*			ptr;
-	ulint			space_id;
-	//byte*			master_key = NULL;
-        byte			key_info[ENCRYPTION_KEY_LEN * 2];
-	ulint			crc1;
-	ulint			crc2;
-	char			srv_uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
-#ifdef	UNIV_ENCRYPT_DEBUG
-	const byte*		data;
-	ulint			i;
-#endif
-
-	ptr = encryption_info;
-	ptr += ENCRYPTION_MAGIC_SIZE; // skip magic, we already know what it is
-
-	/* Get master key id. */
-        //We are using only one byte
-        memcpy(encryption, ptr, 1);
-        ptr+= 1;
-        memcpy(type, ptr, 1);
-	//ptr += sizeof(ulint); // skip master_key_id, we do not use it
-        ptr += 2;
-
-        // Get server uuid
-	memset(srv_uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
-	memcpy(srv_uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
-	ptr += ENCRYPTION_SERVER_UUID_LEN;
-
-        memset(key_info, 0, sizeof(key_info));
-        memcpy(key_info, ptr, sizeof(key_info));
-        ptr += sizeof(key_info); 
-
-	/* Get tablespace iv */
-	memcpy(tablespace_iv, ptr + ENCRYPTION_KEY_LEN,
-	       ENCRYPTION_KEY_LEN);
-        ptr += ENCRYPTION_KEY_LEN;
-
-	/* Check checksum bytes. */
-	crc1 = mach_read_from_4(ptr);
-	crc2 = ut_crc32(key_info, sizeof(key_info));
-	if (crc1 != crc2) {
-		ib::error() << "The encryption information in tablespace header"
-                               " is corrupted!";
-		my_free(tablespace_key);
-		return(false);
-	}
-
-	/* Get tablespace key */
-	memcpy(&space_id, key_info, 4);
-        memcpy(&tablespace_key_version, key_info + 4, 4);
-        memcpy(&tablespace_iv, key_info + ENCRYPTION_KEY_LEN, 4);
-
-        /* Get tablespace key */
-        Encryption::get_tablespace_key(space_id, srv_uuid, *tablespace_key_version, &tablespace_key); 
-
-        //TODO: Robert - it would be better if the arguments were not changed when there is an error
-        if (tablespace_key == NULL)
-          return (false);
-
-#ifdef	UNIV_ENCRYPT_DEBUG
-	fprintf(stderr, "%lu ", space_id);
-	for (data = (const byte*) key, i = 0;
-	     i < ENCRYPTION_KEY_LEN; i++)
-		fprintf(stderr, "%02lx", (ulong)*data++);
-#endif
-
-#ifdef	UNIV_ENCRYPT_DEBUG
-	fprintf(stderr, " ");
-	for (data = (const byte*) tablespace_key,
-	     i = 0; i < ENCRYPTION_KEY_LEN; i++)
-		fprintf(stderr, "%02lx", (ulong)*data++);
-	fprintf(stderr, " ");
-	for (data = (const byte*) tablespace_iv,
-	     i = 0; i < ENCRYPTION_KEY_LEN; i++)
-		fprintf(stderr, "%02lx", (ulong)*data++);
-	fprintf(stderr, "\n");
-#endif
-
-	return(true);
-}
-
 /** Decoding the encryption info
 from the first page of a tablespace.
 @param[in/out]	key		key
@@ -1391,7 +1198,7 @@ from the first page of a tablespace.
 @param[in]	encryption_info	encrytion info.
 @return true if success */
 bool
-fsp_header_decode_encryption_info_for_master_key_encryption(
+fsp_header_decode_encryption_info(
 	byte*		key,
 	byte*		iv,
 	byte*		encryption_info)
@@ -1519,20 +1326,6 @@ fsp_header_decode_encryption_info_for_master_key_encryption(
 	return(true);
 }
 
-bool
-fsp_header_decode_encryption_info(
-	byte*		key,
-	byte*		iv,
-	byte*		encryption_info,
-        uint8_t *type = NULL,
-        ulint*          key_version = NULL,
-	fil_encryption_t *encryption = NULL)
-{
-        return (memcmp(encryption_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) == 0) 
-                ? fsp_header_decode_encryption_info_for_rotated_keys_encryption(key, iv, encryption_info, type, key_version, encryption)
-                : fsp_header_decode_encryption_info_for_master_key_encryption(key, iv, encryption_info);
-}
-
 /** Reads the encryption key from the first page of a tablespace.
 @param[in]	fsp_flags	tablespace flags
 @param[in/out]	key		tablespace key
@@ -1544,10 +1337,7 @@ fsp_header_get_encryption_key(
 	ulint		fsp_flags,
 	byte*		key,
 	byte*		iv,
-        page_t*		page,
-        uint8_t *type = NULL,
-        ulint*          key_version = NULL,
-	fil_encryption_t *encryption = NULL)
+	page_t*		page)
 {
 	ulint			offset;
 	const page_size_t	page_size(fsp_flags);
@@ -1557,7 +1347,7 @@ fsp_header_get_encryption_key(
 		return(false);
 	}
 
-	return(fsp_header_decode_encryption_info(key, iv, page + offset, type, key_version, encryption);
+	return(fsp_header_decode_encryption_info(key, iv, page + offset));
 }
 
 #ifndef UNIV_HOTBACKUP

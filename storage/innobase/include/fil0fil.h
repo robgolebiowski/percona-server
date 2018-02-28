@@ -45,7 +45,9 @@ Created 10/25/1995 Heikki Tuuri
 #include <list>
 #include <vector>
 
-#include "fil0crypt.h"
+//#include "fil0crypt.h"
+/** Structure containing encryption specification */
+struct fil_space_crypt_t;
 
 #ifdef UNIV_HOTBACKUP
 #include <cstring>
@@ -582,6 +584,16 @@ index */
 
 #ifndef UNIV_INNOCHECKSUM
 
+/** Enum values for encryption table option */
+enum fil_encryption_t {
+	/** Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) */
+	FIL_ENCRYPTION_DEFAULT,
+	/** Encrypted */
+	FIL_ENCRYPTION_ON,
+	/** Not encrypted */
+	FIL_ENCRYPTION_OFF
+};
+
 /** The number of fsyncs done to the log */
 extern ulint	fil_n_log_flushes;
 
@@ -736,6 +748,14 @@ Error messages are issued to the server log.
 @retval NULL on failure (such as when the same tablespace exists) */
 fil_space_t*
 fil_space_create(
+	const char*	name,
+	ulint		id,
+	ulint		flags,
+	fil_type_t	purpose)
+	MY_ATTRIBUTE((warn_unused_result));
+/*
+fil_space_t*
+fil_space_create(
 	const char*		name,
 	ulint			id,
 	ulint			flags,
@@ -743,6 +763,7 @@ fil_space_create(
 	fil_space_crypt_t*	crypt_data,
 	fil_encryption_t	mode = FIL_ENCRYPTION_DEFAULT)
 	MY_ATTRIBUTE((warn_unused_result));
+*/
 
 /*******************************************************************//**
 Assigns a new space id for a new single-table tablespace. This works simply by
@@ -1703,6 +1724,7 @@ fil_get_compression(
 @param[in] key			Encryption key
 @param[in] iv			Encryption iv
 @return DB_SUCCESS or error code */
+/*
 dberr_t
 fil_set_encryption(
 	ulint			space_id,
@@ -1711,6 +1733,14 @@ fil_set_encryption(
 	byte*			iv,
         ulint                   key_version,
         fil_encryption_t        encryption)
+	MY_ATTRIBUTE((warn_unused_result));
+*/
+dberr_t
+fil_set_encryption(
+	ulint			space_id,
+	Encryption::Type	algorithm,
+	byte*			key,
+	byte*			iv)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /**

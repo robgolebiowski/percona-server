@@ -353,6 +353,7 @@ static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
 static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = 9;
 
 /** Encryption master key prifix */
+//TODO: Change this to percona_innodb_idb
 static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb_space";
 
 /** Encryption master key prifix size */
@@ -474,6 +475,7 @@ struct Encryption {
         @param[in,out]	value	Encryption value */
 	static void random_value(byte* value);
 
+        //TODO:Robert: Czy to powinno być tutaj robione ?
         static void create_tablespace_key(byte** tablespace_key,
                                           ulint space_id);
 
@@ -482,6 +484,7 @@ struct Encryption {
 	static void create_master_key(byte** master_key, 
                                       ulint space_id=0);
 
+       //TODO:Robert: Te dwa są potrzebne.
         static void get_latest_tablespace_key(ulint space_id,
 			   const char* srv_uuid,
                            uint *tablespace_key_version,
@@ -562,6 +565,7 @@ struct Encryption {
 	/** Current uuid of server instance */
 	static char		uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 private:
+//TODO: Robert: Is it needed here?
         static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
         static void get_system_key(const char *system_key_name, byte **key, uint *key_version,
                                    size_t *key_length);

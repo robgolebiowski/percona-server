@@ -51,7 +51,6 @@ Datafile::init(
 	m_flags = flags;
 	m_encryption_key = NULL;
 	m_encryption_iv = NULL;
-        m_encryption_key_version = 0;
 }
 
 /** Release the resources. */
@@ -644,7 +643,6 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 		if (!fsp_header_get_encryption_key(m_flags,
 						   m_encryption_key,
 						   m_encryption_iv,
-                                                   &m_encryption_key_version,
 						   m_first_page)) {
 			ib::error()
 				<< "Encryption information in"

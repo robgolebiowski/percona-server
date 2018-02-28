@@ -491,11 +491,6 @@ public:
 	/** Encryption iv read from first page */
 	byte*			m_encryption_iv;
 
-        //TODO:Robert : This may not be needed as for now it is only used inside
-        //TODO:fsp_header_decode_encryption_info_for_rotated_keys_encryption function
-        //TODO:can this stay local?
-        ulint m_encryption_key_version;
-
 };
 
 

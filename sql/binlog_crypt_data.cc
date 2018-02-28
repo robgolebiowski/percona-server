@@ -25,8 +25,6 @@
 #include <sstream>
 #endif
 
-#define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
-
 Binlog_crypt_data::Binlog_crypt_data()
   : key_length(0)
   , key(NULL)
@@ -80,43 +78,33 @@ Binlog_crypt_data& Binlog_crypt_data::operator=(Binlog_crypt_data b)
   return *this;
 }
 
-bool encryption_get_latest_innodb_key(uint key_id, byte **key, ulint *key_len, uint *key_version)
+bool Binlog_crypt_data::load_latest_binlog_key()
 {
-  char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
-
-  memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
-
-  ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      "%s-%s-%lu", "percona_",
-	      "dummy", key_id);
-
+  free_key(key, key_length);
+#ifdef MYSQL_SERVER
   char *system_key_type = NULL;
   size_t system_key_len = 0;
   uchar *system_key = NULL;
 
-  //DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
-                  //{ return true; } );
-  if (my_key_fetch(key_name, &system_key_type, NULL,
+  DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
+                  { return true; } );
+
+  if (my_key_fetch(PERCONA_BINLOG_KEY_NAME, &system_key_type, NULL,
                    reinterpret_cast<void**>(&system_key), &system_key_len) ||
       (system_key == NULL &&
-       (my_key_generate(key_name, "AES", NULL, 16) ||
-        my_key_fetch(key_name, &system_key_type, NULL,
+       (my_key_generate(PERCONA_BINLOG_KEY_NAME, "AES", NULL, 16) ||
+        my_key_fetch(PERCONA_BINLOG_KEY_NAME, &system_key_type, NULL,
                      reinterpret_cast<void**>(&system_key), &system_key_len) ||
         system_key == NULL)))
-         return false;
+         return true;
 
   my_free(system_key_type);
-  //DBUG_ASSERT(strncmp(system_key_type, "AES", 3) == 0);
+  DBUG_ASSERT(strncmp(system_key_type, "AES", 3) == 0);
 
   if (parse_system_key(system_key, system_key_len, &key_version, &key, &key_length) == reinterpret_cast<uchar*>(NullS))
-  {
-    my_free(system_key);
-    return ENCRYPTION_KEY_VERSION_INVALID;
-  }
-  my_free(system_key);
-  my_free(key);
-
-  return key_version;
+    return true;
+#endif
+  return false;
 }
 
 bool Binlog_crypt_data::init_with_loaded_key(uint sch, const uchar* nonce)

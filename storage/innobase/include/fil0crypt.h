@@ -80,14 +80,14 @@ struct key_struct
                                                 (that is L in CRYPT_SCHEME_1) */
 };
 
-enum fil_encryption_t {
-	/** Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) */
-	FIL_ENCRYPTION_DEFAULT,
-	/** Encrypted */
-	FIL_ENCRYPTION_ON,
-	/** Not encrypted */
-	FIL_ENCRYPTION_OFF
-};
+//enum fil_encryption_t {
+	//[>* Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) <]
+	//FIL_ENCRYPTION_DEFAULT,
+	//[>* Encrypted <]
+	//FIL_ENCRYPTION_ON,
+	//[>* Not encrypted <]
+	//FIL_ENCRYPTION_OFF
+//};
 
 struct st_encryption_scheme_key {
   unsigned int version;
