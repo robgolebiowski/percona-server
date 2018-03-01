@@ -126,7 +126,7 @@ fil_space_crypt_init()
 /*********************************************************************
 Cleanup space crypt */
 void
-fil_space_crypt_cleanup()
+fil_space_crypt_cleanup() // TODO:Robert kiedy to jest wołane?!
 {
 	os_event_destroy(fil_crypt_throttle_sleep_event);
 	mutex_free(&fil_crypt_key_mutex);
@@ -567,7 +567,7 @@ fil_space_destroy_crypt_data(
 	}
 }
 
-#ifndef UNIV_HOTBACKUP
+//#ifndef UNIV_HOTBACKUP
 /** Get the offset of encrytion information in page 0.
 @param[in]	page_size	page size.
 @return	offset on success, otherwise 0. */

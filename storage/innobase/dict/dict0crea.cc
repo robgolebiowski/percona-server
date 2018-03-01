@@ -385,7 +385,8 @@ dict_build_table_def_step(
 @return DB_SUCCESS or error code. */
 dberr_t
 dict_build_tablespace(
-	Tablespace*	tablespace)
+	Tablespace*	tablespace,
+        tab_node_t*	node) // TODO : change this parameter only to encryption mode
 {
 	dberr_t		err	= DB_SUCCESS;
 	mtr_t		mtr;

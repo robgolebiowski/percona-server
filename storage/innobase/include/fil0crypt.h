@@ -159,9 +159,9 @@ struct fil_space_crypt_t : st_encryption_scheme
 		rotate_state()
 	{
 		key_id = new_key_id;
-		my_random_bytes(iv, sizeof(iv));
+		(void)my_random_bytes(iv, sizeof(iv)); // TODO:Robert: This can return error and because of that it should not be in constructor
                 mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
-		locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
+		//locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
 		type = new_type;
 
 		if (new_encryption == FIL_ENCRYPTION_OFF ||

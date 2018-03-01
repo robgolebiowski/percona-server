@@ -6463,6 +6463,8 @@ fil_close(void)
 
 	ut_free(fil_system);
 	fil_system = NULL;
+
+        fil_space_crypt_cleanup();
 }
 
 #ifndef UNIV_HOTBACKUP

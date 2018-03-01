@@ -481,8 +481,7 @@ struct Encryption {
 
 	/** Create new master key for key rotation.
         @param[in,out]	master_key	master key */
-	static void create_master_key(byte** master_key, 
-                                      ulint space_id=0);
+	static void create_master_key(byte** master_key);
 
        //TODO:Robert: Te dwa są potrzebne.
         static void get_latest_tablespace_key(ulint space_id,

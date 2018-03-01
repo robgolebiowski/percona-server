@@ -9282,6 +9282,7 @@ void Encryption::get_system_key(const char *system_key_name,
                                 uint *key_version,
                                 size_t *key_length)
 {
+#ifndef UNIV_INNOCHECKSUM
   size_t system_key_len = 0;
   uchar **system_key = NULL;
   get_keyring_key(system_key_name, system_key, &system_key_len);
@@ -9290,7 +9291,12 @@ void Encryption::get_system_key(const char *system_key_name,
     key = NULL;
     return;
   }
+
+//extern uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
+                               //uchar **key_data, size_t *key_data_length);
+
   parse_system_key(*system_key, system_key_len, key_version, (uchar**)key, key_length);
+#endif
 }
 
 // tablespace_key_version as output parameter

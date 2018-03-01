@@ -2178,7 +2178,6 @@ passed back to caller. Ignored if NULL.
 @return true if a batch was queued successfully for each buffer pool
 instance. false if another batch of same type was already running in
 at least one of the buffer pool instance */
-static
 bool
 buf_flush_lists(
 	ulint			min_n,

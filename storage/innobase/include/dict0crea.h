@@ -68,7 +68,8 @@ dict_create_table_step(
 @return DB_SUCCESS or error code. */
 dberr_t
 dict_build_tablespace(
-	Tablespace*	tablespace);
+	Tablespace*	tablespace,
+        tab_node_t*	node); // TODO : change this parameter only to encryption mode
 
 /** Builds a tablespace to contain a table, using file-per-table=1.
 @param[in,out]	table	Table to build in its own tablespace.

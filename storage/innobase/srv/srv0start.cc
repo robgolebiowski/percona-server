@@ -1315,6 +1315,10 @@ srv_shutdown_all_bg_threads()
 				/* d. Wakeup purge threads. */
 				srv_purge_wakeup();
 			}
+
+                        if (srv_n_fil_crypt_threads_started) {
+				os_event_set(fil_crypt_threads_event);
+			}
 		}
 
 		if (srv_start_state_is_set(SRV_START_STATE_IO)) {
