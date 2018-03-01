@@ -69,6 +69,9 @@ bool	recv_replay_file_ops	= true;
 #include "fut0lst.h"
 #endif /* !UNIV_HOTBACKUP */
 
+
+#include "fil0crypt.h" //TODO:Robert - just for now
+
 /** Log records are stored in the hash table in chunks at most of this size;
 this must be less than UNIV_PAGE_SIZE as it is stored in the buffer pool */
 #define RECV_DATA_BLOCK_SIZE	(MEM_MAX_ALLOC_IN_BUF - sizeof(recv_data_t))
@@ -266,6 +269,8 @@ fil_name_process(
 			/* For encrypted tablespace, set key and iv. */
 			if (FSP_FLAGS_GET_ENCRYPTION(space->flags)
 			    && recv_sys->encryption_list != NULL) {
+
+                                ut_ad(FSP_FLAGS_GET_ROTATED_KEYS(space->flags) == false);
 				dberr_t				err;
 				encryption_list_t::iterator	it;
 
@@ -275,9 +280,10 @@ fil_name_process(
 					if (it->space_id == space->id) {
 						err = fil_set_encryption(
 							space->id,
-							FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+							/*FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
                                                           ? Encryption::ROTATED_KEYS
-                                                          : Encryption::AES,
+                                                          : Encryption::AES,*/
+                                                        Encryption::AES,
 							it->key,
 							it->iv);
 						if (err != DB_SUCCESS) {
@@ -1513,7 +1519,7 @@ fil_write_encryption_parse(
 	ulint		len;
 	byte*		key = NULL;
 	byte*		iv = NULL;
-        ulint           key_version = 0;
+//        ulint           key_version = 0;
 	bool		is_new = false;
 
 	space = fil_space_get(space_id);
@@ -1531,7 +1537,7 @@ fil_write_encryption_parse(
 			if (it->space_id == space_id) {
 				key = it->key;
 				iv = it->iv;
-                                key_version = it->key_version;
+//                                key_version = it->key_version;
 			}
 		}
 
@@ -1540,7 +1546,7 @@ fil_write_encryption_parse(
 					ENCRYPTION_KEY_LEN));
 			iv = static_cast<byte*>(ut_malloc_nokey(
 					ENCRYPTION_KEY_LEN));
-                        key_version = 0;
+//                        key_version = 0;
 			is_new = true;
 		}
 	} else {
@@ -1572,7 +1578,7 @@ fil_write_encryption_parse(
 #endif
 	if (!fsp_header_decode_encryption_info(key,
 					       iv,
-                                               &key_version,
+//                                               &key_version,
 					       ptr)) {
 		recv_sys->found_corrupt_log = TRUE;
 		ib::warn() << "Encryption information"
@@ -1593,16 +1599,17 @@ fil_write_encryption_parse(
 			info.space_id = space_id;
 			info.key = key;
 			info.iv = iv;
-                        info.key_version = key_version;
+//                        info.key_version = key_version;
 
 			recv_sys->encryption_list->push_back(info);
 		}
 	} else {
 		ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
 
-		space->encryption_type = FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+/*		space->encryption_type = FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
                                          ? Encryption::ROTATED_KEYS
-                                         : Encryption::AES;
+                                         : Encryption::AES;*/
+                space->encryption_type = Encryption::AES;
 		space->encryption_klen = ENCRYPTION_KEY_LEN;
 	}
 
@@ -1714,7 +1721,8 @@ recv_parse_or_apply_log_rec_body(
 		return(ptr + 8);
 	case MLOG_TRUNCATE:
 		return(truncate_t::parse_redo_entry(ptr, end_ptr, space_id));
-	case MLOG_WRITE_STRING:
+        case MLOG_WRITE_STRING: //TODO:Robert: This was added by Harin, it is reusing MLOG_WRITE_STRING, I am not sure how it is known
+                // that space is encrypted
 		/* For encrypted tablespace, we need to get the
 		encryption key information before the page 0 is recovered.
 	        Otherwise, redo will not find the key to decrypt
@@ -1804,6 +1812,8 @@ recv_parse_or_apply_log_rec_body(
 				redo log been written with something
 				older than InnoDB Plugin 1.0.4. */
 				ut_ad(0
+				      /* fil_crypt_rotate_page() writes this */
+				      || offs == FIL_PAGE_SPACE_ID
 				      || offs == IBUF_TREE_SEG_HEADER
 				      + IBUF_HEADER + FSEG_HDR_SPACE
 				      || offs == IBUF_TREE_SEG_HEADER
@@ -2073,6 +2083,14 @@ recv_parse_or_apply_log_rec_body(
 				== dict_table_is_comp(index->table)));
 			ptr = page_zip_parse_compress_no_data(
 				ptr, end_ptr, page, page_zip, index);
+		}
+		break;
+        case MLOG_FILE_WRITE_CRYPT_DATA: // TODO:Robert I need to try to merge it with how Oracle is reusing MLOG_WRITE_STRING
+		dberr_t err;
+		ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, &err));
+
+		if (err != DB_SUCCESS) {
+			recv_sys->found_corrupt_log = TRUE;
 		}
 		break;
 	default:

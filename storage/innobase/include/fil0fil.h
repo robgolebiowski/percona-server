@@ -241,7 +241,7 @@ struct fil_space_t {
 	ulint			encryption_klen;
 
 	/** Encrypt initial vector */
-        byte			encryption_iv[ENCRYPTION_KEY_LEN];
+        //byte			encryption_iv[ENCRYPTION_KEY_LEN];
 
         //ulint                   encryption_key_version; //TODO: Should this be minimal key version?
 

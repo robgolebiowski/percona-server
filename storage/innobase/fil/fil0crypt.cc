@@ -981,6 +981,9 @@ fil_parse_write_crypt_data(
 	/* update fil_space memory cache with crypt_data */
 	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
 		crypt_data = fil_space_set_crypt_data(space, crypt_data);
+                //TODO: Robert: Added by me
+                space->flags |= FSP_FLAGS_MASK_ROTATED_KEYS;
+                //***
 		fil_space_release(space);
 		/* Check is used key found from encryption plugin */
 		if (crypt_data->should_encrypt()

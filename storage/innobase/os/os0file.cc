@@ -1698,8 +1698,6 @@ os_file_read_string(
 	}
 }
 
-static void get_decryption_key(byte *page, 
-
 /** Decompress after a read and punch a hole in the file if it was a write
 @param[in]	type		IO context
 @param[in]	fh		Open file handle
@@ -1734,7 +1732,7 @@ os_file_io_complete(
 
 		ut_ad(!type.is_log());
 
-		ret = encryption.decrypt(type, buf, src_len, scratch, len);byte *page, 
+		ret = encryption.decrypt(type, buf, src_len, scratch, len);
 		if (ret == DB_SUCCESS) {
 			return(os_file_decompress_page(
 					type.is_dblwr_recover(),
@@ -2148,7 +2146,7 @@ os_file_compress_page(
 
 	return(block);
 }
-
+/*
 static
 Block*
 static
@@ -2186,7 +2184,7 @@ os_file_encrypt_page_for_rotated_keys(
 	}
 
 	return(block);
-}
+}*/
 
 /** Encrypt a page content when write it to disk.
 @param[in]	type		IO flags
@@ -9179,8 +9177,7 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 /** Create new master key for key rotation.
 @param[in,out]	master_key	master key */
 void
-Encryption::create_master_key(byte** master_key,
-                              ulint space_id)
+Encryption::create_master_key(byte** master_key)
 {
 #ifndef UNIV_INNOCHECKSUM
 	char*	key_type = NULL;
@@ -9315,10 +9312,12 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 
         get_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
 
+        /* //TODO : For now, I am commenting this out maybe I will change this to error
+         * TODO: If I decided to move creating innodb tablespace key creationg to fil_set_encryption
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find master key, please check"
 				" the keyring plugin is loaded.";
-	}
+	}*/
 
 #ifdef UNIV_ENCRYPT_DEBUG
 	if (*tablespace_key) {
@@ -9546,6 +9545,13 @@ Encryption::encrypt(
 
         uint tablespace_key_version = 0; // TODO: Change it to not encrypted ?
         get_latest_tablespace_key(space_id, uuid, &tablespace_key_version, &m_key);
+        if (m_key == NULL)
+        {
+          Encryption::create_tablespace_key(&m_key, space_id);
+          tablespace_key_version = 0; // Just to be sure
+          if (m_key == NULL)
+            return src;
+        }
 
 	/* This is data size which need to encrypt. */
         if (m_type == Encryption::ROTATED_KEYS)

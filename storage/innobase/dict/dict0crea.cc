@@ -367,6 +367,7 @@ dict_build_table_def_step(
 
 	//err = dict_build_tablespace_for_table(table);
         //TODO: Robert added by me
+//TODO: I am only taking encryption mode from node, so I can just pass encryption mode
 	err = dict_build_tablespace_for_table(table, node);
 	if (err != DB_SUCCESS) {
 		return(err);
