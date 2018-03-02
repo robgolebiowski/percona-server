@@ -357,6 +357,10 @@ private:
 	/** Log file name. */
 	char*			m_log_file_name;
 
+	/** Encryption information of the table */
+	fil_encryption_t	m_encryption; // I am not sure if it is needed here, since the table gets truncated
+                                              // if I understand correctly this will never be used
+
 	/** Vector of tables to truncate. */
 	typedef	std::vector<truncate_t*, ut_allocator<truncate_t*> >
 		tables_t;

@@ -957,7 +957,8 @@ SysTablespace::open_or_create(
 			tablespace in the tablespace manager. */
 			space = fil_space_create(
 				name(), space_id(), flags(), is_temp
-				? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE);
+				? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
+                                NULL);
 		}
 
 		ut_a(fil_validate());

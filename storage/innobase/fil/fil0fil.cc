@@ -24,6 +24,7 @@ Created 10/25/1995 Heikki Tuuri
 *******************************************************/
 
 #include "ha_prototypes.h"
+#include "fil0crypt.h"
 
 #ifndef UNIV_HOTBACKUP
 #include "btr0btr.h"
@@ -2078,6 +2079,72 @@ fil_space_remove_from_keyrotation(
 		UT_LIST_REMOVE(fil_system->rotation_list, space);
 	}
 }
+
+/** Return the next fil_space_t from key rotation list.
+Once started, the caller must keep calling this until it returns NULL.
+fil_space_acquire() and fil_space_release() are invoked here which
+blocks a concurrent operation from dropping the tablespace.
+@param[in]	prev_space	Pointer to the previous fil_space_t.
+If NULL, use the first fil_space_t on fil_system->space_list.
+@return pointer to the next fil_space_t.
+@retval NULL if this was the last*/
+fil_space_t*
+fil_space_keyrotate_next(
+	fil_space_t*	prev_space)
+{
+	fil_space_t* space = prev_space;
+	fil_space_t* old   = NULL;
+
+	mutex_enter(&fil_system->mutex);
+
+	if (UT_LIST_GET_LEN(fil_system->rotation_list) == 0) {
+		if (space) {
+			ut_ad(space->n_pending_ops > 0);
+			space->n_pending_ops--;
+			fil_space_remove_from_keyrotation(space);
+		}
+		mutex_exit(&fil_system->mutex);
+		return(NULL);
+	}
+
+	if (prev_space == NULL) {
+		space = UT_LIST_GET_FIRST(fil_system->rotation_list);
+
+		/* We can trust that space is not NULL because we
+		checked list length above */
+	} else {
+		ut_ad(space->n_pending_ops > 0);
+
+		/* Move on to the next fil_space_t */
+		space->n_pending_ops--;
+
+		old = space;
+		space = UT_LIST_GET_NEXT(rotation_list, space);
+
+		fil_space_remove_from_keyrotation(old);
+	}
+
+	/* Skip spaces that are being created by fil_ibd_create(),
+	or dropped or truncated. Note that rotation_list contains only
+	space->purpose == FIL_TYPE_TABLESPACE. */
+	while (space != NULL
+	       && (UT_LIST_GET_LEN(space->chain) == 0
+		   || space->is_stopping())) {
+
+		old = space;
+		space = UT_LIST_GET_NEXT(rotation_list, space);
+		fil_space_remove_from_keyrotation(old);
+	}
+
+	if (space != NULL) {
+		space->n_pending_ops++;
+	}
+
+	mutex_exit(&fil_system->mutex);
+
+	return(space);
+}
+
 
 #endif /* !UNIV_HOTBACKUP */
 
@@ -6800,7 +6867,7 @@ fil_tablespace_iterate(
 		//			" tablespace with rotated keys";
 		//		err = DB_IO_NO_ENCRYPT_TABLESPACE;
 		//	}
-		}
+		//}
 
 		if (err == DB_SUCCESS) {
 

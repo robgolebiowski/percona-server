@@ -241,7 +241,7 @@ struct fil_space_t {
 	ulint			encryption_klen;
 
 	/** Encrypt initial vector */
-        //byte			encryption_iv[ENCRYPTION_KEY_LEN];
+        byte			encryption_iv[ENCRYPTION_KEY_LEN];
 
         //ulint                   encryption_key_version; //TODO: Should this be minimal key version?
 
@@ -746,6 +746,7 @@ Error messages are issued to the server log.
 @param[in]	purpose	tablespace purpose
 @return pointer to created tablespace, to be filled in with fil_node_create()
 @retval NULL on failure (such as when the same tablespace exists) */
+/*
 fil_space_t*
 fil_space_create(
 	const char*	name,
@@ -753,7 +754,7 @@ fil_space_create(
 	ulint		flags,
 	fil_type_t	purpose)
 	MY_ATTRIBUTE((warn_unused_result));
-/*
+        */
 fil_space_t*
 fil_space_create(
 	const char*		name,
@@ -763,7 +764,6 @@ fil_space_create(
 	fil_space_crypt_t*	crypt_data,
 	fil_encryption_t	mode = FIL_ENCRYPTION_DEFAULT)
 	MY_ATTRIBUTE((warn_unused_result));
-*/
 
 /*******************************************************************//**
 Assigns a new space id for a new single-table tablespace. This works simply by
@@ -1199,7 +1199,8 @@ fil_ibd_create(
 	const char*	name,
 	const char*	path,
 	ulint		flags,
-	ulint		size)
+	ulint		size,
+        fil_encryption_t mode)
 	MY_ATTRIBUTE((warn_unused_result));
 /********************************************************************//**
 Tries to open a single-table tablespace and optionally checks the space id is

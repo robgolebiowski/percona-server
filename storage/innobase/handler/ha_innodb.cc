@@ -1089,36 +1089,34 @@ static SHOW_VAR innodb_status_variables[]= {
   /* Encryption */
   {"encryption_rotation_pages_read_from_cache",
    (char*) &export_vars.innodb_encryption_rotation_pages_read_from_cache,
-   SHOW_LONG},
+   SHOW_LONG, SHOW_SCOPE_GLOBAL},
   {"encryption_rotation_pages_read_from_disk",
   (char*) &export_vars.innodb_encryption_rotation_pages_read_from_disk,
-   SHOW_LONG},
+   SHOW_LONG, SHOW_SCOPE_GLOBAL},
   {"encryption_rotation_pages_modified",
   (char*) &export_vars.innodb_encryption_rotation_pages_modified,
-   SHOW_LONG},
+   SHOW_LONG, SHOW_SCOPE_GLOBAL},
   {"encryption_rotation_pages_flushed",
   (char*) &export_vars.innodb_encryption_rotation_pages_flushed,
-   SHOW_LONG},
+   SHOW_LONG, SHOW_SCOPE_GLOBAL},
   {"encryption_rotation_estimated_iops",
   (char*) &export_vars.innodb_encryption_rotation_estimated_iops,
-   SHOW_LONG},
+   SHOW_LONG, SHOW_SCOPE_GLOBAL},
   {"encryption_key_rotation_list_length",
   (char*)&export_vars.innodb_key_rotation_list_length,
-   SHOW_LONGLONG},
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
   {"encryption_n_merge_blocks_encrypted",
   (char*)&export_vars.innodb_n_merge_blocks_encrypted,
-   SHOW_LONGLONG},
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
   {"encryption_n_merge_blocks_decrypted",
   (char*)&export_vars.innodb_n_merge_blocks_decrypted,
-   SHOW_LONGLONG},
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
   {"encryption_n_rowlog_blocks_encrypted",
   (char*)&export_vars.innodb_n_rowlog_blocks_encrypted,
-   SHOW_LONGLONG},
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
   {"encryption_n_rowlog_blocks_decrypted",
   (char*)&export_vars.innodb_n_rowlog_blocks_decrypted,
-   SHOW_LONGLONG},
-
-
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
 
   {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}
 };
@@ -13863,7 +13861,7 @@ innobase_create_tablespace(
 		is_encrypted);	/* Create encrypted tablespace if needed */
 	tablespace.set_flags(fsp_flags);
 
-	err = dict_build_tablespace(&tablespace);
+	err = dict_build_tablespace(&tablespace, NULL);
 	if (err != DB_SUCCESS) {
 		error = convert_error_code_to_mysql(err, 0, NULL);
 		trx_rollback_for_mysql(trx);

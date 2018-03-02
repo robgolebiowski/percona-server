@@ -2264,7 +2264,9 @@ truncate_t::fixup_tables_in_non_system_tablespace()
 					(*it)->m_tablename,
 					(*it)->m_dir_path,
 					(*it)->m_tablespace_flags,
-					FIL_IBD_FILE_INITIAL_SIZE);
+					FIL_IBD_FILE_INITIAL_SIZE,
+                                        (*it)->m_encryption
+                                        );
 				if (err != DB_SUCCESS) {
 					/* If checkpoint is not yet done
 					and table is dropped and then we might
@@ -2359,7 +2361,8 @@ truncate_t::truncate_t(
 	m_format_flags(),
 	m_indexes(),
 	m_log_lsn(),
-	m_log_file_name()
+	m_log_file_name(),
+        m_encryption(FIL_ENCRYPTION_DEFAULT)
 {
 	if (dir_path != NULL) {
 		m_dir_path = mem_strdup(dir_path);
@@ -2383,7 +2386,8 @@ truncate_t::truncate_t(
 	m_format_flags(),
 	m_indexes(),
 	m_log_lsn(),
-	m_log_file_name()
+	m_log_file_name(),
+        m_encryption(FIL_ENCRYPTION_DEFAULT)
 {
 	m_log_file_name = mem_strdup(log_file_name);
 	if (m_log_file_name == NULL) {

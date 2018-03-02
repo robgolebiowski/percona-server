@@ -57,6 +57,7 @@ Created 2/16/1996 Heikki Tuuri
 #include "os0file.h"
 #include "os0thread.h"
 #include "fil0fil.h"
+#include "fil0crypt.h"
 #include "fsp0fsp.h"
 #include "rem0rec.h"
 #include "mtr0mtr.h"
@@ -456,7 +457,8 @@ create_log_files(
 	fil_space_t*	log_space = fil_space_create(
 		"innodb_redo_log", SRV_LOG_SPACE_FIRST_ID,
 		fsp_flags_set_page_size(0, univ_page_size),
-		FIL_TYPE_LOG);
+		FIL_TYPE_LOG,
+                NULL/* innodb_encrypt_log works at a different level */);
 	ut_a(fil_validate());
 	ut_a(log_space != NULL);
 
@@ -706,7 +708,7 @@ srv_undo_tablespace_open(
 		flags = fsp_flags_init(
 			univ_page_size, false, false, false, false);
 		space = fil_space_create(
-			undo_name, space_id, flags, FIL_TYPE_TABLESPACE);
+			undo_name, space_id, flags, FIL_TYPE_TABLESPACE, NULL);
 
 		ut_a(fil_validate());
 		ut_a(space);
@@ -2140,7 +2142,7 @@ innobase_start_or_create_for_mysql(void)
 			"innodb_redo_log",
 			SRV_LOG_SPACE_FIRST_ID,
 			fsp_flags_set_page_size(0, univ_page_size),
-			FIL_TYPE_LOG);
+			FIL_TYPE_LOG, NULL);
 
 		ut_a(fil_validate());
 		ut_a(log_space);

@@ -4745,6 +4745,9 @@ get_mlog_string(mlog_id_t type)
 
 	case MLOG_TRUNCATE:
 		return("MLOG_TRUNCATE");
+
+        case MLOG_FILE_WRITE_CRYPT_DATA:
+		return("MLOG_FILE_WRITE_CRYPT_DATA");
 	}
 	DBUG_ASSERT(0);
 	return(NULL);

@@ -82,8 +82,8 @@ static uint srv_alloc_time = 3;		    // allocate iops for 3s at a time
 static uint n_fil_crypt_iops_allocated = 0;
 
 /** Variables for scrubbing */
-extern uint srv_background_scrub_data_interval;
-extern uint srv_background_scrub_data_check_interval;
+//extern uint srv_background_scrub_data_interval;
+//extern uint srv_background_scrub_data_check_interval;
 
 #define DEBUG_KEYROTATION_THROTTLING 0
 
@@ -92,8 +92,8 @@ static fil_crypt_stat_t crypt_stat;
 static ib_mutex_t crypt_stat_mutex;
 
 /** Is background scrubbing enabled, defined on btr0scrub.cc */
-extern my_bool srv_background_scrub_data_uncompressed;
-extern my_bool srv_background_scrub_data_compressed;
+//extern my_bool srv_background_scrub_data_uncompressed;
+//extern my_bool srv_background_scrub_data_compressed;
 
 /***********************************************************************
 Check if a key needs rotation given a key_state
@@ -1808,17 +1808,18 @@ fil_crypt_space_needs_rotation(
 		//crypt_data->rotate_state.scrubbing.is_active =
 			//btr_scrub_start_space(space->id, &state->scrub_data);
 
-		time_t diff = time(0) - crypt_data->rotate_state.scrubbing.
-			last_scrub_completed;
+		//time_t diff = time(0) - crypt_data->rotate_state.scrubbing.
+			//last_scrub_completed;
 
-		bool need_scrubbing =
+	/*	bool need_scrubbing =
 			(srv_background_scrub_data_uncompressed ||
 			 srv_background_scrub_data_compressed) &&
 			crypt_data->rotate_state.scrubbing.is_active
 			&& diff >= 0
-			&& ulint(diff) >= srv_background_scrub_data_interval;
+			&& ulint(diff) >= srv_background_scrub_data_interval;*/
 
-		if (need_key_rotation == false && need_scrubbing == false) {
+		//if (need_key_rotation == false && need_scrubbing == false) {
+		if (need_key_rotation == false) {
 			break;
 		}
 
@@ -2723,7 +2724,7 @@ DECLARE_THREAD(fil_crypt_thread)(
 
 		key_state_t new_state;
 
-		time_t wait_start = time(0);
+		//time_t wait_start = time(0);
 
 		while (!thr.should_shutdown()) {
 
@@ -2743,16 +2744,16 @@ DECLARE_THREAD(fil_crypt_thread)(
 				break;
 			}
 
-			time_t waited = time(0) - wait_start;
+			//time_t waited = time(0) - wait_start;
 
 			/* Break if we have waited the background scrub
 			internal and background scrubbing is enabled */
-			if (waited >= 0
-			    && ulint(waited) >= srv_background_scrub_data_check_interval
-			    && (srv_background_scrub_data_uncompressed
-			        || srv_background_scrub_data_compressed)) {
-				break;
-			}
+			//if (waited >= 0
+			    //&& ulint(waited) >= srv_background_scrub_data_check_interval
+			    //&& (srv_background_scrub_data_uncompressed
+				//|| srv_background_scrub_data_compressed)) {
+				//break;
+			//}
 		}
 
 		recheck = false;

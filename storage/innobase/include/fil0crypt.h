@@ -30,6 +30,12 @@ Created 04/01/2015 Jan Lindström
 
 #include "os0event.h"
 #include "my_crypt.h"
+#include "log0types.h"
+
+// TODO: Robert: This is temporary for fil_encryption_t
+#include "fil0fil.h"
+
+
 #endif /*! UNIV_INNOCHECKSUM */
 
 /**
@@ -159,7 +165,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 		rotate_state()
 	{
 		key_id = new_key_id;
-		(void)my_random_bytes(iv, sizeof(iv)); // TODO:Robert: This can return error and because of that it should not be in constructor
+		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
+                  type = 0; //TODO:Robert: This is temporary to get rid of unused variable problem
                 mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
 		//locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
 		type = new_type;

@@ -292,6 +292,9 @@ extern const char* deprecated_undo_logs;
 /** Maximum size of undo tablespace. */
 extern unsigned long long	srv_max_undo_log_size;
 
+extern uint	srv_n_fil_crypt_threads;
+extern uint	srv_n_fil_crypt_threads_started;
+
 /** Rate at which UNDO records should be purged. */
 extern ulong	srv_purge_rseg_truncate_frequency;
 
