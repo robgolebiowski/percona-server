@@ -1684,6 +1684,12 @@ fil_mtr_rename_log(
 	mtr_t*			mtr)
 	MY_ATTRIBUTE((warn_unused_result));
 
+//TODO:Robert - why exactly do I need those mutexes ?
+/** Acquire the fil_system mutex. */
+#define fil_system_enter()	mutex_enter(&fil_system->mutex)
+/** Release the fil_system mutex. */
+#define fil_system_exit()	mutex_exit(&fil_system->mutex)
+
 /** Note that a non-predefined persistent tablespace has been modified
 by redo log.
 @param[in,out]	space	tablespace */

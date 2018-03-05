@@ -186,7 +186,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 	/** Destructor */
 	~fil_space_crypt_t()
 	{
-		mutex_free(&mutex);
+                mutex_free(&mutex);
 	}
 
 	/** Get latest key version from encryption plugin

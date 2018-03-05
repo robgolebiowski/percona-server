@@ -2822,6 +2822,11 @@ files_checked:
 		/* Create the thread that will optimize the FTS sub-system. */
 		fts_optimize_init();
 
+		fil_system_enter();
+		//btr_scrub_init();
+		fil_crypt_threads_init();
+		fil_system_exit();
+
 		srv_start_state_set(SRV_START_STATE_STAT);
 	}
 
@@ -2881,6 +2886,13 @@ innobase_shutdown_for_mysql(void)
 	if (!srv_read_only_mode) {
 		fts_optimize_shutdown();
 		dict_stats_shutdown();
+
+                /* Shutdown key rotation threads */
+                fil_crypt_threads_cleanup(); // TODO:Robert: in the original there is also 
+//   srv_start_state_t: Document the flags. Replace SRV_START_STATE_STAT
+  //  with SRV_START_STATE_REDO. The srv_bg_undo_sources replaces the
+  //  original use of SRV_START_STATE_STAT.
+
 	}
 
 	/* 1. Flush the buffer pool to disk, write the current lsn to

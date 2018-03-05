@@ -231,7 +231,7 @@ ROW_FORMAT=REDUNDANT.  InnoDB engines do not check these flags
 for unknown bits in order to protect backward incompatibility. */
 /* @{ */
 /** Total number of bits in table->flags2. */
-#define DICT_TF2_BITS			9
+#define DICT_TF2_BITS			10
 #define DICT_TF2_UNUSED_BIT_MASK	(~0U << DICT_TF2_BITS)
 #define DICT_TF2_BIT_MASK		~DICT_TF2_UNUSED_BIT_MASK
 
@@ -269,7 +269,8 @@ it is not created by user and so not visible to end-user. */
 #define DICT_TF2_ENCRYPTION		256
 
 /** Rotated keys bit, 2^31 */
-#define DICT_TF2_ROTATED_KEYS           2147483648
+//#define DICT_TF2_ROTATED_KEYS           2147483648
+#define DICT_TF2_ROTATED_KEYS           512
 
 /* @} */
 
@@ -1728,6 +1729,7 @@ public:
 	columns */
 	dict_vcol_templ_t*			vc_templ;
 
+        //TODO:Robert what with our export/import
 	/** encryption key, it's only for export/import */
 	byte*					encryption_key;
 

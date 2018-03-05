@@ -71,6 +71,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "dict0stats.h"
 #include "dict0stats_bg.h"
 #include "fil0fil.h"
+#include "fil0crypt.h"
 #include "fsp0fsp.h"
 #include "fsp0space.h"
 #include "fsp0sysspace.h"
@@ -196,6 +197,9 @@ static my_bool	innobase_large_prefix			= FALSE;
 static my_bool	innodb_optimize_fulltext_only		= FALSE;
 
 static char*	innodb_version_str = (char*) INNODB_VERSION_STR;
+
+extern uint srv_fil_crypt_rotate_key_age;
+extern uint srv_n_fil_crypt_iops;
 
 /** Note we cannot use rec_format_enum because we do not allow
 COMPRESSED row format for innodb_default_row_format option. */
@@ -843,6 +847,18 @@ static const char*	deprecated_innodb_support_xa_off
 	= "Using innodb_support_xa is deprecated and the"
 	" parameter may be removed in future releases."
 	" Only innodb_support_xa=ON is allowed.";
+
+static
+int
+innodb_encrypt_tables_validate(
+/*==================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to system
+						variable */
+	void*				save,	/*!< out: immediate result
+						for update function */
+	struct st_mysql_value*		value);	/*!< in: incoming string */
+
 
 /** Update the session variable innodb_support_xa.
 @param[in]	thd	current session
@@ -11145,6 +11161,10 @@ err_col:
                               // i zapisać w keyringu ?
                           /* Check if keyring is ready. */
                           //TODO:Robert, duże kopiuj/wklej. Czy mogę tutaj utworzyć klucz dla tablicy?
+                           DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+                           DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
+ 
+//TODO:Robert: Ingoring the chekcing for keyring - seems get_master_key can be null here
                           Encryption::get_master_key(&master_key_id,
                                                      &master_key,
                                                      &version);
@@ -12752,6 +12772,13 @@ create_table_info_t::prepare_create_table(
 
 	normalize_table_name(m_table_name, name);
 
+	/* Validate table options not handled by the SQL-parser */
+        //TODO:Robert: W tej funkcji MariaDB sprawdza czy wszystko się zgadza z enkrypcją
+        //TODO:Robert: I need to port this function too!!
+	//if (check_table_options()) {
+		//DBUG_RETURN(HA_WRONG_CREATE_OPTION);
+	//}
+
 	/* Validate the create options if innodb_strict_mode is set.
 	Do not use the regular message for ER_ILLEGAL_HA_CREATE_OPTION
 	because InnoDB might actually support the option, but not under
@@ -13850,6 +13877,8 @@ innobase_create_tablespace(
 	bool atomic_blobs = page_size.is_compressed();
 	bool is_encrypted = (alter_info->encrypt
 		&& !Encryption::is_none(alter_info->encrypt_type.str));
+        bool is_rotated_key = (alter_info->encrypt 
+            && Encryption::is_rotated_keys(alter_info->encrypt_type.str));
 
 	/* Create the filespace flags */
 	ulint	fsp_flags = fsp_flags_init(
@@ -13858,7 +13887,8 @@ innobase_create_tablespace(
 		false,		/* This is not a file-per-table tablespace */
 		true,		/* This is a general shared tablespace */
 		false,		/* Temporary General Tablespaces not allowed */
-		is_encrypted);	/* Create encrypted tablespace if needed */
+		is_encrypted,	/* Create encrypted tablespace if needed */
+                is_rotated_key);
 	tablespace.set_flags(fsp_flags);
 
 	err = dict_build_tablespace(&tablespace, NULL);
@@ -20707,6 +20737,74 @@ innodb_srv_empty_free_list_algorithm_validate(
 	return(0);
 }
 
+/******************************************************************
+Update the system variable innodb_encryption_threads */
+static
+void
+innodb_encryption_threads_update(
+/*=============================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to
+						system variable */
+	void*				var_ptr,/*!< out: where the
+						formal string goes */
+	const void*			save)	/*!< in: immediate result
+						from check function */
+{
+	fil_crypt_set_thread_cnt(*static_cast<const uint*>(save));
+}
+
+/******************************************************************
+Update the system variable innodb_encryption_rotate_key_age */
+static
+void
+innodb_encryption_rotate_key_age_update(
+/*====================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to
+						system variable */
+	void*				var_ptr,/*!< out: where the
+						formal string goes */
+	const void*			save)	/*!< in: immediate result
+						from check function */
+{
+	fil_crypt_set_rotate_key_age(*static_cast<const uint*>(save));
+}
+
+/******************************************************************
+Update the system variable innodb_encryption_rotation_iops */
+static
+void
+innodb_encryption_rotation_iops_update(
+/*===================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to
+						system variable */
+	void*				var_ptr,/*!< out: where the
+						formal string goes */
+	const void*			save)	/*!< in: immediate result
+						from check function */
+{
+	fil_crypt_set_rotation_iops(*static_cast<const uint*>(save));
+}
+
+/******************************************************************
+Update the system variable innodb_encrypt_tables*/
+static
+void
+innodb_encrypt_tables_update(
+/*=========================*/
+	THD*                            thd,    /*!< in: thread handle */
+	struct st_mysql_sys_var*        var,    /*!< in: pointer to
+						system variable */
+	void*                           var_ptr,/*!< out: where the
+						formal string goes */
+	const void*                     save)   /*!< in: immediate result
+						from check function */
+{
+	fil_crypt_set_encrypt_tables(*static_cast<const ulong*>(save));
+}
+
 /** Update the innodb_log_checksums parameter.
 @param[in]	thd	thread handle
 @param[in]	var	system variable
@@ -21849,6 +21947,43 @@ static MYSQL_SYSVAR_ULONG(compressed_columns_threshold,
   "Compress column data if its length exceeds this value. Default is 96",
   NULL, NULL, 96, 1, ~0UL, 0);
 
+static MYSQL_SYSVAR_ENUM(encrypt_tables, srv_encrypt_tables,
+			 PLUGIN_VAR_OPCMDARG,
+			 "Enable encryption for tables. "
+			 "Don't forget to enable --innodb-encrypt-log too",
+			 innodb_encrypt_tables_validate,
+			 innodb_encrypt_tables_update,
+			 0,
+			 &srv_encrypt_tables_typelib);
+
+static MYSQL_SYSVAR_UINT(encryption_threads, srv_n_fil_crypt_threads,
+			 PLUGIN_VAR_RQCMDARG,
+			 "Number of threads performing background key rotation and "
+			 "scrubbing",
+			 NULL,
+			 innodb_encryption_threads_update,
+			 srv_n_fil_crypt_threads, 0, UINT_MAX32, 0);
+
+static MYSQL_SYSVAR_UINT(encryption_rotate_key_age,
+			 srv_fil_crypt_rotate_key_age,
+			 PLUGIN_VAR_RQCMDARG,
+			 "Key rotation - re-encrypt in background "
+                         "all pages that were encrypted with a key that "
+                         "many (or more) versions behind. Value 0 indicates "
+			 "that key rotation is disabled.",
+			 NULL,
+			 innodb_encryption_rotate_key_age_update,
+			 1, 0, UINT_MAX32, 0);
+
+static MYSQL_SYSVAR_UINT(encryption_rotation_iops, srv_n_fil_crypt_iops,
+			 PLUGIN_VAR_RQCMDARG,
+			 "Use this many iops for background key rotation",
+			 NULL,
+			 innodb_encryption_rotation_iops_update,
+			 srv_n_fil_crypt_iops, 0, UINT_MAX32, 0);
+
+
+
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(api_trx_level),
   MYSQL_SYSVAR(api_bk_commit_interval),
@@ -22046,6 +22181,11 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(compressed_columns_zip_level),
   MYSQL_SYSVAR(compressed_columns_threshold),
   MYSQL_SYSVAR(ft_ignore_stopwords),
+  /* Encryption feature */
+  MYSQL_SYSVAR(encrypt_tables),
+  MYSQL_SYSVAR(encryption_threads),
+  MYSQL_SYSVAR(encryption_rotate_key_age),
+  MYSQL_SYSVAR(encryption_rotation_iops),
   NULL
 };
 
@@ -22100,7 +22240,8 @@ i_s_innodb_sys_foreign_cols,
 i_s_innodb_sys_tablespaces,
 i_s_innodb_sys_datafiles,
 i_s_innodb_changed_pages,
-i_s_innodb_sys_virtual
+i_s_innodb_sys_virtual,
+i_s_innodb_tablespaces_encryption,
 
 mysql_declare_plugin_end;
 
@@ -22973,4 +23114,43 @@ innodb_buffer_pool_size_validate(
 	}
 
 	return(0);
+}
+
+static
+int
+innodb_encrypt_tables_validate(
+/*=================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to system
+						variable */
+	void*				save,	/*!< out: immediate result
+						for update function */
+	struct st_mysql_value*		value)	/*!< in: incoming string */
+{
+	if (check_sysvar_enum(thd, var, save, value)) {
+		return 1;
+	}
+
+	ulong encrypt_tables = *(ulong*)save;
+
+	if (encrypt_tables
+	    && !encryption_key_id_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
+		push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+				    HA_ERR_UNSUPPORTED,
+				    "InnoDB: cannot enable encryption, "
+		                    "encryption plugin is not available");
+		return 1;
+	}
+
+	if (!srv_fil_crypt_rotate_key_age) {
+		const char *msg = (encrypt_tables ? "enable" : "disable");
+		push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+				    HA_ERR_UNSUPPORTED,
+				    "InnoDB: cannot %s encryption, "
+				    "innodb_encryption_rotate_key_age=0"
+				    " i.e. key rotation disabled", msg);
+		return 1;
+	}
+
+	return 0;
 }

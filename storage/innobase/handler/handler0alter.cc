@@ -4630,6 +4630,9 @@ prepare_inplace_alter_table_dict(
 				my_free(master_key);
 				DICT_TF2_FLAG_SET(ctx->new_table,
 						  DICT_TF2_ENCRYPTION);
+                                if (Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str))
+				  DICT_TF2_FLAG_SET(ctx->new_table,
+				         	    DICT_TF2_ROTATED_KEYS);
 			}
 		}
 

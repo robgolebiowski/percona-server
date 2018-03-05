@@ -115,11 +115,11 @@ Init space crypt */
 void
 fil_space_crypt_init()
 {
-	mutex_create(LATCH_ID_FIL_CRYPT_MUTEX, &fil_crypt_key_mutex);
+        mutex_create(LATCH_ID_FIL_CRYPT_MUTEX, &fil_crypt_key_mutex);
 
 	fil_crypt_throttle_sleep_event = os_event_create(0);
 
-	mutex_create(LATCH_ID_FIL_CRYPT_STAT_MUTEX, &crypt_stat_mutex);
+        mutex_create(LATCH_ID_FIL_CRYPT_STAT_MUTEX, &crypt_stat_mutex);
 	memset(&crypt_stat, 0, sizeof(crypt_stat));
 }
 
@@ -129,8 +129,8 @@ void
 fil_space_crypt_cleanup() // TODO:Robert kiedy to jest wołane?!
 {
 	os_event_destroy(fil_crypt_throttle_sleep_event);
-	mutex_free(&fil_crypt_key_mutex);
-	mutex_free(&crypt_stat_mutex);
+        mutex_free(&fil_crypt_key_mutex);
+        mutex_free(&crypt_stat_mutex);
 }
 
 
@@ -2913,8 +2913,8 @@ fil_crypt_threads_init()
 	if (!fil_crypt_threads_inited) {
 		fil_crypt_event = os_event_create(0);
 		fil_crypt_threads_event = os_event_create(0);
-		mutex_create(LATCH_ID_FIL_CRYPT_THREADS_MUTEX,
-		     &fil_crypt_threads_mutex);
+                mutex_create(LATCH_ID_FIL_CRYPT_THREADS_MUTEX,
+                     &fil_crypt_threads_mutex);
 
 		uint cnt = srv_n_fil_crypt_threads;
 		srv_n_fil_crypt_threads = 0;
@@ -2935,7 +2935,7 @@ fil_crypt_threads_cleanup()
 	ut_a(!srv_n_fil_crypt_threads_started);
 	os_event_destroy(fil_crypt_event);
 	os_event_destroy(fil_crypt_threads_event);
-	mutex_free(&fil_crypt_threads_mutex);
+        mutex_free(&fil_crypt_threads_mutex);
 	fil_crypt_threads_inited = false;
 }
 

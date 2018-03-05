@@ -797,6 +797,13 @@ retry:
 			space->free_len = free_len;
 		}
 
+		/* Try to read crypt_data from page 0 if it is not yet
+		read. */
+		if (FSP_FLAGS_GET_ROTATED_KEYS(flags) && !space->crypt_data) {
+			space->crypt_data = fil_space_read_crypt_data(
+				page_size_t(space->flags), page);
+		}
+
 		ut_free(buf2);
 
 		/* For encrypted tablespace, we need to check the
@@ -1214,6 +1221,7 @@ fil_space_free_low(
 	ut_ad(space->size == 0);
 
 	rw_lock_free(&space->latch);
+        fil_space_destroy_crypt_data(&space->crypt_data);
 
 	ut_free(space->name);
 	ut_free(space);
@@ -1730,6 +1738,8 @@ fil_init(
 	UT_LIST_INIT(fil_system->named_spaces, &fil_space_t::named_spaces);
 
 	fil_system->max_n_open = max_n_open;
+
+        fil_space_crypt_init();
 }
 
 /*******************************************************************//**
@@ -2754,14 +2764,19 @@ fil_check_pending_operations(
 	fil_space_t* sp = fil_space_get_by_id(id);
 	if (sp) {
 		sp->stop_new_ops = true;
+		if (sp->crypt_data) {
+			sp->n_pending_ops++;
+			mutex_exit(&fil_system->mutex);
+			fil_space_crypt_close_tablespace(sp);
+			mutex_enter(&fil_system->mutex);
+			ut_ad(sp->n_pending_ops > 0);
+			sp->n_pending_ops--;
+		}
 	}
-	mutex_exit(&fil_system->mutex);
 
 	/* Check for pending operations. */
 
 	do {
-		mutex_enter(&fil_system->mutex);
-
 		sp = fil_space_get_by_id(id);
 
 		count = fil_check_pending_ops(sp, count);
@@ -3873,11 +3888,12 @@ fil_ibd_create(
 	requested it to remain unencrypted. */
 	if (FSP_FLAGS_GET_ROTATED_KEYS(flags))
         {
-            if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
-		srv_encrypt_tables) {
+          mode = FIL_ENCRYPTION_ON;
+            //if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
+		//srv_encrypt_tables) {
 		//crypt_data = fil_space_create_crypt_data(mode, key_id);
 		crypt_data = fil_space_create_crypt_data(mode, 0);
-            }
+            //}
 	}
 
 	space = fil_space_create(name, space_id, flags, is_temp
@@ -6568,6 +6584,7 @@ struct fil_iterator_t {
 	byte*		io_buffer;		/*!< Buffer to use for IO */
 	byte*		encryption_key;		/*!< Encryption key */
 	byte*		encryption_iv;		/*!< Encryption iv */
+	fil_space_crypt_t *crypt_data;		/*!< Crypt data (if encrypted) */
 };
 
 /********************************************************************//**
@@ -6639,6 +6656,10 @@ fil_iterate(
 
 		ut_ad(n_bytes > 0);
 		ut_ad(!(n_bytes % iter.page_size));
+
+                const bool	encrypted = iter.crypt_data != NULL
+		         	&& iter.crypt_data->should_encrypt();
+                bool		decrypted = false;
 
 		dberr_t		err;
 		IORequest	read_request(read_type);
@@ -6838,13 +6859,26 @@ fil_tablespace_iterate(
 		iter.n_io_buffers = n_io_buffers;
 		iter.page_size = callback.get_page_size().physical();
 
-		/* Set encryption info. */
-		iter.encryption_key = table->encryption_key;
-		iter.encryption_iv = table->encryption_iv;
+		ulint	space_flags = callback.get_space_flags();
+		/* read (optional) crypt data */
+                if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags))
+                {
+		  iter.crypt_data = fil_space_read_crypt_data(
+		  	callback.get_page_size(), page);
+                  iter.encryption_iv = iter.crypt_data->iv; //TODO:Robert:This should be safe, we calll fil_iterate and then we call
+                                                            //fil_space_destroy_crypt_data
+                  //memcpy(iter.encryption_iv, iter.crypt_data->iv, 16); //TODO: FOR now I am setting magic number, cannot find the variable for iv size
+                }
+                else
+                {
+		  /* Set encryption info. */
+		  iter.encryption_key = table->encryption_key;
+		  iter.encryption_iv = table->encryption_iv;
+                }
 
 		/* Check encryption is matched or not. */
-		ulint	space_flags = callback.get_space_flags();
-		if (FSP_FLAGS_GET_ENCRYPTION(space_flags)) {
+		//ulint	space_flags = callback.get_space_flags();
+		if (!FSP_FLAGS_GET_ROTATED_KEYS(space_flags) && FSP_FLAGS_GET_ENCRYPTION(space_flags)) {  //TODO:Robert: For now disabling this for 'ROTATED_KEYS'
 			ut_ad(table->encryption_key != NULL);
 
 			if (!dict_table_is_encrypted(table)) {
@@ -6889,6 +6923,10 @@ fil_tablespace_iterate(
 				ut_align(io_buffer, UNIV_PAGE_SIZE));
 
 			err = fil_iterate(iter, block, callback);
+
+			if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags) && iter.crypt_data) {
+				fil_space_destroy_crypt_data(&iter.crypt_data);
+			}
 
 			ut_free(io_buffer);
 		}

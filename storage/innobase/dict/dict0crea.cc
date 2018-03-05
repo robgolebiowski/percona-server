@@ -499,10 +499,12 @@ dict_build_tablespace_for_table(
 		/* Determine the tablespace flags. */
 		bool	is_temp = dict_table_is_temporary(table);
 		bool	is_encrypted = dict_table_is_encrypted(table);
+                bool    is_rotated_keys = dict_table_is_rotated_keys(table);
 		bool	has_data_dir = DICT_TF_HAS_DATA_DIR(table->flags);
 		ulint	fsp_flags = dict_tf_to_fsp_flags(table->flags,
 							 is_temp,
-							 is_encrypted);
+							 is_encrypted,
+                                                         is_rotated_keys);
 
 		/* Determine the full filepath */
 		if (is_temp) {
