@@ -9142,12 +9142,12 @@ Encryption::create_tablespace_key(byte** tablespace_key,
         byte *system_tablespace_key = NULL;
 	/* We call key ring API to get tablespace key here. */
 	ret = my_key_fetch(key_name, &key_type, NULL,
-			   reinterpret_cast<void**>(system_tablespace_key),
+			   reinterpret_cast<void**>(&system_tablespace_key),
 			   &key_len);
 
 	if (ret || system_tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
-				" that the keyring plugin is loaded.";
+				" that the keyring plugin is loaded. 1";
 		*tablespace_key = NULL;
                 my_free(key_type);
                 return;
@@ -9261,8 +9261,8 @@ Encryption::get_tablespace_key(ulint space_id,
         get_keyring_key(key_name, tablespace_key, &key_len);
 
 	if (*tablespace_key == NULL) {
-		ib::error() << "Encryption can't find master key, please check"
-				" the keyring plugin is loaded.";
+		ib::error() << "Encryption can't find tablespace key, please check"
+				" the keyring plugin is loaded. 2";
 	}
 
 #ifdef UNIV_ENCRYPT_DEBUG
@@ -9284,18 +9284,18 @@ void Encryption::get_system_key(const char *system_key_name,
 {
 #ifndef UNIV_INNOCHECKSUM
   size_t system_key_len = 0;
-  uchar **system_key = NULL;
-  get_keyring_key(system_key_name, system_key, &system_key_len);
+  uchar *system_key = NULL;
+  get_keyring_key(system_key_name, &system_key, &system_key_len);
   if (system_key == NULL)
   {
-    key = NULL;
+    *key = NULL;
     return;
   }
 
 //extern uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
                                //uchar **key_data, size_t *key_data_length);
 
-  parse_system_key(*system_key, system_key_len, key_version, (uchar**)key, key_length);
+  parse_system_key(system_key, system_key_len, key_version, (uchar**)key, key_length);
 #endif
 }
 
@@ -9368,7 +9368,7 @@ Encryption::get_master_key(ulint master_key_id,
         get_keyring_key(key_name, master_key, &key_len);
         if (*master_key == NULL)
 	  ib::error() << "Encryption can't find master key, please check"
-                         " the keyring plugin is loaded.";
+                         " the keyring plugin is loaded 1.";
 #ifdef UNIV_ENCRYPT_DEBUG
 	if (*master_key) {
 		fprintf(stderr, "Fetched master key:%lu ", master_key_id);
@@ -9479,7 +9479,7 @@ Encryption::get_master_key(ulint* master_key_id,
 	if (ret) {
 		*master_key = NULL;
 		ib::error() << "Encryption can't find master key, please check"
-				" the keyring plugin is loaded.";
+				" the keyring plugin is loaded. 2";
 	}
 
 	if (key_type) {
@@ -9543,20 +9543,27 @@ Encryption::encrypt(
 
 	ut_ad(m_type != Encryption::NONE);
 
-        if (m_key != NULL)
-        {
-          memset(m_key, 0, MY_AES_BLOCK_SIZE);
-          my_free(m_key);
-        }
-
         uint tablespace_key_version = 0; // TODO: Change it to not encrypted ?
-        get_latest_tablespace_key(space_id, uuid, &tablespace_key_version, &m_key);
-        if (m_key == NULL)
+
+
+        if (m_type == Encryption::ROTATED_KEYS)
         {
-          Encryption::create_tablespace_key(&m_key, space_id);
-          tablespace_key_version = 0; // Just to be sure
+          ut_ad(m_key == NULL);
+          //if (m_key != NULL)
+          //{
+            //memset(m_key, 0, MY_AES_BLOCK_SIZE);
+            //my_free(m_key);
+          //}
+          
+
+          get_latest_tablespace_key(space_id, uuid, &tablespace_key_version, &m_key);
           if (m_key == NULL)
-            return src;
+          {
+            Encryption::create_tablespace_key(&m_key, space_id);
+            tablespace_key_version = 0; // Just to be sure
+            if (m_key == NULL)
+              return src;
+          }
         }
 
 	/* This is data size which need to encrypt. */

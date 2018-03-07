@@ -21947,6 +21947,12 @@ static MYSQL_SYSVAR_ULONG(compressed_columns_threshold,
   "Compress column data if its length exceeds this value. Default is 96",
   NULL, NULL, 96, 1, ~0UL, 0);
 
+static const char* srv_encrypt_tables_names[] = { "OFF", "ON", "FORCE", 0 };
+static TYPELIB srv_encrypt_tables_typelib = {
+	array_elements(srv_encrypt_tables_names)-1, 0, srv_encrypt_tables_names,
+	NULL
+};
+
 static MYSQL_SYSVAR_ENUM(encrypt_tables, srv_encrypt_tables,
 			 PLUGIN_VAR_OPCMDARG,
 			 "Enable encryption for tables. "
@@ -22240,10 +22246,12 @@ i_s_innodb_sys_foreign_cols,
 i_s_innodb_sys_tablespaces,
 i_s_innodb_sys_datafiles,
 i_s_innodb_changed_pages,
-i_s_innodb_sys_virtual,
-i_s_innodb_tablespaces_encryption,
-
+i_s_innodb_sys_virtual
 mysql_declare_plugin_end;
+
+  //TODO:Robert : this is information schema
+//i_s_innodb_tablespaces_encryption,
+
 
 /** @brief Initialize the default value of innodb_commit_concurrency.
 
@@ -23127,30 +23135,32 @@ innodb_encrypt_tables_validate(
 						for update function */
 	struct st_mysql_value*		value)	/*!< in: incoming string */
 {
-	if (check_sysvar_enum(thd, var, save, value)) {
-		return 1;
-	}
+  //TODO: Robert:For now I am not evaluating anything!!!
+  //
+	//if (check_sysvar_enum(thd, var, save, value)) {
+		//return 1;
+	//}
 
-	ulong encrypt_tables = *(ulong*)save;
+	//ulong encrypt_tables = *(ulong*)save;
 
-	if (encrypt_tables
-	    && !encryption_key_id_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
-		push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-				    HA_ERR_UNSUPPORTED,
-				    "InnoDB: cannot enable encryption, "
-		                    "encryption plugin is not available");
-		return 1;
-	}
+	//if (encrypt_tables
+	    //&& !encryption_key_id_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
+		//push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+				    //HA_ERR_UNSUPPORTED,
+				    //"InnoDB: cannot enable encryption, "
+				    //"encryption plugin is not available");
+		//return 1;
+	//}
 
-	if (!srv_fil_crypt_rotate_key_age) {
-		const char *msg = (encrypt_tables ? "enable" : "disable");
-		push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-				    HA_ERR_UNSUPPORTED,
-				    "InnoDB: cannot %s encryption, "
-				    "innodb_encryption_rotate_key_age=0"
-				    " i.e. key rotation disabled", msg);
-		return 1;
-	}
+	//if (!srv_fil_crypt_rotate_key_age) {
+		//const char *msg = (encrypt_tables ? "enable" : "disable");
+		//push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+				    //HA_ERR_UNSUPPORTED,
+				    //"InnoDB: cannot %s encryption, "
+				    //"innodb_encryption_rotate_key_age=0"
+				    //" i.e. key rotation disabled", msg);
+		//return 1;
+	//}
 
 	return 0;
 }

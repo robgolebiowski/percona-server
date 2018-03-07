@@ -959,6 +959,16 @@ static monitor_info_t	innodb_counter_info[] =
 	 MONITOR_NONE,
 	 MONITOR_DEFAULT_START, MONITOR_PAD_DECREMENTS},
 
+	{"compress_pages_encrypted", "compression",
+	 "Number of pages encrypted",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_OVLD_PAGES_ENCRYPTED},
+
+	{"compress_pages_decrypted", "compression",
+	 "Number of pages decrypted",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_OVLD_PAGES_DECRYPTED},
+
 	/* ========== Counters for Index ========== */
 	{"module_index", "index", "Index Manager",
 	 MONITOR_MODULE,

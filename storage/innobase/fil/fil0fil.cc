@@ -5701,15 +5701,36 @@ fil_io_set_encryption(
                 //uint key_version = space->encryption_type == Encryption::ROTATED_KEYS
                                      //? get_latest_tablespace_key_version()
                                      //: 0;
+                                     
                                      //
-                uchar *iv = space->encryption_type == Encryption::ROTATED_KEYS 
-                             ? space->crypt_data->iv
-                             : space->encryption_iv;
+                                     //
+                                     //
+                byte* key = NULL;
+                ulint key_len = 16; //16*8=128
+                byte* iv = NULL;
 
-		req_type.encryption_key(space->encryption_key,
-					space->encryption_klen,
+                if (space->encryption_type == Encryption::ROTATED_KEYS)
+                {
+                  iv = space->crypt_data->iv;
+                  key = NULL;
+                  key_len = ENCRYPTION_KEY_LEN;
+                }
+                else 
+                {
+                  iv =  space->encryption_iv;
+                  key = space->encryption_key;
+                  key_len = space->encryption_klen;
+                }
+
+		//req_type.encryption_key(space->encryption_key,
+					//space->encryption_klen,
+                                        //iv);
+					//space->encryption_iv);
+                req_type.encryption_key(key,
+					key_len,
                                         iv);
 					//space->encryption_iv);
+
                                         
                 if (space->encryption_type == Encryption::ROTATED_KEYS)
 		  req_type.encryption_algorithm(space->encryption_type);
@@ -6657,9 +6678,10 @@ fil_iterate(
 		ut_ad(n_bytes > 0);
 		ut_ad(!(n_bytes % iter.page_size));
 
-                const bool	encrypted = iter.crypt_data != NULL
-		         	&& iter.crypt_data->should_encrypt();
-                bool		decrypted = false;
+                //TODO:Robert: I am not using those variables
+                //const bool	encrypted = iter.crypt_data != NULL
+				 //&& iter.crypt_data->should_encrypt();
+                //bool		decrypted = false;
 
 		dberr_t		err;
 		IORequest	read_request(read_type);
@@ -6867,6 +6889,9 @@ fil_tablespace_iterate(
 		  	callback.get_page_size(), page);
                   iter.encryption_iv = iter.crypt_data->iv; //TODO:Robert:This should be safe, we calll fil_iterate and then we call
                                                             //fil_space_destroy_crypt_data
+                  if (iter.encryption_key != NULL)
+                    my_free(iter.encryption_key); 
+                  iter.encryption_key = NULL;
                   //memcpy(iter.encryption_iv, iter.crypt_data->iv, 16); //TODO: FOR now I am setting magic number, cannot find the variable for iv size
                 }
                 else

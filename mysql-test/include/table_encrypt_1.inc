@@ -257,14 +257,19 @@ DROP TABLE t1;
 # Test encryption works fine after alter table.
 SET GLOBAL innodb_file_per_table=ON;
 
-CREATE TABLE t1 (id int unsigned NOT NULL auto_increment PRIMARY KEY, val varchar(20) NOT NULL) ENGINE=InnoDB;
+#eval CREATE TABLE t1 (id int unsigned NOT NULL auto_increment PRIMARY KEY, val varchar(20) NOT NULL) ENCRYPTION="$encryption_type" ENGINE=InnoDB;
+eval CREATE TABLE t1 (id int unsigned NOT NULL auto_increment PRIMARY KEY, val varchar(20) NOT NULL) ENGINE=InnoDB;
 
+#eval CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="$encryption_type" ENGINE = InnoDB;
+
+#
 INSERT INTO t1 (val) VALUES ('Sydney'), ('Melbourne'), ('Brisbane'), ('Perth'), ('Adelaide');
 
-ALTER TABLE t1 ENCRYPTION = 'Y';
+ALTER TABLE t1 ENCRYPTION = "ROTATED_KEYS";
+#ALTER TABLE t1 ENCRYPTION = 'Y';
 
-ALTER TABLE t1 ADD COLUMN is_capital char(1) NOT NULL DEFAULT 'N' AFTER val;
-SHOW CREATE TABLE t1;
+#ALTER TABLE t1 ADD COLUMN is_capital char(1) NOT NULL DEFAULT 'N' AFTER val;
+#SHOW CREATE TABLE t1;
 
 LET $MYSQLD_DATADIR = `select @@datadir`;
 let SEARCH_FILE = $MYSQLD_DATADIR/test/t1.ibd;

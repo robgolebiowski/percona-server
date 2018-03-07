@@ -239,12 +239,12 @@ enum mlog_id_t {
 	redo log about individual pages */
 	MLOG_INDEX_LOAD = 61,
 
-	/** biggest value (used in assertions) */
-	MLOG_BIGGEST_TYPE = MLOG_INDEX_LOAD,
-
 	/** log record for writing/updating crypt data of
 	a tablespace */
-	MLOG_FILE_WRITE_CRYPT_DATA = 100
+	MLOG_FILE_WRITE_CRYPT_DATA = 100, //TODO:Robert: Czy to powinnien być 100, a może coś innego?
+
+	/** biggest value (used in assertions) */
+	MLOG_BIGGEST_TYPE = MLOG_FILE_WRITE_CRYPT_DATA
 };
 
 /* @} */

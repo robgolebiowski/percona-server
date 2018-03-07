@@ -2887,13 +2887,7 @@ innobase_shutdown_for_mysql(void)
 		fts_optimize_shutdown();
 		dict_stats_shutdown();
 
-                /* Shutdown key rotation threads */
-                fil_crypt_threads_cleanup(); // TODO:Robert: in the original there is also 
-//   srv_start_state_t: Document the flags. Replace SRV_START_STATE_STAT
-  //  with SRV_START_STATE_REDO. The srv_bg_undo_sources replaces the
-  //  original use of SRV_START_STATE_STAT.
-
-	}
+ 	}
 
 	/* 1. Flush the buffer pool to disk, write the current lsn to
 	the tablespace header(s), and copy all log data to archive.
@@ -2933,6 +2927,11 @@ innobase_shutdown_for_mysql(void)
 
 	if (!srv_read_only_mode) {
 		dict_stats_thread_deinit();
+               /* Shutdown key rotation threads */
+                fil_crypt_threads_cleanup(); // TODO:Robert: in the original there is also 
+//   srv_start_state_t: Document the flags. Replace SRV_START_STATE_STAT
+  //  with SRV_START_STATE_REDO. The srv_bg_undo_sources replaces the
+  //  original use of SRV_START_STATE_STAT.
 	}
 
 	/* This must be disabled before closing the buffer pool
