@@ -431,7 +431,8 @@ struct Encryption {
 		m_type(other.m_type),
 		m_key(other.m_key),
 		m_klen(other.m_klen),
-		m_iv(other.m_iv)
+		m_iv(other.m_iv),
+                m_key_version(other.m_key_version)
 	{ };
 
 	/** Check if page is encrypted page or not
@@ -485,7 +486,6 @@ struct Encryption {
 
        //TODO:Robert: Te dwa są potrzebne.
         static void get_latest_tablespace_key(ulint space_id,
-			   const char* srv_uuid,
                            uint *tablespace_key_version,
 			   byte** tablespace_key);
 
@@ -557,6 +557,8 @@ struct Encryption {
 
 	/** Encrypt initial vector */
 	byte*			m_iv;
+
+        uint                    m_key_version;
 
 	/** Current master key id */
 	static ulint		master_key_id;
@@ -836,11 +838,14 @@ public:
 	@param[in] iv		The encryption iv to use */
 	void encryption_key(byte* key,
 			    ulint key_len,
-			    byte* iv)
+			    byte* iv,
+                            uint key_version)
 	{
+                //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
 		m_encryption.m_key = key;
 		m_encryption.m_klen = key_len;
 		m_encryption.m_iv = iv;
+                m_encryption.m_key_version = key_version;
 	}
 
 	/** Get the encryption algorithm.

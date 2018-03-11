@@ -958,6 +958,13 @@ fil_space_keyrotate_next(
 	fil_space_t*	prev_space)
 	MY_ATTRIBUTE((warn_unused_result));
 
+void
+fil_io_set_encryption(
+	IORequest&		req_type,
+	const page_id_t&	page_id,
+	fil_space_t*		space,
+        buf_page_t*	bpage = NULL);
+
 
 /** Wrapper with reference-counting for a fil_space_t. */
 class FilSpace
@@ -1857,5 +1864,6 @@ void
 fil_space_set_corrupt(
 /*==================*/
 	ulint	space_id);
+
 
 #endif /* fil0fil_h */

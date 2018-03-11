@@ -5690,7 +5690,8 @@ void
 fil_io_set_encryption(
 	IORequest&		req_type,
 	const page_id_t&	page_id,
-	fil_space_t*		space)
+	fil_space_t*		space,
+        buf_page_t*	bpage)
 {
 	/* Don't encrypt the log, page 0 of all tablespaces, all pages
 	from the system tablespace. */
@@ -5708,12 +5709,22 @@ fil_io_set_encryption(
                 byte* key = NULL;
                 ulint key_len = 16; //16*8=128
                 byte* iv = NULL;
+                uint key_version = 0;
+
+                //ut_ad(space->encryption_type != Encryption::ROTATED_KEYS); //TODO:Robert:Cannot be called for ROTATED_KEYS
 
                 if (space->encryption_type == Encryption::ROTATED_KEYS)
                 {
-                  iv = space->crypt_data->iv;
-                  key = NULL;
-                  key_len = ENCRYPTION_KEY_LEN;
+                  if (req_type.is_write())
+                  {
+                    iv = space->crypt_data->iv;
+                    key = bpage->encryption_key;
+                    key_version = bpage->encryption_key_version;
+                    //Encryption::get_latest_tablespace_key(space->id, &key_version, &key);
+                    key_len = bpage->encryption_key_length;
+                  }
+                  else
+                    ut_ad(false); // we do not get encryption key here for ROTATED_KEYS when read
                 }
                 else 
                 {
@@ -5728,12 +5739,13 @@ fil_io_set_encryption(
 					//space->encryption_iv);
                 req_type.encryption_key(key,
 					key_len,
-                                        iv);
+                                        iv,
+                                        key_version);
 					//space->encryption_iv);
 
                                         
                 if (space->encryption_type == Encryption::ROTATED_KEYS)
-		  req_type.encryption_algorithm(space->encryption_type);
+                  req_type.encryption_algorithm(space->encryption_type);
 	} else {
 		req_type.clear_encrypted();
 	}
@@ -6064,7 +6076,7 @@ _fil_io(
 	}
 
 	/* Set encryption information. */
-	fil_io_set_encryption(req_type, page_id, space);
+        fil_io_set_encryption(req_type, page_id, space, static_cast<buf_page_t*>(message));
 
 	req_type.block_size(node->block_size);
 
@@ -6605,6 +6617,7 @@ struct fil_iterator_t {
 	byte*		io_buffer;		/*!< Buffer to use for IO */
 	byte*		encryption_key;		/*!< Encryption key */
 	byte*		encryption_iv;		/*!< Encryption iv */
+        uint            encryption_key_version; //TODO:Robert - used for ROTATED_KEYS
 	fil_space_crypt_t *crypt_data;		/*!< Crypt data (if encrypted) */
 };
 
@@ -6685,13 +6698,19 @@ fil_iterate(
 
 		dberr_t		err;
 		IORequest	read_request(read_type);
+		ulint	space_flags = callback.get_space_flags();
 
 		/* For encrypted table, set encryption information. */
 		if (iter.encryption_key != NULL && offset != 0) {
 			read_request.encryption_key(iter.encryption_key,
 						    ENCRYPTION_KEY_LEN,
-						    iter.encryption_iv);
-			read_request.encryption_algorithm(Encryption::AES);
+						    iter.encryption_iv,
+                                                    0); //TODO:Robert - maybe I should not set key version to 0 here, but to 
+                                                        //TODO:Robert: something like invalid key?
+
+			read_request.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space_flags) ? Encryption::ROTATED_KEYS
+                                                                                                  : Encryption::AES);
+
 		}
 
 		err = os_file_read(
@@ -6732,12 +6751,20 @@ fil_iterate(
 
 		IORequest	write_request(write_type);
 
+                //TODO:Robert: For read request all information needed is set in calling function, i.e.
+                //TODO:Robert: fil_tablespace_iterate
 		/* For encrypted table, set encryption information. */
+
+
+                //TODO:Robert: getting latest key can be moved here - as it is only needed
+                //if the updated flag is set!
 		if (iter.encryption_key != NULL && offset != 0) {
 			write_request.encryption_key(iter.encryption_key,
 						     ENCRYPTION_KEY_LEN,
-						     iter.encryption_iv);
-			write_request.encryption_algorithm(Encryption::AES);
+						     iter.encryption_iv,
+                                                     iter.encryption_key_version);
+			write_request.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space_flags) ? Encryption::ROTATED_KEYS
+                                                                                                   : Encryption::AES);
 		}
 
 		/* A page was updated in the set, write back to disk.
@@ -6885,13 +6912,15 @@ fil_tablespace_iterate(
 		/* read (optional) crypt data */
                 if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags))
                 {
-		  iter.crypt_data = fil_space_read_crypt_data(
-		  	callback.get_page_size(), page);
+		  //iter.crypt_data = fil_space_read_crypt_data(
+			  //callback.get_page_size(), page);
                   iter.encryption_iv = iter.crypt_data->iv; //TODO:Robert:This should be safe, we calll fil_iterate and then we call
-                                                            //fil_space_destroy_crypt_data
-                  if (iter.encryption_key != NULL)
-                    my_free(iter.encryption_key); 
-                  iter.encryption_key = NULL;
+                  
+                  ut_ad(iter.encryption_key == NULL);
+                  Encryption::get_latest_tablespace_key(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  //if (iter.encryption_key != NULL)
+                    //my_free(iter.encryption_key); 
+                  //iter.encryption_key = NULL;
                   //memcpy(iter.encryption_iv, iter.crypt_data->iv, 16); //TODO: FOR now I am setting magic number, cannot find the variable for iv size
                 }
                 else
@@ -6899,6 +6928,7 @@ fil_tablespace_iterate(
 		  /* Set encryption info. */
 		  iter.encryption_key = table->encryption_key;
 		  iter.encryption_iv = table->encryption_iv;
+                  iter.encryption_key_version = 0;
                 }
 
 		/* Check encryption is matched or not. */

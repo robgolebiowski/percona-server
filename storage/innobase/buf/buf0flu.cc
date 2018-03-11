@@ -1070,9 +1070,23 @@ buf_flush_write_block_low(
 		break;
 	}
 
+        //fil_io_set_encryption(
+	//IORequest&		req_type,
+	//const page_id_t&	page_id,
+	//fil_space_t*		space)
+
 	/* Disable use of double-write buffer for temporary tablespace.
 	Given the nature and load of temporary tablespace doublewrite buffer
 	adds an overhead during flushing. */
+
+       fil_space_t* space = fil_space_get(bpage->id.space());
+       ut_ad(space != NULL);
+
+       if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
+       {
+         Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
+         bpage->encryption_key_length = ENCRYPTION_KEY_LEN; 
+       }
 
 	if (!srv_use_doublewrite_buf
 	    || buf_dblwr == NULL
@@ -1085,6 +1099,8 @@ buf_flush_write_block_low(
 		ulint	type = IORequest::WRITE | IORequest::DO_NOT_WAKE;
 
 		IORequest	request(type);
+
+                //fil_io_set_encryption(request, bpage->id, space);
 
 		fil_io(request,
 		       sync, bpage->id, bpage->size, 0, bpage->size.physical(),

@@ -9302,7 +9302,6 @@ void Encryption::get_system_key(const char *system_key_name,
 // tablespace_key_version as output parameter
 void
 Encryption::get_latest_tablespace_key(ulint space_id,
-			   const char* srv_uuid,
                            uint *tablespace_key_version,
 			   byte** tablespace_key)
 {
@@ -9310,11 +9309,13 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 	size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
+        ut_ad(uuid[0] != '\0'); // TODO:Robert: Make sure Encryption::uuid was already initialized
+
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
 		    "%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    srv_uuid, space_id);
+		    uuid, space_id); // TODO:Robert make sure uuid is set till we get here
 
         get_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
 
@@ -9548,22 +9549,33 @@ Encryption::encrypt(
 
         if (m_type == Encryption::ROTATED_KEYS)
         {
-          ut_ad(m_key == NULL);
+          ut_ad(m_key != NULL);
           //if (m_key != NULL)
           //{
             //memset(m_key, 0, MY_AES_BLOCK_SIZE);
             //my_free(m_key);
           //}
           
-
-          get_latest_tablespace_key(space_id, uuid, &tablespace_key_version, &m_key);
+//#ifdef UNIV_ENCRYPT_DEBUG
+	  fprintf(stderr, "Robert:Rotating tablspace\n");
+//#endif
+          //get_latest_tablespace_key(space_id, uuid, &tablespace_key_version, &m_key);
           if (m_key == NULL)
           {
+            fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key\n");
+
             Encryption::create_tablespace_key(&m_key, space_id);
             tablespace_key_version = 0; // Just to be sure
-            if (m_key == NULL)
+          }
+          else
+            fprintf(stderr, "Robert:get_latest_tablespace_key returned key, using it\n");
+          if (m_key == NULL)
+          {
+              fprintf(stderr, "Robert:failed to generate tablespace_key\n");
               return src;
           }
+          else
+              fprintf(stderr, "Robert:succesfuly generated new tablespace_key\n");
         }
 
 	/* This is data size which need to encrypt. */
@@ -9722,7 +9734,9 @@ Encryption::encrypt(
 #endif
 #endif
 	*dst_len = src_len;
-
+#ifdef UNIV_ENCRYPT_DEBUG
+        fprintf(stderr, "Robert:Encrypted page:%lu.%lu\n", space_id, page_no);
+#endif
 
 	return(dst);
 }

@@ -1544,6 +1544,10 @@ for compressed and uncompressed frames */
 
 class buf_page_t {
 public:
+       byte *encryption_key;
+       uint encryption_key_version;
+       uint encryption_key_length;
+
 	/** @name General fields
 	None of these bit-fields must be modified without holding
 	buf_page_get_mutex() [buf_block_t::mutex or

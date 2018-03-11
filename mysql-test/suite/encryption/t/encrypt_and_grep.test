@@ -1,0 +1,75 @@
+-- source include/have_innodb.inc
+#-- source include/have_file_key_management_plugin.inc
+
+# embedded does not support restart
+-- source include/not_embedded.inc
+
+#--echo $KEYRING_PLUGIN_OPT
+#--echo $KEYRING_PLUGIN_LOAD
+
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/keyring";
+
+SHOW PLUGINS;
+#
+# MDEV-8138: strange results from encrypt-and-grep test
+#
+--let $MYSQLD_DATADIR=`select @@datadir`
+#TODO: Robert - dlaczego tu jest ibdata1
+--let ib1_IBD = $MYSQLD_DATADIR/ibdata1
+--let t1_IBD = $MYSQLD_DATADIR/test/t1.ibd
+--let t2_IBD = $MYSQLD_DATADIR/test/t2.ibd
+--let t3_IBD = $MYSQLD_DATADIR/test/t3.ibd
+--let SEARCH_RANGE = 10000000
+
+--disable_warnings
+SET GLOBAL innodb_file_per_table = ON;
+SET GLOBAL innodb_file_format = `Barracuda`;
+--enable_warnings
+
+create table t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+create table t2 (a varchar(255)) engine=innodb;
+show warnings;
+create table t3 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+
+insert t1 values (repeat('foobarsecret', 12));
+insert t2 values (repeat('tempsecret', 12));
+insert t3 values (repeat('dummysecret', 12));
+
+select * from t1;
+select * from t2;
+select * from t3;
+
+#--sleep 3
+
+#--echo # Wait max 10 min for key encryption threads to encrypt all spaces
+#--let $wait_timeout= 600
+#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
+#--source include/wait_condition.inc
+#
+
+
+#SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+#SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
+
+--source include/shutdown_mysqld.inc
+
+--let PRINT_SEARCH_RESULT=1
+--let SEARCH_PATTERN=foobarsecret
+--echo # t1 yes on expecting NOT FOUND
+-- let SEARCH_FILE=$t1_IBD
+-- source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN=tempsecret
+--echo # t2 ... on expecting NOT FOUND
+-- let SEARCH_FILE=$t2_IBD
+-- source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN=dummysecret
+--echo # t3 no  on expecting FOUND
+-- let SEARCH_FILE=$t3_IBD
+-- source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN=foobarsecret
+--echo # ibdata1 expecting NOT FOUND
+-- let SEARCH_FILE=$ib1_IBD
+-- source include/search_pattern_in_file.inc
+
+#drop table t1, t2, t3;
