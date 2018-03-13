@@ -9337,6 +9337,28 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 #endif
 }
 
+void
+Encryption::get_latest_tablespace_key_or_create_new_one(ulint space_id,
+                                                        uint *tablespace_key_version,
+			                                byte** tablespace_key)
+{
+     get_latest_tablespace_key(space_id, tablespace_key_version, tablespace_key);
+     if (*tablespace_key == NULL)
+     {
+       fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key\n");
+
+       Encryption::create_tablespace_key(tablespace_key, space_id);
+       *tablespace_key_version = 0;
+     }
+     else
+       fprintf(stderr, "Robert:get_latest_tablespace_key returned key, using it\n");
+     if (*tablespace_key == NULL)
+         fprintf(stderr, "Robert:failed to generate tablespace_key\n");
+     else
+         fprintf(stderr, "Robert:succesfuly generated new tablespace_key\n");
+}
+
+
 /** Get master key by key id.
 @param[in]	master_key_id	master key id
 @param[in]	srv_uuid	uuid of server instance
@@ -9558,24 +9580,28 @@ Encryption::encrypt(
           
 //#ifdef UNIV_ENCRYPT_DEBUG
 	  fprintf(stderr, "Robert:Rotating tablspace\n");
+          //get_latest_tablespace_key_or_create_new_one(ulint space_id,
+                                                       //uint *tablespace_key_version,
+							//byte** tablespace_key)
+
 //#endif
           //get_latest_tablespace_key(space_id, uuid, &tablespace_key_version, &m_key);
-          if (m_key == NULL)
-          {
-            fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key\n");
+          //if (m_key == NULL)
+          //{
+            //fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key\n");
 
-            Encryption::create_tablespace_key(&m_key, space_id);
-            tablespace_key_version = 0; // Just to be sure
-          }
-          else
-            fprintf(stderr, "Robert:get_latest_tablespace_key returned key, using it\n");
-          if (m_key == NULL)
-          {
-              fprintf(stderr, "Robert:failed to generate tablespace_key\n");
-              return src;
-          }
-          else
-              fprintf(stderr, "Robert:succesfuly generated new tablespace_key\n");
+            //Encryption::create_tablespace_key(&m_key, space_id);
+            //tablespace_key_version = 0; // Just to be sure
+          //}
+          //else
+            //fprintf(stderr, "Robert:get_latest_tablespace_key returned key, using it\n");
+          //if (m_key == NULL)
+          //{
+              //fprintf(stderr, "Robert:failed to generate tablespace_key\n");
+              //return src;
+          //}
+          //else
+              //fprintf(stderr, "Robert:succesfuly generated new tablespace_key\n");
         }
 
 	/* This is data size which need to encrypt. */

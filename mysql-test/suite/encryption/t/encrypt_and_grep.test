@@ -72,4 +72,5 @@ select * from t3;
 -- let SEARCH_FILE=$ib1_IBD
 -- source include/search_pattern_in_file.inc
 
-#drop table t1, t2, t3;
+-- source include/start_mysqld.inc
+drop table t1, t2, t3;

@@ -632,7 +632,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
-	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import) {
+	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !FSP_FLAGS_GET_ROTATED_KEYS(m_flags) && !for_import) {
 		m_encryption_key = static_cast<byte*>(
 			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 		m_encryption_iv = static_cast<byte*>(

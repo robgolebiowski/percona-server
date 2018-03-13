@@ -342,7 +342,7 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	const ulint offset = FSP_HEADER_OFFSET
 		+ fsp_header_get_encryption_offset(page_size);
 
-	if (memcmp(page + offset, CRYPT_MAGIC, ENCRYPTION_MAGIC_SIZE) != 0) {
+	if (memcmp(page + offset, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) != 0) {
 		/* Crypt data is not stored. */
 		return NULL;
 	}
@@ -598,16 +598,16 @@ fil_space_crypt_t::write_page0(
 	followed by an MLOG_FILE_WRITE_CRYPT_DATA
 	(that will during recovery update fil_space_t)
 	*/
-	mlog_write_string(page + offset, CRYPT_MAGIC, MAGIC_SZ, mtr);
-	mlog_write_ulint(page + offset + MAGIC_SZ + 0, type, MLOG_1BYTE, mtr);
-	mlog_write_ulint(page + offset + MAGIC_SZ + 1, len, MLOG_1BYTE, mtr);
-	mlog_write_string(page + offset + MAGIC_SZ + 2, iv, len,
+	mlog_write_string(page + offset, CRYPT_MAGIC, ENCRYPTION_MAGIC_SIZE, mtr);
+	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr);
+	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 1, len, MLOG_1BYTE, mtr);
+	mlog_write_string(page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv, len,
 			  mtr);
-	mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len, min_key_version,
+	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len, min_key_version,
 			 MLOG_4BYTES, mtr);
-	mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len + 4, key_id,
+	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 4, key_id,
 			 MLOG_4BYTES, mtr);
-	mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len + 8, encryption,
+	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 8, encryption,
 		MLOG_1BYTE, mtr);
 
 	byte* log_ptr = mlog_open(mtr, 11 + 17 + len);

@@ -799,6 +799,8 @@ retry:
 
 		/* Try to read crypt_data from page 0 if it is not yet
 		read. */
+                // TODO:Robert: Should not this be moved to validate first page (the name might be different, but the function where
+                // encryption key is read from the header) ?
 		if (FSP_FLAGS_GET_ROTATED_KEYS(flags) && !space->crypt_data) {
 			space->crypt_data = fil_space_read_crypt_data(
 				page_size_t(space->flags), page);
@@ -808,11 +810,11 @@ retry:
 
 		/* For encrypted tablespace, we need to check the
 		encrytion key and iv(initial vector) is readed. */
-		if (FSP_FLAGS_GET_ENCRYPTION(flags)
+		if (FSP_FLAGS_GET_ENCRYPTION(flags) && !FSP_FLAGS_GET_ROTATED_KEYS(flags)
 		    && !recv_recovery_is_on()) {
                         // TODO:Robert tu chyba bardziej powinienem sprawdzić czy encryption_type != Encryption::NONE ?
-			if (space->encryption_type != Encryption::AES &&
-                            space->encryption_type != Encryption::ROTATED_KEYS) {
+			if (space->encryption_type != Encryption::AES)
+                        {
 				ib::error()
 					<< "Can't read encryption"
 					<< " key from file "
@@ -820,6 +822,19 @@ retry:
 				return(false);
 			}
 		}
+
+		if (FSP_FLAGS_GET_ROTATED_KEYS(flags)
+		    && !recv_recovery_is_on()) {
+                        // TODO:Robert tu chyba bardziej powinienem sprawdzić czy encryption_type != Encryption::NONE ?
+			if (space->encryption_type != Encryption::ROTATED_KEYS) {
+				ib::error()
+					<< "Can't read encryption"
+					<< " key from file "
+					<< node->name << "!";
+				return(false);
+			}
+		}
+
 
 		if (node->size == 0) {
 			ulint	extent_size;
@@ -4344,14 +4359,18 @@ skip_validate:
 
 		/* For encryption tablespace, initialize encryption
 		information.*/
-		if (!is_rotated_keys && err == DB_SUCCESS && is_encrypted && !for_import) {
+		if (err == DB_SUCCESS && is_encrypted && !for_import) {
 			Datafile& df_current = df_remote.is_open() ?
 				df_remote: df_dict.is_open() ?
 				df_dict : df_default;
 
 			byte*	key = df_current.m_encryption_key;
 			byte*	iv = df_current.m_encryption_iv;
-			ut_ad(key && iv);
+
+                        if (!is_rotated_keys)
+			  ut_ad(key && iv);
+
+                        //TODO:Robert:It is also done for encryption key - it should not take key and iv from df_current - change it
 
 			err = fil_set_encryption(space->id,
                                                  is_rotated_keys ? Encryption::ROTATED_KEYS
@@ -5718,13 +5737,23 @@ fil_io_set_encryption(
                   if (req_type.is_write())
                   {
                     iv = space->crypt_data->iv;
-                    key = bpage->encryption_key;
-                    key_version = bpage->encryption_key_version;
-                    //Encryption::get_latest_tablespace_key(space->id, &key_version, &key);
-                    key_len = bpage->encryption_key_length;
+                    //if (bpage->encryption_key == NULL)
+                      //ut_ad(false);
+                    if (bpage->encryption_key != NULL)
+                    {
+                      key = bpage->encryption_key;
+                      key_version = bpage->encryption_key_version;
+                      //Encryption::get_latest_tablespace_key(space->id, &key_version, &key);
+                      key_len = bpage->encryption_key_length;
+                    }
+                    else
+                    {
+                      ut_ad(key_version != (uint)(~0));
+                      return; 
+                    }
                   }
-                  else
-                    ut_ad(false); // we do not get encryption key here for ROTATED_KEYS when read
+                  //else
+                    //ut_ad(false); // we do not get encryption key here for ROTATED_KEYS when read
                 }
                 else 
                 {
@@ -6917,7 +6946,8 @@ fil_tablespace_iterate(
                   iter.encryption_iv = iter.crypt_data->iv; //TODO:Robert:This should be safe, we calll fil_iterate and then we call
                   
                   ut_ad(iter.encryption_key == NULL);
-                  Encryption::get_latest_tablespace_key(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  Encryption::get_latest_tablespace_key_or_create_new_one(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  //Encryption::get_latest_tablespace_key(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
                   //if (iter.encryption_key != NULL)
                     //my_free(iter.encryption_key); 
                   //iter.encryption_key = NULL;
@@ -6928,7 +6958,7 @@ fil_tablespace_iterate(
 		  /* Set encryption info. */
 		  iter.encryption_key = table->encryption_key;
 		  iter.encryption_iv = table->encryption_iv;
-                  iter.encryption_key_version = 0;
+                  iter.encryption_key_version = ~0; //TODO:Robert:flipping bits so to make this a marker that tablespace key id used
                 }
 
 		/* Check encryption is matched or not. */

@@ -489,6 +489,11 @@ struct Encryption {
                            uint *tablespace_key_version,
 			   byte** tablespace_key);
 
+
+        static void get_latest_tablespace_key_or_create_new_one(ulint space_id,
+                                                                uint *tablespace_key_version,
+			                                        byte** tablespace_key);
+
         static void get_tablespace_key(ulint space_id,
 			               char* srv_uuid,
                                        uint tablespace_key_version,
