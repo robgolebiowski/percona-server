@@ -45,7 +45,7 @@ Created 10/25/1995 Heikki Tuuri
 #include <list>
 #include <vector>
 
-//#include "fil0crypt.h"
+//#include "fil0crypt.h" //TODO:Robert This should be removed, when fil_space_crypt_t will be moved to appropriate place
 /** Structure containing encryption specification */
 struct fil_space_crypt_t;
 
