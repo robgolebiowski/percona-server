@@ -9309,7 +9309,9 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 	size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-        ut_ad(uuid[0] != '\0'); // TODO:Robert: Make sure Encryption::uuid was already initialized
+        if (uuid[0] == '\0')
+          memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
+        //ut_ad(uuid[0] != '\0'); // TODO:Robert: Make sure Encryption::uuid was already initialized
 
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 

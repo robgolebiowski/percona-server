@@ -2191,6 +2191,7 @@ loop:
 		os_event_set(srv_error_event);
 		os_event_set(srv_monitor_event);
 		os_event_set(srv_buf_dump_event);
+                os_event_set(srv_buf_resize_event);
 		if (lock_sys) {
 			os_event_set(lock_sys->timeout_event);
 		}
@@ -2300,7 +2301,8 @@ wait_suspend_loop:
 		goto wait_suspend_loop;
 	case SRV_PURGE:
 	case SRV_WORKER:
-		ut_ad(!"purge was not shut down");
+                //TODO:Robert: Remove by me - in Oracle - calling srv_purge_wakeup jest okej
+		//ut_ad(!"purge was not shut down");
 		srv_purge_wakeup();
 		thread_name = "purge thread";
 		goto wait_suspend_loop;

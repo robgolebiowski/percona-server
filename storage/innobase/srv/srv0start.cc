@@ -2817,12 +2817,12 @@ files_checked:
 		}
 
 		/* Create the buffer pool dump/load thread */
-		os_thread_create(buf_dump_thread, NULL, NULL);
                 srv_buf_dump_thread_active = true;
+		os_thread_create(buf_dump_thread, NULL, NULL);
 
 		/* Create the dict stats gathering thread */
-		os_thread_create(dict_stats_thread, NULL, NULL);
 		srv_dict_stats_thread_active = true;
+		os_thread_create(dict_stats_thread, NULL, NULL);
 
 		/* Create the thread that will optimize the FTS sub-system. */
 		fts_optimize_init();
@@ -2836,6 +2836,7 @@ files_checked:
 	}
 
 	/* Create the buffer pool resize thread */
+	srv_buf_resize_thread_active = true;
 	os_thread_create(buf_resize_thread, NULL, NULL);
 
 	srv_was_started = TRUE;
