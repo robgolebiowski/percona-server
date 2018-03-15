@@ -3850,6 +3850,7 @@ row_import_for_mysql(
 
 	/* For encrypted table, set encryption information. */
 	if (dict_table_is_encrypted(table)) {
+                ut_ad(dict_table_is_rotated_keys(table) == false);
 
 		err = fil_set_encryption(table->space,
 					 dict_table_is_rotated_keys(table) ? Encryption::ROTATED_KEYS 

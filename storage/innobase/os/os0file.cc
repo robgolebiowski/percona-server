@@ -9246,10 +9246,11 @@ void
 Encryption::get_tablespace_key(ulint space_id,
 		               char* srv_uuid,
                                uint tablespace_key_version,
-                	       byte** tablespace_key)
+                	       byte** tablespace_key,
+                               size_t *key_len)
 {
 #ifndef UNIV_INNOCHECKSUM
-	size_t	key_len;
+	//size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
@@ -9258,7 +9259,7 @@ Encryption::get_tablespace_key(ulint space_id,
 		    "%s-%s-%lu:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 		    srv_uuid, space_id, tablespace_key_version);
 
-        get_keyring_key(key_name, tablespace_key, &key_len);
+        get_keyring_key(key_name, tablespace_key, key_len);
 
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
@@ -9268,7 +9269,7 @@ Encryption::get_tablespace_key(ulint space_id,
 #ifdef UNIV_ENCRYPT_DEBUG
 	if (*tablespace_key) {
 		fprintf(stderr, "Fetched tablespace key:%s ", key_name);
-		ut_print_buf(stderr, *tablespace_key, key_len);
+		ut_print_buf(stderr, *tablespace_key, *key_len);
 		fprintf(stderr, "\n");
 	}
 #endif /* DEBUG_TDE */
@@ -9559,6 +9560,11 @@ Encryption::encrypt(
 
 	fprintf(stderr, "Encrypting page:%lu.%lu len:%lu\n",
 		space_id, page_no, src_len);
+        fprintf(stderr, "with key:");
+	ut_print_buf(stderr, m_key, ENCRYPTION_KEY_LEN);
+        fprintf(stderr, "\nand iv:");
+	ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
+        fprintf(stderr, "\n");
 #endif
 
 	/* Shouldn't encrypte an already encrypted page. */
@@ -9629,6 +9635,7 @@ Encryption::encrypt(
 		lint			elen;
 
 		ut_ad(m_klen == ENCRYPTION_KEY_LEN);
+                ut_ad(m_iv != NULL);
 
 		elen = my_aes_encrypt(
 			src + FIL_PAGE_DATA,
@@ -9741,22 +9748,29 @@ Encryption::encrypt(
 
 #ifdef UNIV_ENCRYPT_DEBUG
 #ifndef UNIV_INNOCHECKSUM
-#if 0
-	byte*	check_buf = static_cast<byte*>(ut_malloc_nokey(src_len));
-	byte*	buf2 = static_cast<byte*>(ut_malloc_nokey(src_len));
+#if 1
+        if (m_type == Encryption::ROTATED_KEYS)
+        {
+          byte*	check_buf = static_cast<byte*>(ut_malloc_nokey(src_len));
+          byte*	buf2 = static_cast<byte*>(ut_malloc_nokey(src_len));
 
-	memcpy(check_buf, dst, src_len);
+          memcpy(check_buf, dst, src_len);
 
-	dberr_t err = decrypt(type, check_buf, src_len, buf2, src_len);
-	if (err != DB_SUCCESS || memcmp(src + FIL_PAGE_DATA,
-					check_buf + FIL_PAGE_DATA,
-					src_len - FIL_PAGE_DATA) != 0) {
-		ut_print_buf(stderr, src, src_len);
-		ut_print_buf(stderr, check_buf, src_len);
-		ut_ad(0);
-	}
-	ut_free(buf2);
-	ut_free(check_buf);
+	  fprintf(stderr, "Robert: Comparing before and after encryption");
+
+          dberr_t err = decrypt(type, check_buf, src_len, buf2, src_len);
+          if (err != DB_SUCCESS || memcmp(src + FIL_PAGE_DATA,
+                                          check_buf + FIL_PAGE_DATA,
+                                          src_len - FIL_PAGE_DATA) != 0) {
+
+	          fprintf(stderr, "Robert: After and before encryption are different:");
+                  ut_print_buf(stderr, src, src_len);
+                  ut_print_buf(stderr, check_buf, src_len);
+                  ut_ad(0);
+          }
+          ut_free(buf2);
+          ut_free(check_buf);
+        }
 #endif
 	fprintf(stderr, "Encrypted page:%lu.%lu\n", space_id, page_no);
 #endif
@@ -9816,12 +9830,17 @@ Encryption::decrypt(
 	ulint space_id =
 		mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
-#ifdef UNIV_ENCRYPT_DEBUG
-	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
+//#ifdef UNIV_ENCRYPT_DEBUG
+	//ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 
-	fprintf(stderr, "Decrypting page:%lu.%lu len:%lu\n",
-		space_id, page_no, src_len);
-#endif
+	//fprintf(stderr, "Decrypting page:%lu.%lu len:%lu\n",
+		//space_id, page_no, src_len);
+        //fprintf(stderr, "with key:");
+	//ut_print_buf(stderr, m_key, ENCRYPTION_KEY_LEN);
+        //fprintf(stderr, "\nand iv:");
+	//ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
+        //fprintf(stderr, "\n");
+//#endif
 
 	original_type = static_cast<uint16_t>(
 		mach_read_from_2(src + FIL_PAGE_ORIGINAL_TYPE_V1));
@@ -9851,7 +9870,9 @@ Encryption::decrypt(
           if (m_key != NULL)
             memset(m_key, 0, MY_AES_BLOCK_SIZE);
           m_key = NULL;
-          get_tablespace_key(space_id, uuid, key_version, &m_key);
+          size_t key_len;
+          get_tablespace_key(space_id, uuid, key_version, &m_key, &key_len);
+          m_klen = static_cast<ulint>(key_len);
           if (m_key == NULL)
             return (DB_IO_DECRYPT_FAIL);
         }
@@ -9860,7 +9881,24 @@ Encryption::decrypt(
 	main_len = (data_len / MY_AES_BLOCK_SIZE) * MY_AES_BLOCK_SIZE;
 	remain_len = data_len - main_len;
 
+#ifdef UNIV_ENCRYPT_DEBUG
+	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
+
+	fprintf(stderr, "Decrypting page:%lu.%lu len:%lu\n",
+		space_id, page_no, src_len);
+        fprintf(stderr, "with key:");
+	ut_print_buf(stderr, m_key, ENCRYPTION_KEY_LEN);
+        fprintf(stderr, "\nand iv:");
+	ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
+        fprintf(stderr, "\n");
+#endif
+
+
+
+        ut_ad(m_iv != NULL);
+
 	switch(m_type) {
+        case Encryption::ROTATED_KEYS:
 	case Encryption::AES: {
 		lint			elen;
 
@@ -9868,6 +9906,7 @@ Encryption::decrypt(
 		data is no block aligned. */
 		if (remain_len != 0) {
 			ut_ad(m_klen == ENCRYPTION_KEY_LEN);
+                        ut_ad(m_iv != NULL);
 
 			remain_len = MY_AES_BLOCK_SIZE * 2;
 
@@ -9955,9 +9994,11 @@ Encryption::decrypt(
         if (m_type == Encryption::ROTATED_KEYS)
         {
           //restore LSN
-          uint last_4_bytes_of_fil_page_lsn;
-          memcpy(&last_4_bytes_of_fil_page_lsn, ptr + FIL_PAGE_LSN + 4, 4);
-          memcpy(ptr + data_len, &last_4_bytes_of_fil_page_lsn, 4); 
+          uint high_4_bytes_of_fil_page_lsn;
+          memcpy(&high_4_bytes_of_fil_page_lsn, src + FIL_PAGE_LSN + 4, 4);
+          if (high_4_bytes_of_fil_page_lsn == 0)
+            ut_ad(0);
+          memcpy(ptr + data_len, &high_4_bytes_of_fil_page_lsn, 4); 
         }
 
 	if (page_type == FIL_PAGE_ENCRYPTED) {

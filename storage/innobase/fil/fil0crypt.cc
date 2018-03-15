@@ -598,7 +598,7 @@ fil_space_crypt_t::write_page0(
 	followed by an MLOG_FILE_WRITE_CRYPT_DATA
 	(that will during recovery update fil_space_t)
 	*/
-	mlog_write_string(page + offset, CRYPT_MAGIC, ENCRYPTION_MAGIC_SIZE, mtr);
+	mlog_write_string(page + offset, (const uchar*)ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr);
 	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr);
 	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 1, len, MLOG_1BYTE, mtr);
 	mlog_write_string(page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv, len,
@@ -640,7 +640,7 @@ fil_space_crypt_t::write_page0(
 //void
 //fil_space_crypt_t::write_page0(
 	//byte* 			page,
-	//mtr_t*			mtr)
+	//mtr_t*		emtr)
 //{
 	//ut_ad(this == space->crypt_data);
 	//const uint len = sizeof(iv);

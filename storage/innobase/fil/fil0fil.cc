@@ -1312,6 +1312,9 @@ fil_space_create(
 {
 	fil_space_t*	space;
 
+        if (id == 23 && crypt_data == NULL)
+          ut_ad(0);
+
 	ut_ad(fil_system);
 	ut_ad(fsp_flags_is_valid(flags));
 	ut_ad(srv_page_size == UNIV_PAGE_SIZE_ORIG || flags != 0);
@@ -4336,10 +4339,19 @@ skip_validate:
                   //ze strony, natomiast w przypadku MK czytanie jest z pól. Czyli informacje ze strony
                   //zostały przeczytane już wcześniej. Może warto to przenieść, żeby było tak jak w MK?
 
-                  crypt_data = first_page
-                          ? fil_space_read_crypt_data(page_size_t(flags),
-                                                      first_page)
-                          : NULL;
+                  //crypt_data = first_page
+                          //? fil_space_read_crypt_data(page_size_t(flags),
+                                                      //first_page)
+                          //: NULL;
+                          //
+                  if (first_page)
+                  {
+                    crypt_data = fil_space_read_crypt_data(page_size_t(flags),
+                                                           first_page);
+                    if (crypt_data == NULL)
+                      ut_ad(0);
+
+                  }
                 }
 
 		fil_space_t*	space = fil_space_create(
@@ -4375,7 +4387,10 @@ skip_validate:
 			err = fil_set_encryption(space->id,
                                                  is_rotated_keys ? Encryption::ROTATED_KEYS
                                                                  : Encryption::AES,
-						 key, iv);
+						 key, 
+                                                 is_rotated_keys ? crypt_data->iv 
+                                                                 : iv
+                                                 );
 			ut_ad(err == DB_SUCCESS);
 		}
 	}
@@ -4875,7 +4890,9 @@ fil_ibd_load(
                                                    ? Encryption::ROTATED_KEYS
                                                    : Encryption::AES,
 						 file.m_encryption_key,
-						 file.m_encryption_iv);
+						 FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                                                   ? crypt_data->iv
+                                                   : file.m_encryption_iv);
 		if (err != DB_SUCCESS) {
 			ib::error() << "Can't set encryption information for"
 				" tablespace " << space->name << "!";
@@ -5734,9 +5751,11 @@ fil_io_set_encryption(
 
                 if (space->encryption_type == Encryption::ROTATED_KEYS)
                 {
+                  ut_ad(space->crypt_data != NULL);
+                  ut_ad(space->crypt_data->iv[0] != '\0');
+                  iv = space->crypt_data->iv;
                   if (req_type.is_write())
                   {
-                    iv = space->crypt_data->iv;
                     //if (bpage->encryption_key == NULL)
                       //ut_ad(false);
                     if (bpage->encryption_key != NULL)
@@ -6941,8 +6960,9 @@ fil_tablespace_iterate(
 		/* read (optional) crypt data */
                 if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags))
                 {
-		  //iter.crypt_data = fil_space_read_crypt_data(
-			  //callback.get_page_size(), page);
+                  // TODO:Robert I realy need to merge this with table->encryption_key below
+                  iter.crypt_data = fil_space_read_crypt_data(
+                          callback.get_page_size(), page);
                   iter.encryption_iv = iter.crypt_data->iv; //TODO:Robert:This should be safe, we calll fil_iterate and then we call
                   
                   ut_ad(iter.encryption_key == NULL);

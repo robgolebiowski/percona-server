@@ -495,9 +495,10 @@ struct Encryption {
 			                                        byte** tablespace_key);
 
         static void get_tablespace_key(ulint space_id,
-			               char* srv_uuid,
+                                       char* srv_uuid,
                                        uint tablespace_key_version,
-			               byte** tablespace_key);
+                                       byte** tablespace_key,
+                                       size_t *key_len);
 
         /** Get master key by key id.
         @param[in]	master_key_id	master key id
