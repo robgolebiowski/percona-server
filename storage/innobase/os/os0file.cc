@@ -9611,7 +9611,7 @@ Encryption::encrypt(
 
 	ut_ad(m_type != Encryption::NONE);
 
-        uint tablespace_key_version = 0; // TODO: Change it to not encrypted ?
+        //uint tablespace_key_version = 0; // TODO: Change it to not encrypted ?
 
 
         if (m_type == Encryption::ROTATED_KEYS)
@@ -9759,7 +9759,7 @@ Encryption::encrypt(
 	}
 
         if (m_type == Encryption::ROTATED_KEYS)
-          memcpy(dst + FIL_PAGE_DATA + data_len, &tablespace_key_version, 4);
+          memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
 
 	/* Copy the header as is. */
 	memmove(dst, src, FIL_PAGE_DATA);

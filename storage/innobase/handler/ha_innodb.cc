@@ -22246,7 +22246,8 @@ i_s_innodb_sys_foreign_cols,
 i_s_innodb_sys_tablespaces,
 i_s_innodb_sys_datafiles,
 i_s_innodb_changed_pages,
-i_s_innodb_sys_virtual
+i_s_innodb_sys_virtual,
+i_s_innodb_tablespaces_encryption
 mysql_declare_plugin_end;
 
   //TODO:Robert : this is information schema
