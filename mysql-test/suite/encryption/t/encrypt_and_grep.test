@@ -8,7 +8,7 @@
 #--echo $KEYRING_PLUGIN_LOAD
 
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
-eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/keyring";
+eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 
 SHOW PLUGINS;
 #

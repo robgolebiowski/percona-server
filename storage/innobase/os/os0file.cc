@@ -9123,11 +9123,21 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 	}
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
+        //if (uuid[0] == '\0')
+          //memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
+
+        //ut_ad(uuid[0] != '\0');
+
 	/* Generate new tablespace key */
         // key name should not contain version, as this is first version, it will get assigned version 0
+	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    //"%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    //uuid, space_id);
+
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    uuid, space_id);
+		    "%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    space_id);
+
 
 	/* We call key ring API to generate tablespace key here. */
 	ret = my_key_generate(key_name, "AES",
@@ -9191,6 +9201,8 @@ Encryption::create_master_key(byte** master_key)
 		memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
 	}
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+        ut_ad(key_name[0] != '\0');
 
 	/* Generate new master key */
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
@@ -9256,10 +9268,18 @@ Encryption::get_tablespace_key(ulint space_id,
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%s-%lu:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    srv_uuid, space_id, tablespace_key_version);
+		    "%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    space_id);
 
-        get_keyring_key(key_name, tablespace_key, key_len);
+	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    //"%s-%s-%lu:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    //srv_uuid, space_id, tablespace_key_version);
+
+        uint key_version_fetched = (~0);
+        get_system_key(key_name, tablespace_key, &key_version_fetched, key_len);
+        ut_ad(tablespace_key_version == key_version_fetched);
+
+        //get_keyring_key(key_name, tablespace_key, key_len);
 
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
@@ -9317,8 +9337,11 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    uuid, space_id); // TODO:Robert make sure uuid is set till we get here
+		    "%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    space_id);
+	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    //"%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    //uuid, space_id); // TODO:Robert make sure uuid is set till we get here
 
         get_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
 
@@ -9348,17 +9371,31 @@ Encryption::get_latest_tablespace_key_or_create_new_one(ulint space_id,
      get_latest_tablespace_key(space_id, tablespace_key_version, tablespace_key);
      if (*tablespace_key == NULL)
      {
-       fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key\n");
+       fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key for space: %lu\n", space_id);
 
        Encryption::create_tablespace_key(tablespace_key, space_id);
        *tablespace_key_version = 0;
      }
      else
-       fprintf(stderr, "Robert:get_latest_tablespace_key returned key, using it\n");
+     {
+
+#ifdef UNIV_ENCRYPT_DEBUG
+       fprintf(stderr, "Robert:get_latest_tablespace_key returned key, using it:");
+       ut_print_buf(stderr, *tablespace_key, ENCRYPTION_KEY_LEN);
+       fprintf(stderr, "\n");
+       return;
+#endif
+     }
      if (*tablespace_key == NULL)
          fprintf(stderr, "Robert:failed to generate tablespace_key\n");
      else
-         fprintf(stderr, "Robert:succesfuly generated new tablespace_key\n");
+     {
+#ifdef UNIV_ENCRYPT_DEBUG
+         fprintf(stderr, "Robert:succesfuly generated new tablespace_key: ");
+         ut_print_buf(stderr, *tablespace_key, ENCRYPTION_KEY_LEN);
+         fprintf(stderr, "\n");
+#endif
+     }
 }
 
 
