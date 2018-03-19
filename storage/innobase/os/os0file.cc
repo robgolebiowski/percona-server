@@ -9609,6 +9609,10 @@ Encryption::encrypt(
 	      && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED
 	      && page_type != FIL_PAGE_ENCRYPTED_RTREE);
 
+        //TODO:Robert: To są typy z ROTATED_KEYS
+
+        ut_ad(page_type != FIL_PAGE_RTREE);
+
 	ut_ad(m_type != Encryption::NONE);
 
         //uint tablespace_key_version = 0; // TODO: Change it to not encrypted ?
@@ -9683,6 +9687,7 @@ Encryption::encrypt(
 			my_aes_256_cbc,
 			reinterpret_cast<unsigned char*>(m_iv),
 			false);
+                ut_ad(elen != MY_AES_BAD_DATA);
 
 		if (elen == MY_AES_BAD_DATA) {
 			ulint	page_no =mach_read_from_4(
@@ -9725,6 +9730,8 @@ Encryption::encrypt(
 				my_aes_256_cbc,
 				reinterpret_cast<unsigned char*>(m_iv),
 				false);
+
+                        ut_ad(elen != MY_AES_BAD_DATA);
 
 			if (elen == MY_AES_BAD_DATA) {
 				ulint	page_no =mach_read_from_4(
@@ -9961,6 +9968,9 @@ Encryption::decrypt(
 				my_aes_256_cbc,
 				reinterpret_cast<unsigned char*>(m_iv),
 				false);
+
+                        ut_ad(elen != MY_AES_BAD_DATA);
+
 			if (elen == MY_AES_BAD_DATA) {
 				if (block != NULL) {
 					os_free_block(block);
@@ -9988,6 +9998,8 @@ Encryption::decrypt(
 				my_aes_256_cbc,
 				reinterpret_cast<unsigned char*>(m_iv),
 				false);
+                ut_ad(elen != MY_AES_BAD_DATA);
+
 		if (elen == MY_AES_BAD_DATA) {
 
 			if (block != NULL) {

@@ -175,6 +175,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 			(!srv_encrypt_tables &&
 			 new_encryption == FIL_ENCRYPTION_DEFAULT)) {
 			type = CRYPT_SCHEME_UNENCRYPTED;
+                        min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
 		} else {
 			type = CRYPT_SCHEME_1;
 			min_key_version = key_get_latest_version();

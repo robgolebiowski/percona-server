@@ -1114,7 +1114,10 @@ buf_dblwr_check_block(
 		return;
 	case FIL_PAGE_TYPE_ALLOCATED:
 		/* empty pages should never be flushed */
-		break;
+                //TODO:Robert w MariaDB tutaj jest return - sprawdz czy jezeli zmienisz w MariaDB na break to sie sypnie`
+                return;
+                //ut_ad(0);
+		//break;
 	}
 
 	buf_dblwr_assert_on_corrupt_block(block);

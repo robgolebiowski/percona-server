@@ -11876,23 +11876,60 @@ create_table_info_t::create_option_encryption_is_valid() const
 
         //TODO:Robert, czy powinno być możliwe tworzenie rotated keys tables w rotated keys tablespace ?
 
-        bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
-        bool tablespace_is_rotated_keys = FSP_FLAGS_GET_ROTATED_KEYS(fsp_flags);
+        //bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
+        //bool tablespace_is_rotated_keys = FSP_FLAGS_GET_ROTATED_KEYS(fsp_flags);
 
-	if (table_is_rotated_keys && !tablespace_is_rotated_keys) {
-		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-			"InnoDB: Tablespace `%s` cannot contain an"
-			" ENCRYPTED table with key rotation.", MYF(0), tablespace_name);
-		return(false);
-	}
+        //if (tablespace_is_rotated_keys)
+        //{
+          //enum row_type	row_format = m_form->s->row_type;
+          ////ha_table_option_struct *options= m_form->s->option_struct;
+          ////fil_encryption_t encrypt = (fil_encryption_t)options->encryption;
+          //bool should_encrypt = (table_is_encrypted);
 
-	if (!table_is_rotated_keys && tablespace_is_rotated_keys) {
-		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-			"InnoDB: Tablespace `%s` can contain only an"
-			" ENCRYPTED tables with key rotation.", MYF(0), tablespace_name);
-		return(false);
-	}
+          //[> Currently we do not support encryption for
+          //spatial indexes thus do not allow creating table with forced
+          //encryption */
+          //for(ulint i = 0; i < m_form->s->keys; i++) {
+                  //const KEY* key = m_form->key_info + i;
+                  //if (key->flags & HA_SPATIAL && should_encrypt) {
+                          //push_warning_printf(m_thd, Sql_condition::SL_WARNING,
+                                  //HA_ERR_UNSUPPORTED,
+                                  //"InnoDB: ENCRYPTED=ON not supported for table because "
+                                  //"it contains spatial index.");
+                          //return "ENCRYPTED";
+                  //}
+          //}
 
+          //if (encrypt != FIL_ENCRYPTION_DEFAULT && !m_allow_file_per_table) {
+                  //push_warning(
+                          //m_thd, Sql_condition::SL_WARNING,
+                          //HA_WRONG_CREATE_OPTION,
+                          //"InnoDB: ENCRYPTED requires innodb_file_per_table");
+                  //return "ENCRYPTED";
+          //}
+
+          //if (encrypt == FIL_ENCRYPTION_OFF && srv_encrypt_tables == 2) {
+                  //push_warning(
+                          //m_thd, Sql_condition::SL_WARNING,
+                          //HA_WRONG_CREATE_OPTION,
+                          //"InnoDB: ENCRYPTED=OFF cannot be used when innodb_encrypt_tables=FORCE");
+                  //return "ENCRYPTED";
+          //}
+
+          //if (table_is_rotated_keys && !tablespace_is_rotated_keys) {
+                  //my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                          //"InnoDB: Tablespace `%s` cannot contain an"
+                          //" ENCRYPTED table with key rotation.", MYF(0), tablespace_name);
+                  //return(false);
+          //}
+
+          //if (!table_is_rotated_keys && tablespace_is_rotated_keys) {
+                  //my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                          //"InnoDB: Tablespace `%s` can contain only an"
+                          //" ENCRYPTED tables with key rotation.", MYF(0), tablespace_name);
+                  //return(false);
+          //}
+        //}
 	return(true);
 }
 
@@ -23136,32 +23173,62 @@ innodb_encrypt_tables_validate(
 						for update function */
 	struct st_mysql_value*		value)	/*!< in: incoming string */
 {
+  //static const char* srv_encrypt_tables_names[] = { "OFF", "ON", "FORCE", 0 };
+//static TYPELIB srv_encrypt_tables_typelib = {
+	//array_elements(srv_encrypt_tables_names)-1, 0, srv_encrypt_tables_names,
+	//NULL
+//}
   //TODO: Robert:For now I am not evaluating anything!!!
-  //
-	//if (check_sysvar_enum(thd, var, save, value)) {
-		//return 1;
-	//}
 
-	//ulong encrypt_tables = *(ulong*)save;
+	const char*	innodb_encrypt_tables_input;
+	char		buff[STRING_BUFFER_USUAL_SIZE];
+	int		len = sizeof(buff);
 
-	//if (encrypt_tables
-	    //&& !encryption_key_id_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
-		//push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-				    //HA_ERR_UNSUPPORTED,
-				    //"InnoDB: cannot enable encryption, "
-				    //"encryption plugin is not available");
-		//return 1;
-	//}
+	ut_a(save != NULL);
+	ut_a(value != NULL);
 
-	//if (!srv_fil_crypt_rotate_key_age) {
-		//const char *msg = (encrypt_tables ? "enable" : "disable");
-		//push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-				    //HA_ERR_UNSUPPORTED,
-				    //"InnoDB: cannot %s encryption, "
-				    //"innodb_encryption_rotate_key_age=0"
-				    //" i.e. key rotation disabled", msg);
-		//return 1;
-	//}
+	innodb_encrypt_tables_input= value->val_str(value, buff, &len);
+
+
+        bool legit_value= false;
+
+        uint use = 0;
+      for (;
+	   use < array_elements(srv_encrypt_tables_names);
+	   use++) {
+        if (!innobase_strcasecmp(
+            innodb_encrypt_tables_input,
+	    srv_encrypt_tables_names[use])) {
+            legit_value = true;
+            break; 
+          }
+        }
+
+      if (legit_value == false)
+        return 1;
+       *static_cast<ulong*>(save)= use;
+
+        ulong encrypt_tables = *(ulong*)save;
+
+        //TODO:Still to implement!
+        //if (encrypt_tables
+            //&& !encryption_key_id_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
+                //push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                                    //HA_ERR_UNSUPPORTED,
+                                    //"InnoDB: cannot enable encryption, "
+                                    //"encryption plugin is not available");
+                //return 1;
+        //}
+
+        if (!srv_fil_crypt_rotate_key_age) {
+                const char *msg = (encrypt_tables ? "enable" : "disable");
+                push_warning_printf(thd, Sql_condition::SL_WARNING,
+                                    HA_ERR_UNSUPPORTED,
+                                    "InnoDB: cannot %s encryption, "
+                                    "innodb_encryption_rotate_key_age=0"
+                                    " i.e. key rotation disabled", msg);
+                return 1;
+        }
 
 	return 0;
 }

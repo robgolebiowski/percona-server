@@ -1088,6 +1088,8 @@ buf_flush_write_block_low(
          //Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
          Encryption::get_latest_tablespace_key_or_create_new_one(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
          bpage->encryption_key_length = ENCRYPTION_KEY_LEN; 
+
+         ut_ad(fil_page_get_type(reinterpret_cast<const buf_block_t*>(bpage)->frame) != 0);
        }
 
 	if (!srv_use_doublewrite_buf

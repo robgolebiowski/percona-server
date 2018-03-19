@@ -3904,15 +3904,18 @@ fil_ibd_create(
 #endif /* !UNIV_HOTBACKUP */
 	/* Create crypt data if the tablespace is either encrypted or user has
 	requested it to remain unencrypted. */
-	if (FSP_FLAGS_GET_ROTATED_KEYS(flags))
+        //TODO:Robert - żadne może nie jest tu przekazywane !!
+	if (FSP_FLAGS_GET_ROTATED_KEYS(flags)) //&& srv_encrypt_tables)
         {
-          mode = FIL_ENCRYPTION_ON;
             //if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
-		//srv_encrypt_tables) {
-		//crypt_data = fil_space_create_crypt_data(mode, key_id);
-		crypt_data = fil_space_create_crypt_data(mode, 0);
-            //}
-	}
+                //srv_encrypt_tables) {
+            mode = FIL_ENCRYPTION_ON;
+            crypt_data = fil_space_create_crypt_data(mode, 0);
+	} else
+        {
+          mode = FIL_ENCRYPTION_OFF;
+	  crypt_data = fil_space_create_crypt_data(mode, 0);
+        }
 
 	space = fil_space_create(name, space_id, flags, is_temp
 				 ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
@@ -4339,19 +4342,19 @@ skip_validate:
                   //ze strony, natomiast w przypadku MK czytanie jest z pól. Czyli informacje ze strony
                   //zostały przeczytane już wcześniej. Może warto to przenieść, żeby było tak jak w MK?
 
-                  //crypt_data = first_page
-                          //? fil_space_read_crypt_data(page_size_t(flags),
-                                                      //first_page)
-                          //: NULL;
-                          //
-                  if (first_page)
-                  {
-                    crypt_data = fil_space_read_crypt_data(page_size_t(flags),
-                                                           first_page);
-                    if (crypt_data == NULL)
-                      ut_ad(0);
+                  crypt_data = first_page
+                          ? fil_space_read_crypt_data(page_size_t(flags),
+                                                      first_page)
+                          : NULL;
+                          
+                  //if (first_page)
+                  //{
+                    //crypt_data = fil_space_read_crypt_data(page_size_t(flags),
+                                                           //first_page);
+                    //if (crypt_data == NULL)
+                      //ut_ad(0);
 
-                  }
+                  //}
                 }
 
 		fil_space_t*	space = fil_space_create(

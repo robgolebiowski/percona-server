@@ -1344,23 +1344,24 @@ struct key_state_t {
 };
 
 /***********************************************************************
+TODO:Robert na razie zakomentowane
 Copy global key state
 @param[in,out]	new_state	key state
 @param[in]	crypt_data	crypt data */
 static void
 fil_crypt_get_key_state(
-	key_state_t*			new_state,
-	fil_space_crypt_t*		crypt_data)
+        key_state_t*			new_state,
+        fil_space_crypt_t*		crypt_data)
 {
-	if (srv_encrypt_tables) {
-		new_state->key_version = crypt_data->key_get_latest_version();
-		new_state->rotate_key_age = srv_fil_crypt_rotate_key_age;
+        if (srv_encrypt_tables) {
+                new_state->key_version = crypt_data->key_get_latest_version();
+                new_state->rotate_key_age = srv_fil_crypt_rotate_key_age;
 
-		ut_a(new_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-	} else {
-		new_state->key_version = 0;
-		new_state->rotate_key_age = 0;
-	}
+                ut_a(new_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+        } else {
+                new_state->key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                new_state->rotate_key_age = 0;
+        }
 }
 
 /***********************************************************************
@@ -1390,12 +1391,15 @@ fil_crypt_needs_rotation(
 	}
 
 	if (latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-		if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
+		//if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
 			/* this is rotation encrypted => unencrypted */
 			return true;
-		}
-		return false;
+		//}
+		//return false;
 	}
+
+        //TODO:Robert dodałem to nie wiem co robić gdy oba są not_encrypted - czy to możliwe, żeby doszedł tutaj ?:
+        //ut_ad(!(latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  && key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED));
 
 	/* this is rotation encrypted => encrypted,
 	* only reencrypt if key is sufficiently old */
@@ -1482,7 +1486,7 @@ fil_crypt_start_encrypting_space(
 	}
 
 	crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
-	crypt_data->min_key_version = 0; // all pages are unencrypted
+	crypt_data->min_key_version = (~0) - 1; // all pages are unencrypted
 	crypt_data->rotate_state.start_time = time(0);
 	crypt_data->rotate_state.starting = true;
 	crypt_data->rotate_state.active_threads = 1;
@@ -1794,10 +1798,11 @@ fil_crypt_space_needs_rotation(
 			break;
 		}
 
-		if (crypt_data->key_id != key_state->key_id) {
-			key_state->key_id= crypt_data->key_id;
-			fil_crypt_get_key_state(key_state, crypt_data);
-		}
+                //TODO:Robert - od komentuj to jak już zaimplementujesz key_id //acha - to jest odswiezenie wartosci klucza
+		//if (crypt_data->key_id != key_state->key_id) {
+                        //key_state->key_id= crypt_data->key_id;
+                        fil_crypt_get_key_state(key_state, crypt_data);
+		//}
 
 		bool need_key_rotation = fil_crypt_needs_rotation(
 			crypt_data->encryption,
@@ -2069,8 +2074,8 @@ fil_crypt_find_space_to_rotate(
 	while (!state->should_shutdown() && state->space) {
 	        fil_crypt_read_crypt_data(state->space);
 
-		if (fil_crypt_space_needs_rotation(state, key_state, recheck)) {
-			ut_ad(key_state->key_id);
+	if (fil_crypt_space_needs_rotation(state, key_state, recheck)) {
+			//ut_ad(key_state->key_id);
 			/* init state->min_key_version_found before
 			* starting on a space */
 			state->min_key_version_found = key_state->key_version;
@@ -2105,7 +2110,7 @@ fil_crypt_start_rotate_space(
 
 	ut_ad(crypt_data);
 	mutex_enter(&crypt_data->mutex);
-	ut_ad(key_state->key_id == crypt_data->key_id);
+	//ut_ad(key_state->key_id == crypt_data->key_id);
 
 	if (crypt_data->rotate_state.active_threads == 0) {
 		/* only first thread needs to init */
@@ -2123,7 +2128,7 @@ fil_crypt_start_rotate_space(
 
 		if (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED &&
 			crypt_data->is_encrypted() &&
-			key_state->key_version != 0) {
+			key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 			/* this is rotation unencrypted => encrypted */
 			crypt_data->type = CRYPT_SCHEME_1;
 		}
@@ -2164,7 +2169,7 @@ fil_crypt_find_page_to_rotate(
 	fil_space_crypt_t *crypt_data = space->crypt_data;
 
 	mutex_enter(&crypt_data->mutex);
-	ut_ad(key_state->key_id == crypt_data->key_id);
+	//ut_ad(key_state->key_id == crypt_data->key_id);
 
 	bool found = crypt_data->rotate_state.max_offset >=
 		crypt_data->rotate_state.next_offset;
@@ -2225,8 +2230,11 @@ fil_crypt_get_page_throttle_func(
 					      NULL,
 					      BUF_PEEK_IF_IN_POOL, file, line,
 					      mtr);
+
 	if (block != NULL) {
 		/* page was in buffer pool */
+
+                //ut_ad(fil_page_get_type(block->frame) != 0);
 		state->crypt_stat.pages_read_from_cache++;
 		return block;
 	}
@@ -2243,6 +2251,8 @@ fil_crypt_get_page_throttle_func(
 				 NULL, BUF_GET_POSSIBLY_FREED,
 				file, line, mtr);
 	uintmax_t end = ut_time_us(NULL);
+
+        //ut_ad(fil_page_get_type(block->frame) != 0);
 
 	if (end < start) {
 		end = start; // safety...
@@ -2374,6 +2384,7 @@ fil_crypt_rotate_page(
 		//int needs_scrubbing = BTR_SCRUB_SKIP_PAGE;
 		lsn_t block_lsn = block->page.newest_modification;
 		byte* frame = buf_block_get_frame(block);
+                //TODO:Robert  - musze po dekrypcji dodac nowe pole do block - tak, zeby trzymac tam kv
 		uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
 
 		if (space->is_stopping()) {
@@ -2392,7 +2403,7 @@ fil_crypt_rotate_page(
 			then the fseg_page_is_free() information
 			could be stale already. */
 			//ut_ad(was_free); //TODO: Robert for the time being commented out
-			ut_ad(kv == 0); // TODO: Robert - nie powinno to zostać zmienione na moją flage ?
+			//ut_ad(kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED); // TODO: Robert - nie powinno to zostać zmienione na moją flage ?
 			ut_ad(page_get_space_id(frame) == 0);
 		} else if (fil_crypt_needs_rotation(
 				   crypt_data->encryption,
@@ -2410,7 +2421,8 @@ fil_crypt_rotate_page(
 			state->crypt_stat.pages_modified++;
 		} else {
 			if (crypt_data->is_encrypted()) {
-				if (kv < state->min_key_version_found) {
+                          //TODO:Robert, o cholera ...
+				if (kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  || kv < state->min_key_version_found) {
 					state->min_key_version_found = kv;
 				}
 			}
@@ -2585,7 +2597,7 @@ fil_crypt_flush_space(
 		}
 	}
 
-	if (crypt_data->min_key_version == 0) {
+	if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 		crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
 	}
 
@@ -2629,7 +2641,7 @@ fil_crypt_complete_rotate_space(
 		/**
 		* Update crypt data state with state from thread
 		*/
-		if (state->min_key_version_found <
+		if (state->min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED || state->min_key_version_found <
 			crypt_data->rotate_state.min_key_version_found) {
 			crypt_data->rotate_state.min_key_version_found =
 				state->min_key_version_found;
@@ -2795,7 +2807,7 @@ DECLARE_THREAD(fil_crypt_thread)(
 			}
 
 			/* force key state refresh */
-			new_state.key_id = 0;
+			new_state.key_id = 0; //TODO:Robert - co to robi?
 
 			/* return iops */
 			fil_crypt_return_iops(&thr);
@@ -3025,7 +3037,7 @@ fil_space_crypt_get_status(
 		status->scheme = crypt_data->type;
 		status->keyserver_requests = crypt_data->keyserver_requests;
 		status->min_key_version = crypt_data->min_key_version;
-		status->key_id = crypt_data->key_id;
+		status->key_id = 0;//crypt_data->key_id;
 
 		if (crypt_data->rotate_state.active_threads > 0 ||
 		    crypt_data->rotate_state.flushing) {
@@ -3040,7 +3052,7 @@ fil_space_crypt_get_status(
 
 		mutex_exit(&crypt_data->mutex);
 
-		if (srv_encrypt_tables || crypt_data->min_key_version) {
+		if (srv_encrypt_tables || crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 			status->current_key_version =
 				fil_crypt_get_latest_key_version(crypt_data);
 		}
