@@ -1744,6 +1744,12 @@ fil_crypt_space_needs_rotation(
 {
 	fil_space_t* space = state->space;
 
+        //if (space->id == 23)
+        //{
+          //space->id = 23;
+        //}
+
+
 	/* Make sure that tablespace is normal tablespace */
 	if (space->purpose != FIL_TYPE_TABLESPACE) {
 		return false;
@@ -1808,6 +1814,10 @@ fil_crypt_space_needs_rotation(
 			crypt_data->encryption,
 			crypt_data->min_key_version,
 			key_state->key_version, key_state->rotate_key_age);
+
+                //TODO:Robert to jest tymczasowe i troche glupie - zeby umowliwic rotacje enkrytped -> not enkrypted
+                if (need_key_rotation && key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+                  space->encryption_type = Encryption::NONE;
 
 		crypt_data->rotate_state.scrubbing.is_active = false;
 		//crypt_data->rotate_state.scrubbing.is_active =
@@ -2215,9 +2225,14 @@ fil_crypt_get_page_throttle_func(
 	unsigned		line)
 {
 	fil_space_t* space = state->space;
+
+
 	const page_size_t page_size = page_size_t(space->flags);
 	const page_id_t page_id(space->id, offset);
 	ut_ad(space->n_pending_ops > 0);
+
+        if (space->id == 0 && page_id.page_no() == 13)
+          space->id = 0;
 
 	/* Before reading from tablespace we need to make sure that
 	the tablespace is not about to be dropped or truncated. */

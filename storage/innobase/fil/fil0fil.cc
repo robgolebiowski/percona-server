@@ -1312,8 +1312,8 @@ fil_space_create(
 {
 	fil_space_t*	space;
 
-        if (id == 23 && crypt_data == NULL)
-          ut_ad(0);
+        //if (id == 23 && crypt_data == NULL)
+          //ut_ad(0);
 
 	ut_ad(fil_system);
 	ut_ad(fsp_flags_is_valid(flags));
@@ -2074,7 +2074,7 @@ fil_space_next(fil_space_t* prev_space)
 			&& (UT_LIST_GET_LEN(space->chain) == 0
 			    || space->is_stopping()
 			    || space->purpose != FIL_TYPE_TABLESPACE
-                            || FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                            //|| FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
                            )) {
 			space = UT_LIST_GET_NEXT(space_list, space);
 		}

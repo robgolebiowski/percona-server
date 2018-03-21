@@ -5640,6 +5640,7 @@ default_service_handling(char **argv,
 
 int mysqld_main(int argc, char **argv)
 {
+  printf(stderr, "Robert:Wstaje!");
   /*
     When several instances are running on the same machine, we
     need to have an  unique  named  hEventShudown  through the

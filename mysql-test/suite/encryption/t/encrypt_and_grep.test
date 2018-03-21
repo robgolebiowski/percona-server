@@ -80,12 +80,14 @@ SET GLOBAL innodb_encrypt_tables = off;
 
 --echo # Wait max 10 min for key encryption threads to decrypt all spaces
 #--let $wait_timeout= 600
-#--let $tables_count= `select count(*) from information_schema.tables where engine = 'InnoDB'`
-#--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 4294967294
+--let $tables_count= `select count(*) from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
+echo $tables_count;
+select * from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema';
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 4294967294
 #AND CURRENT_KEY_VERSION = 0;
-#--source include/wait_condition.inc
+--source include/wait_condition.inc
 #
---sleep 70
+#--sleep 70
 
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
@@ -112,6 +114,37 @@ SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTI
 
 -- source include/start_mysqld.inc
 
+--echo # Now turn on encryption and wait for threads to encrypt all spaces
+SET GLOBAL innodb_encrypt_tables = on;
 
+--echo # Wait max 10 min for key encryption threads to encrypt all spaces
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+--source include/wait_condition.inc
+
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
+
+--source include/shutdown_mysqld.inc
+
+--let SEARCH_PATTERN=foobarsecret
+--echo # t1 yes on expecting NOT FOUND
+-- let SEARCH_FILE=$t1_IBD
+-- source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN=tempsecret
+--echo # t2 ... on expecting NOT FOUND
+-- let SEARCH_FILE=$t2_IBD
+-- source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN=dummysecret
+--echo # t3 no  on expecting FOUND
+-- let SEARCH_FILE=$t3_IBD
+-- source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN=foobarsecret
+--echo # ibdata1 expecting NOT FOUND
+-- let SEARCH_FILE=$ib1_IBD
+-- source include/search_pattern_in_file.inc
+
+-- source include/start_mysqld.inc
 
 drop table t1, t2, t3;
+
