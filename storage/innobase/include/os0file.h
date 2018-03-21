@@ -309,6 +309,9 @@ struct Compression {
 	static bool is_none(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
+        static bool is_no(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
 	/** Decompress the page data contents. Page type must be
 	FIL_PAGE_COMPRESSED, if not then the source contents are
 	left unchanged and DB_SUCCESS is returned.
@@ -464,6 +467,9 @@ struct Encryption {
         @param[in]      algorithm       Encryption algorithm to check
         @return true if no algorithm requested */
 	static bool is_none(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
+	static bool is_no(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
         static bool is_rotated_keys(const char *algoritm)

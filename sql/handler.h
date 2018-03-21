@@ -1219,6 +1219,7 @@ typedef struct st_ha_create_information
   and ignored by the Server layer. */
 
   LEX_STRING encrypt_type;
+  uint32_t encryption_key_id;
 
   const char *data_file_name, *index_file_name;
   const char *alias;

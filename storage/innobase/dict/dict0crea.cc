@@ -51,6 +51,9 @@ Created 1/8/1996 Heikki Tuuri
 #include "fsp0sysspace.h"
 #include "srv0start.h"
 
+//TODO:Robert - może to nie powinno być tutaj, includuje tylko dla fil_encryption_t
+#include "fil0fil.h"
+
 /*****************************************************************//**
 Based on a table object, this function builds the entry to be inserted
 in the SYS_TABLES system table.
@@ -420,7 +423,8 @@ dict_build_tablespace(
 		datafile->filepath(),
 		tablespace->flags(),
 		FIL_IBD_FILE_INITIAL_SIZE,
-                node ? node->mode : FIL_ENCRYPTION_DEFAULT);
+                node ? node->mode : FIL_ENCRYPTION_DEFAULT,
+                node ? node->encryption_key_id : 0);
 	if (err != DB_SUCCESS) {
 		return(err);
 	}
@@ -440,7 +444,7 @@ dict_build_tablespace(
 	/* Once we allow temporary general tablespaces, we must do this;
 	mtr_set_log_mode(&mtr, MTR_LOG_NO_REDO); */
 	ut_a(!FSP_FLAGS_GET_TEMPORARY(tablespace->flags()));
-
+        //TODO:Robert: Tutaj jest zapisywany MLOG_CRYPT_DATA
 	bool ret = fsp_header_init(space, FIL_IBD_FILE_INITIAL_SIZE, &mtr);
 	mtr_commit(&mtr);
 
@@ -539,7 +543,8 @@ dict_build_tablespace_for_table(
 		err = fil_ibd_create(
 			space, table->name.m_name, filepath, fsp_flags,
 			FIL_IBD_FILE_INITIAL_SIZE,
-                        node ? node->mode : FIL_ENCRYPTION_DEFAULT);
+                        node ? node->mode : FIL_ENCRYPTION_DEFAULT,
+                        node ? node->encryption_key_id : 0);
 
 		ut_free(filepath);
 
@@ -1364,7 +1369,9 @@ tab_create_graph_create(
 /*====================*/
 	dict_table_t*	table,	/*!< in: table to create, built as a memory data
 				structure */
-	mem_heap_t*	heap)	/*!< in: heap where created */
+	mem_heap_t*	heap,    /*!< in: heap where created */
+        fil_encryption_t mode,	/*!< in: encryption mode */
+	const uint32_t encryption_key_id)	/*!< in: encryption key_id */
 {
 	tab_node_t*	node;
 
@@ -1377,6 +1384,8 @@ tab_create_graph_create(
 
 	node->state = TABLE_BUILD_TABLE_DEF;
 	node->heap = mem_heap_create(256);
+        node->mode= mode;
+        node->encryption_key_id= encryption_key_id;
 
 	node->tab_def = ins_node_create(INS_DIRECT, dict_sys->sys_tables,
 					heap);

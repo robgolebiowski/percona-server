@@ -1207,7 +1207,8 @@ fil_ibd_create(
 	const char*	path,
 	ulint		flags,
 	ulint		size,
-        fil_encryption_t mode)
+        fil_encryption_t mode,
+        const uint32_t encryption_key_id)
 	MY_ATTRIBUTE((warn_unused_result));
 /********************************************************************//**
 Tries to open a single-table tablespace and optionally checks the space id is

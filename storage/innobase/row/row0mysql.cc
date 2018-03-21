@@ -3490,7 +3490,9 @@ row_create_table_for_mysql(
 				/*!< in: compression algorithm to use,
 				can be NULL */
 	trx_t*		trx,	/*!< in/out: transaction */
-	bool		commit)	/*!< in: if true, commit the transaction */
+	bool		commit, /*!< in: if true, commit the transaction */
+        fil_encryption_t mode,	/*!< in: encryption mode */
+	const uint32_t encryption_key_id)/*!< in: encryption key_id */
 {
 	tab_node_t*	node;
 	mem_heap_t*	heap;
@@ -3543,7 +3545,7 @@ err_exit:
 		ut_ad(strstr(table->name.m_name, "/FTS_") != NULL);
 	}
 
-	node = tab_create_graph_create(table, heap);
+        node = tab_create_graph_create(table, heap, mode, encryption_key_id);
 
 	thr = pars_complete_graph_for_exec(node, trx, heap, NULL);
 

@@ -2265,7 +2265,8 @@ truncate_t::fixup_tables_in_non_system_tablespace()
 					(*it)->m_dir_path,
 					(*it)->m_tablespace_flags,
 					FIL_IBD_FILE_INITIAL_SIZE,
-                                        (*it)->m_encryption
+                                        (*it)->m_encryption,
+                                        (*it)->m_encryption_key_id
                                         );
 				if (err != DB_SUCCESS) {
 					/* If checkpoint is not yet done

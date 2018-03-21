@@ -2723,12 +2723,21 @@ Encryption::is_none(const char* algorithm)
 {
 	/* NULL is the same as NONE */
 	if (algorithm == NULL
-	    || innobase_strcasecmp(algorithm, "n") == 0
+	    || Encryption::is_no(algorithm)
 	    || innobase_strcasecmp(algorithm, "") == 0) {
 		return(true);
 	}
 
 	return(false);
+}
+
+/** Check if the string is "" or "n".
+@param[in]      algorithm       Encryption algorithm to check
+@return true if no algorithm requested */
+bool
+Encryption::is_no(const char* algorithm)
+{
+        return innobase_strcasecmp(algorithm, "n") == 0;
 }
 
 bool
@@ -11149,52 +11158,58 @@ err_col:
 
 		const char*	encrypt = m_create_info->encrypt_type.str;
 
-		if (!Encryption::is_none(encrypt)) {
+                fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
+                uint32_t encryption_key_id;
+                //LEX_STRING encryption_key_id; //TODO:Robert:For now it is LEX_STRING
+
+		if (!Encryption::is_none(encrypt)) {  // && !Encryption::is_rotated_keys(encrypt)) {
+
+
 			/* Set the encryption flag. */
 			byte*			master_key = NULL;
 			ulint			master_key_id;
 			Encryption::Version	version;
 
-                        if (Encryption::is_rotated_keys(encrypt))
-                        {
+                        //if (Encryption::is_rotated_keys(encrypt))
+                        //{
                               // TODO: Czy powininem tutaj już wygenerować klucz dla tablicy
                               // i zapisać w keyringu ?
                           /* Check if keyring is ready. */
                           //TODO:Robert, duże kopiuj/wklej. Czy mogę tutaj utworzyć klucz dla tablicy?
-                           DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                           DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
+                           //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+                           //DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
  
 //TODO:Robert: Ingoring the chekcing for keyring - seems get_master_key can be null here
-                          Encryption::get_master_key(&master_key_id,
-                                                     &master_key,
-                                                     &version);
+                          //Encryption::get_master_key(&master_key_id,
+                                                     //&master_key,
+                                                     //&version);
 
-                          if (master_key == NULL) {
-                                  my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
-                                           MYF(0));
-                                  err = DB_UNSUPPORTED;
-                                  dict_mem_table_free(table);
-                          } else {
-                                  my_free(master_key);
+                          //if (master_key == NULL) {
+                                  //my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+                                           //MYF(0));
+                                  //err = DB_UNSUPPORTED;
+                                  //dict_mem_table_free(table);
+                          //} else {
+                                  //my_free(master_key);
 
-                              DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                              DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
-                          }
+                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
+                          //}
 
 
 
                               //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
                               //DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
-                        }
-                        else
-                        {
+                        //}
+                        //else
+                        //{
                           /* Check if keyring is ready. */
                           Encryption::get_master_key(&master_key_id,
                                                      &master_key,
                                                      &version);
 
                           if (master_key == NULL) {
-                                  my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+                                  my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, //TODO:Robert:To sprawdzenie jest tez dla rotated keys, ale blad powininen byc inny niz "cannot find master key"
                                            MYF(0));
                                   err = DB_UNSUPPORTED;
                                   dict_mem_table_free(table);
@@ -11202,13 +11217,34 @@ err_col:
                                   my_free(master_key);
                                   DICT_TF2_FLAG_SET(table,
                                                     DICT_TF2_ENCRYPTION);
+
+                                  if (m_create_info->encrypt_type.length > 0)
+                                  {
+                                      if (Encryption::is_no(m_create_info->encrypt_type.str))
+                                        rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
+                                      else if (Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
+                                      {
+                                        rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
+                                        encryption_key_id= m_create_info->encryption_key_id;
+                                      }
+                                  }
                           }
-                        }
 		}
 
+
+                // Make sure that encryption_key_id is not used with MK encryption
+                //ut_ad(!Encryption::is_none(m_create_info->encrypt_type.str) &&
+                //      !Encryption::is_rotated_keys(m_create_info->encrypt_type.str) &&
+                //      m_create_info->encryption_key_id.length == 0);
+
 		if (err == DB_SUCCESS) {
-			err = row_create_table_for_mysql(
-				table, algorithm, m_trx, false);
+			//err = row_create_table_for_mysql(
+				//table, algorithm, m_trx, false,
+                                //FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+                        err = row_create_table_for_mysql(
+				table, algorithm, m_trx, false,
+				rotated_keys_encryption_option,
+				encryption_key_id);
 		}
 
 		if (err == DB_IO_NO_PUNCH_HOLE_FS) {

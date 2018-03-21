@@ -469,8 +469,9 @@ row_create_table_for_mysql(
                                 /*!< in: compression algorithm to use,
                                 can be NULL */
 	trx_t*		trx,	/*!< in/out: transaction */
-	bool		commit)	/*!< in: if true, commit the transaction */
-	MY_ATTRIBUTE((warn_unused_result));
+	bool		commit, /*!< in: if true, commit the transaction */
+        fil_encryption_t mode,	/*!< in: encryption mode */
+	const uint32_t encryption_key_id); /*!< in: encryption key_id */
 /*********************************************************************//**
 Does an index creation operation for MySQL. TODO: currently failure
 to create an index results in dropping the whole table! This is no problem

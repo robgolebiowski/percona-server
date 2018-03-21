@@ -713,7 +713,9 @@ fil_name_parse(
 				dberr_t ret = fil_ibd_create(
 					space_id, tablespace_name.c_str(),
 					abs_file_path.c_str(),
-					flags, FIL_IBD_FILE_INITIAL_SIZE);
+					flags, FIL_IBD_FILE_INITIAL_SIZE,
+                                        FIL_ENCRYPTION_DEFAULT,
+                                        0);
 
 				if (ret != DB_SUCCESS) {
 					ib::fatal() << "Could not create the"
@@ -2086,6 +2088,7 @@ recv_parse_or_apply_log_rec_body(
 		}
 		break;
         case MLOG_FILE_WRITE_CRYPT_DATA: // TODO:Robert I need to try to merge it with how Oracle is reusing MLOG_WRITE_STRING
+                                         // TODO:It is added after create table
 		dberr_t err;
 		ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, &err));
 

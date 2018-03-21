@@ -3670,7 +3670,8 @@ fil_ibd_create(
 	const char*	path,
 	ulint		flags,
 	ulint		size,
-        fil_encryption_t mode)
+        fil_encryption_t mode,
+        const uint32_t encryption_key_id)
 {
 	pfs_os_file_t	file;
 	dberr_t		err;
@@ -3902,24 +3903,18 @@ fil_ibd_create(
 		}
 	}
 #endif /* !UNIV_HOTBACKUP */
+
 	/* Create crypt data if the tablespace is either encrypted or user has
 	requested it to remain unencrypted. */
-        //TODO:Robert - żadne może nie jest tu przekazywane !!
-	if (FSP_FLAGS_GET_ROTATED_KEYS(flags)) //&& srv_encrypt_tables)
-        {
-            //if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
-                //srv_encrypt_tables) {
-            mode = FIL_ENCRYPTION_ON;
-            crypt_data = fil_space_create_crypt_data(mode, 0);
-	} else
-        {
-          mode = FIL_ENCRYPTION_OFF;
-	  crypt_data = fil_space_create_crypt_data(mode, 0);
-        }
+        // TODO:Robert: FIL_ENCRYPTION_ON jest tylko ustawione dla rotated_keys
+	if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
+		srv_encrypt_tables) {
+		crypt_data = fil_space_create_crypt_data(mode, encryption_key_id);
+	}
 
-	space = fil_space_create(name, space_id, flags, is_temp
-				 ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
-                                 crypt_data, mode);
+        //TODO: Robert czy destruktor space powinien niszczyc crypt_data ?
+	space = fil_space_create(name, space_id, flags, FIL_TYPE_TABLESPACE,
+				 crypt_data, mode);
 
 	DEBUG_SYNC_C("fil_ibd_created_space");
 
@@ -3933,7 +3928,7 @@ fil_ibd_create(
 	/* For encryption tablespace, initial encryption information. */
 	if (FSP_FLAGS_GET_ENCRYPTION(space->flags)) {
 		err = fil_set_encryption(space->id,
-                                         FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
+                                         mode == FIL_ENCRYPTION_ON
                                                    ? Encryption::ROTATED_KEYS
                                                    : Encryption::AES,
 					 NULL,
