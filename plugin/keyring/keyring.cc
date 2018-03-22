@@ -81,10 +81,29 @@ static MYSQL_SYSVAR_STR(
   MYSQL_DEFAULT_KEYRINGFILE                                    /* default    */
 );
 
+static my_bool keyring_file_force= FALSE;
+
+static MYSQL_SYSVAR_BOOL(
+  force,
+  keyring_file_force,
+  PLUGIN_VAR_OPCMDARG,
+  "Force keyring connection",
+  NULL,
+  NULL,
+  FALSE
+);
+
+
 static struct st_mysql_sys_var *keyring_file_system_variables[]= {
   MYSQL_SYSVAR(data),
+  MYSQL_SYSVAR(force),
   NULL
 };
+
+const char* error_msg_on_incorrect_storage= "It seems you are trying to connect to incorrect keyring storage. There was another "
+                                "Percona Server using this keyring storage previously. Any given keyring storage should be "
+                                "used only with one Percona Server. In case you are sure you want to force keyring to connect "
+                                "to this storage use --keyring_force option";
 
 static int keyring_init(MYSQL_PLUGIN plugin_info)
 {
@@ -107,6 +126,7 @@ static int keyring_init(MYSQL_PLUGIN plugin_info)
     }
     keys.reset(new Keys_container(logger.get()));
     IKeyring_io *keyring_io= new Buffered_file_io(logger.get());
+
     if (keys->init(keyring_io, keyring_file_data_value))
     {
       is_keys_container_initialized = FALSE;
@@ -117,7 +137,10 @@ static int keyring_init(MYSQL_PLUGIN plugin_info)
         "gets provided");
       return FALSE;
     }
-    is_keys_container_initialized = TRUE;
+    is_keys_container_initialized= TRUE; // setting to TRUE so that mysql_key_* functions could be called
+    if (is_storage_correct<keyring::Key>(keyring_file_force, "keyring_file", error_msg_on_incorrect_storage))
+      is_keys_container_initialized= FALSE;
+
     return FALSE;
   }
   catch (...)

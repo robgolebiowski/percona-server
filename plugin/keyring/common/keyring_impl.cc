@@ -16,6 +16,7 @@
 #include <my_global.h>
 #include <sstream>
 #include "keyring.h"
+#include "system_key.h"
 
 namespace keyring
 {
@@ -257,4 +258,31 @@ bool mysql_keyring_iterator_get_key(Keys_iterator *key_iterator,
     return TRUE;
   }
   return error;
+}
+
+bool parse_and_check_percona_server_uuid(uchar *percona_server_uuid_system_key, size_t percona_server_uuid_system_key_len,
+                                         const char *error_message)
+{
+  uchar *percona_server_key= NULL;
+  size_t percona_server_key_len= 0;
+  uint key_version= 0;
+
+  if(parse_system_key(percona_server_uuid_system_key, percona_server_uuid_system_key_len, &key_version,
+                      &percona_server_key, &percona_server_key_len) == NULL ||
+     percona_server_key_len != 36)
+  {
+    if (percona_server_key != NULL)
+      my_free(percona_server_key);
+    logger->log(MY_ERROR_LEVEL, "Error while parsing percona_server_uuid key, keyring seems corrupted!");
+    return true;
+  }
+
+  if (memcmp(percona_server_key, server_uuid_ptr, 36) != 0)
+  {
+    my_free(percona_server_key);
+    logger->log(MY_ERROR_LEVEL, error_message);
+    return true;
+  }
+  my_free(percona_server_key);
+  return false;
 }

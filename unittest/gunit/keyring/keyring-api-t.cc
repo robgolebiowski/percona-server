@@ -22,6 +22,9 @@
 #include "keyring_impl.cc"
 #include "mock_logger.h"
 
+
+//const char *server_uuid_ptr;//= new char[37];
+
 namespace keyring__api_unittest
 {
   using ::testing::StrEq;
@@ -40,6 +43,9 @@ namespace keyring__api_unittest
   protected:
     virtual void SetUp()
     {
+      server_uuid_ptr= new char[37];
+      strcpy(const_cast<char*>(server_uuid_ptr), "GUID0000-GUID-0001-GUID-0002GUID0003");
+
       plugin_name= new char[strlen("FakeKeyring") + 1];
       strcpy(plugin_name, "FakeKeyring");
       keyring_filename= new char[strlen("./keyring") + 1];
@@ -63,6 +69,8 @@ namespace keyring__api_unittest
       keyring_deinit_with_mock_logger();
       remove(keyring_file_data_value);
       remove("./keyring.backup");
+      //delete[] const_cast<char*>(server_uuid_ptr);
+      delete[] server_uuid_ptr;
     }
   protected:
     void keyring_init_with_mock_logger();
@@ -518,6 +526,103 @@ namespace keyring__api_unittest
     keyring_init_with_mock_logger();
     EXPECT_EQ(mysql_key_fetch("Robert_key_new", &key_type, "Robert", &key,
                               &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, sample_key_data.length() + 1);
+    ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+    remove("./new_keyring");
+    // backup will stay as adding percona_binlog key will be unsuccessful - we have already added it in
+    // keyring
+    remove("./new_keyring.backup");
+  }
+
+  TEST_F(Keyring_api_test, KeyringFileChangeAndGUID)
+  {
+    EXPECT_EQ(mysql_key_store("Robert_key", "AES", "Robert", sample_key_data.c_str(),
+                              sample_key_data.length() + 1), 0);
+    char *key_type;
+    size_t key_len;
+    void *key;
+    EXPECT_EQ(mysql_key_fetch("Robert_key", &key_type, "Robert", &key,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, sample_key_data.length() + 1);
+    ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+    const char *original_server_uuid_ptr= server_uuid_ptr;
+    // keyring_file that is using new_keyring as a storage will only work with server 
+    // that has GUID: GUID0004-GUID-0005-GUID-0006GUID0007
+    server_uuid_ptr="GUID0004-GUID-0005-GUID-0006GUID0007";
+    delete[] keyring_filename;
+    keyring_filename= new char[strlen("./new_keyring") + 1];
+    strcpy(keyring_filename, "./new_keyring");
+    remove(keyring_filename); // just to make sure new_keyring does not exist
+    keyring_file_data_value= keyring_filename;
+    keyring_deinit_with_mock_logger();
+    keyring_init_with_mock_logger();
+    EXPECT_EQ(mysql_key_fetch("Robert_key", &key_type, "Robert", &key,
+                              &key_len), 0);
+    ASSERT_TRUE(key == NULL);
+    EXPECT_EQ(mysql_key_store("Robert_key_new", "AES", "Robert", sample_key_data.c_str(),
+                              sample_key_data.length() + 1), 0);
+    delete[] keyring_filename;
+    keyring_filename= new char[strlen("./keyring") + 1];
+    strcpy(keyring_filename, "./keyring");
+    keyring_file_data_value= keyring_filename;
+    keyring_deinit_with_mock_logger();
+
+    // Now our server has UUID assigned GUID0004-GUID-0005-GUID-0006GUID0007
+    // but keyring file ./keyring is set to work with server that has GUID:
+    // GUID0000-GUID-0001-GUID-0002GUID0003, thus keyring initialization should fail
+    keyring_init_with_mock_logger();
+    ASSERT_FALSE(is_keys_container_initialized);
+    EXPECT_EQ(mysql_key_fetch("Robert_key", &key_type, "Robert", &key,
+                              &key_len), TRUE);
+    
+    // Now change our server's GUID back to GUID0000-GUID-0001-GUID-0002GUID0003 - this time
+    // ./keyring 's GUID and server's GUID is a match - thus keyring_file should get
+    // initalized
+    server_uuid_ptr= original_server_uuid_ptr;
+    keyring_init_with_mock_logger();
+    ASSERT_TRUE(is_keys_container_initialized);
+    EXPECT_EQ(mysql_key_fetch("Robert_key", &key_type, "Robert", &key,
+                              &key_len), FALSE);
+
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, sample_key_data.length() + 1);
+    ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);
+    my_free(key_type);
+    key_type= NULL;
+    my_free(key);
+    key= NULL;
+
+    // new_keyring has assigned GUID: GUID0004-GUID-0005-GUID-0006GUID0007
+    // and server has assigned GUID: GUID0000-GUID-0001-GUID-0002GUID0003,
+    // i.e. keyring_file initalization should fail
+    delete[] keyring_filename;
+    keyring_filename= new char[strlen("./new_keyring") + 1];
+    strcpy(keyring_filename, "./new_keyring");
+    keyring_file_data_value= keyring_filename;
+    keyring_deinit_with_mock_logger();
+    keyring_init_with_mock_logger();
+    ASSERT_FALSE(is_keys_container_initialized);
+    EXPECT_EQ(mysql_key_fetch("Robert_key_new", &key_type, "Robert", &key,
+                              &key_len), TRUE);
+
+    // we will try to initalize with new_keyring once again - this time using
+    // force - this should override the default behavior 
+    keyring_file_force= TRUE;
+    keyring_init_with_mock_logger();
+    ASSERT_TRUE(is_keys_container_initialized);
+    EXPECT_EQ(mysql_key_fetch("Robert_key_new", &key_type, "Robert", &key,
+                              &key_len), FALSE);
+
     EXPECT_STREQ("AES", key_type);
     EXPECT_EQ(key_len, sample_key_data.length() + 1);
     ASSERT_TRUE(memcmp((char *)key, sample_key_data.c_str(), key_len) == 0);

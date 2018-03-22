@@ -71,6 +71,9 @@ void log_operation_error(const char *failed_operation, const char *plugin_name);
 
 my_bool is_key_length_and_type_valid(const char *key_type, size_t key_len);
 
+bool parse_and_check_percona_server_uuid(uchar *percona_server_system_key, size_t percona_server_system_key_len,
+                                         const char *error_message);
+
 template <typename T>
 my_bool mysql_key_fetch(const char *key_id, char **key_type, const char *user_id,
                         void **key, size_t *key_len, const char *plugin_name)
@@ -159,6 +162,67 @@ bool mysql_key_iterator_get_key(Keys_iterator *key_iterator, char *key_id, char 
     log_operation_error("iterator get_key", plugin_name);
     return TRUE;
   }
+}
+
+//my_bool mysql_key_fetch(const char *key_id, char **key_type, const char *user_id,
+                        //void **key, size_t *key_len)
+//{
+  //return mysql_key_fetch<keyring::Key>(key_id, key_type, user_id, key, key_len,
+                                       //"keyring_file");
+//}
+
+
+//my_bool mysql_key_store(const char *key_id, const char *key_type, const char *user_id,
+                        //const void *key, size_t key_len, const char *plugin_name)
+
+
+//template <typename T>
+//my_bool mysql_key_fetch(const char *key_id, char **key_type, const char *user_id,
+                        //void **key, size_t *key_len, const char *plugin_name)
+
+template <typename T>
+bool is_storage_correct(bool force, const char *plugin_name, const char *error_message)
+{
+  DBUG_ASSERT(server_uuid_ptr != NULL && is_keys_container_initialized == TRUE);
+
+  uchar *percona_server_system_key= NULL;
+  char*	percona_server_system_key_type= NULL;
+  size_t percona_server_system_key_len= 0;
+
+  if (mysql_key_fetch<T>("percona_server_uuid", &percona_server_system_key_type, NULL, reinterpret_cast<void**>(&percona_server_system_key),
+                         &percona_server_system_key_len, plugin_name))
+  {
+    DBUG_ASSERT(percona_server_system_key == NULL && percona_server_system_key_type == NULL);
+    logger->log(MY_ERROR_LEVEL, "Could not connect to the keyring storage while fetching percona_server_uuid key");
+    return true;    
+  }
+  my_free(percona_server_system_key_type);
+  if (percona_server_system_key == NULL) // This is a fresh keyring storage - add ours server GUID to the keyring
+  {
+    if (mysql_key_store<T>("percona_server_uuid", "AES", NULL, server_uuid_ptr , 36, plugin_name))
+    {
+      logger->log(MY_ERROR_LEVEL, "Could not connect to the keyring storage while storing server's GUID in percona_server_uuid key");
+      return true;
+    }
+    return false; 
+  }
+
+  if (parse_and_check_percona_server_uuid(percona_server_system_key, percona_server_system_key_len, error_message))
+  {
+    my_free(percona_server_system_key);
+    if (force) // override
+    {
+      if (mysql_key_store<T>("percona_server_uuid", "AES", NULL, server_uuid_ptr, 36, plugin_name))
+      {
+        logger->log(MY_ERROR_LEVEL, "Could not connect to the keyring storage while generating percona_server_uuid key");
+        return true;
+      }
+      return false;
+    }
+    return true;
+  }
+  my_free(percona_server_system_key);
+  return false;
 }
 
 #endif //MYSQL_KEYRING_H
