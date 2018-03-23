@@ -32,9 +32,14 @@ Created 2013-7-26 by Kevin Lewis
 #include "page0page.h"
 #include "srv0start.h"
 #include "ut0new.h"
+#include "fil0crypt.h"
 #ifdef UNIV_HOTBACKUP
 #include "my_sys.h"
+
+
 #endif /* UNIV_HOTBACKUP */
+
+
 
 /** Initialize the name, size and order of this datafile
 @param[in]	name	tablespace name, will be copied
@@ -629,10 +634,19 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 
 	}
 
+                  //crypt_data = first_page
+                          //? fil_space_read_crypt_data(page_size_t(flags),
+                                                      //first_page)
+                          //: NULL;
+ 
+
+
+        m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
+ 
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
-	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !FSP_FLAGS_GET_ROTATED_KEYS(m_flags) && !for_import) {
+	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !m_crypt_data && !for_import) {
 		m_encryption_key = static_cast<byte*>(
 			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 		m_encryption_iv = static_cast<byte*>(
@@ -640,6 +654,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 #ifdef	UNIV_ENCRYPT_DEBUG
                 fprintf(stderr, "Got from file %lu:", m_space_id);
 #endif
+                //TODO:Tutaj jest czytanie m_encryption_key - i tutaj powinieem dodać crypt_data i czytanie m_encryption
 		if (!fsp_header_get_encryption_key(m_flags,
 						   m_encryption_key,
 						   m_encryption_iv,

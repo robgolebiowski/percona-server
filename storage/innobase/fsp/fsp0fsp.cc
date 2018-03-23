@@ -233,7 +233,7 @@ fsp_flags_is_valid(
 	bool	is_shared = FSP_FLAGS_GET_SHARED(flags);
 	bool	is_temp = FSP_FLAGS_GET_TEMPORARY(flags);
 	bool	is_encryption = FSP_FLAGS_GET_ENCRYPTION(flags);
-        bool    is_rotated_keys = FSP_FLAGS_GET_ROTATED_KEYS(flags);
+        //bool    is_rotated_keys = FSP_FLAGS_GET_ROTATED_KEYS(flags);
 
 	ulint	unused = FSP_FLAGS_GET_UNUSED(flags);
 
@@ -256,7 +256,7 @@ fsp_flags_is_valid(
 	}
 
 	/* Make sure there are no bits that we do not know about. */
-	if (unused != 0 && !is_rotated_keys) {
+	if (unused != 0 ) {
 		return(false);
 	}
 
@@ -285,9 +285,9 @@ fsp_flags_is_valid(
 		return(false);
 	}
 
-        if (is_rotated_keys && !is_encryption) {
-                return(false);
-        }
+        //if (is_rotated_keys && !is_encryption) {
+                //return(false);
+        //}
 
 #if UNIV_FORMAT_MAX != UNIV_FORMAT_B
 # error UNIV_FORMAT_MAX != UNIV_FORMAT_B, Add more validations.
@@ -1123,7 +1123,7 @@ fsp_header_init(
 	/* For encryption tablespace, we need to save the encryption
 	info to the page 0. */
 	if (FSP_FLAGS_GET_ENCRYPTION(space->flags) &&
-            !FSP_FLAGS_GET_ROTATED_KEYS(space->flags)) {
+            !space->crypt_data) {
 		ulint	offset = fsp_header_get_encryption_offset(page_size);
 		byte	encryption_info[ENCRYPTION_INFO_SIZE_V2];
 
@@ -1144,8 +1144,9 @@ fsp_header_init(
 				  mtr);
 	}
 
-        if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
+        if (space->crypt_data)
         {
+          DBUG_ASSERT(FSP_FLAGS_GET_ENCRYPTION(space->flags));
           /* Write encryption metadata to page 0 if tablespace is
 	  encrypted or encryption is disabled by table option. */
 	  if (space->crypt_data &&

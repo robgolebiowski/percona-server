@@ -1332,7 +1332,8 @@ not needed. */
 
 /** A copy of global key state */
 struct key_state_t {
-	key_state_t() : key_id(0), key_version(0),
+  //TODO:Robert zmien
+	key_state_t() : key_id(30), key_version(ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED),
 			rotate_key_age(srv_fil_crypt_rotate_key_age) {}
 	bool operator==(const key_state_t& other) const {
 		return key_version == other.key_version &&
@@ -1391,11 +1392,11 @@ fil_crypt_needs_rotation(
 	}
 
 	if (latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-		//if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
-			/* this is rotation encrypted => unencrypted */
+                if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
+                         //this is rotation encrypted => unencrypted 
 			return true;
-		//}
-		//return false;
+                }
+                return false;
 	}
 
         //TODO:Robert dodałem to nie wiem co robić gdy oba są not_encrypted - czy to możliwe, żeby doszedł tutaj ?:
@@ -1805,10 +1806,11 @@ fil_crypt_space_needs_rotation(
 		}
 
                 //TODO:Robert - od komentuj to jak już zaimplementujesz key_id //acha - to jest odswiezenie wartosci klucza
-		//if (crypt_data->key_id != key_state->key_id) {
-                        //key_state->key_id= crypt_data->key_id;
+                //bo fil_crypt_get_key_state później woła get latest version na tym key_id
+                if (crypt_data->key_id != key_state->key_id) {
+                        key_state->key_id= crypt_data->key_id;
                         fil_crypt_get_key_state(key_state, crypt_data);
-		//}
+                }
 
 		bool need_key_rotation = fil_crypt_needs_rotation(
 			crypt_data->encryption,
@@ -2085,7 +2087,7 @@ fil_crypt_find_space_to_rotate(
 	        fil_crypt_read_crypt_data(state->space);
 
 	if (fil_crypt_space_needs_rotation(state, key_state, recheck)) {
-			//ut_ad(key_state->key_id);
+                        ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
 			/* init state->min_key_version_found before
 			* starting on a space */
 			state->min_key_version_found = key_state->key_version;
@@ -2120,7 +2122,7 @@ fil_crypt_start_rotate_space(
 
 	ut_ad(crypt_data);
 	mutex_enter(&crypt_data->mutex);
-	//ut_ad(key_state->key_id == crypt_data->key_id);
+        ut_ad(key_state->key_id == crypt_data->key_id);
 
 	if (crypt_data->rotate_state.active_threads == 0) {
 		/* only first thread needs to init */
@@ -2179,7 +2181,7 @@ fil_crypt_find_page_to_rotate(
 	fil_space_crypt_t *crypt_data = space->crypt_data;
 
 	mutex_enter(&crypt_data->mutex);
-	//ut_ad(key_state->key_id == crypt_data->key_id);
+        ut_ad(key_state->key_id == crypt_data->key_id);
 
 	bool found = crypt_data->rotate_state.max_offset >=
 		crypt_data->rotate_state.next_offset;
@@ -2689,12 +2691,15 @@ fil_crypt_complete_rotate_space(
 			crypt_data->rotate_state.flushing = true;
 			crypt_data->min_key_version =
 				crypt_data->rotate_state.min_key_version_found;
+                //TODO:Robert - tutaj chyba może być wyścik
+                //TODO:Robert: Jeszcze nie było flush a nowe crypt_data->min_key_version
+                //TODO:Robert: jest już ustawione
+
 		}
 
 		/* inform scrubbing */
 		crypt_data->rotate_state.scrubbing.is_active = false;
-		mutex_exit(&crypt_data->mutex);
-
+		mutex_exit(&crypt_data->mutex); 
 		/* all threads must call btr_scrub_complete_space wo/ mutex held */
 		//if (state->scrub_data.scrubbing) {
 			//btr_scrub_complete_space(&state->scrub_data);
@@ -3052,7 +3057,8 @@ fil_space_crypt_get_status(
 		status->scheme = crypt_data->type;
 		status->keyserver_requests = crypt_data->keyserver_requests;
 		status->min_key_version = crypt_data->min_key_version;
-		status->key_id = 0;//crypt_data->key_id;
+		//status->key_id = 0;//crypt_data->key_id;
+		status->key_id= crypt_data->key_id;
 
 		if (crypt_data->rotate_state.active_threads > 0 ||
 		    crypt_data->rotate_state.flushing) {

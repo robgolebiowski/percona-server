@@ -28,7 +28,7 @@ SET GLOBAL innodb_file_format = `Barracuda`;
 --enable_warnings
 
 create table t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
-create table t2 (a varchar(255)) engine=innodb;
+create table t2 (a varchar(255)) engine=innodb encryption='n';
 show warnings;
 create table t3 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
 
@@ -41,6 +41,8 @@ select * from t2;
 select * from t3;
 
 #--sleep 3
+
+#--sleep 10
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
@@ -83,6 +85,10 @@ SET GLOBAL innodb_encrypt_tables = off;
 --let $tables_count= `select count(*) from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
 echo $tables_count;
 select * from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema';
+
+echo ======alll-from-information_schema====
+
+select * from information_schema.tables where engine = 'InnoDB'; 
 --let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 4294967294
 #AND CURRENT_KEY_VERSION = 0;
 --source include/wait_condition.inc

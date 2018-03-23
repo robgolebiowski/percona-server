@@ -1082,7 +1082,8 @@ buf_flush_write_block_low(
        fil_space_t* space = fil_space_get(bpage->id.space());
        ut_ad(space != NULL);
 
-       if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
+       //if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
+       if (space->encryption_type == Encryption::ROTATED_KEYS)
        {
          ut_ad(space->crypt_data != NULL);// && space->crypt_data->iv[0] != '\0');
          //Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);

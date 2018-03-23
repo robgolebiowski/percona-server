@@ -270,7 +270,7 @@ fil_name_process(
 			if (FSP_FLAGS_GET_ENCRYPTION(space->flags)
 			    && recv_sys->encryption_list != NULL) {
 
-                                ut_ad(FSP_FLAGS_GET_ROTATED_KEYS(space->flags) == false);
+                                ut_ad(space->crypt_data == NULL);
 				dberr_t				err;
 				encryption_list_t::iterator	it;
 

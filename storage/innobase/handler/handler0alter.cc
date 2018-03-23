@@ -58,6 +58,8 @@ Smart ALTER TABLE
 #include "partition_info.h"
 #include "ha_innopart.h"
 
+#include "fil0crypt.h"
+
 /** Operations for creating secondary indexes (no rebuild needed) */
 static const Alter_inplace_info::HA_ALTER_FLAGS INNOBASE_ONLINE_CREATE
 	= Alter_inplace_info::ADD_INDEX
@@ -4386,6 +4388,8 @@ prepare_inplace_alter_table_dict(
 		ulint		space_id = 0;
 		ulint		z = 0;
 		const char*	err_zip_dict_name = 0;
+		ulint		key_id = 0;
+		fil_encryption_t mode = FIL_ENCRYPTION_DEFAULT;
 
 		if (!innobase_check_zip_dicts(altered_table, zip_dict_ids,
 			ctx->trx, &err_zip_dict_name)) {
@@ -4598,6 +4602,22 @@ prepare_inplace_alter_table_dict(
 		const char* encrypt;
 		encrypt	= ha_alter_info->create_info->encrypt_type.str;
 
+                //TODO:Wydaje się być niepotrzebne skoro informacje o enkrypcji są w alter
+		//if (fil_space_t* space
+		    //= fil_space_acquire(ctx->prebuilt->table->space)) {
+			//if (const fil_space_crypt_t* crypt_data
+			    //= space->crypt_data) {
+				//key_id = crypt_data->key_id;
+				//mode = crypt_data->encryption;
+			//}
+
+			//fil_space_release(space);
+		//}
+
+
+                if (Encryption::is_no(encrypt))
+                  mode= FIL_ENCRYPTION_OFF;
+
 		if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE)
 		    && ha_alter_info->create_info->encrypt_type.length > 0
 		    && !Encryption::is_none(encrypt)
@@ -4630,14 +4650,19 @@ prepare_inplace_alter_table_dict(
 				my_free(master_key);
 				DICT_TF2_FLAG_SET(ctx->new_table,
 						  DICT_TF2_ENCRYPTION);
-                                if (Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str))
-				  DICT_TF2_FLAG_SET(ctx->new_table,
-				         	    DICT_TF2_ROTATED_KEYS);
+                                if (Encryption::is_rotated_keys(encrypt))
+                                {
+                                  mode= FIL_ENCRYPTION_ON;
+                                  key_id= ha_alter_info->create_info->encryption_key_id;
+                                }
+				//DICT_TF2_FLAG_SET(ctx->new_table,
+						   //DICT_TF2_ROTATED_KEYS);
 			}
 		}
 
+                //TODO:Robert - to musisz zmienic na pobieranie poprawnych informacji z alter table
 		error = row_create_table_for_mysql(
-			ctx->new_table, compression, ctx->trx, false);
+			ctx->new_table, compression, ctx->trx, false, mode, key_id);
 
 		punch_hole_warning =
 			(error == DB_IO_NO_PUNCH_HOLE_FS)

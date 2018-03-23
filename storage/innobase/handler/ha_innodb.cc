@@ -11161,6 +11161,9 @@ err_col:
                 fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
                 uint32_t encryption_key_id;
                 //LEX_STRING encryption_key_id; //TODO:Robert:For now it is LEX_STRING
+                if (Encryption::is_no(m_create_info->encrypt_type.str))
+                      rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
+
 
 		if (!Encryption::is_none(encrypt)) {  // && !Encryption::is_rotated_keys(encrypt)) {
 
@@ -11218,15 +11221,11 @@ err_col:
                                   DICT_TF2_FLAG_SET(table,
                                                     DICT_TF2_ENCRYPTION);
 
-                                  if (m_create_info->encrypt_type.length > 0)
+                                  if (m_create_info->encrypt_type.length > 0 && 
+                                      Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
                                   {
-                                      if (Encryption::is_no(m_create_info->encrypt_type.str))
-                                        rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
-                                      else if (Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
-                                      {
-                                        rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
-                                        encryption_key_id= m_create_info->encryption_key_id;
-                                      }
+                                    rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
+                                    encryption_key_id= m_create_info->encryption_key_id;
                                   }
                           }
 		}
@@ -13948,8 +13947,10 @@ innobase_create_tablespace(
 	bool	zipped = (zip_size != UNIV_PAGE_SIZE);
 	page_size_t	page_size(zip_size, UNIV_PAGE_SIZE, zipped);
 	bool atomic_blobs = page_size.is_compressed();
-	bool is_encrypted = (alter_info->encrypt
-		&& !Encryption::is_none(alter_info->encrypt_type.str));
+	bool is_encrypted = ((alter_info->encrypt
+		&& (!Encryption::is_none(alter_info->encrypt_type.str) ||
+                    (srv_encrypt_tables && !Encryption::is_no(alter_info->encrypt_type.str)))) 
+                || srv_encrypt_tables);
         bool is_rotated_key = (alter_info->encrypt 
             && Encryption::is_rotated_keys(alter_info->encrypt_type.str));
 
