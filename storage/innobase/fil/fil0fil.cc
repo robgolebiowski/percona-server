@@ -825,9 +825,10 @@ retry:
 
 		if (space->crypt_data
 		    && !recv_recovery_is_on()) {
-                        ut_ad(FSP_FLAGS_GET_ENCRYPTION(flags));
+                        // TODO:For some reason system tablespaces do not go through reading dict flags
+                        ut_ad(space->id == srv_sys_space.space_id() || FSP_FLAGS_GET_ENCRYPTION(flags)); 
                         // TODO:Robert tu chyba bardziej powinienem sprawdzić czy encryption_type != Encryption::NONE ?
-			if (space->encryption_type != Encryption::ROTATED_KEYS) {
+			if (space->encryption_type != Encryption::ROTATED_KEYS && space->id != srv_sys_space.space_id()) {
 				ib::error()
 					<< "Can't read encryption"
 					<< " key from file "
@@ -2051,6 +2052,13 @@ fil_space_release(
 	mutex_exit(&fil_system->mutex);
 }
 
+bool space_should_not_be_rotated(fil_space_t *space)
+{
+  ut_ad(space != NULL);
+  return (space->encryption_type != Encryption::ROTATED_KEYS
+          && (srv_encrypt_tables && FSP_FLAGS_GET_ENCRYPTION(space->flags)));
+}
+
 fil_space_t*
 fil_space_next(fil_space_t* prev_space)
 {
@@ -2063,8 +2071,10 @@ fil_space_next(fil_space_t* prev_space)
 
 		/* We can trust that space is not NULL because at least the
 		system tablespace is always present and loaded first. */
-		space->n_pending_ops++;
-	} else {
+                space->n_pending_ops++;
+	}
+       
+       if (prev_space != NULL || space_should_not_be_rotated(space)) {
 		ut_ad(space->n_pending_ops > 0);
 
 		/* Move on to the next fil_space_t */
@@ -2074,11 +2084,12 @@ fil_space_next(fil_space_t* prev_space)
 		/* Skip spaces that are being created by
 		fil_ibd_create(), or dropped, or !tablespace. */
 		while (space != NULL
-			&& (UT_LIST_GET_LEN(space->chain) == 0
-			    || space->is_stopping()
-			    || space->purpose != FIL_TYPE_TABLESPACE
+                            && (UT_LIST_GET_LEN(space->chain) == 0
+			       || space_should_not_be_rotated(space)
+                               || space->is_stopping()
+			       || space->purpose != FIL_TYPE_TABLESPACE)
                             //|| FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
-                           )) {
+                           ) {
 			space = UT_LIST_GET_NEXT(space_list, space);
 		}
 
@@ -2160,7 +2171,9 @@ fil_space_keyrotate_next(
 	space->purpose == FIL_TYPE_TABLESPACE. */
 	while (space != NULL
 	       && (UT_LIST_GET_LEN(space->chain) == 0
-		   || space->is_stopping())) {
+		   || space->is_stopping()
+                   || space_should_not_be_rotated(space)
+                  )) {
 
 		old = space;
 		space = UT_LIST_GET_NEXT(rotation_list, space);

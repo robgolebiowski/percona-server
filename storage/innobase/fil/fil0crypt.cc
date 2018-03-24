@@ -598,6 +598,10 @@ fil_space_crypt_t::write_page0(
 	followed by an MLOG_FILE_WRITE_CRYPT_DATA
 	(that will during recovery update fil_space_t)
 	*/
+        mlog_write_ulint(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page, space->flags, MLOG_4BYTES, mtr);
+	//mach_write_to_4(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page,
+			//flags);
+
 	mlog_write_string(page + offset, (const uchar*)ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr);
 	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr);
 	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 1, len, MLOG_1BYTE, mtr);
@@ -1517,6 +1521,7 @@ fil_crypt_start_encrypting_space(
 		/* 3 - write crypt data to page 0 */
 		byte* frame = buf_block_get_frame(block);
 		crypt_data->type = CRYPT_SCHEME_1;
+                space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
 		crypt_data->write_page0(space, frame, &mtr);
 
 		mtr.commit();

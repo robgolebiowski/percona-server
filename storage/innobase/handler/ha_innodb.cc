@@ -11165,7 +11165,8 @@ err_col:
                       rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
 
 
-		if (!Encryption::is_none(encrypt)) {  // && !Encryption::is_rotated_keys(encrypt)) {
+		if (!Encryption::is_none(encrypt) ||
+                    (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str))) {  // && !Encryption::is_rotated_keys(encrypt)) {
 
 
 			/* Set the encryption flag. */
@@ -11221,8 +11222,10 @@ err_col:
                                   DICT_TF2_FLAG_SET(table,
                                                     DICT_TF2_ENCRYPTION);
 
-                                  if (m_create_info->encrypt_type.length > 0 && 
-                                      Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
+                                  if ((m_create_info->encrypt_type.length > 0 && 
+                                       (Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
+                                        (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)))) ||
+                                      srv_encrypt_tables) // TODO:Robert już później powinienem się tylko opierać na FIL_ENCRYPTION...
                                   {
                                     rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
                                     encryption_key_id= m_create_info->encryption_key_id;
@@ -11868,8 +11871,11 @@ create_table_info_t::create_option_encryption_is_valid() const
 		}
 	}
 
+        // TODO:Robert table is not encrypted when temporary table
 	bool table_is_encrypted =
-		!Encryption::is_none(m_create_info->encrypt_type.str);
+		!Encryption::is_none(m_create_info->encrypt_type.str) ||
+                (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str) &&
+                 !(m_create_info->options & HA_LEX_CREATE_TMP_TABLE));
 
 	if ((m_create_info->options & HA_LEX_CREATE_TMP_TABLE)
 		&& table_is_encrypted) {
@@ -11901,13 +11907,15 @@ create_table_info_t::create_option_encryption_is_valid() const
 			" ENCRYPTED table.", MYF(0), tablespace_name);
 		return(false);
 	}
+      
+        // TODO:Robert :temporary allow temporary tables to be created in encrypted tablespaces
 
-	if (!table_is_encrypted && tablespace_is_encrypted) {
-		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-			"InnoDB: Tablespace `%s` can contain only an"
-			" ENCRYPTED tables.", MYF(0), tablespace_name);
-		return(false);
-	}
+	//if ((!table_is_encrypted && tablespace_is_encrypted) || m_create_info->options & HA_LEX_CREATE_TMP_TABLE) {
+		//my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+			//"InnoDB: Tablespace `%s` can contain only an"
+			//" ENCRYPTED tables.", MYF(0), tablespace_name);
+		//return(false);
+	//}
 
         //TODO:Robert, czy powinno być możliwe tworzenie rotated keys tables w rotated keys tablespace ?
 
