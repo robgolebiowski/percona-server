@@ -733,6 +733,23 @@ retry:
 
 		/* Close the file now that we have read the space id from it */
 
+		/* Try to read crypt_data from page 0 if it is not yet
+		read. */
+                // TODO:Robert: Should not this be moved to validate first page (the name might be different, but the function where
+                // encryption key is read from the header) ?
+		if (!space->crypt_data) { // read if it is not yet read for logs etc.
+         	  space->crypt_data = fil_space_read_crypt_data(
+				page_size_t(space->flags), page);
+                
+                  if (space->crypt_data && fil_set_encryption(space->id,
+                                       Encryption::ROTATED_KEYS,
+                                       NULL,
+                                       space->crypt_data->iv,
+                                       false) != DB_SUCCESS)
+                        ut_ad(0);
+                }                                                     
+
+
 		os_file_close(node->handle);
 
 		const page_size_t	page_size(flags);
@@ -797,14 +814,6 @@ retry:
 			space->free_len = free_len;
 		}
 
-		/* Try to read crypt_data from page 0 if it is not yet
-		read. */
-                // TODO:Robert: Should not this be moved to validate first page (the name might be different, but the function where
-                // encryption key is read from the header) ?
-		//if (!space->crypt_data) {
-	        space->crypt_data = fil_space_read_crypt_data(
-				page_size_t(space->flags), page);
-		//}
 
 		ut_free(buf2);
 
@@ -826,9 +835,9 @@ retry:
 		if (space->crypt_data
 		    && !recv_recovery_is_on()) {
                         // TODO:For some reason system tablespaces do not go through reading dict flags
-                        ut_ad(space->id == srv_sys_space.space_id() || FSP_FLAGS_GET_ENCRYPTION(flags)); 
+                        //ut_ad(space->id == srv_sys_space.space_id() || FSP_FLAGS_GET_ENCRYPTION(flags)); 
                         // TODO:Robert tu chyba bardziej powinienem sprawdzić czy encryption_type != Encryption::NONE ?
-			if (space->encryption_type != Encryption::ROTATED_KEYS && space->id != srv_sys_space.space_id()) {
+			if (space->encryption_type != Encryption::ROTATED_KEYS) {
 				ib::error()
 					<< "Can't read encryption"
 					<< " key from file "
@@ -1222,6 +1231,7 @@ void
 fil_space_free_low(
 	fil_space_t*	space)
 {
+        //ut_ad(space->id != 0);
 	/* The tablespace must not be in fil_system->named_spaces. */
 	ut_ad(srv_fast_shutdown == 2 || space->max_lsn == 0);
 
@@ -1352,8 +1362,6 @@ fil_space_create(
 	space = static_cast<fil_space_t*>(ut_zalloc_nokey(sizeof(*space)));
 
 	space->id = id;
-        if (space->id == 20)
-          space->id= 20;
 	space->name = mem_strdup(name);
 
 	UT_LIST_INIT(space->chain, &fil_node_t::chain);
@@ -1409,8 +1417,8 @@ fil_space_create(
 	to do */
 	if (purpose == FIL_TYPE_TABLESPACE
 	    && !srv_fil_crypt_rotate_key_age && fil_crypt_threads_event &&
-	    (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF ||
-		    srv_encrypt_tables)) {
+	    (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
+		    srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))) {
 		/* Key rotation is not enabled, need to inform background
 		encryption threads. */
 		UT_LIST_ADD_LAST(fil_system->rotation_list, space);
@@ -2055,8 +2063,7 @@ fil_space_release(
 bool space_should_not_be_rotated(fil_space_t *space)
 {
   ut_ad(space != NULL);
-  return (space->encryption_type != Encryption::ROTATED_KEYS
-          && (srv_encrypt_tables && FSP_FLAGS_GET_ENCRYPTION(space->flags)));
+  return FSP_FLAGS_GET_ENCRYPTION(space->flags);
 }
 
 fil_space_t*
@@ -3923,7 +3930,8 @@ fil_ibd_create(
 	/* Create crypt data if the tablespace is either encrypted or user has
 	requested it to remain unencrypted. */
         // TODO:Robert: FIL_ENCRYPTION_ON jest tylko ustawione dla rotated_keys
-	if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)) {
+	if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF
+            || (srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(flags))) {
 		crypt_data = fil_space_create_crypt_data(mode, encryption_key_id);
 	}
 
@@ -3941,13 +3949,14 @@ fil_ibd_create(
 	}
 
 	/* For encryption tablespace, initial encryption information. */
-	if (FSP_FLAGS_GET_ENCRYPTION(space->flags)) {
+	if (FSP_FLAGS_GET_ENCRYPTION(space->flags) || crypt_data) {
 		err = fil_set_encryption(space->id,
-                                         mode == FIL_ENCRYPTION_ON
+                                         crypt_data != NULL
                                                    ? Encryption::ROTATED_KEYS
                                                    : Encryption::AES,
 					 NULL,
-					 NULL);
+					 crypt_data != NULL ? crypt_data->iv
+                                                            : NULL); //TODO: To jest ustawiane w fil_io_set_encryption
 		ut_ad(err == DB_SUCCESS);
 	}
 
@@ -4339,23 +4348,24 @@ fil_ibd_open(
 
 skip_validate:
 	if (err == DB_SUCCESS) {
-                //fil_space_crypt_t* crypt_data = NULL;
+                fil_space_crypt_t* crypt_data = NULL;
 
                 //if (is_rotated_keys)
                 //{
-                  //const byte* first_page =
-                          //df_default.is_open() ? df_default.get_first_page() :
-                          //df_dict.is_open() ? df_dict.get_first_page() :
-                          //df_remote.get_first_page();
+                  const byte* first_page =
+                          df_default.is_open() ? df_default.get_first_page() :
+                          df_dict.is_open() ? df_dict.get_first_page() :
+                          df_remote.get_first_page();
 
                   //TODO:Robert tutaj jest robione czytanie informacji odnosnie encrypcji bezposrednio
                   //ze strony, natomiast w przypadku MK czytanie jest z pól. Czyli informacje ze strony
                   //zostały przeczytane już wcześniej. Może warto to przenieść, żeby było tak jak w MK?
 
-                  //crypt_data = first_page
-                          //? fil_space_read_crypt_data(page_size_t(flags),
-                                                      //first_page)
-                          //: NULL;
+                  crypt_data = first_page
+                          ? fil_space_read_crypt_data(page_size_t(flags),
+                                                      first_page)
+                          : NULL;
+
                           
                   //if (first_page)
                   //{
@@ -4367,12 +4377,19 @@ skip_validate:
                   //}
                 //}
 
-	        Datafile& df_current = df_remote.is_open() ?
-				df_remote: df_dict.is_open() ?
-				df_dict : df_default;
+                //Datafile& df_current = df_remote.is_open() ?
+                                //df_remote: df_dict.is_open() ?
+                                //df_dict : df_default;
+
+                //crypt_data = first_page
+                          //? df_current.m_crypt_data : NULL;
+
+
 
 		fil_space_t*	space = fil_space_create(
-			space_name, id, flags, purpose, df_current.m_crypt_data); // TODO:Robert: mode nie jest wymagane?
+                        space_name, id, flags, purpose, crypt_data); // TODO:Robert: mode nie jest wymagane?
+                        //space_name, id, flags, purpose, df_current.m_crypt_data); // TODO:Robert: mode nie jest wymagane?
+                //df_current.m_crypt_data= NULL;
 
 		/* We do not measure the size of the file, that is why
 		we pass the 0 below */
@@ -4388,18 +4405,19 @@ skip_validate:
 
 		/* For encryption tablespace, initialize encryption
 		information.*/
-		if (err == DB_SUCCESS && is_encrypted && !for_import) {
+		if (err == DB_SUCCESS) {
+                  if (is_encrypted && !for_import) {
 			Datafile& df_current = df_remote.is_open() ?
 				df_remote: df_dict.is_open() ?
 				df_dict : df_default;
 
 			byte*	key = df_current.m_encryption_key;
 			byte*	iv = df_current.m_encryption_iv;
-                        fil_space_crypt_t* crypt_data = df_current.m_crypt_data;
+                        //fil_space_crypt_t* crypt_data = df_current.m_crypt_data;
 
                         //if (!is_rotated_keys)
-                        if (!crypt_data) //TODO:No, niedokońca
-			  ut_ad(key && iv);
+                        //if (!crypt_data) //TODO:No, niedokońca
+			ut_ad(key && iv);
 
                         //TODO:Robert:It is also done for encryption key - it should not take key and iv from df_current - change it
 
@@ -4411,15 +4429,22 @@ skip_validate:
                                                                  //: iv
                                                  //);
 			err = fil_set_encryption(space->id,
-                                                 crypt_data ? Encryption::ROTATED_KEYS
-                                                            : Encryption::AES,
+                                                 Encryption::AES,
 						 key, 
-                                                 crypt_data ? crypt_data->iv 
-                                                            : iv
-                                                 );
+                                                 iv);
 
 			ut_ad(err == DB_SUCCESS);
-		}
+                  }
+                  else if (space->crypt_data)
+                  {
+                        err = fil_set_encryption(space->id,
+                                                 Encryption::ROTATED_KEYS,
+                                                 NULL, //TODO: Czy tu powinienem pobrać latest_key?
+                                                 space->crypt_data->iv);
+
+			ut_ad(err == DB_SUCCESS);
+                  }
+	      }
 	}
 
 	return(err);
@@ -4876,11 +4901,11 @@ fil_ibd_load(
 
 	const byte* first_page = file.get_first_page();
 
-        fil_space_crypt_t *crypt_data = NULL;
+        //fil_space_crypt_t *crypt_data = NULL;
 
         //if (FSP_FLAGS_GET_ROTATED_KEYS(file.flags()))
         //{
-          crypt_data = first_page
+        fil_space_crypt_t *crypt_data = first_page
                   ? fil_space_read_crypt_data(page_size_t(file.flags()), first_page)
                   : NULL;
           //space = fil_space_create(
@@ -4910,14 +4935,15 @@ fil_ibd_load(
 	}
 
 	/* For encryption tablespace, initial encryption information. */
-	if (FSP_FLAGS_GET_ENCRYPTION(space->flags)
-	    && file.m_encryption_key != NULL) {
+	if ((FSP_FLAGS_GET_ENCRYPTION(space->flags) 
+	     && file.m_encryption_key != NULL)
+            || crypt_data) {
 		dberr_t err = fil_set_encryption(space->id,
-						 crypt_data && crypt_data->type == CRYPT_SCHEME_1
+						 crypt_data
                                                    ? Encryption::ROTATED_KEYS
                                                    : Encryption::AES,
 						 file.m_encryption_key,
-						 crypt_data && crypt_data->type == CRYPT_SCHEME_1
+						 crypt_data
                                                    ? crypt_data->iv
                                                    : file.m_encryption_iv);
 		if (err != DB_SUCCESS) {
@@ -5779,7 +5805,7 @@ fil_io_set_encryption(
                 if (space->encryption_type == Encryption::ROTATED_KEYS)
                 {
                   ut_ad(space->crypt_data != NULL);
-                  ut_ad(space->crypt_data->iv[0] != '\0');
+                  //ut_ad(space->crypt_data->iv[0] != '\0'); //TO Chyba jest bez sensu assert, bo iv może się zaczynać od 0
                   iv = space->crypt_data->iv;
                   if (req_type.is_write())
                   {
@@ -7016,7 +7042,7 @@ fil_tablespace_iterate(
 
 		/* Check encryption is matched or not. */
 		//ulint	space_flags = callback.get_space_flags();
-		if (!iter.crypt_data && FSP_FLAGS_GET_ENCRYPTION(space_flags)) {  //TODO:Robert: For now disabling this for 'ROTATED_KEYS'
+		if (FSP_FLAGS_GET_ENCRYPTION(space_flags)) {  //TODO:Robert: For now disabling this for 'ROTATED_KEYS'
 			ut_ad(table->encryption_key != NULL);
 
 			if (!dict_table_is_encrypted(table)) {
@@ -7763,15 +7789,17 @@ fil_set_encryption(
 	ulint			space_id,
 	Encryption::Type	algorithm,
 	byte*			key,
-	byte*			iv)
+	byte*			iv,
+        bool aquire_mutex)
 {
-	ut_ad(!is_system_or_undo_tablespace(space_id));
+	ut_ad(!is_system_or_undo_tablespace(space_id) || algorithm == Encryption::ROTATED_KEYS);
 
-	if (is_system_tablespace(space_id)) {
+	if (is_system_tablespace(space_id) && algorithm != Encryption::ROTATED_KEYS) {
 		return(DB_IO_NO_ENCRYPT_TABLESPACE);
 	}
 
-	mutex_enter(&fil_system->mutex);
+        if (aquire_mutex)
+	  mutex_enter(&fil_system->mutex);
 
 	fil_space_t*	space = fil_space_get_by_id(space_id);
 
@@ -7797,7 +7825,8 @@ fil_set_encryption(
 		       iv, ENCRYPTION_KEY_LEN);
 	}
 
-	mutex_exit(&fil_system->mutex);
+        if (aquire_mutex)
+	  mutex_exit(&fil_system->mutex);
 
 	return(DB_SUCCESS);
 }

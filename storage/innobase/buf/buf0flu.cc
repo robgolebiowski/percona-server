@@ -53,6 +53,8 @@ Created 11/11/1995 Heikki Tuuri
 #include "fsp0sysspace.h"
 #include "ut0stage.h"
 
+#include "fil0crypt.h"
+
 #ifdef UNIV_LINUX
 /* include defs for CPU time priority settings */
 #include <unistd.h>
@@ -1083,7 +1085,10 @@ buf_flush_write_block_low(
        ut_ad(space != NULL);
 
        //if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
-       if (space->encryption_type == Encryption::ROTATED_KEYS)
+         
+       if (space->encryption_type == Encryption::ROTATED_KEYS &&
+           (space->crypt_data->encryption == FIL_ENCRYPTION_ON ||
+            (space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
        {
          ut_ad(space->crypt_data != NULL);// && space->crypt_data->iv[0] != '\0');
          //Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);

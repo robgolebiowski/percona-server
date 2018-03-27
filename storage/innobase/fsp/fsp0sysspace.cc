@@ -45,6 +45,8 @@ direct reference to server header and global variable */
 my_bool opt_initialize = 0;
 #endif /* !UNIV_HOTBACKUP */
 
+#include "fil0crypt.h"
+
 /** The control info of the system tablespace. */
 SysTablespace srv_sys_space;
 
@@ -579,9 +581,11 @@ SysTablespace::read_lsn_and_check_flags(lsn_t* flushed_lsn)
 
 	/* Check the contents of the first page of the
 	first datafile. */
+        // TODO:Robert: Here is error - validate_first_page is called more than once even if it is successful!!
 	for (int retry = 0; retry < 2; ++retry) {
 
 		err = it->validate_first_page(flushed_lsn, false);
+
 
 		if (err != DB_SUCCESS
 		    && (retry == 1
@@ -959,6 +963,12 @@ SysTablespace::open_or_create(
 				name(), space_id(), flags(), is_temp
 				? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
                                 NULL);
+                                //it->m_crypt_data);
+
+                        //if(it->m_crypt_data && fil_set_encryption(space_id(), Encryption::ROTATED_KEYS, NULL, it->m_crypt_data->iv) !=
+                                               //DB_SUCCESS)
+                          //ut_ad(false);
+
 		}
 
 		ut_a(fil_validate());

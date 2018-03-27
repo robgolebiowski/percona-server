@@ -309,6 +309,7 @@ struct Compression {
 	static bool is_none(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
+
         static bool is_no(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
@@ -467,6 +468,9 @@ struct Encryption {
         @param[in]      algorithm       Encryption algorithm to check
         @return true if no algorithm requested */
 	static bool is_none(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
+        static bool is_master_key_encryption(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
 	static bool is_no(const char* algorithm)

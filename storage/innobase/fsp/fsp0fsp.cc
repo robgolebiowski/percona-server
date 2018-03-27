@@ -1146,7 +1146,7 @@ fsp_header_init(
 
         if (space->crypt_data)
         {
-          DBUG_ASSERT(FSP_FLAGS_GET_ENCRYPTION(space->flags));
+          //DBUG_ASSERT(FSP_FLAGS_GET_ENCRYPTION(space->flags));
           /* Write encryption metadata to page 0 if tablespace is
 	  encrypted or encryption is disabled by table option. */
 	  if (space->crypt_data &&

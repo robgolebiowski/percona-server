@@ -286,7 +286,7 @@ fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			key_id)
 {
-	return (fil_space_create_crypt_data(0, encrypt_mode, 0, key_id));
+	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id));
 }
 
 /******************************************************************
@@ -564,6 +564,8 @@ fil_space_destroy_crypt_data(
 			c->~fil_space_crypt_t();
 			ut_free(c);
 		}
+                else
+                  ut_ad(0);
 	}
 }
 
@@ -598,7 +600,7 @@ fil_space_crypt_t::write_page0(
 	followed by an MLOG_FILE_WRITE_CRYPT_DATA
 	(that will during recovery update fil_space_t)
 	*/
-        mlog_write_ulint(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page, space->flags, MLOG_4BYTES, mtr);
+        //mlog_write_ulint(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page, space->flags, MLOG_4BYTES, mtr);
 	//mach_write_to_4(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page,
 			//flags);
 
@@ -1491,7 +1493,7 @@ fil_crypt_start_encrypting_space(
 	}
 
 	crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
-	crypt_data->min_key_version = (~0) - 1; // all pages are unencrypted
+	crypt_data->min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; // all pages are unencrypted
 	crypt_data->rotate_state.start_time = time(0);
 	crypt_data->rotate_state.starting = true;
 	crypt_data->rotate_state.active_threads = 1;
@@ -1521,10 +1523,14 @@ fil_crypt_start_encrypting_space(
 		/* 3 - write crypt data to page 0 */
 		byte* frame = buf_block_get_frame(block);
 		crypt_data->type = CRYPT_SCHEME_1;
-                space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+                //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
 		crypt_data->write_page0(space, frame, &mtr);
 
 		mtr.commit();
+
+                // TODO:Robert to bierze mutex na space - czy napewno bezpieczne ?
+                if (fil_set_encryption(space->id, Encryption::ROTATED_KEYS, NULL, crypt_data->iv) != DB_SUCCESS)
+                  ut_ad(0);
 
 		/* record lsn of update */
 		lsn_t end_lsn = mtr.commit_lsn();
@@ -1823,8 +1829,8 @@ fil_crypt_space_needs_rotation(
 			key_state->key_version, key_state->rotate_key_age);
 
                 //TODO:Robert to jest tymczasowe i troche glupie - zeby umowliwic rotacje enkrytped -> not enkrypted
-                if (need_key_rotation && key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
-                  space->encryption_type = Encryption::NONE;
+                //if (need_key_rotation && key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+                  //space->encryption_type = Encryption::NONE;
 
 		crypt_data->rotate_state.scrubbing.is_active = false;
 		//crypt_data->rotate_state.scrubbing.is_active =

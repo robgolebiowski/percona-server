@@ -1755,7 +1755,8 @@ fil_set_encryption(
 	ulint			space_id,
 	Encryption::Type	algorithm,
 	byte*			key,
-	byte*			iv)
+	byte*			iv,
+        bool aquire_mutex = true)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /**

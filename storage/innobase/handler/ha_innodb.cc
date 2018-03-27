@@ -2731,6 +2731,13 @@ Encryption::is_none(const char* algorithm)
 	return(false);
 }
 
+bool
+Encryption::is_master_key_encryption(const char* algorithm)
+{
+  return innobase_strcasecmp(algorithm, "y") == 0;
+
+}
+
 /** Check if the string is "" or "n".
 @param[in]      algorithm       Encryption algorithm to check
 @return true if no algorithm requested */
@@ -11161,12 +11168,20 @@ err_col:
                 fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
                 uint32_t encryption_key_id;
                 //LEX_STRING encryption_key_id; //TODO:Robert:For now it is LEX_STRING
-                if (Encryption::is_no(m_create_info->encrypt_type.str))
-                      rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
-
-
-		if (!Encryption::is_none(encrypt) ||
-                    (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str))) {  // && !Encryption::is_rotated_keys(encrypt)) {
+                if (!Encryption::is_master_key_encryption(encrypt))
+                {
+                  if (Encryption::is_no(m_create_info->encrypt_type.str))
+                        rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
+                  //else if((Encryption::is_none(m_create_info->encrypt_type.str) && srv_encrypt_tables)
+                          //|| Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
+                  else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
+                  {
+                      rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
+                      encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
+                                                                           // TODO: To będzie też sprawdzane w check_table z crypt_data
+                  }
+                }
+		else {
 
 
 			/* Set the encryption flag. */
@@ -11222,14 +11237,14 @@ err_col:
                                   DICT_TF2_FLAG_SET(table,
                                                     DICT_TF2_ENCRYPTION);
 
-                                  if ((m_create_info->encrypt_type.length > 0 && 
-                                       (Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
-                                        (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)))) ||
-                                      srv_encrypt_tables) // TODO:Robert już później powinienem się tylko opierać na FIL_ENCRYPTION...
-                                  {
-                                    rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
-                                    encryption_key_id= m_create_info->encryption_key_id;
-                                  }
+                                  //if ((m_create_info->encrypt_type.length > 0 && 
+                                       //(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
+                                        //(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)))) ||
+                                      //srv_encrypt_tables) // TODO:Robert już później powinienem się tylko opierać na FIL_ENCRYPTION...
+                                  //{
+                                    //rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
+                                    //encryption_key_id= m_create_info->encryption_key_id;
+                                  //}
                           }
 		}
 

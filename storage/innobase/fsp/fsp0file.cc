@@ -36,6 +36,8 @@ Created 2013-7-26 by Kevin Lewis
 #ifdef UNIV_HOTBACKUP
 #include "my_sys.h"
 
+#include "file0crypt.h"
+
 
 #endif /* UNIV_HOTBACKUP */
 
@@ -56,6 +58,9 @@ Datafile::init(
 	m_flags = flags;
 	m_encryption_key = NULL;
 	m_encryption_iv = NULL;
+        //if (m_crypt_data != NULL)
+          //fil_space_destroy_crypt_data(&m_crypt_data);
+        //m_crypt_data = NULL;
 }
 
 /** Release the resources. */
@@ -70,6 +75,12 @@ Datafile::shutdown()
 	free_filepath();
 
 	free_first_page();
+        
+        //if (m_crypt_data != NULL)
+        //{
+          //fil_space_destroy_crypt_data(&m_crypt_data);
+          //m_crypt_data = NULL;
+        //}
 
 	if (m_encryption_key != NULL) {
 		ut_free(m_encryption_key);
@@ -641,12 +652,15 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
  
 
 
-        m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
+        //ut_ad(m_crypt_data == NULL);
+        //if (m_crypt_data != NULL)
+          //fil_space_destroy_crypt_data(&m_crypt_data);
+        //m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
  
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
-	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !m_crypt_data && !for_import) {
+	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import) {
 		m_encryption_key = static_cast<byte*>(
 			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 		m_encryption_iv = static_cast<byte*>(

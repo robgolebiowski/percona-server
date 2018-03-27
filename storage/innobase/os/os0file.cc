@@ -9559,6 +9559,8 @@ Encryption::is_encrypted_page(const byte* page)
 {
 	ulint	page_type = mach_read_from_2(page + FIL_PAGE_TYPE);
 
+        //TODO: Będzie trzeba dodać FIL_PAGE_ROTATED_KEYS_ENCRYPTED
+
 	return(page_type == FIL_PAGE_ENCRYPTED
 	       || page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED
 	       || page_type == FIL_PAGE_ENCRYPTED_RTREE);

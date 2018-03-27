@@ -4617,10 +4617,14 @@ prepare_inplace_alter_table_dict(
 
                 if (Encryption::is_no(encrypt))
                   mode= FIL_ENCRYPTION_OFF;
-
-		if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE)
+                else if (Encryption::is_rotated_keys(encrypt))
+                {
+                  mode= FIL_ENCRYPTION_ON;
+                  key_id= ha_alter_info->create_info->encryption_key_id;
+                }
+		else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE)
 		    && ha_alter_info->create_info->encrypt_type.length > 0
-		    && !Encryption::is_none(encrypt)
+		    && Encryption::is_master_key_encryption(encrypt)
 		    && !DICT_TF2_FLAG_SET(ctx->old_table,
 					  DICT_TF2_ENCRYPTION)) {
 
@@ -4630,8 +4634,8 @@ prepare_inplace_alter_table_dict(
 			dict_mem_table_free( ctx->new_table);
 			my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
 			goto new_clustered_failed;
-		} else if (!Encryption::is_none(encrypt) ||
-                           (srv_encrypt_tables && !Encryption::is_no(encrypt))) {
+		} else if (Encryption::is_master_key_encryption(encrypt)) {
+                           //(srv_encrypt_tables && !Encryption::is_no(encrypt))) {
 			/* Set the encryption flag. */
 			byte*			master_key = NULL;
 			ulint			master_key_id;
@@ -4651,12 +4655,6 @@ prepare_inplace_alter_table_dict(
 				my_free(master_key);
 				DICT_TF2_FLAG_SET(ctx->new_table,
 						  DICT_TF2_ENCRYPTION);
-                                if (Encryption::is_rotated_keys(encrypt) ||
-                                    (srv_encrypt_tables && !Encryption::is_no(encrypt)))
-                                {
-                                  mode= FIL_ENCRYPTION_ON;
-                                  key_id= ha_alter_info->create_info->encryption_key_id;
-                                }
 				//DICT_TF2_FLAG_SET(ctx->new_table,
 						   //DICT_TF2_ROTATED_KEYS);
 			}

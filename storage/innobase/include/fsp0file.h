@@ -67,8 +67,8 @@ public:
 		m_last_os_error(),
 		m_file_info(),
 		m_encryption_key(NULL),
-		m_encryption_iv(NULL),
-                m_crypt_data(NULL)
+		m_encryption_iv(NULL)
+                //m_crypt_data(NULL)
 	{
 
 		m_handle.m_file = OS_FILE_CLOSED;
@@ -94,8 +94,8 @@ public:
 		m_last_os_error(),
 		m_file_info(),
 		m_encryption_key(NULL),
-		m_encryption_iv(NULL),
-                m_crypt_data(NULL)
+		m_encryption_iv(NULL)
+                //m_crypt_data(NULL)
 	{
 		ut_ad(m_name != NULL);
 		m_handle.m_file = OS_FILE_CLOSED;
@@ -119,8 +119,8 @@ public:
 		m_last_os_error(),
 		m_file_info(),
 		m_encryption_key(NULL),
-		m_encryption_iv(NULL),
-                m_crypt_data(NULL)
+		m_encryption_iv(NULL)
+                //m_crypt_data(NULL)
 	{
 		m_name = mem_strdup(file.m_name);
 		ut_ad(m_name != NULL);
@@ -178,7 +178,7 @@ public:
 		m_first_page = NULL;
 		m_encryption_key = NULL;
 		m_encryption_iv = NULL;
-                m_crypt_data = NULL;
+                //m_crypt_data = NULL;
 
 		m_atomic_write = file.m_atomic_write;
 
@@ -495,7 +495,7 @@ public:
 	/** Encryption iv read from first page */
 	byte*			m_encryption_iv;
 
-        fil_space_crypt_t*      m_crypt_data;
+        //fil_space_crypt_t*      m_crypt_data;
 
 };
 
