@@ -1338,7 +1338,8 @@ os_file_compress_page(
 	byte*		src,
 	ulint		src_len,
 	byte*		dst,
-	ulint*		dst_len)
+	ulint*		dst_len,
+        bool            will_be_encrypted_with_rotated_keys)
 {
 	ulint		len = 0;
 	ulint		compression_level = page_zip_level;
@@ -1371,13 +1372,14 @@ os_file_compress_page(
 	ut_ad(src_len > FIL_PAGE_DATA + block_size);
 
 	/* Must compress to <= N-1 FS blocks. */
-	ulint		out_len = src_len - (FIL_PAGE_DATA + block_size);
+        /* There need to be at least 4 bytes for key version */
+	ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
 
 	/* This is the original data page size - the page header. */
 	ulint		content_len = src_len - FIL_PAGE_DATA;
 
 	ut_ad(out_len >= block_size - FIL_PAGE_DATA);
-	ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA));
+	ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA)- ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
 
 	/* Only compress the data + trailer, leave the header alone */
 
@@ -1455,10 +1457,13 @@ os_file_compress_page(
 	/* Round to the next full block size */
 
 	len += FIL_PAGE_DATA;
+        //if (will_be_encrypted_with_rotated_keys)
+          //len += 4;
 
+        // For encryption with rotated keys we required that there will be at least 4 bytes left - when alliging to the block limit
 	*dst_len = ut_calc_align(len, block_size);
 
-	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA);
+	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys) ? 4 : 0);
 
 	/* Clear out the unused portion of the page. */
 	if (len % block_size) {
@@ -2126,7 +2131,8 @@ os_file_compress_page(
 		reinterpret_cast<byte*>(buf),
 		*n,
 		compressed_page,
-		&compressed_len);
+		&compressed_len,
+                type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS);
 
 	if (buf_ptr != buf) {
 		/* Set new compressed size to uncompressed page. */
@@ -8923,7 +8929,7 @@ Compression::deserialize(
 	meta_t	header;
 
 	deserialize_header(src, &header);
-
+        
 	byte*	ptr = src + FIL_PAGE_DATA;
 
 	ut_ad(header.m_version == 1);
@@ -9767,7 +9773,10 @@ Encryption::encrypt(
 		ut_error;
 	}
 
-        if (m_type == Encryption::ROTATED_KEYS)
+        //uint i= 0;
+        //ut_ad(memcmp(dst + FIL_PAGE_DATA + data_len, &i, 4) != 0);
+
+        if (m_type == Encryption::ROTATED_KEYS)// && page_type == FIL_PAGE_ENCRYPTED)
           memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
 
 	/* Copy the header as is. */
@@ -10049,7 +10058,10 @@ Encryption::decrypt(
           memcpy(&high_4_bytes_of_fil_page_lsn, src + FIL_PAGE_LSN + 4, 4);
           if (high_4_bytes_of_fil_page_lsn == 0)
             ut_ad(0);
-          memcpy(ptr + data_len, &high_4_bytes_of_fil_page_lsn, 4); 
+          if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED || original_type == FIL_PAGE_IBUF_BITMAP)
+            memset(ptr + data_len, 0, 4); 
+          else
+            memcpy(ptr + data_len, &high_4_bytes_of_fil_page_lsn, 4); 
         }
 
 	if (page_type == FIL_PAGE_ENCRYPTED) {

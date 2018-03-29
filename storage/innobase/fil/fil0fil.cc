@@ -5811,18 +5811,28 @@ fil_io_set_encryption(
                   {
                     //if (bpage->encryption_key == NULL)
                       //ut_ad(false);
-                    if (bpage->encryption_key != NULL)
+                    if (bpage->encrypt)
                     {
-                      key = bpage->encryption_key;
-                      key_version = bpage->encryption_key_version;
-                      //Encryption::get_latest_tablespace_key(space->id, &key_version, &key);
-                      key_len = bpage->encryption_key_length;
+                      ut_ad(bpage->encryption_key != NULL);
+                      //{
+                        key = bpage->encryption_key;
+                        key_version = bpage->encryption_key_version;
+                        //Encryption::get_latest_tablespace_key(space->id, &key_version, &key);
+                        key_len = bpage->encryption_key_length;
+                      //}
+                      //else
+                      //{
+                        //ut_ad(key_version != (uint)(~0));
+                        //return; 
+                      //}
                     }
                     else
                     {
+                      req_type.clear_encrypted();
                       ut_ad(key_version != (uint)(~0));
                       return; 
                     }
+
                   }
                   //else
                     //ut_ad(false); // we do not get encryption key here for ROTATED_KEYS when read

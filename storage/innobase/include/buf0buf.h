@@ -1547,6 +1547,7 @@ public:
        byte *encryption_key;
        uint encryption_key_version;
        uint encryption_key_length;
+       bool encrypt;
 
 	/** @name General fields
 	None of these bit-fields must be modified without holding
