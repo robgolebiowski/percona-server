@@ -1467,7 +1467,8 @@ retry:
 		       page_id_t(TRX_SYS_SPACE, offset), univ_page_size, 0,
 		       univ_page_size.physical(),
 		       (void*) ((buf_block_t*) bpage)->frame,
-		       NULL);
+                       bpage);
+		       //NULL);
 	}
 
 	/* Now flush the doublewrite buffer data to disk */

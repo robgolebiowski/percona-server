@@ -201,7 +201,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 	/** Returns true if key was found from encryption plugin
 	and false if not. */
 	bool is_key_found() const {
-		return key_found != ENCRYPTION_KEY_VERSION_INVALID;
+		return true; //TODO:temporary key is always found //key_found != ENCRYPTION_KEY_VERSION_INVALID;
 	}
 
 	/** Returns true if tablespace should be encrypted */

@@ -1781,13 +1781,6 @@ static void plugin_load(MEM_ROOT *tmp_root, int *argc, char **argv)
     DBUG_VOID_RETURN;
   }
   table->use_all_columns();
-  /*
-    there're no other threads running yet, so we don't need a mutex.
-    but plugin_add() before is designed to work in multi-threaded
-    environment, and it uses mysql_mutex_assert_owner(), so we lock
-    the mutex here to satisfy the assert
-  */
-  mysql_mutex_lock(&LOCK_plugin);
   while (!(error= read_record_info.read_record(&read_record_info)))
   {
     DBUG_PRINT("info", ("init plugin record"));
@@ -1798,12 +1791,19 @@ static void plugin_load(MEM_ROOT *tmp_root, int *argc, char **argv)
     LEX_STRING name= {(char *)str_name.ptr(), str_name.length()};
     LEX_STRING dl= {(char *)str_dl.ptr(), str_dl.length()};
 
+    /*
+      there're no other threads running yet, so we don't need a mutex. //TODO:Robert:This should be changed
+      but plugin_add() before is designed to work in multi-threaded
+      environment, and it uses mysql_mutex_assert_owner(), so we lock
+      the mutex here to satisfy the assert
+    */
+    mysql_mutex_lock(&LOCK_plugin);
     if (plugin_add(tmp_root, &name, &dl, argc, argv, REPORT_TO_LOG, false))
       sql_print_warning("Couldn't load plugin named '%s' with soname '%s'.",
                         str_name.c_ptr(), str_dl.c_ptr());
     free_root(tmp_root, MYF(MY_MARK_BLOCKS_FREE));
+    mysql_mutex_unlock(&LOCK_plugin);
   }
-  mysql_mutex_unlock(&LOCK_plugin);
   if (error > 0)
     sql_print_error(ER(ER_GET_ERRNO), my_errno);
   end_read_record(&read_record_info);

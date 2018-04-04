@@ -46,36 +46,37 @@ set autocommit=1;
 
 --source include/shutdown_mysqld.inc
 
---let SEARCH_RANGE = 10000000
+--let ABORT_ON=FOUND
 --let SEARCH_PATTERN=foobar
 --echo # t1 yes on expecting NOT FOUND
--- let SEARCH_FILE=$MYSQLD_DATADIR/test/t1.ibd
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$MYSQLD_DATADIR/test/t1.ibd
+--source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=tempsecret
 --echo # t2 ... on expecting NOT FOUND
--- let SEARCH_FILE=$MYSQLD_DATADIR/test/t2.ibd
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$MYSQLD_DATADIR/test/t2.ibd
+--source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=barfoo
 --echo # t3 ... on expecting NOT FOUND
--- let SEARCH_FILE=$MYSQLD_DATADIR/test/t3.ibd
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$MYSQLD_DATADIR/test/t3.ibd
+--source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=repeat
 --echo # t4 ... on expecting NOT FOUND
--- let SEARCH_FILE=$MYSQLD_DATADIR/test/t4.ibd
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$MYSQLD_DATADIR/test/t4.ibd
+--source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=author
 --echo # t5 ... on expecting NOT FOUND
--- let SEARCH_FILE=$MYSQLD_DATADIR/test/t5.ibd
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$MYSQLD_DATADIR/test/t5.ibd
+--source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=mangled
 --echo # t6 ... on expecting NOT FOUND
--- let SEARCH_FILE=$MYSQLD_DATADIR/test/t6.ibd
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$MYSQLD_DATADIR/test/t6.ibd
+--source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=mysql
 --echo # t7 ... on expecting NOT FOUND
--- let SEARCH_FILE=$MYSQLD_DATADIR/test/t7.ibd
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$MYSQLD_DATADIR/test/t7.ibd
+--source include/search_pattern_in_file.inc
 
+--let $restart_parameters=restart:
 -- source include/start_mysqld.inc
 
 --disable_warnings
@@ -106,6 +107,7 @@ SHOW CREATE TABLE t7;
 
 --source include/shutdown_mysqld.inc
 
+--let ABORT_ON=FOUND
 --let SEARCH_PATTERN=foobar
 --echo # t1 yes on expecting NOT FOUND
 -- let SEARCH_FILE=$MYSQLD_DATADIR/test/t1.ibd
@@ -135,6 +137,8 @@ SHOW CREATE TABLE t7;
 -- let SEARCH_FILE=$MYSQLD_DATADIR/test/t7.ibd
 -- source include/search_pattern_in_file.inc
 
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+#--let $restart_parameters=restart:
 -- source include/start_mysqld.inc
 
 DROP PROCEDURE innodb_insert_proc;

@@ -1086,20 +1086,28 @@ buf_flush_write_block_low(
 
        //if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
          
-       if (space->encryption_type == Encryption::ROTATED_KEYS &&
+       if (space->crypt_data != NULL && //space->encryption_type == Encryption::ROTATED_KEYS &&
            (space->crypt_data->encryption == FIL_ENCRYPTION_ON ||
             (space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
        {
+         //space->encryption_type = Encryption::ROTATED_KEYS;
          ut_ad(space->crypt_data != NULL);// && space->crypt_data->iv[0] != '\0');
          //Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
          Encryption::get_latest_tablespace_key_or_create_new_one(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
          bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
          bpage->encrypt= true;
 
-         ut_ad(fil_page_get_type(reinterpret_cast<const buf_block_t*>(bpage)->frame) != 0);
+         //ut_ad(fil_page_get_type(reinterpret_cast<const buf_block_t*>(bpage)->frame) != 0);
        }
        else
+       {
+         ut_ad(space->crypt_data == NULL || !srv_encrypt_tables || space->crypt_data->encryption == FIL_ENCRYPTION_OFF);
+         //if (space->crypt_data != NULL)
+         //{
+           //space->encryption_type = Encryption::ROTATED_KEYS;
+         //}
          bpage->encrypt= false;
+       }
 
 	if (!srv_use_doublewrite_buf
 	    || buf_dblwr == NULL

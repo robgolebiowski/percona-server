@@ -2828,6 +2828,8 @@ fil_check_pending_operations(
 			os_thread_sleep(20000);
 		}
 
+                mutex_enter(&fil_system->mutex);
+
 	} while (count > 0);
 
 	/* Check for pending IO. */
@@ -2835,8 +2837,6 @@ fil_check_pending_operations(
 	*path = 0;
 
 	do {
-		mutex_enter(&fil_system->mutex);
-
 		sp = fil_space_get_by_id(id);
 
 		if (sp == NULL) {
@@ -2854,9 +2854,12 @@ fil_check_pending_operations(
 
 		mutex_exit(&fil_system->mutex);
 
-		if (count > 0) {
-			os_thread_sleep(20000);
+		if (count == 0) {
+			break;
 		}
+
+	        os_thread_sleep(20000);
+                mutex_enter(&fil_system->mutex);
 
 	} while (count > 0);
 
@@ -5784,6 +5787,10 @@ fil_io_set_encryption(
 {
 	/* Don't encrypt the log, page 0 of all tablespaces, all pages
 	from the system tablespace. */
+        //TODO:Robert: I need to remove is_log() from here - to all system tablepsace encryption
+        //
+        //bpage->      
+
 	if (!req_type.is_log() && page_id.page_no() > 0
 	    && space->encryption_type != Encryption::NONE)
 	{
@@ -5801,6 +5808,11 @@ fil_io_set_encryption(
                 uint key_version = 0;
 
                 //ut_ad(space->encryption_type != Encryption::ROTATED_KEYS); //TODO:Robert:Cannot be called for ROTATED_KEYS
+
+                if (req_type.is_write() && space->crypt_data != NULL && 
+                    ((srv_encrypt_tables && space->crypt_data->encryption != FIL_ENCRYPTION_OFF) ||
+                    (!srv_encrypt_tables && space->crypt_data->encryption == FIL_ENCRYPTION_ON)))
+                  ut_ad(bpage->encrypt != false);
 
                 if (space->encryption_type == Encryption::ROTATED_KEYS)
                 {
@@ -5828,9 +5840,19 @@ fil_io_set_encryption(
                     }
                     else
                     {
-                      req_type.clear_encrypted();
+
+                      if (strcmp(space->name, "test/t2") == 0)
+                        ib::error() << "Setting key to unencrypted for space: " << space->name << '\n';
+
+                      ut_ad((!srv_encrypt_tables && space->crypt_data->encryption != FIL_ENCRYPTION_ON) ||
+                            (srv_encrypt_tables && space->crypt_data->encryption == FIL_ENCRYPTION_OFF));
+         	      key = NULL;
+		      key_len = 0;
+		      iv = NULL;
+                      key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+
+                      //req_type.clear_encrypted();
                       ut_ad(key_version != (uint)(~0));
-                      return; 
                     }
 
                   }
@@ -6187,7 +6209,11 @@ _fil_io(
 	}
 
 	/* Set encryption information. */
-        fil_io_set_encryption(req_type, page_id, space, static_cast<buf_page_t*>(message));
+        //ut_ad(message != NULL);
+        if (space->crypt_data != NULL)
+          space->encryption_type= Encryption::ROTATED_KEYS;
+        if (message != NULL) //TODO: Just for now, later I will need to get a key here for such a message
+          fil_io_set_encryption(req_type, page_id, space, static_cast<buf_page_t*>(message));
 
 	req_type.block_size(node->block_size);
 

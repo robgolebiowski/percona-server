@@ -1386,11 +1386,13 @@ fil_crypt_needs_rotation(
 	uint			rotate_key_age)
 {
 	if (key_version == ENCRYPTION_KEY_VERSION_INVALID) {
+                ut_ad(0);
 		return false;
 	}
 
 	//if (key_version == 0 && latest_key_version != 0) {
-	if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+	//if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+	if (key_version != 0 && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 
 		/* this is rotation unencrypted => encrypted
 		* ignore rotate_key_age */
@@ -1529,8 +1531,8 @@ fil_crypt_start_encrypting_space(
 		mtr.commit();
 
                 // TODO:Robert to bierze mutex na space - czy napewno bezpieczne ?
-                if (fil_set_encryption(space->id, Encryption::ROTATED_KEYS, NULL, crypt_data->iv) != DB_SUCCESS)
-                  ut_ad(0);
+                //if (fil_set_encryption(space->id, Encryption::ROTATED_KEYS, NULL, crypt_data->iv) != DB_SUCCESS)
+                  //ut_ad(0);
 
 		/* record lsn of update */
 		lsn_t end_lsn = mtr.commit_lsn();
@@ -1778,6 +1780,8 @@ fil_crypt_space_needs_rotation(
 		*/
 		*recheck = fil_crypt_start_encrypting_space(space);
 		crypt_data = space->crypt_data;
+                //TODO:Robert: To powinno być pod mutexem, albo z użyciem fil_set_encryption
+                //space->encryption_type = Encryption::ROTATED_KEYS;
 
 		if (crypt_data == NULL) {
 			return false;
@@ -1827,6 +1831,9 @@ fil_crypt_space_needs_rotation(
 			crypt_data->encryption,
 			crypt_data->min_key_version,
 			key_state->key_version, key_state->rotate_key_age);
+
+                if (crypt_data->min_key_version != 0)
+                  crypt_data->min_key_version= ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
 
                 //TODO:Robert to jest tymczasowe i troche glupie - zeby umowliwic rotacje enkrytped -> not enkrypted
                 //if (need_key_rotation && key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
@@ -2408,12 +2415,24 @@ fil_crypt_rotate_page(
 	if (buf_block_t* block = fil_crypt_get_page_throttle(state,
 							     offset, &mtr,
 							     &sleeptime_ms)) {
+
+
 		bool modified = false;
 		//int needs_scrubbing = BTR_SCRUB_SKIP_PAGE;
 		lsn_t block_lsn = block->page.newest_modification;
 		byte* frame = buf_block_get_frame(block);
                 //TODO:Robert  - musze po dekrypcji dodac nowe pole do block - tak, zeby trzymac tam kv
-		uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
+		//uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
+
+	        uint kv= mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+                if (strcmp(space->name, "test/t2") == 0)
+                {
+                  ib::error() << "Trying to write to " << space->name << '\n';
+                  ib::error() << "Encryption: " << crypt_data->encryption << '\n';
+                  ib::error() << "kv: " << kv << '\n';
+                  ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
+                }
+
 
 		if (space->is_stopping()) {
 			/* The tablespace is closing (in DROP TABLE or
@@ -2441,13 +2460,15 @@ fil_crypt_rotate_page(
 			mtr.set_named_space(space);
 			modified = true;
 
+                        if (strcmp(space->name, "test/t2") == 0)
+                          ib::error() << "Write to  " << space->name << '\n';
 			/* force rotation by dummy updating page */
 			mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
 					 space_id, MLOG_4BYTES, &mtr);
 
 			/* statistics */
 			state->crypt_stat.pages_modified++;
-		} else {
+		} else { // TO jest else - czyli key version jest tylko pobierane jeżeli nie ma potrzeby rotacji ...
 			if (crypt_data->is_encrypted()) {
                           //TODO:Robert, o cholera ...
 				if (kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  || kv < state->min_key_version_found) {
@@ -2614,6 +2635,8 @@ fil_crypt_flush_space(
 			sum_pages += n_pages;
 		} while (!success && !space->is_stopping());
 
+
+
 		uintmax_t end = ut_time_us(NULL);
 
 		if (sum_pages && end > start) {
@@ -2624,6 +2647,11 @@ fil_crypt_flush_space(
 			state->crypt_stat.pages_flushed += sum_pages;
 		}
 	}
+
+        ib::error() << "Robert: flushed for space: " << space->name << '\n';
+        ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
+        ib::error() << "innodb-tables-encrypt: " << srv_encrypt_tables << '\n';
+
 
 	if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 		crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
@@ -2702,7 +2730,7 @@ fil_crypt_complete_rotate_space(
 			crypt_data->rotate_state.flushing = true;
 			crypt_data->min_key_version =
 				crypt_data->rotate_state.min_key_version_found;
-                //TODO:Robert - tutaj chyba może być wyścik
+                //TODO:Robert - tutaj chyba może być wyścig
                 //TODO:Robert: Jeszcze nie było flush a nowe crypt_data->min_key_version
                 //TODO:Robert: jest już ustawione
 

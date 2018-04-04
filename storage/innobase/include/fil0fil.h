@@ -524,6 +524,8 @@ static const ulint FIL_PAGE_ORIGINAL_SIZE_V1 = FIL_PAGE_ORIGINAL_TYPE_V1 + 2;
 /** Size after compression (u16) */
 static const ulint FIL_PAGE_COMPRESS_SIZE_V1 = FIL_PAGE_ORIGINAL_SIZE_V1 + 2;
 
+static const ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_ORIGINAL_TYPE_V1 + 2;
+
 /** This overloads FIL_PAGE_FILE_FLUSH_LSN for RTREE Split Sequence Number */
 #define	FIL_RTREE_SPLIT_SEQ_NUM	FIL_PAGE_FILE_FLUSH_LSN
 

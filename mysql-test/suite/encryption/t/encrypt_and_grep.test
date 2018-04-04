@@ -56,20 +56,24 @@ SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTI
 
 --source include/shutdown_mysqld.inc
 
---let PRINT_SEARCH_RESULT=1
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=FOUND
+#--let ABORT_ON_NOT_FOUND=0
+#--let ABORT_ON_FOUND=1
 --echo # t1 yes on expecting NOT FOUND
 -- let SEARCH_FILE=$t1_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=tempsecret
 --echo # t2 ... on expecting NOT FOUND
--- let SEARCH_FILE=$t2_IBD
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$t2_IBD
+--source include/search_pattern_in_file.inc
+--let ABORT_ON=NOT_FOUND
 --let SEARCH_PATTERN=dummysecret
 --echo # t3 no  on expecting FOUND
 -- let SEARCH_FILE=$t3_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=FOUND
 --echo # ibdata1 expecting NOT FOUND
 -- let SEARCH_FILE=$ib1_IBD
 -- source include/search_pattern_in_file.inc
@@ -80,6 +84,7 @@ SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTI
 
 --echo # Now turn off encryption and wait for threads to decrypt everything
 
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 SET GLOBAL innodb_encrypt_tables = off;
 
 --echo # Wait max 10 min for key encryption threads to decrypt all spaces (but t1 for which encryption was overriden to yes)
@@ -105,27 +110,34 @@ SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTI
 --source include/shutdown_mysqld.inc
 
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=FOUND
 --echo # t1 yes on expecting NOT FOUND
 -- let SEARCH_FILE=$t1_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=tempsecret
+--let ABORT_ON=NOT_FOUND
 --echo # t2 ... default expecting FOUND
 -- let SEARCH_FILE=$t2_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=dummysecret
+--let ABORT_ON=NOT_FOUND
 --echo # t3 no  on expecting FOUND
 -- let SEARCH_FILE=$t3_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=FOUND
 --echo # ibdata1 expecting NOT FOUND
 -- let SEARCH_FILE=$ib1_IBD
 -- source include/search_pattern_in_file.inc
 
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 
 -- source include/start_mysqld.inc
 
 --echo # Now turn on encryption and wait for threads to encrypt all spaces
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
 SET GLOBAL innodb_encrypt_tables = on;
+
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
@@ -138,18 +150,22 @@ SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTI
 --source include/shutdown_mysqld.inc
 
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=FOUND
 --echo # t1 yes on expecting NOT FOUND
 -- let SEARCH_FILE=$t1_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=tempsecret
+--let ABORT_ON=FOUND
 --echo # t2 ... on expecting NOT FOUND
 -- let SEARCH_FILE=$t2_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=dummysecret
+--let ABORT_ON=NOT_FOUND
 --echo # t3 no  on expecting FOUND
 -- let SEARCH_FILE=$t3_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=FOUND
 --echo # ibdata1 expecting NOT FOUND
 -- let SEARCH_FILE=$ib1_IBD
 -- source include/search_pattern_in_file.inc
@@ -169,19 +185,25 @@ SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTI
 --source include/shutdown_mysqld.inc
 
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=NOT_FOUND
 --echo # t1 yes on expecting FOUND
 -- let SEARCH_FILE=$t1_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=tempsecret
+--let ABORT_ON=FOUND
 --echo # t2 ... on expecting NOT FOUND
 -- let SEARCH_FILE=$t2_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=dummysecret
+--let ABORT_ON=NOT_FOUND
 --echo # t3 no  on expecting FOUND
 -- let SEARCH_FILE=$t3_IBD
 -- source include/search_pattern_in_file.inc
 --let SEARCH_PATTERN=foobarsecret
+--let ABORT_ON=FOUND
 --echo # ibdata1 expecting NOT FOUND
+--let ABORT_ON_NOT_FOUND=0
+--let ABORT_ON_FOUND=1
 -- let SEARCH_FILE=$ib1_IBD
 -- source include/search_pattern_in_file.inc
 
