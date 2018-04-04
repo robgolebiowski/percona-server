@@ -549,6 +549,11 @@ static PSI_file_info	all_innodb_files[] = {
 # endif /* UNIV_PFS_IO */
 #endif /* HAVE_PSI_INTERFACE */
 
+static MYSQL_THDVAR_UINT(default_encryption_key_id, PLUGIN_VAR_RQCMDARG,
+			 "Default encryption key id used for table encryption.",
+			 NULL, NULL,
+			 FIL_DEFAULT_ENCRYPTION_KEY, 0, UINT_MAX32, 0);
+
 /** Set up InnoDB API callback function array */
 ib_cb_t innodb_api_cb[] = {
 	(ib_cb_t) ib_cursor_open_table,
@@ -11888,9 +11893,9 @@ create_table_info_t::create_option_encryption_is_valid() const
 
         // TODO:Robert table is not encrypted when temporary table
 	bool table_is_encrypted =
-		!Encryption::is_none(m_create_info->encrypt_type.str) ||
-                (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str) &&
-                 !(m_create_info->options & HA_LEX_CREATE_TMP_TABLE));
+		!Encryption::is_none(m_create_info->encrypt_type.str); //||
+//                (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str) &&
+//                 !(m_create_info->options & HA_LEX_CREATE_TMP_TABLE));
 
 	if ((m_create_info->options & HA_LEX_CREATE_TMP_TABLE)
 		&& table_is_encrypted) {
@@ -11921,6 +11926,21 @@ create_table_info_t::create_option_encryption_is_valid() const
 			"InnoDB: Tablespace `%s` cannot contain an"
 			" ENCRYPTED table.", MYF(0), tablespace_name);
 		return(false);
+	}
+
+
+	/* Ignore nondefault key_id if encryption is set off */
+	//if (encrypt == FIL_ENCRYPTION_OFF &&
+        if (Encryption::is_no(m_create_info->encrypt_type.str) &&
+	//if (encrypt == FIL_ENCRYPTION_OFF &&
+		m_create_info->encryption_key_id != THDVAR(m_thd, default_encryption_key_id)) {
+		push_warning_printf(
+			m_thd, Sql_condition::SL_WARNING,
+			HA_WRONG_CREATE_OPTION,
+			"InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled",
+			m_create_info->encryption_key_id
+		);
+		m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 	}
       
         // TODO:Robert :temporary allow temporary tables to be created in encrypted tablespaces
@@ -22289,6 +22309,7 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(encryption_threads),
   MYSQL_SYSVAR(encryption_rotate_key_age),
   MYSQL_SYSVAR(encryption_rotation_iops),
+  MYSQL_SYSVAR(default_encryption_key_id),
   NULL
 };
 

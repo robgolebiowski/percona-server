@@ -9274,7 +9274,7 @@ Encryption::get_keyring_key(const char *key_name,
 }
 
 void
-Encryption::get_tablespace_key(ulint space_id,
+Encryption::get_tablespace_key(uint key_id,
 		               char* srv_uuid,
                                uint tablespace_key_version,
                 	       byte** tablespace_key,
@@ -9287,8 +9287,8 @@ Encryption::get_tablespace_key(ulint space_id,
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    space_id);
+		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    key_id);
 
 	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
 		    //"%s-%s-%lu:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
@@ -9967,7 +9967,7 @@ Encryption::decrypt(
             memset(m_key, 0, MY_AES_BLOCK_SIZE);
           m_key = NULL;
           size_t key_len;
-          get_tablespace_key(space_id, uuid, key_version, &m_key, &key_len);
+          get_tablespace_key(m_key_id, uuid, key_version, &m_key, &key_len);
           m_klen = static_cast<ulint>(key_len);
           if (m_key == NULL)
             return (DB_IO_DECRYPT_FAIL);

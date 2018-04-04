@@ -144,9 +144,10 @@ uint encryption_get_latest_version(uint key_id)
 
   memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
+  // The form of the key is percona_innodb-<number>, where <number> == key_id
   ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      "%s-%s-%u", "percona_",
-	      "dummy", key_id);
+	      "%s-%u", "percona_innodb",
+	      key_id);
 
   char *system_key_type = NULL;
   size_t system_key_len = 0;
@@ -1339,7 +1340,7 @@ not needed. */
 /** A copy of global key state */
 struct key_state_t {
   //TODO:Robert zmien
-	key_state_t() : key_id(30), key_version(ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED),
+	key_state_t() : key_id((~0)), key_version(ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED),
 			rotate_key_age(srv_fil_crypt_rotate_key_age) {}
 	bool operator==(const key_state_t& other) const {
 		return key_version == other.key_version &&
@@ -1487,7 +1488,7 @@ fil_crypt_start_encrypting_space(
 
 	/* 1 - create crypt data */
 	//crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
-	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, 0); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
 
 	if (crypt_data == NULL) {
 		mutex_exit(&fil_crypt_threads_mutex);
@@ -2866,7 +2867,7 @@ DECLARE_THREAD(fil_crypt_thread)(
 			}
 
 			/* force key state refresh */
-			new_state.key_id = 0; //TODO:Robert - co to robi?
+			new_state.key_id = (~0); //TODO:Robert - co to robi?
 
 			/* return iops */
 			fil_crypt_return_iops(&thr);

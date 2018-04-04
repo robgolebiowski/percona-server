@@ -4388,7 +4388,7 @@ prepare_inplace_alter_table_dict(
 		ulint		space_id = 0;
 		ulint		z = 0;
 		const char*	err_zip_dict_name = 0;
-		ulint		key_id = 0;
+		ulint		key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 		fil_encryption_t mode = FIL_ENCRYPTION_DEFAULT;
 
 		if (!innobase_check_zip_dicts(altered_table, zip_dict_ids,

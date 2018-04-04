@@ -54,6 +54,8 @@ Created 1/8/1996 Heikki Tuuri
 //TODO:Robert - może to nie powinno być tutaj, includuje tylko dla fil_encryption_t
 #include "fil0fil.h"
 
+#include "fil0crypt.h" //dla FIL_ENCRYPTION_KEY_DEFAULT
+
 /*****************************************************************//**
 Based on a table object, this function builds the entry to be inserted
 in the SYS_TABLES system table.
@@ -424,7 +426,7 @@ dict_build_tablespace(
 		tablespace->flags(),
 		FIL_IBD_FILE_INITIAL_SIZE,
                 node ? node->mode : FIL_ENCRYPTION_DEFAULT,
-                node ? node->encryption_key_id : 0);
+                node ? node->encryption_key_id : FIL_DEFAULT_ENCRYPTION_KEY);
 	if (err != DB_SUCCESS) {
 		return(err);
 	}

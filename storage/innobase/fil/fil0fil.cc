@@ -5806,6 +5806,7 @@ fil_io_set_encryption(
                 ulint key_len = 16; //16*8=128
                 byte* iv = NULL;
                 uint key_version = 0;
+                uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 
                 //ut_ad(space->encryption_type != Encryption::ROTATED_KEYS); //TODO:Robert:Cannot be called for ROTATED_KEYS
 
@@ -5856,6 +5857,7 @@ fil_io_set_encryption(
                     }
 
                   }
+                  key_id= space->crypt_data->key_id;
                   //else
                     //ut_ad(false); // we do not get encryption key here for ROTATED_KEYS when read
                 }
@@ -5873,7 +5875,8 @@ fil_io_set_encryption(
                 req_type.encryption_key(key,
 					key_len,
                                         iv,
-                                        key_version);
+                                        key_version,
+                                        key_id);
 					//space->encryption_iv);
 
                                         

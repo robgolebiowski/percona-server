@@ -358,7 +358,7 @@ static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = 9;
 
 /** Encryption master key prifix */
 //TODO: Change this to percona_innodb_idb
-static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb_space";
+static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb";
 
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX_LEN = array_elements(ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX);
@@ -504,7 +504,7 @@ struct Encryption {
                                                                 uint *tablespace_key_version,
 			                                        byte** tablespace_key);
 
-        static void get_tablespace_key(ulint space_id,
+        static void get_tablespace_key(uint key_id,
                                        char* srv_uuid,
                                        uint tablespace_key_version,
                                        byte** tablespace_key,
@@ -575,6 +575,8 @@ struct Encryption {
 	byte*			m_iv;
 
         uint                    m_key_version;
+
+        uint                    m_key_id;
 
 	/** Current master key id */
 	static ulint		master_key_id;
@@ -855,13 +857,15 @@ public:
 	void encryption_key(byte* key,
 			    ulint key_len,
 			    byte* iv,
-                            uint key_version)
+                            uint key_version,
+                            uint key_id)
 	{
                 //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
 		m_encryption.m_key = key;
 		m_encryption.m_klen = key_len;
 		m_encryption.m_iv = iv;
                 m_encryption.m_key_version = key_version;
+                m_encryption.m_key_id = key_id;
 	}
 
 	/** Get the encryption algorithm.
