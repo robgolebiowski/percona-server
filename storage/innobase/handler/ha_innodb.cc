@@ -11897,6 +11897,26 @@ create_table_info_t::create_option_encryption_is_valid() const
 //                (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str) &&
 //                 !(m_create_info->options & HA_LEX_CREATE_TMP_TABLE));
 
+       if (Encryption::is_no(m_create_info->encrypt_type.str) &&
+	//if (encrypt == FIL_ENCRYPTION_OFF &&
+		m_create_info->encryption_key_id != THDVAR(m_thd, default_encryption_key_id)) {
+		push_warning_printf(
+			m_thd, Sql_condition::SL_WARNING,
+			HA_WRONG_CREATE_OPTION,
+			"InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled",
+			m_create_info->encryption_key_id
+		);
+		m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+	}
+
+        //TODO:There is more to move from rotated_tablespaces
+        if (Encryption::is_no(m_create_info->encrypt_type.str) && srv_encrypt_tables == 2) {
+               my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
+			"InnoDB: Only ENCRYPTED tables can be created with "
+			"innodb_encrypt_tables=FORCE.", MYF(0));
+               return (false);
+        }
+
 	if ((m_create_info->options & HA_LEX_CREATE_TMP_TABLE)
 		&& table_is_encrypted) {
 		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
@@ -11921,6 +11941,7 @@ create_table_info_t::create_option_encryption_is_valid() const
 	const char *tablespace_name = m_create_info->tablespace != NULL ?
 		m_create_info->tablespace : reserved_system_space_name;
 
+
 	if (table_is_encrypted && !tablespace_is_encrypted) {
 		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
 			"InnoDB: Tablespace `%s` cannot contain an"
@@ -11931,8 +11952,8 @@ create_table_info_t::create_option_encryption_is_valid() const
 
 	/* Ignore nondefault key_id if encryption is set off */
 	//if (encrypt == FIL_ENCRYPTION_OFF &&
+        /*
         if (Encryption::is_no(m_create_info->encrypt_type.str) &&
-	//if (encrypt == FIL_ENCRYPTION_OFF &&
 		m_create_info->encryption_key_id != THDVAR(m_thd, default_encryption_key_id)) {
 		push_warning_printf(
 			m_thd, Sql_condition::SL_WARNING,
@@ -11941,7 +11962,7 @@ create_table_info_t::create_option_encryption_is_valid() const
 			m_create_info->encryption_key_id
 		);
 		m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-	}
+	}*/
       
         // TODO:Robert :temporary allow temporary tables to be created in encrypted tablespaces
 
@@ -11986,12 +12007,12 @@ create_table_info_t::create_option_encryption_is_valid() const
                   //return "ENCRYPTED";
           //}
 
-          //if (encrypt == FIL_ENCRYPTION_OFF && srv_encrypt_tables == 2) {
+          //if (Encryption::is_no(m_create_info->encrypt_type.str) && srv_encrypt_tables == 2) {
                   //push_warning(
                           //m_thd, Sql_condition::SL_WARNING,
                           //HA_WRONG_CREATE_OPTION,
-                          //"InnoDB: ENCRYPTED=OFF cannot be used when innodb_encrypt_tables=FORCE");
-                  //return "ENCRYPTED";
+                          //"InnoDB: ENCRYPTION='N' cannot be used when innodb_encrypt_tables=FORCE");
+                  //return false;
           //}
 
           //if (table_is_rotated_keys && !tablespace_is_rotated_keys) {

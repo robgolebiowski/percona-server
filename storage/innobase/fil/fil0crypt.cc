@@ -146,7 +146,7 @@ uint encryption_get_latest_version(uint key_id)
 
   // The form of the key is percona_innodb-<number>, where <number> == key_id
   ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      "%s-%u", "percona_innodb",
+	      "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 	      key_id);
 
   char *system_key_type = NULL;
@@ -158,7 +158,7 @@ uint encryption_get_latest_version(uint key_id)
   if (my_key_fetch(key_name, &system_key_type, NULL,
                    reinterpret_cast<void**>(&system_key), &system_key_len) ||
       (system_key == NULL &&
-       (my_key_generate(key_name, "AES", NULL, 16) ||
+       (my_key_generate(key_name, "AES", NULL, ENCRYPTION_KEY_LEN) ||
         my_key_fetch(key_name, &system_key_type, NULL,
                      reinterpret_cast<void**>(&system_key), &system_key_len) ||
         system_key == NULL)))

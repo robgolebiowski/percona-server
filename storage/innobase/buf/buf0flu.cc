@@ -1093,7 +1093,8 @@ buf_flush_write_block_low(
          //space->encryption_type = Encryption::ROTATED_KEYS;
          ut_ad(space->crypt_data != NULL);// && space->crypt_data->iv[0] != '\0');
          //Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
-         Encryption::get_latest_tablespace_key_or_create_new_one(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
+         //Encryption::get_latest_tablespace_key_or_create_new_one(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
+         Encryption::get_latest_tablespace_key_or_create_new_one(space->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
          bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
          bpage->encrypt= true;
 

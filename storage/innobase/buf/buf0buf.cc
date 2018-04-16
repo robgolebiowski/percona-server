@@ -71,6 +71,7 @@ Created 11/5/1995 Heikki Tuuri
 #include "ut0new.h"
 #include "trx0trx.h"
 #include "srv0start.h"
+#include "fil0crypt.h"
 
 #include <new>
 #include <map>
@@ -5700,8 +5701,11 @@ buf_mark_space_corrupt(
 			BUF_IO_READ);
 	}
 
+        ulint original_page_type= mach_read_from_2(((buf_block_t*) bpage)->frame + FIL_PAGE_ORIGINAL_TYPE_V1);
+
 	/* Find the table with specified space id, and mark it corrupted */
-	if (dict_set_corrupted_by_space(space)) {
+	if ((original_page_type != FIL_PAGE_ENCRYPTED && dict_set_corrupted_by_space(space)) ||
+            (original_page_type == FIL_PAGE_ENCRYPTED && dict_set_encrypted_by_space(space))) {
 		buf_LRU_free_one_page(bpage);
 	} else {
 		rw_lock_x_unlock(hash_lock);
@@ -5715,6 +5719,94 @@ buf_mark_space_corrupt(
 
 	return(ret);
 }
+
+static
+bool
+buf_page_check_corrupted_or_encrypted(buf_page_t* bpage, fil_space_t* space)
+{
+        //TODO:Robert - to trzeba jeszcze dodać
+	//ut_ad(space->n_pending_ios > 0);
+	byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
+		((buf_block_t*) bpage)->frame;
+#ifdef UNIV_INNOCHECKSUM
+        return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
+#else
+
+	bool still_encrypted = false;
+	//dberr_t err = DB_SUCCESS;
+	bool corrupted = false;
+	fil_space_crypt_t* crypt_data = space->crypt_data;
+        ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
+
+
+	/* In buf_decrypt_after_read we have either decrypted the page if
+	page post encryption checksum matches and used key_id is found
+	from the encryption plugin. If checksum did not match page was
+	not decrypted and it could be either encrypted and corrupted
+	or corrupted or good page. If we decrypted, there page could
+	still be corrupted if used key does not match. */
+	still_encrypted = crypt_data
+		&& crypt_data->type != CRYPT_SCHEME_UNENCRYPTED
+		//&& !bpage->encrypted
+                && original_page_type == FIL_PAGE_ENCRYPTED;
+		//&& fil_space_verify_crypt_checksum(
+			//dst_frame, bpage->size,
+			//bpage->id.space(), bpage->id.page_no());
+
+	if (!still_encrypted) {
+		/* If traditional checksums match, we assume that page is
+		not anymore encrypted. */
+		corrupted = buf_page_is_corrupted(
+			true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
+
+                //return false;
+		//if (!corrupted) {
+			//bpage->encrypted = false;
+		//} else {
+			//err = DB_PAGE_CORRUPTED;
+		//}
+                //err = DB_PAGE_CORRUPTED;
+	}
+
+	/* Pages that we think are unencrypted but do not match the checksum
+	checks could be corrupted or encrypted or both. */
+	//if (corrupted && !bpage->encrypted) {
+	if (corrupted && original_page_type != FIL_PAGE_ENCRYPTED) {
+                return true;
+		/* An error will be reported by
+		buf_page_io_complete(). */
+	} else if (still_encrypted || (original_page_type == FIL_PAGE_ENCRYPTED && corrupted)) {
+		//bpage->encrypted = true;
+                
+		//err = DB_IO_DECRYPT_FAIL;
+
+		ib::error()
+			<< "The page " << bpage->id << " in file '"
+			<< space->chain.start->name
+			<< "' cannot be decrypted.";
+
+		ib::info()
+			<< "However key management plugin or used key_version "
+			<< mach_read_from_4(dst_frame
+					    + FIL_PAGE_FILE_FLUSH_LSN)
+			<< " is not found or"
+			" used encryption algorithm or method does not match.";
+
+		if (bpage->id.space() != TRX_SYS_SPACE) {
+			ib::info()
+				<< "Marking tablespace as missing."
+				" You may drop this table or"
+				" install correct key management plugin"
+				" and key file.";
+		}
+                return true;
+	}
+
+	return (false);
+
+#endif // UNIV_INNOCHECKSUM
+}
+
 
 /********************************************************************//**
 Completes an asynchronous read or write request of a file page to or from
@@ -5750,6 +5842,12 @@ buf_page_io_complete(
 		ulint	read_space_id;
 		byte*	frame;
 		bool	compressed_page;
+
+                fil_space_t* space = fil_space_acquire_for_io(
+			bpage->id.space());
+		if (!space) {
+			return DB_TABLESPACE_DELETED;
+		}
 
 		if (bpage->size.is_compressed()) {
 			frame = bpage->zip.data;
@@ -5820,12 +5918,15 @@ buf_page_io_complete(
 				<< "that is not supported by this instance";
 		}
 
+                //bool is_page_corrupted= buf_page_check_corrupt(
+			    //true, frame, bpage->size,
+			    //fsp_is_checksum_disabled(bpage->id.space()), err)
+
 		/* From version 3.23.38 up we store the page checksum
 		to the 4 first bytes of the page end lsn field */
 		if (compressed_page
-		    || buf_page_is_corrupted(
-			    true, frame, bpage->size,
-			    fsp_is_checksum_disabled(bpage->id.space()))) {
+		    || buf_page_check_corrupted_or_encrypted(bpage, space)
+			    ) {
 
 			/* Not a real corruption if it was triggered by
 			error injection */

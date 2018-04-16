@@ -31,13 +31,13 @@ Created 04/01/2015 Jan Lindström
 #include "os0event.h"
 #include "my_crypt.h"
 #include "log0types.h"
-
 // TODO: Robert: This is temporary for fil_encryption_t
 #include "fil0fil.h"
 
 
 #endif /*! UNIV_INNOCHECKSUM */
 
+#include "log0types.h"
 /**
 * Magic pattern in start of crypt data on page 0
 */
@@ -46,10 +46,13 @@ Created 04/01/2015 Jan Lindström
 static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {
 	's', 0xE, 0xC, 'R', 'E', 't' };
 
+//static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb";
+
 /* This key will be used if nothing else is given */
 #define FIL_DEFAULT_ENCRYPTION_KEY 0
 #define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
 #define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
+
 
 extern os_event_t fil_crypt_threads_event;
 

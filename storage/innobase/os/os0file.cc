@@ -9125,7 +9125,7 @@ void Encryption::random_value(byte* value)
 
 void
 Encryption::create_tablespace_key(byte** tablespace_key,
-                                  ulint space_id)
+                                  uint key_id)
 {
 #ifndef UNIV_INNOCHECKSUM
 	char*	key_type = NULL;
@@ -9154,8 +9154,8 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 		    //uuid, space_id);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    space_id);
+		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    key_id);
 
 
 	/* We call key ring API to generate tablespace key here. */
@@ -9341,7 +9341,7 @@ void Encryption::get_system_key(const char *system_key_name,
 
 // tablespace_key_version as output parameter
 void
-Encryption::get_latest_tablespace_key(ulint space_id,
+Encryption::get_latest_tablespace_key(uint key_id,
                            uint *tablespace_key_version,
 			   byte** tablespace_key)
 {
@@ -9356,8 +9356,8 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    space_id);
+		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    key_id);
 	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
 		    //"%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 		    //uuid, space_id); // TODO:Robert make sure uuid is set till we get here
@@ -9383,16 +9383,16 @@ Encryption::get_latest_tablespace_key(ulint space_id,
 }
 
 void
-Encryption::get_latest_tablespace_key_or_create_new_one(ulint space_id,
+Encryption::get_latest_tablespace_key_or_create_new_one(uint key_id,
                                                         uint *tablespace_key_version,
 			                                byte** tablespace_key)
 {
-     get_latest_tablespace_key(space_id, tablespace_key_version, tablespace_key);
+     get_latest_tablespace_key(key_id, tablespace_key_version, tablespace_key);
      if (*tablespace_key == NULL)
      {
-       fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key for space: %lu\n", space_id);
+       fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key for space: %u\n", key_id);
 
-       Encryption::create_tablespace_key(tablespace_key, space_id);
+       Encryption::create_tablespace_key(tablespace_key, key_id);
        *tablespace_key_version = 0;
      }
      else
@@ -9913,8 +9913,8 @@ Encryption::decrypt(
 #endif
 	}
 
-	ulint space_id =
-		mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+	//ulint space_id =
+		//mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
 //#ifdef UNIV_ENCRYPT_DEBUG
 	//ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
@@ -10113,12 +10113,18 @@ Encryption::decrypt(
 
 	if (page_type == FIL_PAGE_ENCRYPTED) {
 		mach_write_to_2(src + FIL_PAGE_TYPE, original_type);
-		mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, 0);
+		//mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, 0);
+                //TODO:Robert:Added by me
+                mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
 	} else if (page_type == FIL_PAGE_ENCRYPTED_RTREE) {
 		mach_write_to_2(src + FIL_PAGE_TYPE, FIL_PAGE_RTREE);
+                //TODO:Robert:Added by me
+                mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
 	} else {
 		ut_ad(page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED);
 		mach_write_to_2(src + FIL_PAGE_TYPE, FIL_PAGE_COMPRESSED);
+                //TODO:Robert:Added by me
+                mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
 	}
 
 	if (block != NULL) {

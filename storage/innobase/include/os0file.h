@@ -436,7 +436,8 @@ struct Encryption {
 		m_key(other.m_key),
 		m_klen(other.m_klen),
 		m_iv(other.m_iv),
-                m_key_version(other.m_key_version)
+        m_key_version(other.m_key_version),
+		m_key_id(other.m_key_id)
 	{ };
 
 	/** Check if page is encrypted page or not
@@ -488,19 +489,19 @@ struct Encryption {
 
         //TODO:Robert: Czy to powinno być tutaj robione ?
         static void create_tablespace_key(byte** tablespace_key,
-                                          ulint space_id);
+                                          uint key_id);
 
 	/** Create new master key for key rotation.
         @param[in,out]	master_key	master key */
 	static void create_master_key(byte** master_key);
 
        //TODO:Robert: Te dwa są potrzebne.
-        static void get_latest_tablespace_key(ulint space_id,
+        static void get_latest_tablespace_key(uint key_id,
                            uint *tablespace_key_version,
 			   byte** tablespace_key);
 
 
-        static void get_latest_tablespace_key_or_create_new_one(ulint space_id,
+        static void get_latest_tablespace_key_or_create_new_one(uint key_id,
                                                                 uint *tablespace_key_version,
 			                                        byte** tablespace_key);
 
