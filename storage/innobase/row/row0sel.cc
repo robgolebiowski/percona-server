@@ -4716,7 +4716,7 @@ row_search_mvcc(
 
 		DBUG_RETURN(DB_TABLESPACE_DELETED);
 
-	} else if (prebuilt->table->ibd_file_missing) {
+	} else if (prebuilt->table->file_unreadable) {
 
 		DBUG_RETURN(DB_TABLESPACE_NOT_FOUND);
 

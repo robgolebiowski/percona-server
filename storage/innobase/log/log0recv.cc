@@ -2618,8 +2618,12 @@ loop:
 	mutex_enter(&(recv_sys->mutex));
 
 	if (recv_sys->apply_batch_on) {
-
+		bool abort = recv_sys->found_corrupt_log;
 		mutex_exit(&(recv_sys->mutex));
+
+		if (abort) {
+			return;
+		}
 
 		os_thread_sleep(500000);
 
@@ -2715,8 +2719,13 @@ loop:
 	/* Wait until all the pages have been processed */
 
 	while (recv_sys->n_addrs != 0) {
+                bool abort = recv_sys->found_corrupt_log;
 
 		mutex_exit(&(recv_sys->mutex));
+
+		if (abort) {
+			return;
+		}
 
 		os_thread_sleep(500000);
 

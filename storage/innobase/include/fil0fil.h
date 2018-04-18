@@ -980,8 +980,9 @@ public:
 	/** Constructor: Look up the tablespace and increment the
 	referece count if found.
 	@param[in]	space_id	tablespace ID */
-	explicit FilSpace(ulint space_id)
-		: m_space(fil_space_acquire(space_id)) {}
+	explicit FilSpace(ulint space_id, bool silent = false)
+		: m_space(silent ? fil_space_acquire_silent(space_id)
+                                 : fil_space_acquire(space_id)) {}
 
 	/** Assignment operator: This assumes that fil_space_acquire()
 	has already been done for the fil_space_t. The caller must

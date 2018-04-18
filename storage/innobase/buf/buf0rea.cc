@@ -239,7 +239,10 @@ buf_read_page_low(
 	if (sync) {
 		/* The i/o is already completed when we arrive from
 		fil_read */
-		if (!buf_page_io_complete(bpage)) {
+
+	        *err = buf_page_io_complete(bpage);
+
+		if (*err != DB_SUCCESS) {
 			return(0);
 		}
 	}
@@ -412,12 +415,19 @@ read_ahead:
 				ibuf_mode,
 				cur_page_id, page_size, false, trx, false);
 
-			if (err == DB_TABLESPACE_DELETED) {
-				ib::warn() << "Random readahead trying to"
+			switch (err) {
+			case DB_SUCCESS:
+			case DB_TABLESPACE_TRUNCATED:
+			case DB_ERROR:
+				break;
+			case DB_TABLESPACE_DELETED:
+				ib::info() << "Random readahead trying to"
 					" access page " << cur_page_id
 					<< " in nonexisting or"
 					" being-dropped tablespace";
 				break;
+			default:
+				ut_error;
 			}
 		}
 	}
@@ -450,15 +460,19 @@ an exclusive lock on the buffer frame. The flag is cleared and the x-lock
 released by the i/o-handler thread.
 @param[in]	page_id		page id
 @param[in]	page_size	page size
-@return TRUE if page has been read in, FALSE in case of failure */
-ibool
+@retval DB_SUCCESS if the page was read and is not corrupted,
+@retval DB_PAGE_CORRUPTED if page based on checksum check is corrupted,
+@retval DB_DECRYPTION_FAILED if page post encryption checksum matches but
+after decryption normal page checksum does not match.
+@retval DB_TABLESPACE_DELETED if tablespace .ibd file is missing */
+dberr_t
 buf_read_page(
 	const page_id_t&	page_id,
 	const page_size_t&	page_size,
 	trx_t*			trx)
 {
 	ulint		count;
-	dberr_t		err;
+	dberr_t		err = DB_SUCCESS;
 
 	ut_ad(!trx || trx->take_stats);
 
@@ -482,7 +496,7 @@ buf_read_page(
 	/* Increment number of I/O operations used for LRU policy. */
 	buf_LRU_stat_inc_io();
 
-	return(count > 0);
+	return(err);
 }
 
 /** High-level function which reads a page asynchronously from a file to the
@@ -788,12 +802,26 @@ buf_read_ahead_linear(
 				ibuf_mode, cur_page_id, page_size, false,
 				trx, true);
 
-			if (err == DB_TABLESPACE_DELETED) {
-				ib::warn() << "linear readahead trying to"
+			switch (err) {
+			case DB_TABLESPACE_DELETED:
+                        	ib::warn() << "linear readahead trying to"
 					" access page "
 					<< page_id_t(page_id.space(), i)
 					<< " in nonexisting or being-dropped"
 					" tablespace";
+                                break;
+			case DB_SUCCESS:
+			case DB_TABLESPACE_TRUNCATED:
+			case DB_ERROR:
+				break;
+			case DB_PAGE_CORRUPTED:
+			case DB_DECRYPTION_FAILED:
+				ib::error() << "linear readahead failed to"
+					" read or decrypt "
+					<< page_id_t(page_id.space(), i);
+				break;
+			default:
+				ut_error;
 			}
 		}
 	}
@@ -876,11 +904,23 @@ buf_read_ibuf_merge_pages(
 				  BUF_READ_ANY_PAGE, page_id, page_size,
 				  true, NULL, false);
 
-		if (err == DB_TABLESPACE_DELETED) {
+		switch(err) {
+		case DB_SUCCESS:
+		case DB_TABLESPACE_TRUNCATED:
+		case DB_ERROR:
+			break;
+		case DB_TABLESPACE_DELETED:
 			/* We have deleted or are deleting the single-table
 			tablespace: remove the entries for that page */
 			ibuf_merge_or_delete_for_page(NULL, page_id,
 						      &page_size, FALSE);
+		case DB_PAGE_CORRUPTED:
+		case DB_DECRYPTION_FAILED:
+			ib::error() << "Failed to read or decrypt " << page_id
+				<< " for change buffer merge";
+			break;
+		default:
+			ut_error;
 		}
 	}
 
@@ -959,6 +999,14 @@ buf_read_recv_pages(
 				BUF_READ_ANY_PAGE,
 				cur_page_id, page_size, true, NULL, false);
 		}
+
+		if (err == DB_DECRYPTION_FAILED) {
+			ib::error() << "Recovery failed to decrypt page "
+				<< cur_page_id;
+		} else if (err == DB_PAGE_CORRUPTED) {
+			ib::error() << "Recovery failed due to corrupted page "
+				<< cur_page_id;
+                }
 	}
 
 	os_aio_simulated_wake_handler_threads();

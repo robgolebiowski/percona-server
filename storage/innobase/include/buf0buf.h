@@ -1286,8 +1286,13 @@ buf_page_init_for_read(
 /********************************************************************//**
 Completes an asynchronous read or write request of a file page to or from
 the buffer pool.
-@return true if successful */
-bool
+@return whether the operation succeeded
+@retval	DB_SUCCESS		always when writing, or if a read page was OK
+@retval	DB_PAGE_CORRUPTED	if the checksum fails on a page read
+@retval	DB_DECRYPTION_FAILED	if page post encryption checksum matches but
+				after decryption normal page checksum does
+				not match */
+dberr_t
 buf_page_io_complete(
 /*=================*/
 	buf_page_t*	bpage,	/*!< in: pointer to the block in question */
@@ -1692,6 +1697,7 @@ public:
 					in the buffer pool. Protected by
 					block mutex */
 	bool		is_corrupt;
+	bool            encrypted;	/*!< page is still encrypted */
 # ifdef UNIV_DEBUG
 	ibool		file_page_was_freed;
 					/*!< this is set to TRUE when

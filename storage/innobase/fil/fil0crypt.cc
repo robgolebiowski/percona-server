@@ -133,6 +133,38 @@ fil_space_crypt_cleanup() // TODO:Robert kiedy to jest wołane?!
         mutex_free(&crypt_stat_mutex);
 }
 
+bool encryption_key_id_exists(const char *key_id)
+{
+#ifndef UNIV_INNOCHECKSUM
+        int ret;
+	char*	key_type = NULL;
+        byte* key = NULL; 
+        size_t key_len;
+	//size_t	key_len;
+	/* We call key ring API to get master key here. */
+	ret = my_key_fetch(key_id, &key_type, NULL,
+			   reinterpret_cast<void**>(&key), &key_len);
+
+	if (key_type) {
+		my_free(key_type);
+	}
+
+	if (ret) {
+          // in case of error most likely keyring plugin is not loaded
+          if (key) {
+            my_free(key);
+          }
+          return false;
+	}
+
+        if (key == NULL)
+          return false;
+        my_free(key);
+        ut_ad(key_len > 0);
+        return true;
+#endif
+}
+
 
 uint encryption_get_latest_version(uint key_id)
 {
@@ -995,8 +1027,8 @@ fil_parse_write_crypt_data(
 		/* Check is used key found from encryption plugin */
 		if (crypt_data->should_encrypt()
 		    && !crypt_data->is_key_found()) {
-			//*err = DB_DECRYPTION_FAILED;
-                        *err = DB_IO_DECRYPT_FAIL;
+                        *err = DB_DECRYPTION_FAILED;
+                        //*err = DB_IO_DECRYPT_FAIL;
 		}
 	} else {
 		fil_space_destroy_crypt_data(&crypt_data);

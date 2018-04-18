@@ -5739,6 +5739,22 @@ dict_find_single_table_by_space(
 	return(NULL);
 }
 
+/** Flag a table with specified space_id encrypted in the data dictionary
+cache
+@param[in]	space_id	Tablespace id */
+bool
+dict_set_encrypted_by_space(ulint	space_id)
+{
+	dict_table_t*   table;
+
+	table = dict_find_single_table_by_space(space_id);
+
+        if (!table)
+          return false;
+
+        table->file_unreadable = true;
+}
+
 /**********************************************************************//**
 Flags a table with specified space_id corrupted in the data dictionary
 cache
@@ -5759,6 +5775,7 @@ dict_set_corrupted_by_space(
 	/* mark the table->corrupted bit only, since the caller
 	could be too deep in the stack for SYS_INDEXES update */
 	table->corrupted = TRUE;
+        table->file_unreadable = true;
 
 	return(TRUE);
 }
@@ -6297,7 +6314,8 @@ dict_table_schema_check(
 		return(DB_TABLE_NOT_FOUND);
 	}
 
-	if (table->ibd_file_missing) {
+	if (!table->is_readable() &&
+	    fil_space_get(table->space) == NULL) {
 		/* missing tablespace */
 
 		ut_snprintf(errstr, errstr_sz,

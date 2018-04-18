@@ -171,6 +171,8 @@ enum dberr_t {
 	DB_NO_FK_ON_S_BASE_COL,		/*!< Cannot add foreign constrain
 					placed on the base column of
 					stored column */
+	DB_PAGE_CORRUPTED = 999,        /* Page read from tablespace is
+					corrupted. */
 
 	/* The following are partial failure codes */
 	DB_FAIL = 1000,

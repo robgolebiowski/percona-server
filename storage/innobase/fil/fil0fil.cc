@@ -6339,6 +6339,8 @@ fil_aio_wait(
 	mutex_enter(&fil_system->mutex);
 
 	fil_node_complete_io(node, fil_system, type);
+	const fil_type_t	purpose	= node->space->purpose;
+	const ulint		space_id= node->space->id;
 
 	mutex_exit(&fil_system->mutex);
 
@@ -6359,9 +6361,34 @@ fil_aio_wait(
 		/* async single page writes from the dblwr buffer don't have
 		access to the page */
 		if (message != NULL) {
-			buf_page_io_complete(static_cast<buf_page_t*>(message));
-		}
-		return;
+                        buf_page_t* bpage = static_cast<buf_page_t*>(message);
+                        if (!bpage) {
+                                return;
+                        }
+
+		        ulint offset = bpage->id.page_no();
+			dberr_t err = buf_page_io_complete(static_cast<buf_page_t*>(message));
+                        if (err == DB_SUCCESS) {
+			   return;
+		        }
+
+                        ut_ad(type.is_read());
+                        if (recv_recovery_is_on() && !srv_force_recovery) {
+                                recv_sys->found_corrupt_fs = true;
+                        }
+
+                        if (fil_space_t* space = fil_space_acquire_for_io(space_id)) {
+                                if (space == node->space) {
+                                        ib::error() << "Failed to read file '"
+                                                    << node->name
+                                                    << "' at offset " << offset
+                                                    << ": " << ut_strerr(err);
+                                }
+
+                                fil_space_release_for_io(space);
+                        }
+                        return;
+                }
 	case FIL_TYPE_LOG:
 		srv_set_io_thread_op_info(segment, "complete io for log");
 		log_io_complete(static_cast<log_group_t*>(message));
@@ -7766,7 +7793,7 @@ fil_set_compression(
 	COMPRESSION is set by TABLE DDL, not TABLESPACE DDL. There is
 	no other technical reason.  Also, do not use it for missing
 	tables or tables with compressed row_format. */
-	if (table->ibd_file_missing
+	if (table->file_unreadable
 	    || !DICT_TF2_FLAG_IS_SET(table, DICT_TF2_USE_FILE_PER_TABLE)
 	    || DICT_TF2_FLAG_IS_SET(table, DICT_TF2_TEMPORARY)
 	    || page_size_t(table->flags).is_compressed()) {

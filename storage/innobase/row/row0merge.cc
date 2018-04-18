@@ -4025,7 +4025,7 @@ row_merge_rename_tables_dict(
 	renamed along with the table. */
 	if (err == DB_SUCCESS
 	    && dict_table_is_file_per_table(old_table)
-	    && !old_table->ibd_file_missing) {
+	    && !old_table->file_unreadable) {
 		/* Make pathname to update SYS_DATAFILES. */
 		char* tmp_path = row_make_new_pathname(old_table, tmp_name);
 
