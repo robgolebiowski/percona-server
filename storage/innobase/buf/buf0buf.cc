@@ -5741,17 +5741,18 @@ buf_mark_space_corrupt(
 			BUF_IO_READ);
 	}
 
-        ulint original_page_type= mach_read_from_2(((buf_block_t*) bpage)->frame + FIL_PAGE_ORIGINAL_TYPE_V1);
-
-	/* Find the table with specified space id, and mark it corrupted */
-	if ((!bpage->encrypted && dict_set_corrupted_by_space(space)) ||
-            (bpage->encrypted && dict_set_encrypted_by_space(space))) {
-		buf_LRU_free_one_page(bpage);
+	/* If block is not encrypted find the table with specified
+	space id, and mark it corrupted. Encrypted tables
+	are marked unusable later e.g. in ::open(). */
+	if (!bpage->encrypted) {
+		dict_set_corrupted_by_space(space);
 	} else {
-		rw_lock_x_unlock(hash_lock);
-		mutex_exit(buf_page_get_mutex(bpage));
-		ret = FALSE;
+		dict_set_encrypted_by_space(space);
 	}
+
+	/* After this point bpage can't be referenced. */
+        buf_LRU_free_one_page(bpage);
+	
 	mutex_exit(&buf_pool->LRU_list_mutex);
 
 	ut_ad(buf_pool->n_pend_reads > 0);
@@ -5772,12 +5773,12 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
 #else
 
-	bool still_encrypted = false;
         dberr_t err = DB_SUCCESS;
 	bool corrupted = false;
-	fil_space_crypt_t* crypt_data = space->crypt_data;
+        fil_space_crypt_t* crypt_data = space->crypt_data;
         ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
-        bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
+        //bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
+	bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
 
 	/* In buf_decrypt_after_read we have either decrypted the page if
 	page post encryption checksum matches and used key_id is found
@@ -5785,35 +5786,32 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 	not decrypted and it could be either encrypted and corrupted
 	or corrupted or good page. If we decrypted, there page could
 	still be corrupted if used key does not match. */
-	still_encrypted = crypt_data
-		&& crypt_data->type != CRYPT_SCHEME_UNENCRYPTED
-		&& bpage->encrypted;
+	//still_encrypted = crypt_data
+		//&& crypt_data->type != CRYPT_SCHEME_UNENCRYPTED &&
+		//&& bpage->encrypted;
 		//&& fil_space_verify_crypt_checksum(
 			//dst_frame, bpage->size,
 			//bpage->id.space(), bpage->id.page_no());
 
-	if (!still_encrypted) {
-		/* If traditional checksums match, we assume that page is
-		not anymore encrypted. */
-		corrupted = buf_page_is_corrupted(
+	//if (was_encrypted) {
+        /* If traditional checksums match, we assume that page is
+	   not anymore encrypted. */
+       corrupted = buf_page_is_corrupted(
 			true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
 
-                //return false;
-		if (!corrupted) {
-		  bpage->encrypted = false;
-		} else {
-			err = DB_PAGE_CORRUPTED;
-		}
-                //err = DB_PAGE_CORRUPTED;
-	}
-
+        if (!corrupted) {
+            bpage->encrypted = false;
+        } else {
+            err = DB_PAGE_CORRUPTED;
+        }
+      
 	/* Pages that we think are unencrypted but do not match the checksum
 	checks could be corrupted or encrypted or both. */
 	//if (corrupted && !bpage->encrypted) {
 	if (corrupted && !bpage->encrypted) {
 		/* An error will be reported by
 		buf_page_io_complete(). */
-	} else if (still_encrypted || (bpage->encrypted && corrupted)) {
+	} else if (bpage->encrypted && corrupted) {
                 bpage->encrypted = true;
                 err = DB_DECRYPTION_FAILED; 
 		//err = DB_IO_DECRYPT_FAIL;
@@ -5823,12 +5821,14 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 			<< space->chain.start->name
 			<< "' cannot be decrypted.";
 
-		ib::info()
-			<< "However key management plugin or used key_version "
-			<< mach_read_from_4(dst_frame
-					    + FIL_PAGE_FILE_FLUSH_LSN)
-			<< " is not found or"
-			" used encryption algorithm or method does not match.";
+                if (crypt_data) {
+                  ib::info()
+                          << "However key management plugin or used key_version "
+                          << mach_read_from_4(dst_frame
+                                              + FIL_PAGE_FILE_FLUSH_LSN)
+                          << " is not found or"
+                          " used encryption algorithm or method does not match.";
+                }
 
 		if (bpage->id.space() != TRX_SYS_SPACE) {
 			ib::info()
@@ -6083,13 +6083,13 @@ corrupt:
 		if (uncompressed
 		    && !Compression::is_compressed_page(frame)
 		    && !recv_no_ibuf_operations
-		    && !Tablespace::is_undo_tablespace(bpage->id.space())
+		    && !Tablespace::is_undo_tablespace(bpage->id.space()) 
 		    && bpage->id.space() != srv_tmp_space.space_id()
 		    && !srv_is_tablespace_truncated(bpage->id.space())
 		    && fil_page_get_type(frame) == FIL_PAGE_INDEX
 		    && page_is_leaf(frame)) {
 
-			if (bpage->encrypted) {
+			if (bpage->encrypted) { // TODO: To nie uwzględnia srv_pass_corrupt_table
 				ib::warn()
 					<< "Table in tablespace "
 					<< bpage->id.space()

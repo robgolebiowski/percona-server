@@ -6704,6 +6704,7 @@ ha_innobase::open(
 
 		/* Mark this table as corrupted, so the drop table
 		or force recovery can still use it, but not others. */
+		ib_table->file_unreadable = true;
 		ib_table->corrupted = true;
 		dict_table_close(ib_table, FALSE, FALSE);
 		ib_table = NULL;
@@ -6811,7 +6812,7 @@ ha_innobase::open(
 	if (!thd_tablespace_op(thd) && no_tablespace) {
 		free_share(m_share);
 		set_my_errno(ENOENT);
-                int ret_err = HA_ERR_NO_SUCH_TABLE;
+                int ret_err = HA_ERR_TABLESPACE_MISSING;
 
 		/* If table has no talespace but it has crypt data, check
 		is tablespace made unaccessible because encryption service
@@ -6860,7 +6861,7 @@ ha_innobase::open(
 
 		dict_table_close(ib_table, FALSE, FALSE);
 
-		DBUG_RETURN(HA_ERR_TABLESPACE_MISSING);
+		DBUG_RETURN(ret_err);
 	}
 
 	m_prebuilt = row_create_prebuilt(ib_table, table->s->reclength);

@@ -58,9 +58,10 @@ btr_block_get_func(
 	mtr_t*		mtr)
 {
 	buf_block_t*	block;
+	dberr_t		err=DB_SUCCESS;
 
 	block = buf_page_get_gen(
-		page_id, page_size, mode, NULL, BUF_GET, file, line, mtr);
+		page_id, page_size, mode, NULL, BUF_GET, file, line, mtr, false, &err);
 
 	SRV_CORRUPT_TABLE_CHECK(block, ; /* do nothing */);
 

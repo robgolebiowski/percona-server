@@ -6352,7 +6352,7 @@ fil_aio_wait(
 	deadlocks in the i/o system. We keep tablespace 0 data files always
 	open, and use a special i/o thread to serve insert buffer requests. */
 
-	switch (node->space->purpose) {
+	switch (purpose) {
 	case FIL_TYPE_TABLESPACE:
 	case FIL_TYPE_TEMPORARY:
 	case FIL_TYPE_IMPORT:

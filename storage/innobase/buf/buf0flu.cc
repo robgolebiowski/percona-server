@@ -1007,8 +1007,18 @@ buf_flush_write_block_low(
 	buf_flush_t	flush_type,	/*!< in: type of flush */
 	bool		sync)		/*!< in: true if sync IO request */
 {
-	page_t*	frame = NULL;
+	fil_space_t* space = fil_space_acquire_for_io(bpage->id.space());
+	if (!space) {
+		return;
+	}
+        // TODO:Robert: czy to są napewno dobre warunki ? - skopiowane z MariaDB
+	ut_ad(space->purpose == FIL_TYPE_TEMPORARY
+	      || space->purpose == FIL_TYPE_IMPORT
+	      || space->purpose == FIL_TYPE_TABLESPACE);
+	ut_ad((space->purpose == FIL_TYPE_TEMPORARY)
+	      == fsp_is_system_temporary(space->id));
 
+	page_t*	frame = NULL;
 #ifdef UNIV_DEBUG
 	buf_pool_t*	buf_pool = buf_pool_from_bpage(bpage);
 	ut_ad(!mutex_own(&buf_pool->LRU_list_mutex));
@@ -1081,7 +1091,7 @@ buf_flush_write_block_low(
 	Given the nature and load of temporary tablespace doublewrite buffer
 	adds an overhead during flushing. */
 
-       fil_space_t* space = fil_space_get(bpage->id.space());
+       //fil_space_t* space = fil_space_get(bpage->id.space());
        ut_ad(space != NULL);
 
        //if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))

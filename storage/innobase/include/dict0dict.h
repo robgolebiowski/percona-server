@@ -1872,7 +1872,6 @@ dict_set_corrupted_by_space(
 /** Flag a table with specified space_id encrypted in the data dictionary
 cache
 @param[in]	space_id	Tablespace id */
-UNIV_INTERN
 void
 dict_set_encrypted_by_space(
 	ulint	space_id);

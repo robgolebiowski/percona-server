@@ -5742,17 +5742,15 @@ dict_find_single_table_by_space(
 /** Flag a table with specified space_id encrypted in the data dictionary
 cache
 @param[in]	space_id	Tablespace id */
-bool
+void
 dict_set_encrypted_by_space(ulint	space_id)
 {
 	dict_table_t*   table;
 
 	table = dict_find_single_table_by_space(space_id);
 
-        if (!table)
-          return false;
-
-        table->file_unreadable = true;
+        if (table)
+            table->file_unreadable = true;
 }
 
 /**********************************************************************//**
