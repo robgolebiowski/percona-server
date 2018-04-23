@@ -5015,6 +5015,8 @@ error_handling:
 	case DB_UNSUPPORTED:
 		my_error(ER_TABLE_CANT_HANDLE_SPKEYS, MYF(0), "SYS_COLUMNS");
 		break;
+
+
 	default:
 		my_error_innodb(error, table_name, user_table->flags);
 	}
@@ -6498,6 +6500,13 @@ oom:
 			 get_error_key_name(m_prebuilt->trx->error_key_num,
 					    ha_alter_info, m_prebuilt->table));
 		break;
+	case DB_DECRYPTION_FAILED: {
+		String str;
+		const char* engine= table_type();
+		get_error_message(HA_ERR_DECRYPTION_FAILED, &str);
+		my_error(ER_GET_ERRMSG, MYF(0), HA_ERR_DECRYPTION_FAILED, str.c_ptr(), engine);
+		break;
+	}
 	default:
 		my_error_innodb(error,
 				table_share->table_name.str,

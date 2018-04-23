@@ -681,8 +681,9 @@ btr_index_rec_validate(
 	MY_ATTRIBUTE((warn_unused_result));
 /**************************************************************//**
 Checks the consistency of an index tree.
-@return true if ok */
-bool
+@return	DB_SUCCESS if ok, error code if not */
+dberr_t
+//bool
 btr_validate_index(
 /*===============*/
 	dict_index_t*	index,	/*!< in: index */

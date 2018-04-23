@@ -3781,10 +3781,13 @@ row_import_for_mysql(
 			table_name, sizeof(table_name),
 			table->name.m_name);
 
-		ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
-			ER_INTERNAL_ERROR,
-			"Cannot reset LSNs in table %s : %s",
-			table_name, ut_strerr(err));
+
+		if (err != DB_DECRYPTION_FAILED) {
+                  ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
+                          ER_INTERNAL_ERROR,
+                          "Cannot reset LSNs in table %s : %s",
+                          table_name, ut_strerr(err));
+                }
 
 		return(row_import_cleanup(prebuilt, trx, err));
 	}

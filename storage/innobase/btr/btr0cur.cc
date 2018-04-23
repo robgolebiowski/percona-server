@@ -735,7 +735,7 @@ If mode is PAGE_CUR_LE , cursor is left at the place where an insert of the
 search tuple should be performed in the B-tree. InnoDB does an insert
 immediately after the cursor. Thus, the cursor may end up on a user record,
 or on a page infimum record. */
-void
+dberr_t
 btr_cur_search_to_nth_level(
 /*========================*/
 	dict_index_t*	index,	/*!< in: index */
@@ -785,6 +785,7 @@ btr_cur_search_to_nth_level(
 	page_cur_t*	page_cursor;
 	btr_op_t	btr_op;
 	ulint		root_height = 0; /* remove warning */
+	dberr_t		err = DB_SUCCESS;
 
 	ulint		upper_rw_latch, root_leaf_rw_latch;
 	btr_intention_t	lock_intention;
@@ -951,7 +952,7 @@ btr_cur_search_to_nth_level(
 		      || mode != PAGE_CUR_LE);
 		btr_cur_n_sea++;
 
-		DBUG_VOID_RETURN;
+		DBUG_RETURN(err);
 	}
 # endif /* BTR_CUR_HASH_ADAPT */
 #endif /* BTR_CUR_ADAPT */
@@ -1118,8 +1119,27 @@ retry_page_get:
 	ut_ad(n_blocks < BTR_MAX_LEVELS);
 	tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
 	block = buf_page_get_gen(page_id, page_size, rw_latch, guess,
-				 buf_mode, file, line, mtr);
+				 buf_mode, file, line, mtr, false, &err);
 	tree_blocks[n_blocks] = block;
+
+	if (err != DB_SUCCESS) {
+		ut_ad(block == NULL);
+		if (err == DB_DECRYPTION_FAILED) {
+                        ib::warn() << "Table is encrypted but encryption service or"
+				" used key_id is not available. "
+				" Can't continue reading table.";
+
+       /*                 ib_push_warning((void *)NULL,*/
+				//DB_DECRYPTION_FAILED,
+				//"Table %s is encrypted but encryption service or"
+				//" used key_id is not available. "
+				//" Can't continue reading table.",
+				/*index->table->name);*/
+			index->table->file_unreadable = true;
+		}
+
+		goto func_exit;
+	}
 
 	if (block == NULL) {
 		SRV_CORRUPT_TABLE_CHECK(buf_mode == BUF_GET_IF_IN_POOL ||
@@ -1230,9 +1250,28 @@ retry_page_get:
 			get_block = buf_page_get_gen(
 				page_id_t(page_id.space(), left_page_no),
 				page_size, rw_latch, NULL, buf_mode,
-				file, line, mtr);
+				file, line, mtr, false, &err);
 			prev_tree_blocks[prev_n_blocks] = get_block;
 			prev_n_blocks++;
+
+			if (err != DB_SUCCESS) {
+				if (err == DB_DECRYPTION_FAILED) {
+                                        ib::warn() << "Table is encrypted but encryption service or"
+						" used key_id is not available. "
+						" Can't continue reading table.";
+
+					//ib_push_warning((void *)NULL,
+						//DB_DECRYPTION_FAILED,
+						//"Table %s is encrypted but encryption service or"
+						//" used key_id is not available. "
+						//" Can't continue reading table.",
+						//index->table->name);
+					index->table->file_unreadable = true;
+				}
+
+				goto func_exit;
+			}
+
 
 			/* BTR_MODIFY_TREE doesn't update prev/next_page_no,
 			without their parent page's lock. So, not needed to
@@ -1246,8 +1285,25 @@ retry_page_get:
 
 		tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
 		block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
-					 buf_mode, file, line, mtr);
+					 buf_mode, file, line, mtr, false, &err);
 		tree_blocks[n_blocks] = block;
+
+		if (err != DB_SUCCESS) {
+			if (err == DB_DECRYPTION_FAILED) {
+                                ib::warn() << "Table is encrypted but encryption service or"
+					" used key_id is not available. "
+					" Can't continue reading table.";
+				//ib_push_warning((void *)NULL,
+					//DB_DECRYPTION_FAILED,
+					//"Table %s is encrypted but encryption service or"
+					//" used key_id is not available. "
+					//" Can't continue reading table.",
+					//index->table->name);
+				index->table->file_unreadable = true;
+			}
+
+			goto func_exit;
+		}
 	}
 
 	page = buf_block_get_frame(block);
@@ -2002,7 +2058,7 @@ func_exit:
 		cursor->rtr_info->mbr_adj = true;
 	}
 
-	DBUG_VOID_RETURN;
+	DBUG_RETURN(err);
 }
 
 /** Searches an index tree and positions a tree cursor on a given level.
@@ -2105,6 +2161,7 @@ btr_cur_search_to_nth_level_with_no_latch(
 
 		ut_ad(n_blocks < BTR_MAX_LEVELS);
 
+                // TODO:Robert: Też with_no_latches funkcja i nie uwzględniamy nulla
 		block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
 				buf_mode, file, line, mtr, mark_dirty);
 
@@ -2166,7 +2223,7 @@ btr_cur_search_to_nth_level_with_no_latch(
 
 /*****************************************************************//**
 Opens a cursor at either end of an index. */
-void
+dberr_t
 btr_cur_open_at_index_side_func(
 /*============================*/
 	bool		from_left,	/*!< in: true if open to the low end,
@@ -2196,6 +2253,7 @@ btr_cur_open_at_index_side_func(
 	mem_heap_t*	heap		= NULL;
 	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
 	ulint*		offsets		= offsets_;
+	dberr_t		err = DB_SUCCESS;
 	rec_offs_init(offsets_);
 
 	estimate = latch_mode & BTR_ESTIMATE;
@@ -2293,12 +2351,30 @@ btr_cur_open_at_index_side_func(
 
 		tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
 		block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
-					 BUF_GET, file, line, mtr);
+					 BUF_GET, file, line, mtr, false, &err);
 		tree_blocks[n_blocks] = block;
+
+		if (err != DB_SUCCESS) {
+			if (err == DB_DECRYPTION_FAILED) {
+                                ib::warn() << "Table is encrypted but encryption service or"
+					" used key_id is not available. "
+					" Can't continue reading table.";
+					///index->table->name);
+
+				//ib_push_warning((void *)NULL,
+					//DB_DECRYPTION_FAILED,
+					//"Table %s is encrypted but encryption service or"
+					//" used key_id is not available. "
+					//" Can't continue reading table.",
+					//index->table->name);
+				index->table->file_unreadable = true;
+			}
+			goto exit_loop;
+		}
 
 		page = buf_block_get_frame(block);
 
-		SRV_CORRUPT_TABLE_CHECK(page,
+		SRV_CORRUPT_TABLE_CHECK(page || err == DB_DECRYPTION_FAILED,
 		{
 			page_cursor->block = 0;
 			page_cursor->rec = 0;
@@ -2531,6 +2607,8 @@ exit_loop:
 	if (heap) {
 		mem_heap_free(heap);
 	}
+
+        return err;
 }
 
 /** Opens a cursor at either end of an index.
@@ -2545,6 +2623,7 @@ as they are not shared and so there is no need of latching.
 @param[in]	line		line where called
 @param[in,out]	mtr		mini transaction
 */
+
 void
 btr_cur_open_at_index_side_with_no_latch_func(
 	bool		from_left,
@@ -2581,6 +2660,7 @@ btr_cur_open_at_index_side_with_no_latch_func(
 
 		ut_ad(n_blocks < BTR_MAX_LEVELS);
 
+                // TODO:Robert - tutaj nie uwzględniamy NULLa
 		block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
 					 BUF_GET, file, line, mtr);
 
@@ -2726,6 +2806,7 @@ btr_cur_open_at_rnd_pos_func(
 	page_id_t		page_id(dict_index_get_space(index),
 					dict_index_get_page(index));
 	const page_size_t&	page_size = dict_table_page_size(index->table);
+	dberr_t			err = DB_SUCCESS;
 
 	if (root_leaf_rw_latch == RW_X_LATCH) {
 		node_ptr_max_size = dict_index_node_ptr_max_size(index);
@@ -2749,8 +2830,37 @@ btr_cur_open_at_rnd_pos_func(
 
 		tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
 		block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
-					 BUF_GET, file, line, mtr);
+					 BUF_GET, file, line, mtr, false, &err);
 		tree_blocks[n_blocks] = block;
+
+		ut_ad((block != NULL) == (err == DB_SUCCESS));
+
+		if (err != DB_SUCCESS) {
+			if (err == DB_DECRYPTION_FAILED) {
+                               //push_warning_printf(NULL, Sql_condition::SL_WARNING,
+                                       //HA_ERR_DECRYPTION_FAILED, "Table %s in tablespace %u encrypted."
+                                          //"However key management plugin or used key_id is not found or"
+                                          //" used encryption algorithm or method does not match.",
+                                          //table->name.m_name, table->space);
+                                          //
+                               // TODO: Robert na razie olewam, ale bedzie trzeba dodac
+                               ib::warn() << "Table %s is encrypted but encryption service or"
+					     " used key_id is not available. "
+					     " Can't continue reading table.";
+					     //index->table->name;
+
+				//ib_push_warning((void *)NULL,
+					//DB_DECRYPTION_FAILED,
+					//"Table %s is encrypted but encryption service or"
+					//" used key_id is not available. "
+					//" Can't continue reading table.",
+					//index->table->name);
+				index->table->file_unreadable = true;
+			}
+
+			goto exit_loop;
+		}
+
 
 		page = buf_block_get_frame(block);
 
@@ -5589,6 +5699,7 @@ btr_estimate_n_rows_in_range_on_level(
 		mtr_t		mtr;
 		page_t*		page;
 		buf_block_t*	block;
+		dberr_t		err=DB_SUCCESS;
 
 		mtr_start(&mtr);
 
@@ -5600,6 +5711,27 @@ btr_estimate_n_rows_in_range_on_level(
 		block = buf_page_get_gen(page_id, page_size, RW_S_LATCH,
 					 NULL, BUF_GET_POSSIBLY_FREED,
 					 __FILE__, __LINE__, &mtr);
+
+		ut_ad((block != NULL) == (err == DB_SUCCESS));
+
+		if (err != DB_SUCCESS) {
+			if (err == DB_DECRYPTION_FAILED) {
+                                ib::warn() << "Table is encrypted but encryption service or"
+                                        " used key_id is not available. "
+					" Can't continue reading table.";
+
+				//ib_push_warning((void *)NULL,
+					//DB_DECRYPTION_FAILED,
+					//"Table %s is encrypted but encryption service or"
+					//" used key_id is not available. "
+					//" Can't continue reading table.",
+					//index->table->name);
+				index->table->file_unreadable = true;
+			}
+
+			mtr_commit(&mtr);
+			goto inexact;
+		}
 
 		page = buf_block_get_frame(block);
 
@@ -5755,9 +5887,18 @@ btr_estimate_n_rows_in_range_low(
 		should_count_the_left_border
 			= !page_rec_is_supremum(btr_cur_get_rec(&cursor));
 	} else {
-		btr_cur_open_at_index_side(true, index,
+		dberr_t err = btr_cur_open_at_index_side(true, index,
 					   BTR_SEARCH_LEAF | BTR_ESTIMATE,
 					   &cursor, 0, &mtr);
+
+		if (err != DB_SUCCESS) {
+			ib::warn() << " Error code: " << err
+				   << " btr_estimate_n_rows_in_range_low "
+				   << " called from file: "
+				   << __FILE__ << " line: " << __LINE__
+				   << " table: " << index->table->name
+				   << " index: " << index->name;
+		}
 
 		ut_ad(page_rec_is_infimum(btr_cur_get_rec(&cursor)));
 
@@ -5816,9 +5957,18 @@ btr_estimate_n_rows_in_range_low(
 		the requested one (can also be positioned on the 'sup') and
 		we should not count the right border. */
 	} else {
-		btr_cur_open_at_index_side(false, index,
+		dberr_t err = btr_cur_open_at_index_side(false, index,
 					   BTR_SEARCH_LEAF | BTR_ESTIMATE,
 					   &cursor, 0, &mtr);
+
+		if (err != DB_SUCCESS) {
+			ib::warn() << " Error code: " << err
+				   << " btr_estimate_n_rows_in_range_low "
+				   << " called from file: "
+				   << __FILE__ << " line: " << __LINE__
+				   << " table: " << index->table->name
+				   << " index: " << index->name;
+		}
 
 		ut_ad(page_rec_is_supremum(btr_cur_get_rec(&cursor)));
 

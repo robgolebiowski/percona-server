@@ -6099,6 +6099,12 @@ corrupt:
 					<< "is not found or"
 					" used encryption algorithm or method does not match."
 					" Can't continue opening the table.";
+
+                              buf_block_t* block = (buf_block_t *) bpage;
+
+                              ibuf_merge_or_delete_for_page(
+                                      block, bpage->id,
+                                      &bpage->size, TRUE);
 			} else {
                               buf_block_t*	block;
                               ibool		update_ibuf_bitmap;
