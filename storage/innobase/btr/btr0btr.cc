@@ -982,17 +982,20 @@ btr_free_root_check(
 
 	buf_block_t*	block = buf_page_get(
 		page_id, page_size, RW_X_LATCH, mtr);
-	buf_block_dbg_add_level(block, SYNC_TREE_NODE);
 
-	if (fil_page_index_page_check(block->frame)
-	    && index_id == btr_page_get_index_id(block->frame)) {
-		/* This should be a root page.
-		It should not be possible to reassign the same
-		index_id for some other index in the tablespace. */
-		ut_ad(page_is_root(block->frame));
-	} else {
-		block = NULL;
-	}
+	if (block) {
+          buf_block_dbg_add_level(block, SYNC_TREE_NODE);
+
+          if (fil_page_index_page_check(block->frame)
+              && index_id == btr_page_get_index_id(block->frame)) {
+                  /* This should be a root page.
+                  It should not be possible to reassign the same
+                  index_id for some other index in the tablespace. */
+                  ut_ad(page_is_root(block->frame));
+          } else {
+                  block = NULL;
+          }
+        }
 
 	return(block);
 }

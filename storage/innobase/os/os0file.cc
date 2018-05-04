@@ -9626,8 +9626,8 @@ Encryption::encrypt(
         ut_ad(page_no != 0); 
 #endif
 
-	ulint page_numer = mach_read_from_4(src + FIL_PAGE_OFFSET);
-        ut_ad(page_numer != 0);
+	//ulint page_numer = mach_read_from_4(src + FIL_PAGE_OFFSET);
+        //ut_ad(page_numer != 0);
 
 	/* Shouldn't encrypte an already encrypted page. */
 	ut_ad(page_type != FIL_PAGE_ENCRYPTED

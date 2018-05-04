@@ -6885,8 +6885,10 @@ fil_iterate(
 		ut_ad(!(n_bytes % iter.page_size));
 
                 //TODO:Robert: I am not using those variables
-                //const bool	encrypted = iter.crypt_data != NULL
-				 //&& iter.crypt_data->should_encrypt();
+                const bool	encrypted_with_rotated_keys = iter.crypt_data != NULL
+                                                              && iter.crypt_data->should_encrypt(); // TODO:Robert: to jest chyba zle w MariaDB
+                                                                                                    // powinni sprawdzać czy tablica jest zaszyfrowana
+                                                                                                    // a nie czy obecny server should encrypt
                 //bool		decrypted = false;
 
 		dberr_t		err;
@@ -6894,17 +6896,17 @@ fil_iterate(
 		//ulint	space_flags = callback.get_space_flags();
 
 		/* For encrypted table, set encryption information. */
-		if (iter.encryption_key != NULL && offset != 0) {
+		if ((iter.encryption_key != NULL || encrypted_with_rotated_keys) && offset != 0) {
 			read_request.encryption_key(iter.encryption_key,
 						    ENCRYPTION_KEY_LEN,
-						    iter.encryption_iv,
+						    encrypted_with_rotated_keys ? iter.crypt_data->iv : iter.encryption_iv,
                                                     0, //TODO:Robert - maybe I should not set key version to 0 here, but to something like invalid key?
                                                     iter.encryption_key_id);
 
 			//read_request.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space_flags) ? Encryption::ROTATED_KEYS
                                                                                                   //: Encryption::AES);
-                          read_request.encryption_algorithm(iter.crypt_data ? Encryption::ROTATED_KEYS
-                                                                            : Encryption::AES);
+                          read_request.encryption_algorithm(encrypted_with_rotated_keys ? Encryption::ROTATED_KEYS
+                                                                                        : Encryption::AES);
 
 		}
 
@@ -6950,10 +6952,9 @@ fil_iterate(
                 //TODO:Robert: fil_tablespace_iterate
 		/* For encrypted table, set encryption information. */
 
-
                 //TODO:Robert: getting latest key can be moved here - as it is only needed
                 //if the updated flag is set!
-		if (iter.encryption_key != NULL && offset != 0) {
+		if (iter.encryption_key != NULL && offset != 0 && iter.crypt_data == NULL) {
 			write_request.encryption_key(iter.encryption_key,
 						     ENCRYPTION_KEY_LEN,
 						     iter.encryption_iv,
@@ -6962,6 +6963,20 @@ fil_iterate(
 			write_request.encryption_algorithm(iter.crypt_data ? Encryption::ROTATED_KEYS
                                                                            : Encryption::AES);
 		}
+                else if (offset != 0 && iter.crypt_data)
+                {
+                       uint tablespace_key_version;
+		       byte* tablespace_key;
+
+                       Encryption::get_latest_tablespace_key_or_create_new_one(iter.crypt_data->key_id, &tablespace_key_version, &tablespace_key);
+
+			write_request.encryption_key(tablespace_key,
+						     ENCRYPTION_KEY_LEN,
+						     iter.crypt_data->iv,
+                                                     tablespace_key_version,
+                                                     iter.crypt_data->key_id);
+                        write_request.encryption_algorithm(Encryption::ROTATED_KEYS);
+                }
 
 		/* A page was updated in the set, write back to disk.
 		Note: We don't have the compression algorithm, we write
@@ -7118,7 +7133,7 @@ fil_tablespace_iterate(
                   iter.encryption_iv = iter.crypt_data->iv; //TODO:Robert:This should be safe, we calll fil_iterate and then we call
                   iter.encryption_key_id = iter.crypt_data->key_id;
                   
-                  ut_ad(iter.encryption_key == NULL);
+                  //ut_ad(iter.encryption_key == NULL); //TODO:Robert - this is not true for import
                   Encryption::get_latest_tablespace_key_or_create_new_one(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
                   //Encryption::get_latest_tablespace_key(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
                   //if (iter.encryption_key != NULL)

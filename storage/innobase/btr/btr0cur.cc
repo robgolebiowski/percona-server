@@ -1135,7 +1135,15 @@ retry_page_get:
 				//" used key_id is not available. "
 				//" Can't continue reading table.",
 				/*index->table->name);*/
+
+				page_cursor->block = 0;
+				page_cursor->rec = 0;
 			index->table->file_unreadable = true;
+                        if (estimate) {
+
+                                cursor->path_arr->nth_rec =
+                                        ULINT_UNDEFINED;
+                        }
 		}
 
 		goto func_exit;
@@ -1259,6 +1267,13 @@ retry_page_get:
                                         ib::warn() << "Table is encrypted but encryption service or"
 						" used key_id is not available. "
 						" Can't continue reading table.";
+                                if (estimate) {
+
+                                        page_cursor->block = 0;
+                                        page_cursor->rec = 0;
+                                        cursor->path_arr->nth_rec =
+                                                ULINT_UNDEFINED;
+                                }
 
 					//ib_push_warning((void *)NULL,
 						//DB_DECRYPTION_FAILED,
@@ -1299,6 +1314,13 @@ retry_page_get:
 					//" used key_id is not available. "
 					//" Can't continue reading table.",
 					//index->table->name);
+                                if (estimate) {
+                                        page_cursor->block = 0;
+                                        page_cursor->rec = 0;
+
+                                        cursor->path_arr->nth_rec =
+                                                ULINT_UNDEFINED;
+                                }
 				index->table->file_unreadable = true;
 			}
 
@@ -2360,10 +2382,16 @@ btr_cur_open_at_index_side_func(
 					" used key_id is not available. "
 					" Can't continue reading table.";
 					///index->table->name);
+                                page_cursor->block = 0;
+                                page_cursor->rec = 0;
+                                if (estimate) {
 
-				//ib_push_warning((void *)NULL,
-					//DB_DECRYPTION_FAILED,
-					//"Table %s is encrypted but encryption service or"
+                                        cursor->path_arr->nth_rec = ULINT_UNDEFINED;
+                                }
+
+                                  //ib_push_warning((void *)NULL,
+                                          //DB_DECRYPTION_FAILED,
+                                          //"Table %s is encrypted but encryption service or"
 					//" used key_id is not available. "
 					//" Can't continue reading table.",
 					//index->table->name);
@@ -2374,7 +2402,7 @@ btr_cur_open_at_index_side_func(
 
 		page = buf_block_get_frame(block);
 
-		SRV_CORRUPT_TABLE_CHECK(page || err == DB_DECRYPTION_FAILED,
+		SRV_CORRUPT_TABLE_CHECK(page,
 		{
 			page_cursor->block = 0;
 			page_cursor->rec = 0;
@@ -2849,6 +2877,8 @@ btr_cur_open_at_rnd_pos_func(
 					     " Can't continue reading table.";
 					     //index->table->name;
 
+                                page_cursor->block = 0;
+                                page_cursor->rec = 0;
 				//ib_push_warning((void *)NULL,
 					//DB_DECRYPTION_FAILED,
 					//"Table %s is encrypted but encryption service or"
@@ -5876,16 +5906,19 @@ btr_estimate_n_rows_in_range_low(
 					    &cursor, 0,
 					    __FILE__, __LINE__, &mtr);
 
-		ut_ad(!page_rec_is_infimum(btr_cur_get_rec(&cursor)));
+                if (index->is_readable())
+                {
+                  ut_ad(!page_rec_is_infimum(btr_cur_get_rec(&cursor)));
 
-		/* We should count the border if there are any records to
-		match the criteria, i.e. if the maximum record on the tree is
-		5 and x > 3 is specified then the cursor will be positioned at
-		5 and we should count the border, but if x > 7 is specified,
-		then the cursor will be positioned at 'sup' on the rightmost
-		leaf page in the tree and we should not count the border. */
-		should_count_the_left_border
-			= !page_rec_is_supremum(btr_cur_get_rec(&cursor));
+                  /* We should count the border if there are any records to
+                  match the criteria, i.e. if the maximum record on the tree is
+                  5 and x > 3 is specified then the cursor will be positioned at
+                  5 and we should count the border, but if x > 7 is specified,
+                  then the cursor will be positioned at 'sup' on the rightmost
+                  leaf page in the tree and we should not count the border. */
+                  should_count_the_left_border
+                          = !page_rec_is_supremum(btr_cur_get_rec(&cursor));
+                }
 	} else {
 		dberr_t err = btr_cur_open_at_index_side(true, index,
 					   BTR_SEARCH_LEAF | BTR_ESTIMATE,
@@ -5900,16 +5933,23 @@ btr_estimate_n_rows_in_range_low(
 				   << " index: " << index->name;
 		}
 
-		ut_ad(page_rec_is_infimum(btr_cur_get_rec(&cursor)));
+                if (index->is_readable())
+                {
+                  ut_ad(page_rec_is_infimum(btr_cur_get_rec(&cursor)));
 
-		/* The range specified is wihout a left border, just
-		'x < 123' or 'x <= 123' and btr_cur_open_at_index_side()
-		positioned the cursor on the infimum record on the leftmost
-		page, which must not be counted. */
-		should_count_the_left_border = false;
+                  /* The range specified is wihout a left border, just
+                  'x < 123' or 'x <= 123' and btr_cur_open_at_index_side()
+                  positioned the cursor on the infimum record on the leftmost
+                  page, which must not be counted. */
+                  should_count_the_left_border = false;
+                }
 	}
 
 	mtr_commit(&mtr);
+
+	if (!index->is_readable()) {
+		return 0;
+	}
 
 #ifdef UNIV_DEBUG
 	if (!strcmp(index->name, "iC")) {

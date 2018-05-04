@@ -2411,11 +2411,22 @@ dict_stats_save(
 	char		db_utf8[MAX_DB_UTF8_LEN];
 	char		table_utf8[MAX_TABLE_UTF8_LEN];
 
+    
+
 	if (!table_orig->is_readable()) {
 		return (dict_stats_report_error(table_orig));
 	}
 
 	table = dict_stats_snapshot_create(table_orig);
+
+        ib::error() << "Saving stats for table "
+			<< table->name;
+        if (table_orig->is_readable())
+          ib::error() << ':' << "is readable" << '\n';
+        else
+          ib::error() << ':' << "is not readable" << '\n';
+
+
 
 	dict_fs2utf8(table->name.m_name, db_utf8, sizeof(db_utf8),
 		     table_utf8, sizeof(table_utf8));

@@ -2207,6 +2207,9 @@ convert_error_code_to_mysql(
 	case DB_TABLE_NOT_FOUND:
 		return(HA_ERR_NO_SUCH_TABLE);
 
+	case DB_DECRYPTION_FAILED:
+		return(HA_ERR_DECRYPTION_FAILED);
+
 	case DB_TABLESPACE_NOT_FOUND:
 		return(HA_ERR_TABLESPACE_MISSING);
 
@@ -13564,7 +13567,7 @@ ha_innobase::discard_or_import_tablespace(
 		err = row_discard_tablespace_for_mysql(
 			dict_table->name.m_name, m_prebuilt->trx);
 
-	} else if (!dict_table->is_readable()) {
+	} else if (dict_table->is_readable()) {
 		/* Commit the transaction in order to
 		release the table lock. */
 		trx_commit_for_mysql(m_prebuilt->trx);
@@ -15922,13 +15925,24 @@ ha_innobase::check(
 			break;
 		}
 		if (ret != DB_SUCCESS) {
-			/* Assume some kind of corruption. */
-			push_warning_printf(
-				thd, Sql_condition::SL_WARNING,
-				ER_NOT_KEYFILE,
-				"InnoDB: The B-tree of"
-				" index %s is corrupted.",
-				index->name());
+                        if (ret == DB_DECRYPTION_FAILED) {
+                                push_warning_printf(
+                                        thd,
+                                        Sql_condition::SL_WARNING,
+                                        ER_NO_SUCH_TABLE,
+                                        "Table %s is encrypted but encryption service or"
+                                        " used key_id is not available. "
+                                        " Can't continue checking table.",
+                                        index->table->name.m_name);
+                        } else {
+                          /* Assume some kind of corruption. */
+                          push_warning_printf(
+                                  thd, Sql_condition::SL_WARNING,
+                                  ER_NOT_KEYFILE,
+                                  "InnoDB: The B-tree of"
+                                  " index %s is corrupted.",
+                                  index->name());
+                        }
 			is_ok = false;
 			dict_set_corrupted(
 				index, m_prebuilt->trx, "CHECK TABLE-check index");
@@ -18148,8 +18162,13 @@ ha_innobase::get_error_message(
 {
 	trx_t*	trx = check_trx_exists(ha_thd());
 
-	buf->copy(trx->detailed_error, (uint) strlen(trx->detailed_error),
-		system_charset_info);
+	if (error == HA_ERR_DECRYPTION_FAILED) {
+		const char *msg = "Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.";
+		buf->copy(msg, (uint)strlen(msg), system_charset_info);
+	} else {
+		buf->copy(trx->detailed_error, (uint) strlen(trx->detailed_error),
+			system_charset_info);
+	}
 
 	return(FALSE);
 }

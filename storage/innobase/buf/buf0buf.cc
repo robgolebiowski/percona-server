@@ -5765,6 +5765,7 @@ static
 dberr_t 
 buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 {
+	//DBUG_ENTER("buf_page_check_corrupt");
         //TODO:Robert - to trzeba jeszcze dodać
 	//ut_ad(space->n_pending_ios > 0);
 	byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
@@ -5779,6 +5780,13 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
         //bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
 	bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
+
+	ulint page_no = mach_read_from_4(dst_frame + FIL_PAGE_OFFSET);
+
+        if (page_no == 0)
+          ut_ad(original_page_type != FIL_PAGE_ENCRYPTED);
+        //ut_ad(page_no == 0 && original_page_type != FIL_PAGE_ENCRYPTED);
+
 
 	/* In buf_decrypt_after_read we have either decrypted the page if
 	page post encryption checksum matches and used key_id is found
@@ -5897,6 +5905,11 @@ buf_page_io_complete(
 		}
 
                 dberr_t	err;
+
+                if (space->crypt_data && 
+                    space->crypt_data->type != CRYPT_SCHEME_UNENCRYPTED)
+                  bpage->encrypted= TRUE;
+                   
 
 		if (bpage->size.is_compressed()) {
 			frame = bpage->zip.data;

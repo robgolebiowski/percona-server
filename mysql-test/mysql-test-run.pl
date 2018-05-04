@@ -4597,6 +4597,10 @@ sub run_testcase ($) {
   # -------------------------------------------------------
   my $timezone= timezone($tinfo);
   $ENV{'TZ'}= $timezone;
+  $ENV{MTR_SUITE_DIR} = $tinfo->{suite}->{dir};
+
+  mtr_verbose("MTR_SUITE_DIR: '$tinfo->{suite}->{dir}'");
+
   mtr_verbose("Setting timezone: $timezone");
 
   if ( ! using_extern() )

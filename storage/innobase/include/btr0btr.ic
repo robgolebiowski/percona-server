@@ -67,9 +67,9 @@ btr_block_get_func(
 		if (index && index->table) {
 			index->table->file_unreadable = true;
 		}
-	}
-
-	SRV_CORRUPT_TABLE_CHECK(block, ; /* do nothing */);
+	} 
+        else
+          SRV_CORRUPT_TABLE_CHECK(block, ; /* do nothing */);
 
 	if (block && mode != RW_NO_LATCH) {
 
