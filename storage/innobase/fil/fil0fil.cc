@@ -6968,6 +6968,12 @@ fil_iterate(
                        uint tablespace_key_version;
 		       byte* tablespace_key;
 
+          //if (m_key != NULL)
+            //memset(m_key, 0, MY_AES_BLOCK_SIZE);
+          //m_key = NULL;
+          //size_t key_len;
+                       //Encryption::get_tablespace_key(iter.crypt_data->key_id, uuid, key_version, &m_key, &key_len);
+
                        Encryption::get_latest_tablespace_key_or_create_new_one(iter.crypt_data->key_id, &tablespace_key_version, &tablespace_key);
 
 			write_request.encryption_key(tablespace_key,
@@ -7134,7 +7140,11 @@ fil_tablespace_iterate(
                   iter.encryption_key_id = iter.crypt_data->key_id;
                   
                   //ut_ad(iter.encryption_key == NULL); //TODO:Robert - this is not true for import
-                  Encryption::get_latest_tablespace_key_or_create_new_one(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  //Encryption::get_latest_tablespace_key_or_create_new_one(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  Encryption::get_latest_tablespace_key(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  if (iter.encryption_key == NULL)
+                    err= DB_DECRYPTION_FAILED;
+                  
                   //Encryption::get_latest_tablespace_key(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
                   //if (iter.encryption_key != NULL)
                     //my_free(iter.encryption_key); 
@@ -7151,7 +7161,7 @@ fil_tablespace_iterate(
 
 		/* Check encryption is matched or not. */
 		//ulint	space_flags = callback.get_space_flags();
-		if (FSP_FLAGS_GET_ENCRYPTION(space_flags)) {  //TODO:Robert: For now disabling this for 'ROTATED_KEYS'
+		if (err == DB_SUCCESS && FSP_FLAGS_GET_ENCRYPTION(space_flags)) {  //TODO:Robert: For now disabling this for 'ROTATED_KEYS'
 			ut_ad(table->encryption_key != NULL);
 
 			if (!dict_table_is_encrypted(table)) {
@@ -7197,12 +7207,14 @@ fil_tablespace_iterate(
 
 			err = fil_iterate(iter, block, callback);
 
-			if (iter.crypt_data) {
-				fil_space_destroy_crypt_data(&iter.crypt_data);
-			}
 
 			ut_free(io_buffer);
 		}
+
+	        if (iter.crypt_data) {
+		     fil_space_destroy_crypt_data(&iter.crypt_data);
+         	}
+
 	}
 
 	if (err == DB_SUCCESS) {
