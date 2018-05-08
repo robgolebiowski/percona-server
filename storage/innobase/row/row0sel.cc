@@ -4438,7 +4438,7 @@ row_search_no_mvcc(
                                                 //" used key_id is not available. "
                                                 //" Can't continue reading table.",
                                                 //prebuilt->table->name);
-                                        index->table->file_unreadable = true;
+                                        index->table->set_file_unreadable();
                                 }
                                 return (err);
                         }
@@ -5241,7 +5241,7 @@ wait_table_again:
 					//" used key_id is not available. "
 					//" Can't continue reading table.",
 					//prebuilt->table->name);
-				index->table->file_unreadable = true;
+				index->table->set_file_unreadable();
 			}
 			rec = NULL;
 			goto lock_wait_or_error;

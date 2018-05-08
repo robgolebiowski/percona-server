@@ -5750,7 +5750,7 @@ dict_set_encrypted_by_space(ulint	space_id)
 	table = dict_find_single_table_by_space(space_id);
 
         if (table)
-            table->file_unreadable = true;
+            table->set_file_unreadable();
 }
 
 /**********************************************************************//**
@@ -5773,7 +5773,7 @@ dict_set_corrupted_by_space(
 	/* mark the table->corrupted bit only, since the caller
 	could be too deep in the stack for SYS_INDEXES update */
 	table->corrupted = TRUE;
-        table->file_unreadable = true;
+        table->set_file_unreadable();
 
 	return(TRUE);
 }

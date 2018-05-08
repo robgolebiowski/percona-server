@@ -5768,10 +5768,19 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 	//DBUG_ENTER("buf_page_check_corrupt");
         //TODO:Robert - to trzeba jeszcze dodać
 	//ut_ad(space->n_pending_ios > 0);
+        //
+        DBUG_PRINT("Robert", ("Checking if page : "UINT32PF":"UINT32PF" is corrupted",
+                            bpage->id.space(), bpage->id.page_no()));
+
+        ib_uint32_t space_id = bpage->id.space();
+        ib_uint32_t page_no = bpage->id.page_no();
+
+        ib::info() << "Checking if is corrupted for space = " << space_id << " page_id = " << page_no;
 	byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
 		((buf_block_t*) bpage)->frame;
 #ifdef UNIV_INNOCHECKSUM
         return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
+        //return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space())) ? DB_PAGE_CORRUPTED : DB_SUCCESS;
 #else
 
         dberr_t err = DB_SUCCESS;
@@ -5781,9 +5790,9 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         //bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
 	bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
 
-	ulint page_no = mach_read_from_4(dst_frame + FIL_PAGE_OFFSET);
-
-        if (page_no == 0)
+        //ulint page_no = mach_read_from_4(dst_frame + FIL_PAGE_OFFSET);
+        if (bpage->id.page_no() == 0)
+        //if (page_no == 0)
           ut_ad(original_page_type != FIL_PAGE_ENCRYPTED);
         //ut_ad(page_no == 0 && original_page_type != FIL_PAGE_ENCRYPTED);
 

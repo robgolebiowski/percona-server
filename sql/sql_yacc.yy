@@ -6016,6 +6016,7 @@ create_table_option:
 	  }
         | ENCRYPTION_KEY_ID_SYM opt_equal real_ulong_num
           {
+            Lex->create_info.used_fields|= HA_CREATE_ENCRYPTION_KEY_ID;
             Lex->create_info.encryption_key_id= $3;
           }
         | AUTO_INC opt_equal ulonglong_num

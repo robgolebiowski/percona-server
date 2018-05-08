@@ -6895,9 +6895,10 @@ fil_iterate(
 		IORequest	read_request(read_type);
 		//ulint	space_flags = callback.get_space_flags();
 
+
 		/* For encrypted table, set encryption information. */
 		if ((iter.encryption_key != NULL || encrypted_with_rotated_keys) && offset != 0) {
-			read_request.encryption_key(iter.encryption_key,
+			read_request.encryption_key(encrypted_with_rotated_keys ? NULL : iter.encryption_key,
 						    ENCRYPTION_KEY_LEN,
 						    encrypted_with_rotated_keys ? iter.crypt_data->iv : iter.encryption_iv,
                                                     0, //TODO:Robert - maybe I should not set key version to 0 here, but to something like invalid key?
@@ -6965,8 +6966,8 @@ fil_iterate(
 		}
                 else if (offset != 0 && iter.crypt_data)
                 {
-                       uint tablespace_key_version;
-		       byte* tablespace_key;
+                       //uint tablespace_key_version;
+		       //byte* tablespace_key;
 
           //if (m_key != NULL)
             //memset(m_key, 0, MY_AES_BLOCK_SIZE);
@@ -6974,13 +6975,19 @@ fil_iterate(
           //size_t key_len;
                        //Encryption::get_tablespace_key(iter.crypt_data->key_id, uuid, key_version, &m_key, &key_len);
 
-                       Encryption::get_latest_tablespace_key_or_create_new_one(iter.crypt_data->key_id, &tablespace_key_version, &tablespace_key);
+                       //Encryption::get_latest_tablespace_key_or_create_new_one(iter.crypt_data->key_id, &tablespace_key_version, &tablespace_key);
 
-			write_request.encryption_key(tablespace_key,
+			//write_request.encryption_key(tablespace_key,
+						     //ENCRYPTION_KEY_LEN,
+						     //iter.crypt_data->iv,
+                                                     //tablespace_key_version,
+                                                     //iter.crypt_data->key_id);
+			write_request.encryption_key(iter.encryption_key,
 						     ENCRYPTION_KEY_LEN,
-						     iter.crypt_data->iv,
-                                                     tablespace_key_version,
+						     iter.encryption_iv,
+                                                     iter.encryption_key_version,
                                                      iter.crypt_data->key_id);
+
                         write_request.encryption_algorithm(Encryption::ROTATED_KEYS);
                 }
 
@@ -7141,7 +7148,7 @@ fil_tablespace_iterate(
                   
                   //ut_ad(iter.encryption_key == NULL); //TODO:Robert - this is not true for import
                   //Encryption::get_latest_tablespace_key_or_create_new_one(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
-                  Encryption::get_latest_tablespace_key(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  Encryption::get_latest_tablespace_key(iter.crypt_data->key_id, &iter.encryption_key_version, &iter.encryption_key);
                   if (iter.encryption_key == NULL)
                     err= DB_DECRYPTION_FAILED;
                   
@@ -7214,7 +7221,8 @@ fil_tablespace_iterate(
 	        if (iter.crypt_data) {
 		     fil_space_destroy_crypt_data(&iter.crypt_data);
          	}
-
+                if (iter.encryption_key != NULL)
+                  my_free(iter.encryption_key);
 	}
 
 	if (err == DB_SUCCESS) {

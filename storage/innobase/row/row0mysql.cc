@@ -4472,7 +4472,7 @@ row_discard_tablespace(
 		/* All persistent operations successful, update the
 		data dictionary memory cache. */
 
-		table->file_unreadable = TRUE;
+		table->set_file_unreadable();
 
 		table->flags2 |= DICT_TF2_DISCARDED;
 

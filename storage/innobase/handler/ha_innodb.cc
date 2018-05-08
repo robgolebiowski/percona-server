@@ -6707,7 +6707,7 @@ ha_innobase::open(
 
 		/* Mark this table as corrupted, so the drop table
 		or force recovery can still use it, but not others. */
-		ib_table->file_unreadable = true;
+		ib_table->set_file_unreadable();
 		ib_table->corrupted = true;
 		dict_table_close(ib_table, FALSE, FALSE);
 		ib_table = NULL;
@@ -11263,8 +11263,13 @@ err_col:
                   else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
                   {
                       rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
-                      encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
-                                                                           // TODO: To będzie też sprawdzane w check_table z crypt_data
+
+                      if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
+                         encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
+                                                                              // TODO: To będzie też sprawdzane w check_table z crypt_data
+                                                                             // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
+                      else
+                        encryption_key_id= 0;
                   }
                 }
 		else {
@@ -13557,7 +13562,7 @@ ha_innobase::discard_or_import_tablespace(
 		user may want to set the DISCARD flag in order to IMPORT
 		a new tablespace. */
 
-		if (dict_table->is_readable()) {
+		if (!dict_table->is_readable()) {
 			ib_senderrf(
 				m_prebuilt->trx->mysql_thd,
 				IB_LOG_LEVEL_WARN, ER_TABLESPACE_MISSING,

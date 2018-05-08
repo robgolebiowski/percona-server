@@ -7724,7 +7724,7 @@ commit_try_rebuild(
 	/* The new table must inherit the flag from the
 	"parent" table. */
 	if (dict_table_is_discarded(user_table)) {
-		rebuilt_table->file_unreadable = true;
+		rebuilt_table->set_file_unreadable();
 		rebuilt_table->flags2 |= DICT_TF2_DISCARDED;
 	}
 
@@ -8253,7 +8253,7 @@ alter_stats_rebuild(
 	DBUG_EXECUTE_IF(
 		"ib_rename_index_fail2",
 		file_unreadable_orig = table->file_unreadable;
-		table->file_unreadable = TRUE;
+		table->set_file_unreadable();
 	);
 
 	dberr_t	ret = dict_stats_update(table, DICT_STATS_RECALC_PERSISTENT);

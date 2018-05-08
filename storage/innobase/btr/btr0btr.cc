@@ -178,7 +178,7 @@ btr_root_block_get(
 
 	if (!block) {
 		if (index && index->table) {
-			index->table->file_unreadable = true;
+			index->table->set_file_unreadable();
 
                         ib::warn() << "Table in tablespace is encrypted but encryption service or"
 				" used key_id is not available. "

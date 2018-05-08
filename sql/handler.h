@@ -515,6 +515,8 @@ given at all. */
 /** COMPRESSION="zlib|lz4|none" used during table create. */
 #define HA_CREATE_USED_COMPRESS         (1L << 26)
 
+#define HA_CREATE_ENCRYPTION_KEY_ID     (1L << 31)
+
 /*
   This is master database for most of system tables. However there
   can be other databases which can hold system tables. Respective

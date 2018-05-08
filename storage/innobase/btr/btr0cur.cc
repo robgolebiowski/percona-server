@@ -1138,7 +1138,7 @@ retry_page_get:
 
 				page_cursor->block = 0;
 				page_cursor->rec = 0;
-			index->table->file_unreadable = true;
+			index->table->set_file_unreadable();
                         if (estimate) {
 
                                 cursor->path_arr->nth_rec =
@@ -1281,7 +1281,7 @@ retry_page_get:
 						//" used key_id is not available. "
 						//" Can't continue reading table.",
 						//index->table->name);
-					index->table->file_unreadable = true;
+					index->table->set_file_unreadable();
 				}
 
 				goto func_exit;
@@ -1321,7 +1321,7 @@ retry_page_get:
                                         cursor->path_arr->nth_rec =
                                                 ULINT_UNDEFINED;
                                 }
-				index->table->file_unreadable = true;
+				index->table->set_file_unreadable();
 			}
 
 			goto func_exit;
@@ -2395,7 +2395,7 @@ btr_cur_open_at_index_side_func(
 					//" used key_id is not available. "
 					//" Can't continue reading table.",
 					//index->table->name);
-				index->table->file_unreadable = true;
+				index->table->set_file_unreadable();
 			}
 			goto exit_loop;
 		}
@@ -2885,7 +2885,7 @@ btr_cur_open_at_rnd_pos_func(
 					//" used key_id is not available. "
 					//" Can't continue reading table.",
 					//index->table->name);
-				index->table->file_unreadable = true;
+				index->table->set_file_unreadable();
 			}
 
 			goto exit_loop;
@@ -5756,7 +5756,7 @@ btr_estimate_n_rows_in_range_on_level(
 					//" used key_id is not available. "
 					//" Can't continue reading table.",
 					//index->table->name);
-				index->table->file_unreadable = true;
+				index->table->set_file_unreadable();
 			}
 
 			mtr_commit(&mtr);

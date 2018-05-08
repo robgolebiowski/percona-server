@@ -2841,7 +2841,7 @@ dict_load_table_low(
 	*table = dict_mem_table_create(
 		name.m_name, space_id, n_cols + n_v_col, n_v_col, flags, flags2);
 	(*table)->id = table_id;
-	(*table)->file_unreadable = false;
+	(*table)->set_file_readable();
 
 	return(NULL);
 }
@@ -3060,13 +3060,13 @@ dict_load_tablespace(
 	if (table->flags2 & DICT_TF2_DISCARDED) {
 		ib::warn() << "Tablespace for table " << table->name
 			<< " is set as discarded.";
-		table->file_unreadable = TRUE;
+		table->set_file_unreadable();
 		return;
 	}
 
 	if (dict_table_is_temporary(table)) {
 		/* Do not bother to retry opening temporary tables. */
-		table->file_unreadable = TRUE;
+		table->set_file_unreadable();
 		return;
 	}
 
@@ -3152,7 +3152,7 @@ dict_load_tablespace(
 
 	if (err != DB_SUCCESS) {
 		/* We failed to find a sensible tablespace file */
-		table->file_unreadable = TRUE;
+		table->set_file_unreadable();
 	}
 
 	ut_free(shared_space_name);

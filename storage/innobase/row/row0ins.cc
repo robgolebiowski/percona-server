@@ -2503,7 +2503,7 @@ row_ins_clust_index_entry_low(
 	err = btr_pcur_open(index, entry, PAGE_CUR_LE, mode, &pcur, &mtr);
 
 	if (err != DB_SUCCESS) {
-		index->table->file_unreadable = true;
+		index->table->set_file_unreadable();
 		mtr.commit();
 		goto func_exit;
 	}
@@ -3018,7 +3018,7 @@ row_ins_sec_index_entry_low(
 				//" used key_id is not available. "
 				//" Can't continue reading table.",
 				//index->table->name);
-			index->table->file_unreadable = true;
+			index->table->set_file_unreadable();
 		}
 		goto func_exit;
 	}

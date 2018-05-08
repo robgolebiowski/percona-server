@@ -78,6 +78,7 @@ Created 10/21/1995 Heikki Tuuri
 #ifdef UNIV_DEBUG
 /** Set when InnoDB has invoked exit(). */
 bool	innodb_calling_exit;
+#include <ut0ut.h>
 #endif /* UNIV_DEBUG */
 
 #include <my_aes.h>
@@ -9622,8 +9623,9 @@ Encryption::encrypt(
 	ut_print_buf(stderr, m_key, ENCRYPTION_KEY_LEN);
         fprintf(stderr, "\nand iv:");
 	ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
+        fprintf(stderr, "key_version:%u", m_key_version);
         fprintf(stderr, "\n");
-        ut_ad(page_no != 0); 
+        //ut_ad(page_no != 0); 
 #endif
 
 	//ulint page_numer = mach_read_from_4(src + FIL_PAGE_OFFSET);
@@ -9695,6 +9697,8 @@ Encryption::encrypt(
 	remain_len = data_len - main_len;
 
 	/* Only encrypt the data + trailer, leave the header alone */
+
+        //memset(m_iv, 0, ENCRYPTION_KEY_LEN/2);
 
 	switch (m_type) {
 	case Encryption::NONE:
@@ -9844,6 +9848,9 @@ Encryption::encrypt(
 
 	  fprintf(stderr, "Robert: Comparing before and after encryption");
 
+          if (m_type == Encryption::ROTATED_KEYS) // TODO:Robert:For decryption ROTATED_KEYS page key needs to be set to NULL
+            m_key = NULL;
+
           dberr_t err = decrypt(type, check_buf, src_len, buf2, src_len);
           if (err != DB_SUCCESS || memcmp(src + FIL_PAGE_DATA,
                                           check_buf + FIL_PAGE_DATA,
@@ -9913,20 +9920,6 @@ Encryption::decrypt(
 #endif
 	}
 
-	//ulint space_id =
-		//mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-
-//#ifdef UNIV_ENCRYPT_DEBUG
-	//ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
-
-	//fprintf(stderr, "Decrypting page:%lu.%lu len:%lu\n",
-		//space_id, page_no, src_len);
-        //fprintf(stderr, "with key:");
-	//ut_print_buf(stderr, m_key, ENCRYPTION_KEY_LEN);
-        //fprintf(stderr, "\nand iv:");
-	//ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
-        //fprintf(stderr, "\n");
-//#endif
 
 	original_type = static_cast<uint16_t>(
 		mach_read_from_2(src + FIL_PAGE_ORIGINAL_TYPE_V1));
@@ -9962,16 +9955,20 @@ Encryption::decrypt(
             ut_ad(page_type == FIL_PAGE_ENCRYPTED);
           }
 
+          ut_ad(key_version == 0);
 
-          if (m_key != NULL)
-            memset(m_key, 0, MY_AES_BLOCK_SIZE);
-          m_key = NULL;
+          ut_ad(m_key == NULL); // TODO:Robert: For rottated keys encryption we will just now fetch the key
+          //if (m_key == NULL)
+            //memset(m_key, 0, ENCRYPTION_KEY_LEN);
+          //m_key = NULL;
           size_t key_len;
           get_tablespace_key(m_key_id, uuid, key_version, &m_key, &key_len);
+          //get_tablespace_key(m_key_id, uuid, 0, &m_key, &key_len);
           m_klen = static_cast<ulint>(key_len);
           if (m_key == NULL)
             return (DB_IO_DECRYPT_FAIL);
         }
+        
         //else
 	  //data_len = src_len - FIL_PAGE_DATA;
           //
@@ -9984,7 +9981,10 @@ Encryption::decrypt(
 	remain_len = data_len - main_len;
 
 #ifdef UNIV_ENCRYPT_DEBUG
-	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
+        ulint space_id =
+                mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+
+        ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 
 	fprintf(stderr, "Decrypting page:%lu.%lu len:%lu\n",
 		space_id, page_no, src_len);
@@ -9998,6 +9998,7 @@ Encryption::decrypt(
 
 
         ut_ad(m_iv != NULL);
+        //memset(m_iv, 0, ENCRYPTION_KEY_LEN/2);
 
 	switch(m_type) {
         case Encryption::ROTATED_KEYS:
@@ -10113,19 +10114,16 @@ Encryption::decrypt(
 
 	if (page_type == FIL_PAGE_ENCRYPTED) {
 		mach_write_to_2(src + FIL_PAGE_TYPE, original_type);
-		//mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, 0);
-                //TODO:Robert:Added by me
-                mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
-	} else if (page_type == FIL_PAGE_ENCRYPTED_RTREE) {
+        } else if (page_type == FIL_PAGE_ENCRYPTED_RTREE) {
 		mach_write_to_2(src + FIL_PAGE_TYPE, FIL_PAGE_RTREE);
-                //TODO:Robert:Added by me
-                mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
 	} else {
 		ut_ad(page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED);
 		mach_write_to_2(src + FIL_PAGE_TYPE, FIL_PAGE_COMPRESSED);
-                //TODO:Robert:Added by me
-                mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
 	}
+
+        //TODO:Robert:Added by me
+        if (original_type != FIL_PAGE_TYPE_ALLOCATED)
+               mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
 
 	if (block != NULL) {
 		os_free_block(block);

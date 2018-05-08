@@ -2148,7 +2148,7 @@ row_import_discard_changes(
 		index->space = FIL_NULL;
 	}
 
-	table->file_unreadable = TRUE;
+	table->set_file_unreadable();
 
 	fil_close_tablespace(trx, table->space);
 }
@@ -4000,7 +4000,7 @@ row_import_for_mysql(
 		return(row_import_error(prebuilt, trx, err));
 	}
 
-	table->file_unreadable = false;
+	table->set_file_readable();
 	table->flags2 &= ~DICT_TF2_DISCARDED;
 
 	/* Set autoinc value read from cfg file. The value is set to zero

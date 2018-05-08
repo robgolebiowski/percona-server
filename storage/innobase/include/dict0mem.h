@@ -1356,6 +1356,16 @@ struct dict_table_t {
 		return(UNIV_LIKELY(!file_unreadable));
 	}
 
+        void set_file_unreadable()
+        {
+                file_unreadable = true;
+        }
+
+        void set_file_readable()
+        {
+                file_unreadable = false;
+        }
+
 	/** Id of the table. */
 	table_id_t				id;
 
