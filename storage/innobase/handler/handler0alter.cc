@@ -390,7 +390,8 @@ innobase_need_rebuild(
 	    && !(ha_alter_info->create_info->used_fields
 		 & (HA_CREATE_USED_ROW_FORMAT
 		    | HA_CREATE_USED_KEY_BLOCK_SIZE
-		    | HA_CREATE_USED_TABLESPACE))) {
+		    | HA_CREATE_USED_TABLESPACE
+                    | HA_CREATE_ENCRYPTION_KEY_ID))) {
 		/* Any other CHANGE_CREATE_OPTION than changing
 		ROW_FORMAT, KEY_BLOCK_SIZE or TABLESPACE can be done
 		without rebuilding the table. */

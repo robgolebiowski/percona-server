@@ -9297,7 +9297,6 @@ Encryption::get_tablespace_key(uint key_id,
 
         uint key_version_fetched = (~0);
         get_system_key(key_name, tablespace_key, &key_version_fetched, key_len);
-        ut_ad(tablespace_key_version == key_version_fetched);
 
         //get_keyring_key(key_name, tablespace_key, key_len);
 
@@ -9305,6 +9304,8 @@ Encryption::get_tablespace_key(uint key_id,
 		ib::error() << "Encryption can't find tablespace key, please check"
 				" the keyring plugin is loaded. 2";
 	}
+        else 
+           ut_ad(tablespace_key_version == key_version_fetched);
 
 #ifdef UNIV_ENCRYPT_DEBUG
 	if (*tablespace_key) {

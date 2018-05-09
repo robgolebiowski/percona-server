@@ -158,7 +158,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 		uint new_type,
 		uint new_min_key_version,
 		uint new_key_id,
-		fil_encryption_t new_encryption)
+		fil_encryption_t new_encryption,
+                bool create_key)
 		: st_encryption_scheme(),
 		min_key_version(new_min_key_version),
 		page0_offset(0),
@@ -181,8 +182,11 @@ struct fil_space_crypt_t : st_encryption_scheme
                         //ut_ad(0);
 		} else {
 			type = CRYPT_SCHEME_1;
-			min_key_version = key_get_latest_version();
-                        ut_ad(min_key_version == 0);
+                        if (create_key)
+         			min_key_version = key_get_latest_version();
+                        else
+                                min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                        //ut_ad(min_key_version == 0);
 		}
 
 		key_found = min_key_version;
@@ -414,7 +418,8 @@ Create a fil_space_crypt_t object
 fil_space_crypt_t*
 fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
-	uint			key_id)
+	uint			key_id,
+        bool                    create_key = true)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /******************************************************************

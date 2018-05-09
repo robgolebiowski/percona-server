@@ -291,7 +291,8 @@ fil_space_create_crypt_data(
 	uint			type,
 	fil_encryption_t	encrypt_mode,
 	uint			min_key_version,
-	uint			key_id)
+	uint			key_id,
+        bool                    create_key = true)
 {
 	fil_space_crypt_t* crypt_data = NULL;
 	if (void* buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
@@ -300,7 +301,8 @@ fil_space_create_crypt_data(
 				type,
 				min_key_version,
 				key_id,
-				encrypt_mode);
+				encrypt_mode,
+                                create_key);
 	}
 
 	return crypt_data;
@@ -317,9 +319,10 @@ Create a fil_space_crypt_t object
 fil_space_crypt_t*
 fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
-	uint			key_id)
+	uint			key_id,
+        bool                    create_key)
 {
-	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id));
+	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id, create_key));
 }
 
 /******************************************************************
@@ -408,7 +411,8 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(
 		page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length + 8);
 
-	crypt_data = fil_space_create_crypt_data(encryption, key_id);
+	crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
+        
 	/* We need to overwrite these as above function will initialize
 	members */
 	crypt_data->type = type;
