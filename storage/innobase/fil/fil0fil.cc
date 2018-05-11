@@ -728,6 +728,10 @@ retry:
 			request,
 			node->handle, page, 0, UNIV_PAGE_SIZE);
 
+                ib::error() << "Robert: Openning tablename "
+                        << node->name << " space_id =  " << space->id;
+
+		srv_stats.page0_read.add(1);
 		space_id = fsp_header_get_space_id(page);
 		flags = fsp_header_get_flags(page);
 
@@ -5860,7 +5864,7 @@ fil_io_set_encryption(
                       //ut_ad(false);
                     if (bpage->encrypt)
                     {
-                      ut_ad(bpage->encryption_key != NULL);
+                      ut_ad(bpage->encryption_key != NULL); //TODO: Tutaj zamiast tego assertu będzie musiałbyć zwrócony błąd
                       //{
                         key = bpage->encryption_key;
                         key_version = bpage->encryption_key_version;

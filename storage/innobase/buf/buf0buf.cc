@@ -5159,6 +5159,7 @@ buf_page_init_low(
         //TODO: Robert they do not 
 	bpage->is_corrupt = false;
 	bpage->encrypted = false;
+        bpage->encrypt = false;
 
 	ut_d(bpage->file_page_was_freed = FALSE);
 }
