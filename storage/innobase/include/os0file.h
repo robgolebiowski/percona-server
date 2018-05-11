@@ -410,13 +410,14 @@ struct Encryption {
 	};
 
 	/** Default constructor */
-	Encryption() : m_type(NONE) { };
+	Encryption() : m_type(NONE) { } //, m_was_page_encrypted_when_read(false) { };
 
 	/** Specific constructor
 	@param[in]	type		Algorithm type */
 	explicit Encryption(Type type)
 		:
 		m_type(type)
+                //m_was_page_encrypted_when_read(false)
 	{
 #ifdef UNIV_DEBUG
 		switch (m_type) {
@@ -436,8 +437,9 @@ struct Encryption {
 		m_key(other.m_key),
 		m_klen(other.m_klen),
 		m_iv(other.m_iv),
-        m_key_version(other.m_key_version),
+                m_key_version(other.m_key_version),
 		m_key_id(other.m_key_id)
+                //m_was_page_encrypted_when_read(false)
 	{ };
 
 	/** Check if page is encrypted page or not
@@ -578,6 +580,8 @@ struct Encryption {
         uint                    m_key_version;
 
         uint                    m_key_id;
+
+        //mutable bool            m_was_page_encrypted_when_read;
 
 	/** Current master key id */
 	static ulint		master_key_id;
@@ -892,6 +896,16 @@ public:
 		m_encryption.m_iv = NULL;
 		m_encryption.m_type = Encryption::NONE;
 	}
+
+        //bool was_page_encrypted_when_read() const
+        //{
+               //return m_encryption.m_was_page_encrypted_when_read;
+        //}
+
+        //void set_that_page_was_encrypted_when_read() const
+        //{
+               //m_encryption.m_was_page_encrypted_when_read = true;
+        //}
 
 	/** Note that the IO is for double write recovery. */
 	void dblwr_recover()
@@ -2184,6 +2198,7 @@ os_aio_func(
 	ulint		space_id,
 	trx_t*		trx,
 	bool		should_buffer);
+        //bool            *was_page_read_encrypted = NULL);
 
 /** Wakes up all async i/o threads so that they know to exit themselves in
 shutdown. */

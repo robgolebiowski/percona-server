@@ -11264,12 +11264,6 @@ err_col:
                   {
                       rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
 
-                      if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
-                         encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
-                                                                              // TODO: To będzie też sprawdzane w check_table z crypt_data
-                                                                             // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
-                      else
-                        encryption_key_id= 0;
                   }
                 }
 		else {
@@ -11344,6 +11338,14 @@ err_col:
                 //ut_ad(!Encryption::is_none(m_create_info->encrypt_type.str) &&
                 //      !Encryption::is_rotated_keys(m_create_info->encrypt_type.str) &&
                 //      m_create_info->encryption_key_id.length == 0);
+
+                if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
+                   encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
+                                                                        // TODO: To będzie też sprawdzane w check_table z crypt_data
+                                                                       // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
+                else
+                  encryption_key_id= 0;
+
 
 		if (err == DB_SUCCESS) {
 			//err = row_create_table_for_mysql(

@@ -5277,7 +5277,7 @@ fil_write_zeros(
 		err = os_aio_func(
 			request, OS_AIO_SYNC, node->name,
 			node->handle, buf, offset, n_bytes, read_only_mode,
-			NULL, NULL, node->space->id, NULL, false);
+			NULL, NULL, node->space->id, NULL, false);//, NULL);
 #endif /* UNIV_HOTBACKUP */
 
 		if (err != DB_SUCCESS) {
@@ -6257,6 +6257,8 @@ _fil_io(
 
 	dberr_t	err;
 
+        //bool was_page_read_encrypted = false;
+
 #ifdef UNIV_HOTBACKUP
 	/* In mysqlbackup do normal i/o, not aio */
 	if (req_type.is_read()) {
@@ -6271,6 +6273,13 @@ _fil_io(
 		err = os_file_write(
 			req_type, node->name, node->handle, buf, offset, len);
 	}
+
+        ib_uint32_t space_id = page_id.space();
+        ib_uint32_t page_no = page_id.page_no();
+
+        if (space_id == 25 && page_no == 2)
+          space_id = 25;
+
 #else /* UNIV_HOTBACKUP */
 	/* Queue the aio request */
 	err = os_aio(
@@ -6278,9 +6287,17 @@ _fil_io(
 		mode, node->name, node->handle, buf, offset, len,
 		fsp_is_system_temporary(page_id.space())
 		? false : srv_read_only_mode,
-		node, message, page_id.space(), trx, should_buffer);
+		node, message, page_id.space(), trx, should_buffer);//, &was_page_read_encrypted);
 
 #endif /* UNIV_HOTBACKUP */
+
+        //if (message != NULL)
+        //{
+          //buf_page_t *bpage = static_cast<buf_page_t*>(message);
+          //bpage->encrypted = was_page_read_encrypted;
+            //if (bpage->encrypted)
+             //ut_ad(page_id.page_no() != 0);
+        //}
 
 	if (err == DB_IO_NO_PUNCH_HOLE) {
 

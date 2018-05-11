@@ -213,6 +213,9 @@ buf_read_page_low(
 	}
 
 	if (*err != DB_SUCCESS) {
+                // TODO: Robert: Maybe I should add handling decryption error here too - instead of returning DB_SUCCESS and later checking
+                // TODO: Robert: that checksums are not valid
+
 		if (*err == DB_TABLESPACE_TRUNCATED) {
 			/* Remove the page which is outside the
 			truncated tablespace bounds when recovering

@@ -408,6 +408,10 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	uint key_id = mach_read_from_4
 		(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length + 4);
 
+        if (key_id != 0)
+          ib::error() << "Read crypt_data: key_id: " << key_id << " type: " << ((type == CRYPT_SCHEME_UNENCRYPTED) ? "schema unencrypted"
+                                                                                                                   : "schema encrypted");
+
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(
 		page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length + 8);
 
@@ -652,6 +656,9 @@ fil_space_crypt_t::write_page0(
 			 MLOG_4BYTES, mtr);
 	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 8, encryption,
 		MLOG_1BYTE, mtr);
+
+        if (key_id != 0)
+          key_id = key_id;
 
 	byte* log_ptr = mlog_open(mtr, 11 + 17 + len);
 

@@ -16,8 +16,8 @@ call mtr.add_suppression("InnoDB: Tablespace for table \`test\`.\`t1\` is set as
 
 SET GLOBAL innodb_stats_persistent=OFF;
 
---let $restart_parameters=restart:--keyring-file-data=$MYSQL_TEST_DIR/std_data/keys2.txt
-#--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQL_TEST_DIR/std_data/keys2.txt
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+#--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys2.txt
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;
@@ -26,8 +26,8 @@ SET GLOBAL innodb_file_per_table = ON;
 CREATE TABLE t1 (pk INT PRIMARY KEY, f VARCHAR(8)) ENGINE=InnoDB ENCRYPTION='ROTATED_KEYS' ENCRYPTION_KEY_ID=4;
 INSERT INTO t1 VALUES (1,'foo'),(2,'bar');
 
---let $restart_parameters=restart:--keyring-file-data=$MYSQL_TEST_DIR/std_data/keys3.txt
-##--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQL_TEST_DIR/std_data/keys3.txt
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
+##--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys3.txt
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;
@@ -48,7 +48,7 @@ CHECK TABLE t1;
 --replace_regex /(tablespace|key_id) [1-9][0-9]*/\1 /
 SHOW WARNINGS;
 
---let $restart_parameters=restart:--keyring-file-data=$MYSQL_TEST_DIR/std_data/keys2.txt
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;
@@ -65,7 +65,7 @@ UNLOCK TABLES;
 
 #--die
 
---let $restart_parameters=restart:--keyring-file-data=$MYSQL_TEST_DIR/std_data/keys3.txt
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;
@@ -80,16 +80,16 @@ ib_restore_tablespaces("test", "t1");
 EOF
 
 
---let $restart_parameters=restart:--keyring-file-data=$MYSQL_TEST_DIR/std_data/keys2.txt
-#--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQL_TEST_DIR/std_data/keys2.txt
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+#--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys2.txt
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;
 ALTER TABLE t1 IMPORT TABLESPACE;
 SHOW CREATE TABLE t1;
 
---let $restart_parameters=restart: --innodb-encrypt-tables --keyring-file-data=$MYSQL_TEST_DIR/std_data/keys3.txt
-#--let $restart_parameters= --innodb-encrypt-tables --plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQL_TEST_DIR/std_data/keys3.txt
+--let $restart_parameters=restart: --innodb-encrypt-tables --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
+#--let $restart_parameters= --innodb-encrypt-tables --plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys3.txt
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;

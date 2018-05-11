@@ -12,7 +12,7 @@
 
 --echo # Restart mysqld --loose-file-key-management-filename=keys2.txt
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
-#-- let $restart_parameters=--loose-file-key-management-filename=$MYSQL_TEST_DIR/std_data/keys2.txt
+#-- let $restart_parameters=--loose-file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys2.txt
 -- source include/restart_mysqld.inc
 
 create table innodb_normal(c1 bigint not null, b char(200)) engine=innodb;
@@ -53,7 +53,7 @@ SELECT variable_value >= 0 FROM information_schema.global_status WHERE variable_
 
 --echo # Restart mysqld --loose-file-key-management-filename=keys3.txt
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
-#-- let $restart_parameters=--loose-file-key-management-filename=$MYSQL_TEST_DIR/std_data/keys3.txt
+#-- let $restart_parameters=--loose-file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys3.txt
 -- source include/restart_mysqld.inc
 
 select * from innodb_normal;

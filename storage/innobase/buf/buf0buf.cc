@@ -5786,16 +5786,22 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         dberr_t err = DB_SUCCESS;
 	bool corrupted = false;
         fil_space_crypt_t* crypt_data = space->crypt_data;
+        ulint page_type= mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
         ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
         //bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
-	bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
+        bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED; // TODO:Robert może rozdzielić to na dwie zmienne
+                                                                                                        // TODO:is_encrypted i was_page_read_encrypted
+        
 
         //ulint page_no = mach_read_from_4(dst_frame + FIL_PAGE_OFFSET);
-        if (bpage->id.page_no() == 0)
+        //if (bpage->id.page_no() == 0)
+          //ut_ad(bpage->encrypted == false); // TODO: Robert: Consider changing this variable to was_page_encrypted_when_read
         //if (page_no == 0)
-          ut_ad(original_page_type != FIL_PAGE_ENCRYPTED);
+          //ut_ad(original_page_type != FIL_PAGE_ENCRYPTED && page_type != FIL_PAGE_ENCRYPTED);
         //ut_ad(page_no == 0 && original_page_type != FIL_PAGE_ENCRYPTED);
 
+        if (bpage->id.page_no() == 0)
+          ut_ad(original_page_type != FIL_PAGE_ENCRYPTED && page_type != FIL_PAGE_ENCRYPTED);
 
 	/* In buf_decrypt_after_read we have either decrypted the page if
 	page post encryption checksum matches and used key_id is found
@@ -5855,7 +5861,11 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 				" and key file.";
 		}
                 //return true;
-	}
+	} else if (corrupted && page_type == FIL_PAGE_COMPRESSED)
+        {
+               ib::info() << "Compressed page is corrupted. If the page was also encrypted it is possible that invalid "
+                             "key was used for decryption"; 
+        }
 
 	//return (false);
         return err;
@@ -5915,9 +5925,9 @@ buf_page_io_complete(
 
                 dberr_t	err;
 
-                if (space->crypt_data && 
-                    space->crypt_data->type != CRYPT_SCHEME_UNENCRYPTED)
-                  bpage->encrypted= TRUE;
+                //if (space->crypt_data && 
+                    //space->crypt_data->type != CRYPT_SCHEME_UNENCRYPTED)
+                  //bpage->encrypted= TRUE;
                    
 
 		if (bpage->size.is_compressed()) {

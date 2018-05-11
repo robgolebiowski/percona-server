@@ -1374,13 +1374,17 @@ os_file_compress_page(
 
 	/* Must compress to <= N-1 FS blocks. */
         /* There need to be at least 4 bytes for key version */
+
+        //TODO:Robert: Myśl o tym w następujący sposób - zwiększasz rozmiar headera o 4
+
 	ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
 
 	/* This is the original data page size - the page header. */
 	ulint		content_len = src_len - FIL_PAGE_DATA;
 
-	ut_ad(out_len >= block_size - FIL_PAGE_DATA);
-	ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA)- ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
+	ut_ad(out_len >= block_size - FIL_PAGE_DATA + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
+	//ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA)- ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
+	ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys ? 4 : 0)));
 
 	/* Only compress the data + trailer, leave the header alone */
 
@@ -1461,9 +1465,13 @@ os_file_compress_page(
         //if (will_be_encrypted_with_rotated_keys)
           //len += 4;
 
+        if (will_be_encrypted_with_rotated_keys)
+          len += 4;
+
         // For encryption with rotated keys we required that there will be at least 4 bytes left - when alliging to the block limit
 	*dst_len = ut_calc_align(len, block_size);
 
+	//ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
 	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys) ? 4 : 0);
 
 	/* Clear out the unused portion of the page. */
@@ -5687,6 +5695,7 @@ os_file_io(
 	ulint		n,
 	os_offset_t	offset,
 	dberr_t*	err)
+        //bool* was_read_page_encrypted = NULL)
 {
 	Block*		block;
 	ulint		original_n = n;
@@ -5748,6 +5757,9 @@ os_file_io(
 
 			if (offset > 0
 			    && (type.is_compressed() || type.is_read())) {
+
+                                //if (was_read_page_encrypted)
+                                  //*was_read_page_encrypted = Encryption::is_encrypted_page(reinterpret_cast<byte*>(buf));
 
 				*err = os_file_io_complete(
 					type, file,
@@ -5830,7 +5842,7 @@ os_file_pwrite(
 	(void) os_atomic_increment_ulint(&os_n_pending_writes, 1);
 	MONITOR_ATOMIC_INC(MONITOR_OS_PENDING_WRITES);
 
-	ssize_t	n_bytes = os_file_io(type, file, (void*) buf, n, offset, err);
+	ssize_t	n_bytes = os_file_io(type, file, (void*) buf, n, offset, err);//, NULL);
 
 	DBUG_EXECUTE_IF("xb_simulate_all_o_direct_write_failure",
 			n_bytes = -1;
@@ -5914,6 +5926,7 @@ os_file_pread(
 	os_offset_t	offset,
 	trx_t*		trx,
 	dberr_t*	err)
+        //bool* was_read_page_encrypted = NULL)
 {
 	ulint		sec;
 	ulint		ms;
@@ -5936,7 +5949,7 @@ os_file_pread(
 	(void) os_atomic_increment_ulint(&os_n_pending_reads, 1);
 	MONITOR_ATOMIC_INC(MONITOR_OS_PENDING_READS);
 
-	ssize_t	n_bytes = os_file_io(type, file, buf, n, offset, err);
+	ssize_t	n_bytes = os_file_io(type, file, buf, n, offset, err);//, was_read_page_encrypted);
 
 	DBUG_EXECUTE_IF("xb_simulate_all_o_direct_read_failure",
 			n_bytes = -1;
@@ -5976,6 +5989,7 @@ os_file_read_page(
 	ulint*		o,
 	bool		exit_on_err,
 	trx_t*		trx)
+        //bool*           was_read_page_encrypted)
 {
 	dberr_t		err;
 	ut_ad(!trx || trx->take_stats);
@@ -5988,7 +6002,7 @@ os_file_read_page(
 	for (;;) {
 		ssize_t	n_bytes;
 
-		n_bytes = os_file_pread(type, file, buf, n, offset, trx, &err);
+		n_bytes = os_file_pread(type, file, buf, n, offset, trx, &err);//, was_read_page_encrypted);
 
 		if (o != NULL) {
 			*o = n_bytes;
@@ -5999,6 +6013,11 @@ os_file_read_page(
 			return(err);
 
 		} else if ((ulint) n_bytes == n) {
+
+                        /*The page decryption failed - will handled by buf_io_comptelete*/
+
+                        if (err == DB_IO_DECRYPT_FAIL)
+                          return (DB_SUCCESS);
 
 			/** The read will succeed but decompress can fail
 			for various reasons. */
@@ -6309,7 +6328,7 @@ os_file_set_size(
 			request,
 			OS_AIO_SYNC, name,
 			file, buf, current_size, n_bytes,
-			read_only, NULL, NULL, 0, NULL, false);
+			read_only, NULL, NULL, 0, NULL, false); //, NULL);
 #endif /* UNIV_HOTBACKUP */
 
 		if (err != DB_SUCCESS) {
@@ -6386,11 +6405,13 @@ os_file_read_func(
 	os_offset_t	offset,
 	ulint		n,
 	trx_t*		trx)
+        //bool*           was_read_page_encrypted)
 {
 	ut_ad(type.is_read());
 	ut_ad(!trx || trx->take_stats);
 
-	return(os_file_read_page(type, file, buf, offset, n, NULL, true, trx));
+	//return(os_file_read_page(type, file, buf, offset, n, NULL, true, trx, was_read_page_encrypted));
+	return(os_file_read_page(type, file, buf, offset, n, NULL, true, trx)); //, was_read_page_encrypted));
 }
 
 /** NOTE! Use the corresponding macro os_file_read_no_error_handling(),
@@ -6412,9 +6433,11 @@ os_file_read_no_error_handling_func(
 	os_offset_t	offset,
 	ulint		n,
 	ulint*		o)
+        //bool*           was_read_page_encrypted)
 {
 	ut_ad(type.is_read());
 
+	//return(os_file_read_page(type, file, buf, offset, n, o, false, NULL, was_read_page_encrypted));
 	return(os_file_read_page(type, file, buf, offset, n, o, false, NULL));
 }
 
@@ -7785,6 +7808,7 @@ os_aio_func(
 	ulint		space_id,
 	trx_t*		trx,
 	bool		should_buffer)
+        //bool            *was_page_read_encrypted)
 {
 #ifdef WIN_ASYNC_IO
 	BOOL		ret = TRUE;
@@ -7820,7 +7844,7 @@ os_aio_func(
 
 		if (type.is_read()) {
 			return(os_file_read_func(type, file.m_file, buf,
-						 offset, n, trx));
+						 offset, n, trx));//, was_page_read_encrypted));
 		}
 
 		ut_ad(type.is_write());
@@ -9626,7 +9650,15 @@ Encryption::encrypt(
 	ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
         fprintf(stderr, "key_version:%u", m_key_version);
         fprintf(stderr, "\n");
-        //ut_ad(page_no != 0); 
+        //ut_ad(page_no != 0);
+        
+        if (space_id == 24 && page_no == 3)
+        {
+	    fprintf(stderr, "Robert: Before encryption page 24:3:");
+            ut_print_buf(stderr, src, src_len);
+        }
+
+        
 #endif
 
 	//ulint page_numer = mach_read_from_4(src + FIL_PAGE_OFFSET);
@@ -9691,7 +9723,10 @@ Encryption::encrypt(
 
 	/* This is data size which need to encrypt. */
         if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED)
+        {
 	  data_len = src_len - FIL_PAGE_DATA - 4; // We need those 4 bytes for key_version
+          ut_ad((uint)(*(src + src_len -4)) == 0);
+        }
         else
 	  data_len = src_len - FIL_PAGE_DATA;
 	main_len = (data_len / MY_AES_BLOCK_SIZE) * MY_AES_BLOCK_SIZE;
@@ -9813,7 +9848,11 @@ Encryption::encrypt(
         if (m_type == Encryption::ROTATED_KEYS)// && page_type == FIL_PAGE_ENCRYPTED)
         {
           if (page_type == FIL_PAGE_COMPRESSED)
-            memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
+          {
+            //ut_ad((uint)(*(dst + FIL_PAGE_DATA + data_len)) == 0);
+            //memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
+            memcpy(dst + src_len - 4, &m_key_version, 4);
+          }
           else
 	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
             //memcpy(dst + FIL_PAGE_FILE_FLUSH_LSN, &m_key_version, 4);
@@ -9853,6 +9892,12 @@ Encryption::encrypt(
             m_key = NULL;
 
           dberr_t err = decrypt(type, check_buf, src_len, buf2, src_len);
+          if (space_id == 24 && page_no == 3)
+          {
+	      fprintf(stderr, "Robert: After encryption page 24:3:");
+              ut_print_buf(stderr, src, src_len);
+          }
+
           if (err != DB_SUCCESS || memcmp(src + FIL_PAGE_DATA,
                                           check_buf + FIL_PAGE_DATA,
                                           src_len - FIL_PAGE_DATA) != 0) {
@@ -9867,6 +9912,7 @@ Encryption::encrypt(
         }
 #endif
 	fprintf(stderr, "Encrypted page:%lu.%lu\n", space_id, page_no);
+
 #endif
 #endif
 	*dst_len = src_len;
@@ -9909,6 +9955,17 @@ Encryption::decrypt(
 		return(DB_SUCCESS);
 	}
 
+#ifdef UNIV_ENCRYPT_DEBUG
+        ulint space_id =
+                mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+
+        ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
+#endif
+
+        //type.set_that_page_was_encrypted_when_read(); //TODO : this might need to be refactored to seperate variable pass to decrypt page_was_encrypted
+                                                      //TODO : or something like this
+                                                      //TODO : for now it is just mutable field
+
 	/* For compressed page, we need to get the compressed size
 	for decryption */
 	page_type = mach_read_from_2(src + FIL_PAGE_TYPE);
@@ -9947,7 +10004,8 @@ Encryption::decrypt(
           if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
           {
             data_len = src_len - FIL_PAGE_DATA - 4;
-            memcpy(&key_version, ptr + data_len, 4); // get the key_version
+            //memcpy(&key_version, ptr + data_len, 4); // get the key_version
+            memcpy(&key_version, src + src_len - 4, 4); // get the key_version
           }
           else
           {
@@ -9982,11 +10040,6 @@ Encryption::decrypt(
 	remain_len = data_len - main_len;
 
 #ifdef UNIV_ENCRYPT_DEBUG
-        ulint space_id =
-                mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-
-        ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
-
 	fprintf(stderr, "Decrypting page:%lu.%lu len:%lu\n",
 		space_id, page_no, src_len);
         fprintf(stderr, "with key:");
@@ -9994,6 +10047,13 @@ Encryption::decrypt(
         fprintf(stderr, "\nand iv:");
 	ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
         fprintf(stderr, "\n");
+
+        if (space_id == 24 && page_no == 3)
+        {
+	    fprintf(stderr, "Robert: Before decrypting page 24:3:");
+            ut_print_buf(stderr, src, src_len);
+        }
+
 #endif
 
 
@@ -10108,7 +10168,8 @@ Encryption::decrypt(
           //if (high_4_bytes_of_fil_page_lsn == 0)
             //ut_ad(0);
           if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
-            memset(ptr + data_len, 0, 4); 
+            //memset(ptr + data_len, 0, 4); 
+            memset(src + src_len - 4, 0, 4); 
           //else
             //memcpy(ptr + data_len, &high_4_bytes_of_fil_page_lsn, 4); 
         }
@@ -10123,7 +10184,7 @@ Encryption::decrypt(
 	}
 
         //TODO:Robert:Added by me
-        if (original_type != FIL_PAGE_TYPE_ALLOCATED)
+        if (original_type != FIL_PAGE_TYPE_ALLOCATED && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
                mach_write_to_2(src + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
 
 	if (block != NULL) {
@@ -10132,6 +10193,12 @@ Encryption::decrypt(
 
 #ifdef UNIV_ENCRYPT_DEBUG
 	fprintf(stderr, "Decrypted page:%lu.%lu\n", space_id, page_no);
+
+        if (space_id == 24 && page_no == 3)
+        {
+	    fprintf(stderr, "Robert: After decrypting page 24:3:");
+            ut_print_buf(stderr, src, src_len);
+        }
 #endif
 
 	DBUG_EXECUTE_IF("ib_crash_during_decrypt_page", DBUG_SUICIDE(););
