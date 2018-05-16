@@ -5791,7 +5791,8 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         ulint page_type= mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
         ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
         //bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
-        bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED; // TODO:Robert może rozdzielić to na dwie zmienne
+        bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED ||
+                           page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED; // TODO:Robert może rozdzielić to na dwie zmienne
                                                                                                         // TODO:is_encrypted i was_page_read_encrypted
         
 

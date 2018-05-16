@@ -9694,9 +9694,16 @@ Encryption::encrypt(
 	    fprintf(stderr, "Robert: Before encryption page 24:3:");
             ut_print_buf(stderr, src, src_len);
         }
-
-        
+        //if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED)
+        //{
+	  //data_len = src_len - FIL_PAGE_DATA - 4; // We need those 4 bytes for key_version
+          //ut_ad((uint)(*(src + src_len -4)) == 0);
+        //}
 #endif
+
+        // Destination header might need to acommodate key_version
+        const uint DST_HEADER_SIZE = (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED)
+                                     ? FIL_PAGE_DATA + 4 : FIL_PAGE_DATA;
 
 	//ulint page_numer = mach_read_from_4(src + FIL_PAGE_OFFSET);
         //ut_ad(page_numer != 0);
@@ -9759,13 +9766,16 @@ Encryption::encrypt(
         }
 
 	/* This is data size which need to encrypt. */
+	//data_len = src_len - HEADER_SIZE;
+	//data_len = src_len - FIL_PAGE_DATA;
         if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED)
         {
-	  data_len = src_len - FIL_PAGE_DATA - 4; // We need those 4 bytes for key_version
-          ut_ad((uint)(*(src + src_len -4)) == 0);
+          data_len = src_len - FIL_PAGE_DATA - 4; // We need those 4 bytes for key_version
+          ut_ad((uint)(*(src + src_len -4)) == 0); // There need to be at least 4 bytes left
         }
         else
 	  data_len = src_len - FIL_PAGE_DATA;
+
 	main_len = (data_len / MY_AES_BLOCK_SIZE) * MY_AES_BLOCK_SIZE;
 	remain_len = data_len - main_len;
 
@@ -9791,7 +9801,7 @@ Encryption::encrypt(
 		elen = my_aes_encrypt(
 			src + FIL_PAGE_DATA,
 			static_cast<uint32>(main_len),
-			dst + FIL_PAGE_DATA,
+			dst + DST_HEADER_SIZE,
 			reinterpret_cast<unsigned char*>(m_key),
 			static_cast<uint32>(m_klen),
 			my_aes_256_cbc,
@@ -9823,7 +9833,7 @@ Encryption::encrypt(
 		ut_ad(len == main_len);
 
 		/* Copy remain bytes and page tailer. */
-		memcpy(dst + FIL_PAGE_DATA + len,
+		memcpy(dst + DST_HEADER_SIZE + len,
 		       src + FIL_PAGE_DATA + len,
 		       src_len - FIL_PAGE_DATA - len);
 
@@ -9832,7 +9842,7 @@ Encryption::encrypt(
 			remain_len = MY_AES_BLOCK_SIZE * 2;
 
 			elen = my_aes_encrypt(
-				dst + FIL_PAGE_DATA + data_len - remain_len,
+				dst + DST_HEADER_SIZE + data_len - remain_len,
 				static_cast<uint32>(remain_len),
 				remain_buf,
 				reinterpret_cast<unsigned char*>(m_key),
@@ -9863,7 +9873,7 @@ Encryption::encrypt(
 				return(src);
 			}
 
-			memcpy(dst + FIL_PAGE_DATA + data_len - remain_len,
+			memcpy(dst + DST_HEADER_SIZE + data_len - remain_len,
 			       remain_buf, remain_len);
 		}
 
@@ -9888,7 +9898,7 @@ Encryption::encrypt(
           {
             //ut_ad((uint)(*(dst + FIL_PAGE_DATA + data_len)) == 0);
             //memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
-            memcpy(dst + src_len - 4, &m_key_version, 4);
+            memcpy(dst + FIL_PAGE_DATA, &m_key_version, 4);
           }
           else
 	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
@@ -10018,11 +10028,13 @@ Encryption::decrypt(
 #endif
 	}
 
+        const uint HEADER_SIZE = (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
+                                 ? FIL_PAGE_DATA + 4 : FIL_PAGE_DATA;
 
 	original_type = static_cast<uint16_t>(
 		mach_read_from_2(src + FIL_PAGE_ORIGINAL_TYPE_V1));
 
-	byte*	ptr = src + FIL_PAGE_DATA;
+	byte*	ptr = src + HEADER_SIZE;
 
 	/* The caller doesn't know what to expect */
 	if (dst == NULL) {
@@ -10043,9 +10055,8 @@ Encryption::decrypt(
           //uint key_version;
           if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
           {
-            data_len = src_len - FIL_PAGE_DATA - 4;
             //memcpy(&key_version, ptr + data_len, 4); // get the key_version
-            memcpy(&m_key_version, src + src_len - 4, 4); // get the key_version
+            memcpy(&m_key_version, src + FIL_PAGE_DATA, 4); // get the key_version
           }
           else
           {
@@ -10072,10 +10083,11 @@ Encryption::decrypt(
         //else
 	  //data_len = src_len - FIL_PAGE_DATA;
           //
-        if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
-            data_len = src_len - FIL_PAGE_DATA - 4;
-        else
-            data_len = src_len - FIL_PAGE_DATA;
+        //if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
+            //data_len = src_len - FIL_PAGE_DATA - 4;
+        //else
+            //data_len = src_len - FIL_PAGE_DATA;
+        data_len = src_len - HEADER_SIZE;
       
 	main_len = (data_len / MY_AES_BLOCK_SIZE) * MY_AES_BLOCK_SIZE;
 	remain_len = data_len - main_len;
@@ -10149,6 +10161,9 @@ Encryption::decrypt(
 			memcpy(dst, ptr, data_len);
 		}
 
+                if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
+                  ptr -= 4; //key_version is not needed - overwrite with decrypted data
+
 		/* Then decrypt the main data */
 		elen = my_aes_decrypt(
 				dst,
@@ -10208,9 +10223,10 @@ Encryption::decrypt(
           //memcpy(&high_4_bytes_of_fil_page_lsn, src + FIL_PAGE_LSN + 4, 4);
           //if (high_4_bytes_of_fil_page_lsn == 0)
             //ut_ad(0);
-          if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
+
+          //TODO: Robert : zakomentkowane ostation: if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
             //memset(ptr + data_len, 0, 4); 
-            memset(src + src_len - 4, 0, 4); 
+          //TODO: Robert : zakomentkowane ostation:  memset(src + src_len - 4, 0, 4); 
           //else
             //memcpy(ptr + data_len, &high_4_bytes_of_fil_page_lsn, 4); 
         }

@@ -45,7 +45,7 @@ let MYSQLD_DATADIR=`select @@datadir`;
 --copy_file $MYSQLD_DATADIR/test/t2.ibd $MYSQLD_DATADIR/test/t2.ibd.backup
 --copy_file $MYSQLD_DATADIR/test/t3.ibd $MYSQLD_DATADIR/test/t3.ibd.backup
 
---echo # Corrupt tables
+--echo # Corrupt tables' key versions
 
 perl;
 open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t1.ibd") or die "open";
@@ -60,7 +60,7 @@ print FILE pack("H*", "c00lcafedeadb017");
 close FILE or die "close";
 open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t3.ibd") or die "open";
 binmode FILE;
-seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 3 + 26, SEEK_SET) or die "seek";
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 3 + 38, SEEK_SET) or die "seek";
 print FILE pack("H*", "c00lcafedeadb017");
 close FILE or die "close";
 EOF
