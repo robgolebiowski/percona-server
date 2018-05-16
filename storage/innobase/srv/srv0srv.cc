@@ -1774,6 +1774,9 @@ srv_export_innodb_status(void)
 
 	export_vars.innodb_available_undo_logs = srv_available_undo_logs;
 
+	export_vars.innodb_pages_decrypted = srv_stats.pages_decrypted;
+	export_vars.innodb_pages_encrypted = srv_stats.pages_encrypted;
+
 #ifdef UNIV_DEBUG
 	rw_lock_s_lock(&purge_sys->latch);
 	trx_id_t	up_limit_id;

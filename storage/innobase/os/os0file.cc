@@ -85,6 +85,7 @@ bool	innodb_calling_exit;
 #include <my_rnd.h>
 #include <mysqld.h>
 #include "system_key.h"
+#include "fil0crypt.h"
 #include <mysql/service_mysql_keyring.h>
 
 /** Insert buffer segment id */
@@ -1746,11 +1747,30 @@ os_file_io_complete(
 
 		ut_ad(!type.is_log());
 
+                //TODO:Tutaj zapisać czy jest encrypted
+                bool was_page_encrypted= encryption.is_encrypted_page(buf);
 		ret = encryption.decrypt(type, buf, src_len, scratch, len);
 		if (ret == DB_SUCCESS) {
-			return(os_file_decompress_page(
+                //TODO:Jeżeli było encrypted to po dekompresji przypisać wersje klucza
+			ret = os_file_decompress_page(
 					type.is_dblwr_recover(),
-					buf, scratch, len));
+					buf, scratch, len);
+                        if (ret == DB_SUCCESS && encryption.m_type == Encryption::ROTATED_KEYS)
+                        {
+                            if (was_page_encrypted)
+                            {
+                              mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
+	                      mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
+                            }
+                            else
+	                      mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+                        }
+                        else
+                        {
+                          return ret;
+                        }
+                //TODO:Tutaj przypisanie wersji klucza i original page type na encrypted - to powinno sprawdzic jezeli strona jest zaszyfrowana i corrupted
+                //Jeżeli nie było encrypted a strona jest ROTATED_KEYS to przypisać key_version not encrypted
 		} else {
 			return(ret);
 		}
@@ -2141,7 +2161,8 @@ os_file_compress_page(
 		*n,
 		compressed_page,
 		&compressed_len,
-                type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS);
+                type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS &&
+                type.encryption_algorithm().m_key != NULL);
 
 	if (buf_ptr != buf) {
 		/* Set new compressed size to uncompressed page. */
@@ -5719,14 +5740,16 @@ os_file_io(
         if (type.is_encrypted() && type.is_write()) {
                
                 ut_ad(offset > 0);
-                if (type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS && type.encryption_algorithm().m_key == NULL)
-                {
-                  //if (strcmp(space->name, "test/t2") == 0)
-                    //ib::error() << "Trying to write to " << space->name << '\n';
-	          mach_write_to_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ENCRYPTION_KEY_VERSION, 
-                                  type.encryption_algorithm().m_key_version);
-                }
-                else
+                //if (type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS && type.encryption_algorithm().m_key == NULL
+                    //&& type.is_compressed() == false)
+                //{
+		  //mach_write_to_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ENCRYPTION_KEY_VERSION, 
+                                  //type.encryption_algorithm().m_key_version); //TODO: Po co mi to, żeby oznaczyć które strony nie zostały jeszcze zaszyfrowane ?
+                                                                              //// Ale to nie powinno być z PAGE_TYPE ?
+                //}
+                //else
+                if (type.encryption_algorithm().m_type != Encryption::ROTATED_KEYS || type.encryption_algorithm().m_key != NULL) // TODO: Ten warunek przesunąć do
+                                                                                                                                 // is_encrypted
                 {
                   /* We don't encrypt the first page of any file. */
                   Block*	compressed_block = block;
@@ -8970,7 +8993,7 @@ Compression::deserialize(
         
 	byte*	ptr = src + FIL_PAGE_DATA;
 
-	ut_ad(header.m_version == 1);
+	//ut_ad(header.m_version == 1);
 
 	if (header.m_version != 1
 	    || header.m_original_size < UNIV_PAGE_SIZE_MIN - (FIL_PAGE_DATA + 8)
@@ -9298,13 +9321,14 @@ Encryption::get_keyring_key(const char *key_name,
 #endif
 }
 
-void
+bool
 Encryption::get_tablespace_key(uint key_id,
 		               char* srv_uuid,
                                uint tablespace_key_version,
                 	       byte** tablespace_key,
                                size_t *key_len)
 {
+        bool result = true;
 #ifndef UNIV_INNOCHECKSUM
 	//size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
@@ -9323,13 +9347,26 @@ Encryption::get_tablespace_key(uint key_id,
         get_system_key(key_name, tablespace_key, &key_version_fetched, key_len);
 
         //get_keyring_key(key_name, tablespace_key, key_len);
+        // TODO:For debug we always expect key_version to be fetched correctly
+        //ut_ad(tablespace_key_version == key_version_fetched);
 
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
 				" the keyring plugin is loaded. 2";
+                result = false;
 	}
-        else 
-           ut_ad(tablespace_key_version == key_version_fetched);
+        else if (key_version_fetched != tablespace_key_version)
+        {
+             	ib::error() << "Encryption can't find tablespace key with version: "
+                            << tablespace_key_version
+                            << " please check the keyring plugin is loaded. 2"
+                            << " If this key version does not seem sensible it is possible"
+                            << " that page is corrupted";
+                my_free(*tablespace_key);
+                *tablespace_key = NULL;
+                result = false;
+        }
+        //else 
 
 #ifdef UNIV_ENCRYPT_DEBUG
 	if (*tablespace_key) {
@@ -9338,8 +9375,8 @@ Encryption::get_tablespace_key(uint key_id,
 		fprintf(stderr, "\n");
 	}
 #endif /* DEBUG_TDE */
-
 #endif
+        return result;
 }
                             
 
@@ -9920,6 +9957,9 @@ Encryption::encrypt(
         fprintf(stderr, "Robert:Encrypted page:%lu.%lu\n", space_id, page_no);
 #endif
 
+#if !defined(UNIV_INNOCHECKSUM)
+        srv_stats.pages_encrypted.inc();
+#endif
 	return(dst);
 }
 
@@ -10000,32 +10040,33 @@ Encryption::decrypt(
 
         if (m_type == Encryption::ROTATED_KEYS)
         {
-          uint key_version;
+          //uint key_version;
           if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
           {
             data_len = src_len - FIL_PAGE_DATA - 4;
             //memcpy(&key_version, ptr + data_len, 4); // get the key_version
-            memcpy(&key_version, src + src_len - 4, 4); // get the key_version
+            memcpy(&m_key_version, src + src_len - 4, 4); // get the key_version
           }
           else
           {
-	    key_version= mach_read_from_4(src + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+	    m_key_version= mach_read_from_4(src + FIL_PAGE_ENCRYPTION_KEY_VERSION);
             //memcpy(&key_version, src + FIL_PAGE_FILE_FLUSH_LSN, 4);
             ut_ad(page_type == FIL_PAGE_ENCRYPTED);
           }
 
-          ut_ad(key_version == 0);
+          //ut_ad(m_key_version == 0);
 
           ut_ad(m_key == NULL); // TODO:Robert: For rottated keys encryption we will just now fetch the key
           //if (m_key == NULL)
             //memset(m_key, 0, ENCRYPTION_KEY_LEN);
           //m_key = NULL;
           size_t key_len;
-          get_tablespace_key(m_key_id, uuid, key_version, &m_key, &key_len);
+          if (get_tablespace_key(m_key_id, uuid, m_key_version, &m_key, &key_len) == false)
+            return (DB_IO_DECRYPT_FAIL);
           //get_tablespace_key(m_key_id, uuid, 0, &m_key, &key_len);
           m_klen = static_cast<ulint>(key_len);
-          if (m_key == NULL)
-            return (DB_IO_DECRYPT_FAIL);
+          //if (m_key == NULL)
+            //return (DB_IO_DECRYPT_FAIL);
         }
         
         //else
@@ -10202,6 +10243,11 @@ Encryption::decrypt(
 #endif
 
 	DBUG_EXECUTE_IF("ib_crash_during_decrypt_page", DBUG_SUICIDE(););
+
+
+#if !defined(UNIV_INNOCHECKSUM)
+        srv_stats.pages_decrypted.inc();
+#endif
 
 	return(DB_SUCCESS);
 }

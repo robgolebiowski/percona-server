@@ -507,7 +507,7 @@ struct Encryption {
                                                                 uint *tablespace_key_version,
 			                                        byte** tablespace_key);
 
-        static void get_tablespace_key(uint key_id,
+        static bool get_tablespace_key(uint key_id,
                                        char* srv_uuid,
                                        uint tablespace_key_version,
                                        byte** tablespace_key,
@@ -937,6 +937,11 @@ public:
 		return(false);
 #endif /* HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE || _WIN32 */
 	}
+
+        //bool will_encrypt_page()
+        //{
+          //return m_encryption.key != NULL;
+        //}
 
 private:
 	/* File system best block size */

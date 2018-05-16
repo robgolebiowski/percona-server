@@ -6317,7 +6317,11 @@ _fil_io(
 		fil_no_punch_hole(node);
 	}
 
-	/* We an try to recover the page from the double write buffer if the decompression fails or the page is corrupt. */ ut_a(req_type.is_dblwr_recover() || err == DB_SUCCESS); if (sync) { /* The i/o operation is already completed when we return from os_aio: */ mutex_enter(&fil_system->mutex); 
+	/* We an try to recover the page from the double write buffer if the decompression fails or the page is corrupt. */ 
+        
+        //ut_a(req_type.is_dblwr_recover() || err == DB_SUCCESS);
+       
+        if (sync) { /* The i/o operation is already completed when we return from os_aio: */ mutex_enter(&fil_system->mutex); 
 		fil_node_complete_io(node, fil_system, req_type);
 
 		mutex_exit(&fil_system->mutex);

@@ -176,9 +176,11 @@ btr_root_block_get(
 	buf_block_t*	block = btr_block_get(page_id, page_size, mode,
 					      index, mtr);
 
-	if (!block) {
-		if (index && index->table) {
-			index->table->set_file_unreadable();
+	//if (!block) {
+		//if (index && index->table) {
+			//index->table->set_file_unreadable();
+	if (!block && index && index->table && !index->table->is_readable()) {
+			//index->table->set_file_unreadable();
 
                         ib::warn() << "Table in tablespace is encrypted but encryption service or"
 				" used key_id is not available. "
@@ -189,8 +191,6 @@ btr_root_block_get(
 				//" used key_id is not available. "
 				//" Can't continue reading table.",
 				//index->table->name, space);
-		}
-
 		return NULL;
 	}
 
@@ -575,8 +575,7 @@ btr_get_size(
 
 	root = btr_root_get(index, mtr);
 
-        // TODO: Robert To jest źle, bo pomija SRV_CORRUPT_TABLE_CHECK - coś z tym trzeba zrobić!
-        if (!root)
+        if (!root && index->table->is_readable() == false)
           return ULINT_UNDEFINED;
 
 	SRV_CORRUPT_TABLE_CHECK(root,

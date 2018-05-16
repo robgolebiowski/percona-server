@@ -1140,6 +1140,13 @@ static SHOW_VAR innodb_status_variables[]= {
   {"encryption_n_rowlog_blocks_decrypted",
   (char*)&export_vars.innodb_n_rowlog_blocks_decrypted,
    SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
+  {"num_pages_encrypted",
+   (char*) &export_vars.innodb_pages_encrypted,
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL },
+  {"num_pages_decrypted",
+   (char*) &export_vars.innodb_pages_decrypted,
+   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL },
+
 
   {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}
 };

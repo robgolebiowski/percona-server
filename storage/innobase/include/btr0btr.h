@@ -234,7 +234,7 @@ btr_block_get_func(
 @param mtr mini-transaction handle
 @return the block descriptor */
 #  define btr_block_get(page_id, page_size, mode, index, mtr)	\
-	btr_block_get_func(page_id, page_size, mode, __FILE__, __LINE__, mtr)
+	btr_block_get_func(page_id, page_size, mode, __FILE__, __LINE__, index, mtr)
 # endif /* UNIV_DEBUG */
 /** Gets a buffer page and declares its latching order level.
 @param page_id tablespace/page identifier

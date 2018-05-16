@@ -743,9 +743,9 @@ buf_block_get_frame(
 	const buf_block_t*	block)	/*!< in: pointer to the control block */
 {
         // TODO: Robert : Temporary to avodd crash
-	if (!block) {
-		return NULL;
-	}
+	/*if (!block) {*/
+		/*return NULL;*/
+	/*}*/
 
 	SRV_CORRUPT_TABLE_CHECK(block, return(0););
 

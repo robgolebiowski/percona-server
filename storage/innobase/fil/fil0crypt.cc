@@ -2468,6 +2468,7 @@ fil_crypt_rotate_page(
                 //TODO:Robert  - musze po dekrypcji dodac nowe pole do block - tak, zeby trzymac tam kv
 		//uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
 
+
 	        uint kv= mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
                 if (strcmp(space->name, "test/t2") == 0)
                 {
@@ -2516,7 +2517,7 @@ fil_crypt_rotate_page(
 			if (crypt_data->is_encrypted()) {
                           //TODO:Robert, o cholera ...
 				if (kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  || kv < state->min_key_version_found) {
-					state->min_key_version_found = kv;
+					state->min_key_version_found = kv; //TODO:Teraz:Czy nie byłoby tu lepiej dać PAGE_TYPE?
 				}
 			}
 

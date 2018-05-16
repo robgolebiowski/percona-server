@@ -4339,6 +4339,7 @@ loop:
 			nonzero. There is no checksum on field
 			FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION. */
 			if (local_err == DB_DECRYPTION_FAILED) {
+                          //TODO:Robert Should not here be added dict_set_encrypted_by_space ?
 				return (NULL);
 			}
 
@@ -5862,11 +5863,11 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 				" and key file.";
 		}
                 //return true;
-	} else if (corrupted && page_type == FIL_PAGE_COMPRESSED)
-        {
-               ib::info() << "Compressed page is corrupted. If the page was also encrypted it is possible that invalid "
-                             "key was used for decryption"; 
-        }
+	} //else if (corrupted && page_type == FIL_PAGE_COMPRESSED)
+        //{
+               //ib::info() << "Compressed page is corrupted. If the page was also encrypted it is possible that invalid "
+                             //"key was used for decryption"; 
+        //}
 
 	//return (false);
         return err;

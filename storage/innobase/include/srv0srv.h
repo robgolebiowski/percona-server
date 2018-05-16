@@ -153,6 +153,11 @@ struct srv_stats_t {
 
 	/** Number of spaces in keyrotation list */
 	ulint_ctr_64_t		key_rotation_list_length;
+
+	/* Number of pages encrypted */
+	ulint_ctr_64_t          pages_encrypted;
+   	/* Number of pages decrypted */
+	ulint_ctr_64_t          pages_decrypted;
 };
 
 extern const char*	srv_main_thread_op_info;
