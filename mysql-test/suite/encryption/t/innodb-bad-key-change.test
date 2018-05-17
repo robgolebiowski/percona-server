@@ -61,8 +61,9 @@ DROP TABLE t1;
 
 SET GLOBAL innodb_stats_persistent=OFF;
 
-SET GLOBAL innodb_default_encryption_key_id=5;
+SET SESSION innodb_default_encryption_key_id=5;
 CREATE TABLE t2 (c VARCHAR(8), id int not null primary key, b int, key(b)) ENGINE=InnoDB ENCRYPTION='ROTATED_KEYS';
+
 INSERT INTO t2 VALUES ('foobar',1,2);
 
 --echo
