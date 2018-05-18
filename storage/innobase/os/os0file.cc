@@ -9715,7 +9715,7 @@ Encryption::encrypt(
 
         //TODO:Robert: To są typy z ROTATED_KEYS
 
-        ut_ad(page_type != FIL_PAGE_RTREE);
+        //ut_ad(page_type != FIL_PAGE_RTREE); //spatial index
 
 	ut_ad(m_type != Encryption::NONE);
 

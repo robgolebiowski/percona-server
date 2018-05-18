@@ -6609,6 +6609,13 @@ ha_innobase::innobase_initialize_autoinc()
 			updates should fail. */
 			err = DB_SUCCESS;
 			break;
+                case DB_DECRYPTION_FAILED:
+                        //ib::error() << "Decryption for table" << index->table->name
+                                    //<< " failed";
+                        ut_ad(index->table->is_readable() == false);
+                        return;
+                        //break;
+
 		default:
 			/* row_search_max_autoinc() should only return
 			one of DB_SUCCESS or DB_RECORD_NOT_FOUND. */
@@ -7043,9 +7050,9 @@ ha_innobase::open(
 
 	/* Only if the table has an AUTOINC column. */
 	if (m_prebuilt->table != NULL
-	    && !m_prebuilt->table->file_unreadable
-	    && table->found_next_number_field != NULL
-            && !m_prebuilt->table->is_readable()) {
+            && m_prebuilt->table->is_readable()
+	    && table->found_next_number_field != NULL)
+        {
 		dict_table_autoinc_lock(m_prebuilt->table);
 
 		/* Since a table can already be "open" in InnoDB's internal
@@ -11353,7 +11360,8 @@ err_col:
                                                                         // TODO: To będzie też sprawdzane w check_table z crypt_data
                                                                        // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
                 else
-                  encryption_key_id= 0;
+                  encryption_key_id= THDVAR(m_thd, default_encryption_key_id);
+
 
 
 		if (err == DB_SUCCESS) {
@@ -11988,7 +11996,26 @@ create_table_info_t::create_option_encryption_is_valid() const
 		}
 	}
 
-        // TODO:Robert table is not encrypted when temporary table
+        //bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
+
+	/* Currently we do not support encryption for
+	spatial indexes thus do not allow creating table with forced
+	encryption */
+
+        //if (table_is_rotated_keys)
+        //{
+          //for(ulint i = 0; i < m_form->s->keys; i++) {
+                  //const KEY* key = m_form->key_info + i;
+                  //if (key->flags & HA_SPATIAL) {
+			//my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                                       //"InnoDB: ENCRYPTED='ROTATED_KEYS' not supported for table because "
+                                       //"it contains spatial index.", MYF(0));
+                          //return(false);
+                  //}
+          //}
+        //}
+
+        // TODO:Robert table is not encrypted when temporary table // should differentiate between Oracle encryption and ROTATED_KEYS
 	bool table_is_encrypted =
 		!Encryption::is_none(m_create_info->encrypt_type.str); //||
 //                (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str) &&
@@ -12045,6 +12072,7 @@ create_table_info_t::create_option_encryption_is_valid() const
 			" ENCRYPTED table.", MYF(0), tablespace_name);
 		return(false);
 	}
+
 
 
 	/* Ignore nondefault key_id if encryption is set off */
@@ -17970,6 +17998,9 @@ ha_innobase::innobase_get_autoinc(
 	*value = 0;
 
 	m_prebuilt->autoinc_error = innobase_lock_autoinc();
+
+        //TODO:Robert:For debug, remove me
+        ut_ad(m_prebuilt->autoinc_error == DB_SUCCESS);
 
 	if (m_prebuilt->autoinc_error == DB_SUCCESS) {
 

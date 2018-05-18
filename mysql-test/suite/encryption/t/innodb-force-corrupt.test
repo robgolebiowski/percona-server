@@ -58,7 +58,7 @@ print FILE pack("H*", "c00lcafedeadb017");
 close FILE or die "close";
 open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t3.ibd") or die "open";
 binmode FILE;
-seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 3 + 26, SEEK_SET) or die "seek";
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 3 + 38, SEEK_SET) or die "seek";
 print FILE pack("H*", "c00lcafedeadb017");
 close FILE or die "close";
 EOF

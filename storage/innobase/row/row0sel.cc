@@ -6744,13 +6744,17 @@ static
 const rec_t*
 row_search_get_max_rec(
 	dict_index_t*	index,
-	mtr_t*		mtr)
+	mtr_t*		mtr,
+        dberr_t		&error)
 {
 	btr_pcur_t	pcur;
 	const rec_t*	rec;
 	/* Open at the high/right end (false), and init cursor */
-	btr_pcur_open_at_index_side(
+	dberr_t err = btr_pcur_open_at_index_side(
 		false, index, BTR_SEARCH_LEAF, &pcur, true, 0, mtr);
+
+        if (err != DB_SUCCESS)
+          return NULL;
 
 	do {
 		const page_t*	page;
@@ -6794,7 +6798,7 @@ row_search_max_autoinc(
 
 		mtr_start(&mtr);
 
-		rec = row_search_get_max_rec(index, &mtr);
+		rec = row_search_get_max_rec(index, &mtr, error);
 
 		if (rec != NULL) {
 			ibool unsigned_type = (
