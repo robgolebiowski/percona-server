@@ -5919,7 +5919,7 @@ fil_io_set_encryption(
 					//space->encryption_iv);
 
                                         
-                if (space->encryption_type == Encryption::ROTATED_KEYS)
+                //if (space->encryption_type == Encryption::ROTATED_KEYS)
                   req_type.encryption_algorithm(space->encryption_type);
 	} else {
 		req_type.clear_encrypted();
@@ -7173,6 +7173,13 @@ fil_tablespace_iterate(
                   
                   //ut_ad(iter.encryption_key == NULL); //TODO:Robert - this is not true for import
                   //Encryption::get_latest_tablespace_key_or_create_new_one(callback.get_space_id(), &iter.encryption_key_version, &iter.encryption_key);
+                  
+                  //table->encryption_key does not have to be freed as it is allocated from the table->heap - this is copied from row0import.cc:
+                  //table->encryption_key =
+		  //static_cast<byte*>(mem_heap_alloc(table->heap,
+						  //ENCRYPTION_KEY_LEN));
+
+                  
                   Encryption::get_latest_tablespace_key(iter.crypt_data->key_id, &iter.encryption_key_version, &iter.encryption_key);
                   if (iter.encryption_key == NULL)
                     err= DB_DECRYPTION_FAILED;
@@ -7245,9 +7252,10 @@ fil_tablespace_iterate(
 
 	        if (iter.crypt_data) {
 		     fil_space_destroy_crypt_data(&iter.crypt_data);
+                     
+                    if (iter.encryption_key != NULL)
+                      my_free(iter.encryption_key);
          	}
-                if (iter.encryption_key != NULL)
-                  my_free(iter.encryption_key);
 	}
 
 	if (err == DB_SUCCESS) {

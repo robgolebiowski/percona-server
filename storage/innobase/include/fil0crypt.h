@@ -53,6 +53,12 @@ static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {
 #define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
 #define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
 
+enum ENCRYPTION_ROTATION
+{
+   NONE,
+   MASTER_KEY_TO_ROTATED_KEY,
+   ROTATED_KEY_TO_MASTER_KEY
+};
 
 extern os_event_t fil_crypt_threads_event;
 
@@ -159,13 +165,15 @@ struct fil_space_crypt_t : st_encryption_scheme
 		uint new_min_key_version,
 		uint new_key_id,
 		fil_encryption_t new_encryption,
-                bool create_key)
+                bool create_key,
+                ENCRYPTION_ROTATION encryption_rotation = NONE)
 		: st_encryption_scheme(),
 		min_key_version(new_min_key_version),
 		page0_offset(0),
 		encryption(new_encryption),
 		key_found(0),
-		rotate_state()
+		rotate_state(),
+                encryption_rotation(encryption_rotation)
 	{
 		key_id = new_key_id;
 		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
@@ -252,6 +260,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 	uint key_found;
 
 	fil_space_rotate_state_t rotate_state;
+
+        ENCRYPTION_ROTATION encryption_rotation;
 };
 
 

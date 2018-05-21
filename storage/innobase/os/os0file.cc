@@ -1757,13 +1757,18 @@ os_file_io_complete(
 					buf, scratch, len);
                         if (ret == DB_SUCCESS && encryption.m_type == Encryption::ROTATED_KEYS)
                         {
-                            if (was_page_encrypted)
+         	            ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
+        //if (original_type != FIL_PAGE_TYPE_ALLOCATED && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
+                            if(page_type != FIL_PAGE_TYPE_ALLOCATED)
                             {
-                              mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
-	                      mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
+                              if (was_page_encrypted) // page allocated needs to be all zeros
+                              {
+                                mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
+                                mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
+                              }
+                              else
+                                mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
                             }
-                            else
-	                      mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
                         }
                         else
                         {
@@ -9268,8 +9273,6 @@ Encryption::create_master_key(byte** master_key)
 		memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
 	}
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
-
-        ut_ad(key_name[0] != '\0');
 
 	/* Generate new master key */
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,

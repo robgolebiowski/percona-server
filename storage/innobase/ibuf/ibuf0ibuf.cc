@@ -820,16 +820,19 @@ ibuf_bitmap_get_map_page_func(
 	const page_size_t&	page_size,
 	const char*		file,
 	ulint			line,
-	mtr_t*			mtr)
+	mtr_t*			mtr,
+        dberr_t                 *err = NULL)
 {
 	buf_block_t*	block;
-	dberr_t		err = DB_SUCCESS;
+        dberr_t error = DB_SUCCESS;
 
 	block = buf_page_get_gen(ibuf_bitmap_page_no_calc(page_id, page_size),
 				 page_size, RW_X_LATCH, NULL, BUF_GET,
-				 file, line, mtr, false, &err);
+				 file, line, mtr, false, &error);
+        if (err != NULL)
+          *err = error;
 
-	if (err != DB_SUCCESS) {
+	if (error != DB_SUCCESS) {
 		return NULL;
 	}
 
@@ -5005,8 +5008,16 @@ ibuf_check_bitmap_on_import(
 
 		ibuf_enter(&mtr);
 
-		bitmap_page = ibuf_bitmap_get_map_page(
-			page_id_t(space_id, page_no), page_size, &mtr);
+                dberr_t err = DB_SUCCESS;
+
+	        bitmap_page = ibuf_bitmap_get_map_page_func(page_id_t(space_id, page_no), page_size,
+				      __FILE__, __LINE__, &mtr, &err);
+
+                if (err != DB_SUCCESS)
+                  return err;
+
+		//bitmap_page = ibuf_bitmap_get_map_page(
+			//page_id_t(space_id, page_no), page_size, &mtr);
 
 		if (buf_page_is_zeroes(bitmap_page, page_size)) {
 			/* This means we got all-zero page instead of
