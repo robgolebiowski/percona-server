@@ -1218,13 +1218,13 @@ int main(int argc, char **argv) {
 
   if (generate_credential_file(
           keyring__vault_keys_container_unittest::credential_file_url, CORRECT,
-          keyring__vault_keys_container_unittest::uuid)) {
+          mount_point_path)) {
     std::cout << "Could not generate credential file" << std::endl;
     return 2;
   }
   if (vault_mount.init(
           &keyring__vault_keys_container_unittest::credential_file_url,
-          &keyring__vault_keys_container_unittest::uuid)) {
+          &mount_point_path)) {
     std::cout << "Could not initialize Vault_mount" << std::endl;
     return 3;
   }
