@@ -2741,6 +2741,9 @@ dict_replace_tablespace_in_dictionary(
 		trx_commit(trx);
 	}
 
+        ib::error() << "Robert now: Added tabelspace definition for space = "
+                        << space_id;
+
 	trx->op_info = "";
 
 	return(error);

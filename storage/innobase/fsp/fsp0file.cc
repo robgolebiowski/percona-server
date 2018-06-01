@@ -654,13 +654,25 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 
         //ut_ad(m_crypt_data == NULL);
         //if (m_crypt_data != NULL)
+          //m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
           //fil_space_destroy_crypt_data(&m_crypt_data);
         //m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
+
+        fil_space_crypt_t* crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page);
+
+
+        if (m_space_id == 24)
+        {
+          if (crypt_data)
+            ib::error() << "Table test/t2 has crypt data in validate first page";
+          else 
+            ib::error() << "Table test/t2 has NOT crypt data in validate first page";
+        }
  
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
-	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import) {
+	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import && crypt_data == NULL) { 
 		m_encryption_key = static_cast<byte*>(
 			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 		m_encryption_iv = static_cast<byte*>(
@@ -700,6 +712,9 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			m_encryption_iv = NULL;
 		}
 	}
+
+        if (crypt_data != NULL)
+          fil_space_destroy_crypt_data(&crypt_data);
 
 	if (fil_space_read_name_and_filepath(
 		m_space_id, &prev_name, &prev_filepath)) {

@@ -165,7 +165,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 		uint new_min_key_version,
 		uint new_key_id,
 		fil_encryption_t new_encryption,
-                bool create_key,
+                bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
                 ENCRYPTION_ROTATION encryption_rotation = NONE)
 		: st_encryption_scheme(),
 		min_key_version(new_min_key_version),
@@ -191,13 +191,20 @@ struct fil_space_crypt_t : st_encryption_scheme
 		} else {
 			type = CRYPT_SCHEME_1;
                         if (create_key)
-         			min_key_version = key_get_latest_version();
+                        {
+         			min_key_version= key_get_latest_version(); //This means table was created with ROTATED_KEYS = thus we know that this table is encrypted
+                                                                          //min_key_version should be set to key_version, when create_key is false it means it was not created
+                                                                          //with ROTATED_KEYS
+                                //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                        }
                         else
-                                min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                                min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; //it will be filled in later by a caller - which read crypto - if it going to be read from page0
+                                //min_key_version = key_get_latest_version();
+                        //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
                         //ut_ad(min_key_version == 0);
 		}
 
-		key_found = min_key_version;
+		key_found = min_key_version; // TODO:This does not make much sense now - always true
 	}
 
 	/** Destructor */

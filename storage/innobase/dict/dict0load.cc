@@ -50,6 +50,7 @@ Created 4/24/1996 Heikki Tuuri
 #include "srv0srv.h"
 #include <stack>
 #include <set>
+#include <cstring>
 
 /** Following are the InnoDB system tables. The positions in
 this array are referenced by enum dict_system_table_id. */
@@ -1539,9 +1540,19 @@ dict_check_sys_tables(
 			   ("name: %p, '%s'", table_name.m_name,
 			    table_name.m_name));
 
+
+
 		dict_sys_tables_rec_read(rec, table_name,
 					 &table_id, &space_id,
 					 &n_cols, &flags, &flags2);
+
+                if (strcmp(table_name.m_name, "test/t2") == 0)
+                {
+                  ib::error() << "Flags for test/t2 :'\n'";
+                  ib::error() << "flags = " << flags << '\n';
+                  ib::error() << "flags2 = " << flags2 << '\n';
+                }
+
 		if (flags == ULINT_UNDEFINED
 		    || is_system_tablespace(space_id)) {
 			ut_free(table_name.m_name);
@@ -1602,6 +1613,7 @@ dict_check_sys_tables(
 		If the file is found elsewhere (from an ISL or the default
 		location) or this path is the same file but looks different,
 		fil_ibd_open() will update the dictionary with what is
+
 		opened. */
 		char*	filepath = dict_get_first_path(space_id);
 
@@ -3426,6 +3438,10 @@ dict_load_table_on_id(
 	dict_err_ignore_t	ignore_err)	/*!< in: errors to ignore
 						when loading the table */
 {
+	DBUG_ENTER("dict_load_table_on_id");
+	DBUG_PRINT("dict_load_table_on_id",
+		   ("table_id: %lu", table_id));
+
 	byte		id_buf[8];
 	btr_pcur_t	pcur;
 	mem_heap_t*	heap;

@@ -11279,7 +11279,12 @@ err_col:
                   else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
                   {
                       rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
-
+                      DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+                  }
+                  else if(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str))
+                  {
+                      rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
+                      DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
                   }
                 }
 		else {
@@ -14139,7 +14144,7 @@ innobase_create_tablespace(
 	bool is_encrypted = ((alter_info->encrypt
 		&& (!Encryption::is_none(alter_info->encrypt_type.str) ||
                     (srv_encrypt_tables && !Encryption::is_no(alter_info->encrypt_type.str)))) 
-                || srv_encrypt_tables);
+                || srv_encrypt_tables); // TODO:Robert tu chyba nie powinno być || srv_encrypt_tables
         bool is_rotated_key = (alter_info->encrypt 
             && Encryption::is_rotated_keys(alter_info->encrypt_type.str));
 

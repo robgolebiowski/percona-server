@@ -5774,10 +5774,10 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         DBUG_PRINT("Robert", ("Checking if page : "UINT32PF":"UINT32PF" is corrupted",
                             bpage->id.space(), bpage->id.page_no()));
 
-        ib_uint32_t space_id = bpage->id.space();
-        ib_uint32_t page_no = bpage->id.page_no();
+        //ib_uint32_t space_id = bpage->id.space();
+        //ib_uint32_t page_no = bpage->id.page_no();
 
-        ib::info() << "Checking if is corrupted for space = " << space_id << " page_id = " << page_no;
+        //ib::info() << "Checking if is corrupted for space = " << space_id << " page_id = " << page_no;
 	byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
 		((buf_block_t*) bpage)->frame;
 #ifdef UNIV_INNOCHECKSUM

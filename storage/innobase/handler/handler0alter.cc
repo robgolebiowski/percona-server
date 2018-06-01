@@ -4622,8 +4622,12 @@ prepare_inplace_alter_table_dict(
                 {
                   mode= FIL_ENCRYPTION_ON;
                   key_id= ha_alter_info->create_info->encryption_key_id;
+                  //TODO:Robert - nie jestem pewny czy tu zawsze dodawać flagę
+		  DICT_TF2_FLAG_SET(ctx->new_table,
+		                    DICT_TF2_ENCRYPTION);
+
                 }
-		else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE)
+		else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE) // TODO:Robert: USE_FILE_PER_TABLE needs to be checked for ROTATED_KEYS too
 		    && ha_alter_info->create_info->encrypt_type.length > 0
 		    && Encryption::is_master_key_encryption(encrypt)
 		    && !DICT_TF2_FLAG_SET(ctx->old_table,

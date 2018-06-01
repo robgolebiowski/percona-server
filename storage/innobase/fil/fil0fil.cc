@@ -570,6 +570,11 @@ fil_node_create_low(
 
 	space->size += size;
 
+        if (strcmp(space->name, "test/t2") == 0)
+        {
+          ib::error() << "In fil_node_create_log : Setting test/t2 size to" << size << '\n';
+        }
+
 	node->space = space;
 
 	os_file_stat_t	stat_info;
@@ -730,6 +735,11 @@ retry:
 
                 ib::error() << "Robert: Openning tablename "
                         << node->name << " space_id =  " << space->id;
+
+                if (strcmp(space->name, "test/t2") == 0)
+                {
+                  ib::error() << "Openning test/t2'\n'";
+                }
 
 		srv_stats.page0_read.add(1);
 		space_id = fsp_header_get_space_id(page);
@@ -1391,6 +1401,12 @@ fil_space_create(
 	space->flags = flags;
 
 	space->magic_n = FIL_SPACE_MAGIC_N;
+
+        if (strcmp(space->name, "test/t2") == 0 && crypt_data != NULL)
+        {
+          ib::error() << "Assigning crypt data to test/t2 <<'\n'";
+        }
+
         space->crypt_data = crypt_data;
 
 	space->encryption_type = Encryption::NONE;
@@ -1422,7 +1438,8 @@ fil_space_create(
 	if (purpose == FIL_TYPE_TABLESPACE
 	    && !srv_fil_crypt_rotate_key_age && fil_crypt_threads_event &&
 	    (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
-		    srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))) {
+		    srv_encrypt_tables ))) {
+		    //srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))) {
 		/* Key rotation is not enabled, need to inform background
 		encryption threads. */
 		UT_LIST_ADD_LAST(fil_system->rotation_list, space);
@@ -2100,7 +2117,9 @@ fil_space_release_for_io(fil_space_t* space)
 bool space_should_not_be_rotated(fil_space_t *space)
 {
   ut_ad(space != NULL);
-  return FSP_FLAGS_GET_ENCRYPTION(space->flags);
+  //TODO:Robert now allowing spaces with ENCRYPTION set to be rottated - need to find a way to exclude MK tablespaces
+  //return FSP_FLAGS_GET_ENCRYPTION(space->flags);
+  return false;
 }
 
 fil_space_t*
@@ -2137,7 +2156,19 @@ fil_space_next(fil_space_t* prev_space)
 			space = UT_LIST_GET_NEXT(space_list, space);
 		}
 
-		if (space != NULL) {
+                if (space != NULL) {
+
+                  //if (strcmp(space->name, "test/t2") == 0)
+                  //{
+                      //ib::error() << "Increasing n_pending_ops for test/t2" << '\n';
+                  //}
+
+                  //if (strcmp(space->name, "test/t2") == 0 && space->n_pending_ops == 1)
+                  //{
+                      //ib::error() << "Increasing n_pending_ops to 2 for test/t2" << '\n';
+                  //}
+           
+
 			space->n_pending_ops++;
 		}
 	}
@@ -3971,7 +4002,8 @@ fil_ibd_create(
 	requested it to remain unencrypted. */
         // TODO:Robert: FIL_ENCRYPTION_ON jest tylko ustawione dla rotated_keys
 	if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF
-            || (srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(flags))) {
+            //|| (srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(flags))) {
+            || (srv_encrypt_tables)) {
 		crypt_data = fil_space_create_crypt_data(mode, encryption_key_id);
 	}
 
@@ -3979,7 +4011,12 @@ fil_ibd_create(
 	space = fil_space_create(name, space_id, flags, FIL_TYPE_TABLESPACE,
 				 crypt_data, mode);
 
-	DEBUG_SYNC_C("fil_ibd_created_space");
+	//DEBUG_SYNC_C("fil_ibd_created_space");
+
+        if (strcmp(space->name, "test/t2") == 0 && size == 0)
+        {
+          ib::error() << "Setting test/t2 size to 0 '\n'";
+        }
 
 	if (!fil_node_create_low(
 			path, size, space, false, punch_hole, atomic_write)) {
@@ -4076,6 +4113,8 @@ fil_ibd_open(
 	bool		link_file_found = false;
 	bool		link_file_is_bad = false;
 	bool		is_shared = FSP_FLAGS_GET_SHARED(flags);
+ 
+
 	bool		is_encrypted = FSP_FLAGS_GET_ENCRYPTION(flags);
         //bool            is_rotated_keys  = FSP_FLAGS_GET_ROTATED_KEYS(flags);
 	Datafile	df_default;	/* default location */
@@ -4446,7 +4485,11 @@ skip_validate:
 		/* For encryption tablespace, initialize encryption
 		information.*/
 		if (err == DB_SUCCESS) {
-                  if (is_encrypted && !for_import) {
+                  if (is_encrypted && !for_import && crypt_data == NULL) {
+
+                        if (strcmp(space->name, "test/t2") == 0)
+                          ib::error() << "There is no crypt_data for test/t2";
+
 			Datafile& df_current = df_remote.is_open() ?
 				df_remote: df_dict.is_open() ?
 				df_dict : df_default;
@@ -4477,6 +4520,10 @@ skip_validate:
                   }
                   else if (space->crypt_data)
                   {
+                      if (strcmp(space->name, "test/t2") == 0)
+                        ib::error() << "There is crypt_data for test/t2";
+
+
                         err = fil_set_encryption(space->id,
                                                  Encryption::ROTATED_KEYS,
                                                  NULL, //TODO: Czy tu powinienem pobrać latest_key?
@@ -8074,7 +8121,8 @@ fil_encryption_rotate()
 			continue;
 		}
 
-		if (space->encryption_type != Encryption::NONE) {
+		//if (space->encryption_type == Encryption::NONE) {
+		if (space->encryption_type == Encryption::AES) {
 			mtr_start(&mtr);
 			mtr.set_named_space(space->id);
 

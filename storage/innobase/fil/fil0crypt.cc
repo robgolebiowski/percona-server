@@ -44,6 +44,14 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "system_key.h"
 #include "buf0flu.h"
 
+#include "trx0trx.h" // for updating data dictionary
+#include "row0mysql.h"
+#include "pars0pars.h"
+#include "que0que.h"
+#include "row0sel.h"
+#include "dict0dict.h"
+#include "fts0priv.h"
+
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
 /** Mutex for keys */
@@ -164,6 +172,33 @@ bool encryption_key_id_exists(const char *key_id)
         return true;
 #endif
 }
+
+//void get_key_name(char *key_name, uint key_id)
+//{
+  //memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+  //// The form of the key is percona_innodb-<number>, where <number> == key_id
+  //ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+	      //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+	      //key_id);
+//}
+
+//bool encryption_create_key(uint key_id, uchar **system_key)
+//{
+  //char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+  //char *system_key_type = NULL;
+  //size_t system_key_len = 0;
+
+  //ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+	      //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+	      //key_id);
+
+  //return 
+   //(my_key_generate(key_name, "AES", NULL, ENCRYPTION_KEY_LEN) ||
+    //my_key_fetch(key_name, &system_key_type, NULL,
+                 //reinterpret_cast<void**>(system_key), &system_key_len) ||
+    //system_key == NULL);
+//}
 
 
 uint encryption_get_latest_version(uint key_id)
@@ -641,9 +676,8 @@ fil_space_crypt_t::write_page0(
 	followed by an MLOG_FILE_WRITE_CRYPT_DATA
 	(that will during recovery update fil_space_t)
 	*/
-        //mlog_write_ulint(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page, space->flags, MLOG_4BYTES, mtr);
-	//mach_write_to_4(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page,
-			//flags);
+        mlog_write_ulint(page + FSP_HEADER_OFFSET + FSP_SPACE_FLAGS, space->flags, MLOG_4BYTES, mtr);
+	//mach_write_to_4(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page, space->flags);
 
 	mlog_write_string(page + offset, (const uchar*)ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr);
 	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr);
@@ -656,6 +690,8 @@ fil_space_crypt_t::write_page0(
 			 MLOG_4BYTES, mtr);
 	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 8, encryption,
 		MLOG_1BYTE, mtr);
+
+        //if (space->flags & DICT_TF2_ENCRYPTION)
 
         if (key_id != 0)
           key_id = key_id;
@@ -685,6 +721,15 @@ fil_space_crypt_t::write_page0(
 
 		mlog_catenate_string(mtr, iv, len);
 	}
+
+        //int x =1;
+        //if (strcmp(space->name, "t2"))
+        //{
+          //x=x;
+        //}
+
+        ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << min_key_version;
+
 }
 
 //void
@@ -1469,13 +1514,22 @@ static inline
 void
 fil_crypt_read_crypt_data(fil_space_t* space)
 {
+        if (strcmp(space->name, "test/t2") == 0)
+        {
+          ib::error() << "Reading crypt data for test/t2 <<'\n'";
+        }
+
+
+  
         //if (encryption_klen != 0 || space->size) {
-        if (space->crypt_data || space->size) {
+        if (space->crypt_data && space->size) {
 		/* The encryption metadata has already been read, or
 		the tablespace is not encrypted and the file has been
 		opened already. */
 		return;
 	}
+
+
 
 	const page_size_t page_size(space->flags);
 	mtr_t	mtr;
@@ -1876,6 +1930,8 @@ fil_crypt_space_needs_rotation(
 			crypt_data->min_key_version,
 			key_state->key_version, key_state->rotate_key_age);
 
+                
+
                 if (crypt_data->min_key_version != 0)
                   crypt_data->min_key_version= ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
 
@@ -1885,7 +1941,7 @@ fil_crypt_space_needs_rotation(
 
 		crypt_data->rotate_state.scrubbing.is_active = false;
 		//crypt_data->rotate_state.scrubbing.is_active =
-			//btr_scrub_start_space(space->id, &state->scrub_data);
+			//btr_scrub_start_space(space->id, &s iate->scrub_data);
 
 		//time_t diff = time(0) - crypt_data->rotate_state.scrubbing.
 			//last_scrub_completed;
@@ -2193,6 +2249,11 @@ fil_crypt_start_rotate_space(
 		* if space extends, it will be encrypted with newer version */
 		/* FIXME: max_offset could be removed and instead
 		space->size consulted.*/
+                if (strcmp(state->space->name, "test/t2") == 0 && state->space->size == 0)
+                {
+                  ib::error() << "Setting max_offset to " << state->space->size << " for test/t2'\n'";
+                }
+
 		crypt_data->rotate_state.max_offset = state->space->size;
 		crypt_data->rotate_state.end_lsn = 0;
 		crypt_data->rotate_state.min_key_version_found =
@@ -2207,6 +2268,12 @@ fil_crypt_start_rotate_space(
 			crypt_data->type = CRYPT_SCHEME_1;
 		}
 	}
+
+        if (strcmp(state->space->name, "test/t2") == 0)
+        {
+          ut_ad(crypt_data->rotate_state.max_offset);
+          //ib::error() << "Getting to rotate " << thr.space->name << '\n';
+        }
 
 	/* count active threads in space */
 	crypt_data->rotate_state.active_threads++;
@@ -2247,6 +2314,18 @@ fil_crypt_find_page_to_rotate(
 
 	bool found = crypt_data->rotate_state.max_offset >=
 		crypt_data->rotate_state.next_offset;
+
+        if (strcmp(state->space->name, "test/t2") == 0)
+        {
+          if (found)
+            ib::error() << "Page is to be rotated for space=" << state->space->name << '\n';
+          else {
+            ib::error() << "Page is NOT to be rotated for space= " << state->space->name << '\n';
+            ib::error() << "crypt_data->rotate_state.max_offset= " << crypt_data->rotate_state.max_offset << '\n';
+            ib::error() << "crypt_data->rotate_state.next_offset= " << crypt_data->rotate_state.next_offset << '\n';
+          }
+        }
+
 
 	if (found) {
 		state->offset = crypt_data->rotate_state.next_offset;
@@ -2651,6 +2730,316 @@ fil_crypt_rotate_pages(
 	}
 }
 
+struct Encrypted_flag_data
+{
+  bool set_flag;
+  ib_uint32_t		flags;
+};
+
+/******************************************************************//**
+Callback that sets a hex formatted FTS table's flags2 in
+SYS_TABLES. The flags is stored in MIX_LEN column.
+@return FALSE if all OK */
+static
+ibool
+fts_set_encrypted_flag(
+        void*		row,		// in: sel_node_t* 
+        void*		user_arg)	// in: bool set/unset flag
+{
+        sel_node_t*	node = static_cast<sel_node_t*>(row);
+        dfield_t*	dfield = que_node_get_val(node->select_list);
+
+        ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+        ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+        // There should be at most one matching record. So the value
+        // must be the default value.
+        ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+              == ULINT32_UNDEFINED);
+        //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
+                //== ULINT32_UNDEFINED);
+
+        ulint		flags = mach_read_from_4(
+                        static_cast<byte*>(dfield_get_data(dfield)));
+
+        //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
+        flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+
+        mach_write_to_4(static_cast<byte*>(user_arg), flags);
+        //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
+
+
+        return(FALSE);
+}
+
+static
+dberr_t
+fts_update_table_encrypted_flag(
+/*=======================*/
+	trx_t*		trx,		/*!< in/out: transaction that
+					covers the update */
+	table_id_t	table_id,	/*!< in: Table for which we want
+					to set the root table->flags2 */
+	bool		dict_locked)	/*!< in: set to true if the
+					caller already owns the
+					dict_sys_t::mutex. */
+{
+	pars_info_t*		info;
+	ib_uint32_t		flags2;
+
+	static const char	sql[] =
+		"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+		"DECLARE FUNCTION my_func;\n"
+		"DECLARE CURSOR c IS\n"
+		" SELECT MIX_LEN"
+		" FROM SYS_TABLES"
+		" WHERE ID = :table_id FOR UPDATE;"
+		"\n"
+		"BEGIN\n"
+		"OPEN c;\n"
+		"WHILE 1 = 1 LOOP\n"
+		"  FETCH c INTO my_func();\n"
+		"  IF c % NOTFOUND THEN\n"
+		"    EXIT;\n"
+		"  END IF;\n"
+		"END LOOP;\n"
+		"UPDATE SYS_TABLES"
+		" SET MIX_LEN = :flags2"
+		" WHERE ID = :table_id;\n"
+		"CLOSE c;\n"
+		"END;\n";
+
+	flags2 = ULINT32_UNDEFINED;
+
+	info = pars_info_create();
+
+	pars_info_add_ull_literal(info, "table_id", table_id);
+	pars_info_bind_int4_literal(info, "flags2", &flags2);
+
+	pars_info_bind_function(
+		info, "my_func", fts_set_encrypted_flag, &flags2);
+
+	if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
+		trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
+	}
+
+	dberr_t err = que_eval_sql(info, sql, !dict_locked, trx);
+
+	ut_a(flags2 != ULINT32_UNDEFINED);
+
+	return(err);
+}
+
+//static
+//ibool
+//fts_set_encrypted_flag(
+        //void*		row,		// in: sel_node_t* 
+        //void*		user_arg)	// in: bool set/unset flag
+//{
+        //sel_node_t*	node = static_cast<sel_node_t*>(row);
+        //dfield_t*	dfield = que_node_get_val(node->select_list);
+
+        //ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+        //ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+        //// There should be at most one matching record. So the value
+        //// must be the default value.
+        //ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+              //== ULINT32_UNDEFINED);
+
+        //ulint		flags2 = mach_read_from_4(
+                        //static_cast<byte*>(dfield_get_data(dfield)));
+
+        //flags2 |=  DICT_TF2_ENCRYPTION;
+
+        //mach_write_to_4(static_cast<byte*>(user_arg), flags2);
+
+        //return(FALSE);
+//}
+
+static
+dberr_t
+//fts_update_encrypted_flag_sql(
+        //trx_t*		trx,		// in/out: transaction that
+                                        //// covers the update 
+        //dict_table_t* table)
+fts_update_encrypted_flag_sql(
+        trx_t*		trx,		// in/out: transaction that
+                                        // covers the update 
+        fil_space_t *space)
+{
+        pars_info_t*		info;
+        ib_uint32_t		flags;
+        //Encrypted_flag_data encrypted_flag_data;
+
+        //static const char	sql[] =
+                //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+                //"DECLARE FUNCTION my_func;\n"
+                //"DECLARE CURSOR c IS\n"
+                //" SELECT MIX_LEN"
+                //" FROM SYS_TABLESPACES"
+                //" WHERE SPACE=:table_id FOR UPDATE;"
+                //"\n"
+                //"BEGIN\n"
+                //"OPEN c;\n"
+                //"WHILE 1 = 1 LOOP\n"
+                //"  FETCH c INTO my_func();\n"
+                //"  IF c % NOTFOUND THEN\n"
+                //"    EXIT;\n"
+                //"  END IF;\n"
+                //"END LOOP;\n"
+                //"UPDATE SYS_TABLESPACES"
+                //" SET MIX_LEN=:flags2"
+                //" WHERE SPACE=:table_id;\n"
+                //"CLOSE c;\n"
+                //"END;\n";
+
+        
+        static const char	sql[] =
+                "PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+                "DECLARE FUNCTION my_func;\n"
+                "DECLARE CURSOR c IS\n"
+                " SELECT FLAGS"
+                " FROM SYS_TABLESPACES"
+                " WHERE SPACE=:space_id FOR UPDATE;"
+                "\n"
+                "BEGIN\n"
+                "OPEN c;\n"
+                "WHILE 1 = 1 LOOP\n"
+                "  FETCH c INTO my_func();\n"
+                "  IF c % NOTFOUND THEN\n"
+                "    EXIT;\n"
+                "  END IF;\n"
+                "END LOOP;\n"
+                "UPDATE SYS_TABLESPACES"
+                " SET FLAGS=:flags"
+                " WHERE SPACE=:space_id;\n"
+                "CLOSE c;\n"
+                "END;\n";
+
+        //static const char	sql[] =
+                //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+                //"DECLARE FUNCTION my_func;\n"
+                //"DECLARE CURSOR c IS\n"
+                //" SELECT MIX_LEN"
+                //" FROM SYS_TABLES"
+                //" WHERE ID=:table_id FOR UPDATE;"
+                //"\n"
+                //"BEGIN\n"
+                //"OPEN c;\n"
+                //"WHILE 1 = 1 LOOP\n"
+                //"  FETCH c INTO my_func();\n"
+                //"  IF c % NOTFOUND THEN\n"
+                //"    EXIT;\n"
+                //"  END IF;\n"
+                //"END LOOP;\n"
+                //"UPDATE SYS_TABLES"
+                //" SET MIX_LEN=:flags2"
+                //" WHERE ID=:table_id;\n"
+                //"CLOSE c;\n"
+                //"END;\n";
+
+        //static const char	sql[] =
+                //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+                //"DECLARE FUNCTION my_func;\n"
+                //"DECLARE CURSOR c IS\n"
+                //" SELECT MIX_LEN"
+                //" FROM SYS_TABLES"
+                //" WHERE SPACE=:table_id FOR UPDATE;"
+                //"\n"
+                //"BEGIN\n"
+                //"OPEN c;\n"
+                //"WHILE 1 = 1 LOOP\n"
+                //"  FETCH c INTO my_func();\n"
+                //"  IF c % NOTFOUND THEN\n"
+                //"    EXIT;\n"
+                //"  END IF;\n"
+                //"END LOOP;\n"
+                //"UPDATE SYS_TABLES"
+                //" SET MIX_LEN=:flags2"
+                //" WHERE SPACE=:table_id;\n"
+                //"CLOSE c;\n"
+                //"END;\n";
+
+
+
+        flags = ULINT32_UNDEFINED;
+
+        info = pars_info_create();
+
+        //pars_info_add_ull_literal(info, "table_id", table->id);
+	pars_info_add_int4_literal(info, "space_id", space->id);
+        //pars_info_add_ull_literal(info, "table_id", space->id);
+        //pars_info_bind_int4_literal(info, "flags2", &flags2);
+        pars_info_bind_int4_literal(info, "flags", &flags);
+
+        pars_info_bind_function(
+                info, "my_func", fts_set_encrypted_flag, &flags);
+
+        if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
+                trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
+        }
+
+        dberr_t err = que_eval_sql(info, sql, false, trx);
+
+
+        ut_a(flags != ULINT32_UNDEFINED);
+        //TODO: Data dictionary was not updated - do another try later
+        if (flags == ULINT32_UNDEFINED)
+            return DB_ERROR;
+        //ut_a(flags2 != ULINT32_UNDEFINED);
+
+        return(err);
+}
+
+static
+dberr_t
+fil_toggle_encrypted_flag(fil_space_t *space)
+{
+  trx_t* trx_set_encrypted = trx_allocate_for_background();
+  trx_set_encrypted->op_info = "setting encrypted flag";
+
+  row_mysql_lock_data_dictionary(trx_set_encrypted);
+
+  //dict_table_t* table = dict_table_open_on_id(space->id, TRUE,
+                                              //DICT_TABLE_OP_LOAD_TABLESPACE);
+                                              ////DICT_TABLE_OP_NORMAL);
+  //if (table == NULL)
+  //{
+    //row_mysql_unlock_data_dictionary(trx_set_encrypted);
+    //trx_free_for_background(trx_set_encrypted);
+    //return DB_ERROR;
+  //}
+
+  //dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
+                                                //table);
+
+  dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
+                                                space);
+
+
+  if (error != DB_SUCCESS)
+      fts_sql_rollback(trx_set_encrypted);
+  else
+  {
+      fts_sql_commit(trx_set_encrypted);
+
+
+      space->flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+      //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+		//flags |= FSP_FLAGS_MASK_ENCRYPTION;
+      //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+      //ib::error() << "Successfuly updated for table = " << table->name
+                     //<< " table_id= " << table->id << " space_id = " << space->id;
+  }
+
+  //dict_table_close(table, TRUE, FALSE);
+
+  row_mysql_unlock_data_dictionary(trx_set_encrypted);
+
+  trx_free_for_background(trx_set_encrypted);
+
+  return error;
+}
+
 /***********************************************************************
 Flush rotated pages and then update page 0
 
@@ -2693,14 +3082,41 @@ fil_crypt_flush_space(
 		}
 	}
 
-        ib::error() << "Robert: flushed for space: " << space->name << '\n';
-        ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
-        ib::error() << "innodb-tables-encrypt: " << srv_encrypt_tables << '\n';
+        //ib::error() << "Robert: flushed for space: " << space->name << '\n';
+        //ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
+        //ib::error() << "innodb-tables-encrypt: " << srv_encrypt_tables << '\n';
 
 
 	if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 		crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
 	}
+
+        if (strcmp(space->name, "mysql/plugin") == 0)
+        {
+          ib::error() << "Updating encryption flag for mysql/plugin" << '\n';
+          ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
+          ib::error() << "crypt_data->type = " << crypt_data->type << '\n';
+        }
+
+        if (space->id != 0)
+        {
+          if ( (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
+               (crypt_data->type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
+          {
+            //we need to flip the encryption bit
+            while (DB_SUCCESS != fil_toggle_encrypted_flag(space)) //TODO: Robert: Zmień to na if a nie while
+            {
+              //ib::error() << "Could not set ENCRYPTED flag for table " << space->name
+                          //<< " Not updating page0 for this table. Will retry updating the flag"
+                          //<< " and page 0 when rotation thread will pick this table for re-encryption. "
+                          //<< " Please note that although table " << space->name  << "does not have encryption flag set "
+                          //<< " and page 0 updated. All its pages have been encrypted";
+                os_thread_sleep(1000);
+                // waiting for DD to be available
+            }
+          }
+        }
+
 
 	/* update page 0 */
 	mtr_t mtr;
@@ -2715,9 +3131,24 @@ fil_crypt_flush_space(
 		    //__FILE__, __LINE__, &mtr, &err)) {
 		mtr.set_named_space(space);
 		crypt_data->write_page0(space, block->frame, &mtr);
+                //ib::error() << "Successfuly updated page0 for table = " << space->name;
 	}
 
 	mtr.commit();
+
+        //(void)fil_update_encrypted_flag;
+        //while (DB_SUCCESS != fil_update_encrypted_flag(space))
+        //{
+          ////ib::error() << "Could not set ENCRYPTED flag for table " << space->name
+                      ////<< " Not updating page0 for this table. Will retry updating the flag"
+                      ////<< " and page 0 when rotation thread will pick this table for re-encryption. "
+                      ////<< " Please note that although table " << space->name  << "does not have encryption flag set "
+                      ////<< " and page 0 updated. All its pages have been encrypted";
+           //os_thread_sleep(1000);
+           //// TODO: waiting for DD to be available
+        //}
+
+
 }
 
 /***********************************************************************
@@ -2879,12 +3310,23 @@ DECLARE_THREAD(fil_crypt_thread)(
 		while (!thr.should_shutdown() &&
 		       fil_crypt_find_space_to_rotate(&new_state, &thr, &recheck)) {
 
+                        if (strcmp(thr.space->name, "test/t2") == 0)
+                        {
+                          ib::error() << "Getting to rotate " << thr.space->name << '\n';
+                        }
+
 			/* we found a space to rotate */
 			fil_crypt_start_rotate_space(&new_state, &thr);
 
 			/* iterate all pages (cooperativly with other threads) */
 			while (!thr.should_shutdown() &&
 			       fil_crypt_find_page_to_rotate(&new_state, &thr)) {
+
+                                if (strcmp(thr.space->name, "test/t2") == 0)
+                                {
+                                  ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
+                                }
+
 
 				if (!thr.space->is_stopping()) {
 					/* rotate a (set) of pages */

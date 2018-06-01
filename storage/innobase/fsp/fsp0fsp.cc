@@ -910,6 +910,7 @@ fsp_header_fill_encryption_info(
 	const byte*		data;
 	ulint			i;
 #endif
+        ib::error() << "Robert: Filling encryption info for space id = " << space->id << " name = " << space->name;
 
 	/* Get master key from key ring */
 	Encryption::get_master_key(&master_key_id, &master_key, &version);
