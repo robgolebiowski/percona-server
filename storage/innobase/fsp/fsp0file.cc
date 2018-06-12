@@ -7,7 +7,7 @@ the terms of the GNU General Public License as published by the Free Software
 Foundation; version 2 of the License.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS //TODO:Robert this should not be blocked for ROTATED_KEYS
 FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
@@ -714,7 +714,9 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 	}
 
         if (crypt_data != NULL)
+        {
           fil_space_destroy_crypt_data(&crypt_data);
+        }
 
 	if (fil_space_read_name_and_filepath(
 		m_space_id, &prev_name, &prev_filepath)) {

@@ -6737,16 +6737,39 @@ ha_innobase::open(
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 	}
 
+	FilSpace space;
+        space = fil_space_acquire_silent(ib_table->space);
+
 	/* For encrypted table, check if the encryption info in data
 	file can't be retrieved properly, mark it as corrupted. */
 	if (ib_table != NULL
 	    && dict_table_is_encrypted(ib_table)
 	    && ib_table->file_unreadable
-	    && !dict_table_is_discarded(ib_table)) {
+	    && !dict_table_is_discarded(ib_table))
+        {
+            //&& ib_table->space) {
+
+        //if (aquire_mutex)
+	  //mutex_enter(&fil_system->mutex);
+
+	//fil_space_t*	space = fil_space_get_by_id(space_id);
+
+	//if (space == NULL) {
+		//mutex_exit(&fil_system->mutex);
+		//return(DB_NOT_FOUND);
+	//}
+
+	//ut_ad(algorithm != Encryption::NONE);
+	//space->encryption_type = algorithm;
+	//if (key == NULL) {
+
 
 		/* Mark this table as corrupted, so the drop table
 		or force recovery can still use it, but not others. */
 
+          if (space() == NULL || space()->crypt_data == NULL) //TODO:Robert: Do not go there for ROTATED_KEYS 
+                                                              //For ROTATED_KEYS there is separate handler below
+          {
 		dict_table_close(ib_table, FALSE, FALSE);
 		ib_table = NULL;
 		is_part = NULL;
@@ -6755,6 +6778,7 @@ ha_innobase::open(
 		my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
 
 		DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
+          }
 	}
 
 	if (NULL == ib_table) {
@@ -6786,7 +6810,6 @@ ha_innobase::open(
 
 	bool	no_tablespace;
 	bool	encrypted = false;
-	FilSpace space;
 
 	if (dict_table_is_discarded(ib_table)) {
 
@@ -6802,7 +6825,7 @@ ha_innobase::open(
 		no_tablespace = false;
 
 	} else if (!ib_table->is_readable()) {
-		space = fil_space_acquire_silent(ib_table->space);
+		//space = fil_space_acquire_silent(ib_table->space);
 
 		if (space()) {
                         //TODO: Robert - this needs to be done also for MK encryption

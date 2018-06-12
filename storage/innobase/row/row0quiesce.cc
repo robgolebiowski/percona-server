@@ -742,7 +742,7 @@ row_quiesce_table_start(
 	if (!trx_is_interrupted(trx)) {
 		extern	ib_mutex_t	master_key_id_mutex;
 
-		if (dict_table_is_encrypted(table)) {
+		if (dict_table_is_encrypted(table)) { //TODO:Robert this should not be blocked for ROTATED_KEYS
 			/* Require the mutex to block key rotation. */
 			mutex_enter(&master_key_id_mutex);
 		}

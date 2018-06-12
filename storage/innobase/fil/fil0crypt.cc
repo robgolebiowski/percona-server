@@ -1514,13 +1514,11 @@ static inline
 void
 fil_crypt_read_crypt_data(fil_space_t* space)
 {
-        if (strcmp(space->name, "test/t2") == 0)
-        {
-          ib::error() << "Reading crypt data for test/t2 <<'\n'";
-        }
+        //if (strcmp(space->name, "test/t2") == 0)
+        //{
+          //ib::error() << "Reading crypt data for test/t2 <<'\n'";
+        //}
 
-
-  
         //if (encryption_klen != 0 || space->size) {
         if (space->crypt_data && space->size) {
 		/* The encryption metadata has already been read, or
@@ -2742,7 +2740,7 @@ SYS_TABLES. The flags is stored in MIX_LEN column.
 @return FALSE if all OK */
 static
 ibool
-fts_set_encrypted_flag(
+fts_set_encrypted_flag_for_table(
         void*		row,		// in: sel_node_t* 
         void*		user_arg)	// in: bool set/unset flag
 {
@@ -2762,7 +2760,9 @@ fts_set_encrypted_flag(
                         static_cast<byte*>(dfield_get_data(dfield)));
 
         //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
-        flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+        //DICT_TF2_ENCRYPTION
+        //flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+        flags ^= DICT_TF2_ENCRYPTION;
 
         mach_write_to_4(static_cast<byte*>(user_arg), flags);
         //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
@@ -2771,17 +2771,16 @@ fts_set_encrypted_flag(
         return(FALSE);
 }
 
+
+
 static
 dberr_t
-fts_update_table_encrypted_flag(
+fts_update_table_encrypted_flag_sql(
 /*=======================*/
 	trx_t*		trx,		/*!< in/out: transaction that
 					covers the update */
-	table_id_t	table_id,	/*!< in: Table for which we want
+	table_id_t	table_id)	/*!< in: Table for which we want
 					to set the root table->flags2 */
-	bool		dict_locked)	/*!< in: set to true if the
-					caller already owns the
-					dict_sys_t::mutex. */
 {
 	pars_info_t*		info;
 	ib_uint32_t		flags2;
@@ -2816,15 +2815,20 @@ fts_update_table_encrypted_flag(
 	pars_info_bind_int4_literal(info, "flags2", &flags2);
 
 	pars_info_bind_function(
-		info, "my_func", fts_set_encrypted_flag, &flags2);
+		info, "my_func", fts_set_encrypted_flag_for_table, &flags2);
 
 	if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
 		trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
 	}
 
-	dberr_t err = que_eval_sql(info, sql, !dict_locked, trx);
+	dberr_t err = que_eval_sql(info, sql, false, trx);
 
 	ut_a(flags2 != ULINT32_UNDEFINED);
+
+        //TODO: Data dictionary was not updated - do another try later
+        if (flags2 == ULINT32_UNDEFINED)
+            return DB_ERROR;
+        //ut_a(flags2 != ULINT32_UNDEFINED);
 
 	return(err);
 }
@@ -2854,6 +2858,37 @@ fts_update_table_encrypted_flag(
 
         //return(FALSE);
 //}
+
+static
+ibool
+fts_set_encrypted_flag_for_tablespace(
+        void*		row,		// in: sel_node_t* 
+        void*		user_arg)	// in: bool set/unset flag
+{
+        sel_node_t*	node = static_cast<sel_node_t*>(row);
+        dfield_t*	dfield = que_node_get_val(node->select_list);
+
+        ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+        ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+        // There should be at most one matching record. So the value
+        // must be the default value.
+        ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+              == ULINT32_UNDEFINED);
+        //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
+                //== ULINT32_UNDEFINED);
+
+        ulint		flags = mach_read_from_4(
+                        static_cast<byte*>(dfield_get_data(dfield)));
+
+        //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
+        flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+
+        mach_write_to_4(static_cast<byte*>(user_arg), flags);
+        //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
+
+
+        return(FALSE);
+}
 
 static
 dberr_t
@@ -2972,7 +3007,7 @@ fts_update_encrypted_flag_sql(
         pars_info_bind_int4_literal(info, "flags", &flags);
 
         pars_info_bind_function(
-                info, "my_func", fts_set_encrypted_flag, &flags);
+                info, "my_func", fts_set_encrypted_flag_for_tablespace, &flags);
 
         if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
                 trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
@@ -2999,31 +3034,51 @@ fil_toggle_encrypted_flag(fil_space_t *space)
 
   row_mysql_lock_data_dictionary(trx_set_encrypted);
 
-  //dict_table_t* table = dict_table_open_on_id(space->id, TRUE,
-                                              //DICT_TABLE_OP_LOAD_TABLESPACE);
-                                              ////DICT_TABLE_OP_NORMAL);
-  //if (table == NULL)
-  //{
-    //row_mysql_unlock_data_dictionary(trx_set_encrypted);
-    //trx_free_for_background(trx_set_encrypted);
-    //return DB_ERROR;
-  //}
+  dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
+                                                DICT_ERR_IGNORE_NONE);
+  if (table == NULL)
+  {
+    ut_ad(false);
+
+    row_mysql_unlock_data_dictionary(trx_set_encrypted);
+    trx_free_for_background(trx_set_encrypted);
+    return DB_ERROR;
+  }
 
   //dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
                                                 //table);
 
   dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
                                                 space);
+  if (error == DB_SUCCESS)
+    error = fts_update_table_encrypted_flag_sql(trx_set_encrypted,
+                                                table->id);
 
+	//table_id_t	table_id)	[>!< in: Table for which we want
 
   if (error != DB_SUCCESS)
+  {
+      ut_ad(0);
       fts_sql_rollback(trx_set_encrypted);
+  }
   else
   {
       fts_sql_commit(trx_set_encrypted);
 
 
       space->flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+
+      if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
+      {
+        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+        ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
+      }
+      else
+      {
+        DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+        ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
+      }
+
       //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
 		//flags |= FSP_FLAGS_MASK_ENCRYPTION;
       //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
@@ -3031,7 +3086,7 @@ fil_toggle_encrypted_flag(fil_space_t *space)
                      //<< " table_id= " << table->id << " space_id = " << space->id;
   }
 
-  //dict_table_close(table, TRUE, FALSE);
+  dict_table_close(table, TRUE, FALSE);
 
   row_mysql_unlock_data_dictionary(trx_set_encrypted);
 

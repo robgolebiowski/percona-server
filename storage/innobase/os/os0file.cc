@@ -10165,7 +10165,10 @@ Encryption::decrypt(
 		}
 
                 if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
+                {
                   ptr -= 4; //key_version is not needed - overwrite with decrypted data
+                  memset(ptr + data_len, 0, 4); // and set the unused space from the bottom of the page to zeros
+                }
 
 		/* Then decrypt the main data */
 		elen = my_aes_decrypt(
