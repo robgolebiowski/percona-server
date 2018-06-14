@@ -3592,9 +3592,9 @@ fil_space_crypt_close_tablespace(
 		  dict_mutex_exit_for_mysql();
                 else
                 {
-		  dict_mutex_exit_for_mysql();
-	          rw_lock_x_unlock(dict_operation_lock);
-                  //row_mysql_unlock_data_dictionary(trx);
+		  //dict_mutex_exit_for_mysql();
+		  //rw_lock_x_unlock(dict_operation_lock);
+                  row_mysql_unlock_data_dictionary(trx);
                 }
 
 		/* wakeup throttle (all) sleepers */
@@ -3605,9 +3605,9 @@ fil_space_crypt_close_tablespace(
 		  dict_mutex_enter_for_mysql();
                 else
                 {
-	          rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
-		  dict_mutex_enter_for_mysql();
-                  //row_mysql_lock_data_dictionary(trx);
+		  //rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
+		  //dict_mutex_enter_for_mysql();
+                  row_mysql_lock_data_dictionary(trx);
                 }
 
 		mutex_enter(&crypt_data->mutex);
