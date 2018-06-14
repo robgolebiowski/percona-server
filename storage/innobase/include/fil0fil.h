@@ -1087,7 +1087,8 @@ for this table in the buffer pool.
 dberr_t
 fil_delete_tablespace(
 	ulint		id,
-	buf_remove_t	buf_remove);
+	buf_remove_t	buf_remove,
+        trx_t*		trx = NULL);
 
 /** Truncate the tablespace to needed size.
 @param[in]	space_id	id of tablespace to truncate

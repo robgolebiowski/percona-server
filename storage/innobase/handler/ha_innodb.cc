@@ -6738,7 +6738,8 @@ ha_innobase::open(
 	}
 
 	FilSpace space;
-        space = fil_space_acquire_silent(ib_table->space);
+        if (ib_table)
+          space = fil_space_acquire_silent(ib_table->space);
 
 	/* For encrypted table, check if the encryption info in data
 	file can't be retrieved properly, mark it as corrupted. */

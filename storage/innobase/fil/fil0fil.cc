@@ -2860,7 +2860,8 @@ fil_check_pending_operations(
 	fil_operation_t	operation,	/*!< in: File operation */
 	fil_space_t**	space,		/*!< out: tablespace instance
 					in memory */
-	char**		path)		/*!< out/own: tablespace path */
+	char**		path,		/*!< out/own: tablespace path */
+        trx_t *trx = NULL)
 {
 	ulint		count = 0;
 
@@ -2876,7 +2877,7 @@ fil_check_pending_operations(
 		if (sp->crypt_data) {
 			sp->n_pending_ops++;
 			mutex_exit(&fil_system->mutex);
-			fil_space_crypt_close_tablespace(sp);
+			fil_space_crypt_close_tablespace(sp, trx);
 			mutex_enter(&fil_system->mutex);
 			ut_ad(sp->n_pending_ops > 0);
 			sp->n_pending_ops--;
@@ -3014,7 +3015,8 @@ for this table in the buffer pool.
 dberr_t
 fil_delete_tablespace(
 	ulint		id,
-	buf_remove_t	buf_remove)
+	buf_remove_t	buf_remove,
+        trx_t*          trx)
 {
 	char*		path = 0;
 	fil_space_t*	space = 0;
@@ -3022,7 +3024,7 @@ fil_delete_tablespace(
 	ut_a(!is_system_tablespace(id));
 
 	dberr_t err = fil_check_pending_operations(
-		id, FIL_OPERATION_DELETE, &space, &path);
+		id, FIL_OPERATION_DELETE, &space, &path, trx);
 
 	if (err != DB_SUCCESS) {
 

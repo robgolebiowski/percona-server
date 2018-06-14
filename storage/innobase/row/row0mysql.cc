@@ -3507,7 +3507,7 @@ row_mysql_unlock_data_dictionary(
 /*=============================*/
 	trx_t*	trx)	/*!< in/out: transaction */
 {
-	ut_ad(lock_trx_has_sys_table_locks(trx) == NULL);
+        ut_ad(lock_trx_has_sys_table_locks(trx) == NULL);
 
 	ut_a(trx->dict_operation_lock_mode == RW_X_LATCH);
 
@@ -4818,7 +4818,7 @@ row_drop_single_table_tablespace(
 				<< " for table " << tablename;
 		}
 
-	} else if (fil_delete_tablespace(space_id, BUF_REMOVE_FLUSH_NO_WRITE)
+	} else if (fil_delete_tablespace(space_id, BUF_REMOVE_FLUSH_NO_WRITE, trx)
 		   != DB_SUCCESS) {
 
 		ib::error() << "We removed the InnoDB internal data"

@@ -51,6 +51,7 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "row0sel.h"
 #include "dict0dict.h"
 #include "fts0priv.h"
+#include "lock0lock.h"
 
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
@@ -3036,13 +3037,13 @@ fil_toggle_encrypted_flag(fil_space_t *space)
 
   dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
                                                 DICT_ERR_IGNORE_NONE);
-  if (table == NULL)
+  if (table == NULL) // table went away - has been dropped
   {
-    ut_ad(false);
+    //ut_ad(false);
 
     row_mysql_unlock_data_dictionary(trx_set_encrypted);
     trx_free_for_background(trx_set_encrypted);
-    return DB_ERROR;
+    return DB_SUCCESS;
   }
 
   //dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
@@ -3158,17 +3159,22 @@ fil_crypt_flush_space(
           if ( (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
                (crypt_data->type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
           {
-            //we need to flip the encryption bit
-            while (DB_SUCCESS != fil_toggle_encrypted_flag(space)) //TODO: Robert: Zmień to na if a nie while
+            if (DB_SUCCESS != fil_toggle_encrypted_flag(space))
             {
+              ut_ad(0);
+              return; //TODO:Robert przemysl to jeszcze czy to jest bezpieczne tu robic return
+            }
+            //we need to flip the encryption bit
+            //while (DB_SUCCESS != fil_toggle_encrypted_flag(space)) //TODO: Robert: Zmień to na if a nie while
+            //{
               //ib::error() << "Could not set ENCRYPTED flag for table " << space->name
                           //<< " Not updating page0 for this table. Will retry updating the flag"
                           //<< " and page 0 when rotation thread will pick this table for re-encryption. "
                           //<< " Please note that although table " << space->name  << "does not have encryption flag set "
                           //<< " and page 0 updated. All its pages have been encrypted";
-                os_thread_sleep(1000);
+                //os_thread_sleep(1000);
                 // waiting for DD to be available
-            }
+            //}
           }
         }
 
@@ -3558,7 +3564,8 @@ Wait for crypt threads to stop accessing space
 
 void
 fil_space_crypt_close_tablespace(
-	const fil_space_t*	space)
+	const fil_space_t*	space,
+        trx_t *trx)
 {
 	fil_space_crypt_t* crypt_data = space->crypt_data;
 
@@ -3581,13 +3588,28 @@ fil_space_crypt_close_tablespace(
 		mutex_exit(&crypt_data->mutex);
 		/* release dict mutex so that scrub threads can release their
 		* table references */
-		dict_mutex_exit_for_mysql();
+                if (!trx)// || lock_trx_has_sys_table_locks(trx) != NULL)
+		  dict_mutex_exit_for_mysql();
+                else
+                {
+		  dict_mutex_exit_for_mysql();
+	          rw_lock_x_unlock(dict_operation_lock);
+                  //row_mysql_unlock_data_dictionary(trx);
+                }
 
 		/* wakeup throttle (all) sleepers */
 		os_event_set(fil_crypt_throttle_sleep_event);
 
 		os_thread_sleep(20000);
-		dict_mutex_enter_for_mysql();
+                if (!trx)// || lock_trx_has_sys_table_locks(trx) != NULL)
+		  dict_mutex_enter_for_mysql();
+                else
+                {
+	          rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
+		  dict_mutex_enter_for_mysql();
+                  //row_mysql_lock_data_dictionary(trx);
+                }
+
 		mutex_enter(&crypt_data->mutex);
 		cnt = crypt_data->rotate_state.active_threads;
 		flushing = crypt_data->rotate_state.flushing;
