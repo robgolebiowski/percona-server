@@ -3526,7 +3526,7 @@ check_rec:
 	mtr_commit(&mtr);
 	mem_heap_free(heap);
 
-	return(table);
+	DBUG_RETURN(table);
 }
 
 /********************************************************************//**

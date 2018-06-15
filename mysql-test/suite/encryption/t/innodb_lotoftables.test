@@ -121,10 +121,15 @@ show status like 'innodb_pages0_read%';
 #
 # Verify
 #
+
+--let $assert_text=Should contain 100 tables
 --echo # should contain 100 tables
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
---echo # should contain 100 tables
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted%\\']" = 100
+--source include/assert.inc
+#SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
+--let $assert_text=Should contain 100 tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND NAME LIKE \\'innodb_encrypted%\\']" = 100;
+--source include/assert.inc
 
 use test;
 show status like 'innodb_pages0_read%';

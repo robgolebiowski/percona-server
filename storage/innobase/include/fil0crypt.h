@@ -482,7 +482,7 @@ fil_parse_write_crypt_data(
 	byte*			ptr,
 	const byte*		end_ptr,
 	const buf_block_t*	block,
-	dberr_t*		err)
+	ulint 		        len)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /** Encrypt a buffer.
@@ -610,8 +610,7 @@ Wait for crypt threads to stop accessing space
 @param[in]	space		Tablespace */
 void
 fil_space_crypt_close_tablespace(
-	const fil_space_t*	space,
-        trx_t *trx);
+	const fil_space_t*	space);
 
 /*********************************************************************
 Get crypt status for a space (used by information_schema)

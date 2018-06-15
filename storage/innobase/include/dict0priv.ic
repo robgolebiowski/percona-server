@@ -99,7 +99,7 @@ dict_table_open_on_id_low(
 
 	/* TODO: should get the type information from MySQL */
 
-	return(table);
+	DBUG_RETURN(table);
 }
 
 /**********************************************************************//**

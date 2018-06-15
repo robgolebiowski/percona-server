@@ -1118,7 +1118,7 @@ dict_table_open_on_id(
 			table, table_op == DICT_TABLE_OP_DROP_ORPHAN);
 	}
 
-	return(table);
+	DBUG_RETURN(table);
 }
 
 /********************************************************************//**

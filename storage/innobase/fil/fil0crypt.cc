@@ -90,6 +90,7 @@ uint srv_n_fil_crypt_iops = 100;	 // 10ms per iop
 static uint srv_alloc_time = 3;		    // allocate iops for 3s at a time
 static uint n_fil_crypt_iops_allocated = 0;
 
+
 /** Variables for scrubbing */
 //extern uint srv_background_scrub_data_interval;
 //extern uint srv_background_scrub_data_check_interval;
@@ -666,62 +667,125 @@ fil_space_crypt_t::write_page0(
 	byte* 			page,
 	mtr_t*			mtr)
 {
+
+        //byte encrypt_info[ENCRYPTION_INFO_SIZE_V2];
+		//4 + // size of space_id
+		//2 + // size of offset
+		//1 + // size of type
+		//1 + // size of iv-len
+		//4 +  // size of min_key_version
+		//4 +  // size of key_id
+		//1; // fil_encryption_t
+
+
 	ut_ad(this == space->crypt_data);
-	const uint len = sizeof(iv);
+	const uint iv_len = sizeof(iv);
 	const ulint offset = FSP_HEADER_OFFSET
 		+ fsp_header_get_encryption_offset(page_size_t(space->flags));
 	page0_offset = offset;
+
+        const uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE
+                                       + 1       //length of iv
+                                       + 4       //space id
+                                       + 2       //offset
+                                       //+ 4     //space->flags
+                                       + 1       //type 
+                                       + 4       //min_key_version
+                                       + 4       //key_id
+                                       + 1       //encryption
+                                       + iv_len; //iv
+
+
+        byte *encrypt_info = new byte[encrypt_info_size];
+        byte *encrypt_info_ptr = encrypt_info;
+
+		//mach_write_to_4(log_ptr, space->id);
+		//log_ptr += 4;
+		//mach_write_to_2(log_ptr, offset);
+		//log_ptr += 2;
+
+
+        memcpy(encrypt_info_ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
+        encrypt_info_ptr += ENCRYPTION_MAGIC_SIZE;
+        mach_write_to_1(encrypt_info_ptr, iv_len);
+        encrypt_info_ptr += 1;
+
+	mach_write_to_4(encrypt_info_ptr, space->id); //TODO:Robert - I do not think this is needed - it is suppliec in log0recv.cc and can be passed to fil_parse_write_crypt_data
+	encrypt_info_ptr += 4;
+	mach_write_to_2(encrypt_info_ptr, offset);
+        encrypt_info_ptr += 2;
+
+	//mach_write_to_4(encrypt_info_ptr, space->flags);
+	//encrypt_info_ptr += 4;
+        mach_write_to_1(encrypt_info_ptr, type);
+        encrypt_info_ptr += 1;
+        mach_write_to_4(encrypt_info_ptr, min_key_version);
+        encrypt_info_ptr += 4;
+        mach_write_to_4(encrypt_info_ptr, key_id);
+        encrypt_info_ptr += 4;
+        mach_write_to_1(encrypt_info_ptr, encryption);
+        encrypt_info_ptr += 1;
+
+        memcpy(encrypt_info_ptr, iv, iv_len);
+        //encrypt_info_ptr += iv_len;
+
+	mlog_write_string(page + offset,
+			  encrypt_info,
+			  encrypt_info_size,
+			  mtr);
+
+        delete[] encrypt_info;
+
 
 	/*
 	redo log this as bytewise updates to page 0
 	followed by an MLOG_FILE_WRITE_CRYPT_DATA
 	(that will during recovery update fil_space_t)
 	*/
-        mlog_write_ulint(page + FSP_HEADER_OFFSET + FSP_SPACE_FLAGS, space->flags, MLOG_4BYTES, mtr);
-	//mach_write_to_4(FSP_HEADER_OFFSET + FSP_SPACE_FLAGS + page, space->flags);
+        //mlog_write_ulint(page + FSP_HEADER_OFFSET + FSP_SPACE_FLAGS, space->flags, MLOG_4BYTES, mtr); // done
 
-	mlog_write_string(page + offset, (const uchar*)ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr);
-	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr);
-	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 1, len, MLOG_1BYTE, mtr);
-	mlog_write_string(page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv, len,
-			  mtr);
-	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len, min_key_version,
-			 MLOG_4BYTES, mtr);
-	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 4, key_id,
-			 MLOG_4BYTES, mtr);
-	mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 8, encryption,
-		MLOG_1BYTE, mtr);
+	//mlog_write_string(page + offset, (const uchar*)ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr); //done
+	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr); //done
+	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 1, len, MLOG_1BYTE, mtr); //done
+	//mlog_write_string(page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv, len,  //done
+			  //mtr);
+	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len, min_key_version, //done
+			 //MLOG_4BYTES, mtr);
+	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 4, key_id, //done
+			 //MLOG_4BYTES, mtr);
+	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 8, encryption, //done
+		//MLOG_1BYTE, mtr);
 
         //if (space->flags & DICT_TF2_ENCRYPTION)
 
-        if (key_id != 0)
-          key_id = key_id;
+	//byte* log_ptr = mlog_open(mtr, 11 + 17 + len);
 
-	byte* log_ptr = mlog_open(mtr, 11 + 17 + len);
+	//if (log_ptr != NULL) {
+		//log_ptr = mlog_write_initial_log_record_fast(
+			//page,
+			//MLOG_FILE_WRITE_CRYPT_DATA,
+			//log_ptr, mtr);
+		//mach_write_to_4(log_ptr, space->id);
+		//log_ptr += 4;
+		//mach_write_to_2(log_ptr, offset);
+		//log_ptr += 2;
+		//mach_write_to_1(log_ptr, type);
+		//log_ptr += 1;
+		//mach_write_to_1(log_ptr, len); {
+		//version = Encryption::ENCRYPTION_VERSION_1;
+	//} 
 
-	if (log_ptr != NULL) {
-		log_ptr = mlog_write_initial_log_record_fast(
-			page,
-			MLOG_FILE_WRITE_CRYPT_DATA,
-			log_ptr, mtr);
-		mach_write_to_4(log_ptr, space->id);
-		log_ptr += 4;
-		mach_write_to_2(log_ptr, offset);
-		log_ptr += 2;
-		mach_write_to_1(log_ptr, type);
-		log_ptr += 1;
-		mach_write_to_1(log_ptr, len);
-		log_ptr += 1;
-		mach_write_to_4(log_ptr, min_key_version);
-		log_ptr += 4;
-		mach_write_to_4(log_ptr, key_id);
-		log_ptr += 4;
-		mach_write_to_1(log_ptr, encryption);
-		log_ptr += 1;
-		mlog_close(mtr, log_ptr);
+		//log_ptr += 1;
+		//mach_write_to_4(log_ptr, min_key_version);
+		//log_ptr += 4;
+		//mach_write_to_4(log_ptr, key_id);
+		//log_ptr += 4;
+		//mach_write_to_1(log_ptr, encryption);
+		//log_ptr += 1;
+		//mlog_close(mtr, log_ptr);
 
-		mlog_catenate_string(mtr, iv, len);
-	}
+		//mlog_catenate_string(mtr, iv, len);
+	//}
 
         //int x =1;
         //if (strcmp(space->name, "t2"))
@@ -1022,37 +1086,122 @@ fil_parse_write_crypt_data(
 	byte*			ptr,
 	const byte*		end_ptr,
 	const buf_block_t*	block,
-	dberr_t*		err)
+        ulint                   len)
 {
+        const uint iv_len = mach_read_from_1(ptr + ENCRYPTION_MAGIC_SIZE);
+	ut_a(iv_len == CRYPT_SCHEME_1_IV_LEN); // only supported
+
+        //uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE + 1 + iv_len + 4 + 1 + 4 + 4 + 1;
+
+        const uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE
+                                       + 1      //length of iv
+                                       + 4      //space id
+                                       + 2      //offset
+                                       //+ 4    //space->flags
+                                       + 1      //type 
+                                       + 4      //min_key_version
+                                       + 4      //key_id
+                                       + 1      //encryption
+                                       + iv_len;//iv
+
+        if(len != encrypt_info_size)
+        {
+          recv_sys->set_corrupt_log();
+          return NULL;
+        }
+        //byte *encrypt_info = new byte[encrypt_info_size];
+
+		////mach_write_to_4(log_ptr, space->id);
+		////log_ptr += 4;
+		////mach_write_to_2(log_ptr, offset);
+		////log_ptr += 2;
+
+
+        //memcpy(encrypt_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
+        //encrypt_info += ENCRYPTION_MAGIC_SIZE;
+        //mach_write_to_1(encrypt_info, iv_len);
+        //encrypt_info += 1;
+        //memcpy(encrypt_info, iv, iv_len);
+        //encrypt_info += iv_len;
+
+	//mach_write_to_4(encrypt_info, space->id);
+	//encrypt_info += 4;
+	//mach_write_to_2(encrypt_info, offset);
+        //encrypt_info += 2;
+
+	//mach_write_to_4(encrypt_info, space->flags);
+	//encrypt_info += 4;
+        //mach_write_to_1(encrypt_info, type);
+        //encrypt_info += 1;
+        //mach_write_to_4(encrypt_info, min_key_version);
+        //encrypt_info += 4;
+        //mach_write_to_4(encrypt_info, key_id);
+        //encrypt_info += 4;
+        //mach_write_to_1(encrypt_info, encryption);
+
+	//mlog_write_string(page + offset,
+			  //encrypt_info,
+			  //encrypt_info_size,
+			  //mtr);
+
+        //delete[] encrypt_info;
+
+
+        //byte *encrypt_info = new byte[encrypt_info_size];
+
+        //memcpy(encrypt_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
+        //encrypt_info += ENCRYPTION_MAGIC_SIZE;
+        //mach_write_to_1(encrypt_info, iv_len);
+        //encrypt_info += 1;
+        //memcpy(encrypt_info, iv, iv_len);
+        //encrypt_info += iv_len;
+	//mach_write_to_4(encrypt_info, space->flags);
+	//encrypt_info += 4;
+        //mach_write_to_1(encrypt_info, type);
+        //encrypt_info += 1;
+        //mach_write_to_4(encrypt_info, min_key_version);
+        //encrypt_info += 4;
+        //mach_write_to_4(encrypt_info, key_id);
+        //encrypt_info += 4;
+        //mach_write_to_1(encrypt_info, encryption);
+
+
 	/* check that redo log entry is complete */
-	uint entry_size =
-		4 + // size of space_id
-		2 + // size of offset
-		1 + // size of type
-		1 + // size of iv-len
-		4 +  // size of min_key_version
-		4 +  // size of key_id
-		1; // fil_encryption_t
+	//uint entry_size =
+		//4 + // size of space_id
+		//2 + // size of offset
+		//1 + // size of type
+		//1 + // size of iv-len
+		//4 +  // size of min_key_version
+		//4 +  // size of key_id
+		//1; // fil_encryption_t
 
-	*err = DB_SUCCESS;
 
-	if (ptr + entry_size > end_ptr) {
+	if (ptr + encrypt_info_size > end_ptr) {
 		return NULL;
 	}
+
+        // We should only enter this function if ENCRYPTION_KEY_MAGIC_PS_V1 is set
+	ut_ad((memcmp(ptr, ENCRYPTION_KEY_MAGIC_PS_V1,
+		     ENCRYPTION_MAGIC_SIZE) == 0));
+        ptr += ENCRYPTION_MAGIC_SIZE;
+
+        ptr += 1; //length of iv has been already read
 
 	ulint space_id = mach_read_from_4(ptr);
 	ptr += 4;
 	uint offset = mach_read_from_2(ptr);
 	ptr += 2;
+   
+        //ulint space_flags = mach_read_from_4(ptr);
+        //ptr += 4;
+
 	uint type = mach_read_from_1(ptr);
-	ptr += 1;
-	uint len = mach_read_from_1(ptr);
 	ptr += 1;
 
 	ut_a(type == CRYPT_SCHEME_UNENCRYPTED ||
 	     type == CRYPT_SCHEME_1); // only supported
 
-	ut_a(len == CRYPT_SCHEME_1_IV_LEN); // only supported
 	uint min_key_version = mach_read_from_4(ptr);
 	ptr += 4;
 
@@ -1060,32 +1209,31 @@ fil_parse_write_crypt_data(
 	ptr += 4;
 
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(ptr);
-	ptr +=1;
+        ptr += 1;
 
-	if (ptr + len > end_ptr) {
-		return NULL;
-	}
+	//if (ptr + len > end_ptr) {
+		//return NULL;
+	//}
 
 	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id);
 	/* Need to overwrite these as above will initialize fields. */
 	crypt_data->page0_offset = offset;
 	crypt_data->min_key_version = min_key_version;
 	crypt_data->encryption = encryption;
-	memcpy(crypt_data->iv, ptr, len);
-	ptr += len;
+	memcpy(crypt_data->iv, ptr, iv_len);
+	ptr += iv_len;
 
 	/* update fil_space memory cache with crypt_data */
 	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
 		crypt_data = fil_space_set_crypt_data(space, crypt_data);
                 //TODO: Robert: Added by me
-                space->flags |= FSP_FLAGS_MASK_ROTATED_KEYS;
+                //space->flags |= FSP_FLAGS_MASK_ROTATED_KEYS;
                 //***
 		fil_space_release(space);
 		/* Check is used key found from encryption plugin */
 		if (crypt_data->should_encrypt()
 		    && !crypt_data->is_key_found()) {
-                        *err = DB_DECRYPTION_FAILED;
-                        //*err = DB_IO_DECRYPT_FAIL;
+                        recv_sys->set_corrupt_log();
 		}
 	} else {
 		fil_space_destroy_crypt_data(&crypt_data);
@@ -3033,7 +3181,19 @@ fil_toggle_encrypted_flag(fil_space_t *space)
   trx_t* trx_set_encrypted = trx_allocate_for_background();
   trx_set_encrypted->op_info = "setting encrypted flag";
 
-  row_mysql_lock_data_dictionary(trx_set_encrypted);
+  while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
+  {
+    os_thread_sleep(6000);
+    if (space->stop_new_ops) // space is about to be dropped
+     return DB_SUCCESS;      // do not try to lock the DD
+  }
+
+  trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
+  mutex_enter(&dict_sys->mutex);
+
+  //rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
+
+  //row_mysql_lock_data_dictionary(trx_set_encrypted);
 
   dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
                                                 DICT_ERR_IGNORE_NONE);
@@ -3564,8 +3724,7 @@ Wait for crypt threads to stop accessing space
 
 void
 fil_space_crypt_close_tablespace(
-	const fil_space_t*	space,
-        trx_t *trx)
+	const fil_space_t*	space)
 {
 	fil_space_crypt_t* crypt_data = space->crypt_data;
 
@@ -3588,27 +3747,13 @@ fil_space_crypt_close_tablespace(
 		mutex_exit(&crypt_data->mutex);
 		/* release dict mutex so that scrub threads can release their
 		* table references */
-                if (!trx)// || lock_trx_has_sys_table_locks(trx) != NULL)
-		  dict_mutex_exit_for_mysql();
-                else
-                {
-		  //dict_mutex_exit_for_mysql();
-		  //rw_lock_x_unlock(dict_operation_lock);
-                  row_mysql_unlock_data_dictionary(trx);
-                }
+                dict_mutex_exit_for_mysql();
 
 		/* wakeup throttle (all) sleepers */
 		os_event_set(fil_crypt_throttle_sleep_event);
 
 		os_thread_sleep(20000);
-                if (!trx)// || lock_trx_has_sys_table_locks(trx) != NULL)
-		  dict_mutex_enter_for_mysql();
-                else
-                {
-		  //rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
-		  //dict_mutex_enter_for_mysql();
-                  row_mysql_lock_data_dictionary(trx);
-                }
+                dict_mutex_enter_for_mysql();
 
 		mutex_enter(&crypt_data->mutex);
 		cnt = crypt_data->rotate_state.active_threads;

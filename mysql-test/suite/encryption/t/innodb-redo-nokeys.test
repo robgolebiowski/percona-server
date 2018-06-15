@@ -50,6 +50,10 @@ commit;
 # happens, InnoDB refuses to start as used
 # encryption key is not found.
 #
+
+#--disable_reconnect
+#--source include/expect_crash.inc
+
 SET GLOBAL innodb_flush_log_at_trx_commit=1;
 begin;
 update t1 set c = repeat('secret3', 20);
@@ -65,14 +69,37 @@ let $cleanup= drop table t1,t2,t3,t4;
 --let CLEANUP_IF_CHECKPOINT= $cleanup;
 --source include/no_checkpoint_end.inc
 
+#--disable_reconnect
+#--source include/expect_crash.inc
+
+--echo # Robert: After no_checkpoint_end
 --echo # restart
--- source include/start_mysqld.inc
+
+--let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
+
+--error 1
+--exec $MYSQLD_CMD --log-error=$error_log
+
+#TODO:Robert - tutaj musze dodac sprawdzanie czy error pojawil sie w logu error_log
+
+#--let SEARCH_FILE=$t2_IBD
+#--source include/search_pattern_in_file.inc
+#--let ABORT_ON=NOT_FOUND
+#--let SEARCH_PATTERN=dummysecret
+
+
+
+#--exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+#--let $restart_parameters=restart:
+#--source include/start_mysqld.inc
+
+--echo # Robert: After start_mysqld.inc
 #
 # In above server does start but InnoDB refuses to start
 # thus we need to restart server with correct key file
 #
 --echo # Restart mysqld
---let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
---source include/restart_mysqld.inc
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--source include/start_mysqld.inc
 
 drop table t1, t2,t3,t4;

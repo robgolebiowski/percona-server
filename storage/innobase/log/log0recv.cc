@@ -444,7 +444,7 @@ fil_name_parse(
 		ut_ad(0); // the caller checked this
 	case MLOG_FILE_NAME:
 		if (corrupt) {
-			recv_sys->found_corrupt_log = true;
+			recv_sys->set_corrupt_log();
 			break;
 		}
 
@@ -453,7 +453,7 @@ fil_name_parse(
 		break;
 	case MLOG_FILE_DELETE:
 		if (corrupt) {
-			recv_sys->found_corrupt_log = true;
+			recv_sys->set_corrupt_log();
 			break;
 		}
 
@@ -465,7 +465,7 @@ fil_name_parse(
 		break;
 	case MLOG_FILE_RENAME2:
 		if (corrupt) {
-			recv_sys->found_corrupt_log = true;
+			recv_sys->set_corrupt_log();
 		}
 
 		/* The new name follows the old name. */
@@ -488,7 +488,7 @@ fil_name_parse(
 			|| !memchr(new_name, OS_PATH_SEPARATOR, new_len);
 
 		if (corrupt) {
-			recv_sys->found_corrupt_log = true;
+			recv_sys->set_corrupt_log();
 			break;
 		}
 
@@ -641,7 +641,7 @@ fil_name_parse(
 	byte*	end_ptr = ptr + len;
 
 	if (corrupt) {
-		recv_sys->found_corrupt_log = true;
+		recv_sys->set_corrupt_log();
 		return(end_ptr);
 	}
 
@@ -751,7 +751,7 @@ fil_name_parse(
 			|| !memchr(new_table_name, OS_PATH_SEPARATOR, new_len);
 
 		if (corrupt) {
-			recv_sys->found_corrupt_log = true;
+			recv_sys->set_corrupt_log();
 			break;
 		}
 
@@ -1514,11 +1514,12 @@ byte*
 fil_write_encryption_parse(
 	byte*		ptr,
 	const byte*	end,
-	ulint		space_id)
+	ulint		space_id,
+        ulint           len)
 {
 	fil_space_t*	space;
-	ulint		offset;
-	ulint		len;
+	//ulint		offset;
+	//ulint		len;
 	byte*		key = NULL;
 	byte*		iv = NULL;
 //        ulint           key_version = 0;
@@ -1556,20 +1557,20 @@ fil_write_encryption_parse(
 		iv = space->encryption_iv;
 	}
 
-	offset = mach_read_from_2(ptr);
-	ptr += 2;
-	len = mach_read_from_2(ptr);
+	//offset = mach_read_from_2(ptr);
+	//ptr += 2;
+	//len = mach_read_from_2(ptr);
 
-	ptr += 2;
-	if (end < ptr + len) {
-		return(NULL);
-	}
+	//ptr += 2;
+	//if (end < ptr + len) {
+		//return(NULL);
+	//}
 
-	if (offset >= UNIV_PAGE_SIZE
-	    || len + offset > UNIV_PAGE_SIZE
-	    || (len != ENCRYPTION_INFO_SIZE_V1
+	//if (offset >= UNIV_PAGE_SIZE
+	    //|| len + offset > UNIV_PAGE_SIZE
+	if  ((len != ENCRYPTION_INFO_SIZE_V1
 		&& len != ENCRYPTION_INFO_SIZE_V2)) {
-		recv_sys->found_corrupt_log = TRUE;
+		recv_sys->set_corrupt_log();
 		return(NULL);
 	}
 
@@ -1582,7 +1583,7 @@ fil_write_encryption_parse(
 					       iv,
 //                                               &key_version,
 					       ptr)) {
-		recv_sys->found_corrupt_log = TRUE;
+		recv_sys->set_corrupt_log();
 		ib::warn() << "Encryption information"
 			<< " in the redo log of space "
 			<< space_id << " is invalid";
@@ -1729,11 +1730,52 @@ recv_parse_or_apply_log_rec_body(
 		encryption key information before the page 0 is recovered.
 	        Otherwise, redo will not find the key to decrypt
 		the data pages. */
-		if (page_no == 0 && !is_system_tablespace(space_id)
-		    && !apply) {
+		//if (page_no == 0 && !is_system_tablespace(space_id)
+		    //&& !apply) {
+
+                if (page_no == 0 && !apply) {
+
+                   ulint offset = mach_read_from_2(ptr);
+		   ptr += 2;
+	           ulint len = mach_read_from_2(ptr);
+                   ptr += 2;
+                   if (end_ptr < ptr + len)
+                     return NULL;
+
+                   if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_V1,
+		              ENCRYPTION_MAGIC_SIZE) == 0) {
+ 
+                        ut_ad(!is_system_tablespace(space_id));
+                        if (is_system_tablespace(space_id))
+                        {
+                          recv_sys->set_corrupt_log();
+                          return NULL;
+                        }
+
+                        // TODO:Move it back to fil_write_encryption_parser?
+                        if (offset >= UNIV_PAGE_SIZE
+                             || len + offset > UNIV_PAGE_SIZE)
+                        {
+                          recv_sys->set_corrupt_log();
+                          return NULL;
+                        }
+
 			return(fil_write_encryption_parse(ptr,
 							  end_ptr,
-							  space_id));
+							  space_id,
+                                                          len));
+                   } else if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_PS_V1,
+                                    ENCRYPTION_MAGIC_SIZE) == 0)
+                   {
+                        //dberr_t err;
+                        ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, len));
+                        return ptr;
+                  }
+                  else
+                  {
+                     recv_sys->set_corrupt_log();
+                     return NULL;
+                  }
 		}
 		break;
 
@@ -2087,18 +2129,18 @@ recv_parse_or_apply_log_rec_body(
 				ptr, end_ptr, page, page_zip, index);
 		}
 		break;
-        case MLOG_FILE_WRITE_CRYPT_DATA: // TODO:Robert I need to try to merge it with how Oracle is reusing MLOG_WRITE_STRING
-                                         // TODO:It is added after create table
-		dberr_t err;
-		ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, &err));
+        //case MLOG_FILE_WRITE_CRYPT_DATA: // TODO:Robert I need to try to merge it with how Oracle is reusing MLOG_WRITE_STRING
+                                         //// TODO:It is added after create table
+		//dberr_t err;
+		//ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, &err));
 
-		if (err != DB_SUCCESS) {
-			recv_sys->found_corrupt_log = TRUE;
-		}
-		break;
+		//if (err != DB_SUCCESS) {
+			//recv_sys->set_corrupt_log();
+		//}
+		//break;
 	default:
 		ptr = NULL;
-		recv_sys->found_corrupt_log = true;
+		recv_sys->set_corrupt_log();
 	}
 
 	if (index) {
@@ -2998,7 +3040,7 @@ recv_parse_log_rec(
 	case MLOG_MULTI_REC_END | MLOG_SINGLE_REC_FLAG:
 	case MLOG_DUMMY_RECORD | MLOG_SINGLE_REC_FLAG:
 	case MLOG_CHECKPOINT | MLOG_SINGLE_REC_FLAG:
-		recv_sys->found_corrupt_log = true;
+		recv_sys->set_corrupt_log();
 		return(0);
 	}
 
@@ -3301,7 +3343,7 @@ loop:
 			if (recv_sys->found_corrupt_log
 			    || type == MLOG_CHECKPOINT
 			    || (*ptr & MLOG_SINGLE_REC_FLAG)) {
-				recv_sys->found_corrupt_log = true;
+				recv_sys->set_corrupt_log();
 				recv_report_corrupt_log(
 					ptr, type, space, page_no);
 				return(true);
@@ -3688,7 +3730,7 @@ recv_scan_log_recs(
 				ib::error() << "Log parsing buffer overflow."
 					" Recovery may have failed!";
 
-				recv_sys->found_corrupt_log = true;
+				recv_sys->set_corrupt_log();
 
 #ifndef UNIV_HOTBACKUP
 				if (!srv_force_recovery) {
@@ -4135,7 +4177,7 @@ recv_recovery_from_checkpoint_start(
 		break;
 	default:
 		ut_ad(0);
-		recv_sys->found_corrupt_log = true;
+		recv_sys->set_corrupt_log();
 		log_mutex_exit();
 		return(DB_ERROR);
 	}
@@ -4758,8 +4800,8 @@ get_mlog_string(mlog_id_t type)
 	case MLOG_TRUNCATE:
 		return("MLOG_TRUNCATE");
 
-        case MLOG_FILE_WRITE_CRYPT_DATA:
-		return("MLOG_FILE_WRITE_CRYPT_DATA");
+        //case MLOG_FILE_WRITE_CRYPT_DATA:
+		//return("MLOG_FILE_WRITE_CRYPT_DATA");
 	}
 	DBUG_ASSERT(0);
 	return(NULL);

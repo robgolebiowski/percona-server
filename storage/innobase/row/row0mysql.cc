@@ -4818,7 +4818,7 @@ row_drop_single_table_tablespace(
 				<< " for table " << tablename;
 		}
 
-	} else if (fil_delete_tablespace(space_id, BUF_REMOVE_FLUSH_NO_WRITE, trx)
+	} else if (fil_delete_tablespace(space_id, BUF_REMOVE_FLUSH_NO_WRITE)
 		   != DB_SUCCESS) {
 
 		ib::error() << "We removed the InnoDB internal data"
