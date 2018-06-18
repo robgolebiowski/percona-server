@@ -35,10 +35,6 @@ Created 2013-7-26 by Kevin Lewis
 #include "fil0crypt.h"
 #ifdef UNIV_HOTBACKUP
 #include "my_sys.h"
-
-#include "file0crypt.h"
-
-
 #endif /* UNIV_HOTBACKUP */
 
 
@@ -672,7 +668,10 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
-	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import && crypt_data == NULL) { 
+	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import)
+        { 
+            if(crypt_data == NULL)
+            {
 		m_encryption_key = static_cast<byte*>(
 			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 		m_encryption_iv = static_cast<byte*>(
@@ -711,6 +710,20 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			m_encryption_key = NULL;
 			m_encryption_iv = NULL;
 		}
+            }
+            else
+            {
+                if (Encryption::tablespace_key_exists(crypt_data->key_id) == false)
+                {
+                   ib::error()
+                     << "Cannot find encryption key for tablespace with SPACE ID = " << m_space_id
+                     << " please confirm that correct keyring is loaded.";
+
+                   m_is_valid = false;
+                   free_first_page();
+                   return (DB_CORRUPTION);
+                }
+            }
 	}
 
         if (crypt_data != NULL)

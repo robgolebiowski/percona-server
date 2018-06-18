@@ -4622,6 +4622,22 @@ prepare_inplace_alter_table_dict(
                 {
                   mode= FIL_ENCRYPTION_ON;
                   key_id= ha_alter_info->create_info->encryption_key_id;
+
+                  uint tablespace_key_version;
+                  byte *tablespace_key; 
+
+                  //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
+                  Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
+                  if (tablespace_key == NULL)
+                  {
+                     dict_mem_table_free(ctx->new_table);
+                     my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, //TODO: Inny błąd?
+                              MYF(0));
+		     goto new_clustered_failed;
+                  }
+                  else
+                    my_free(tablespace_key);
+
                   //TODO:Robert - nie jestem pewny czy tu zawsze dodawać flagę
 		  DICT_TF2_FLAG_SET(ctx->new_table,
 		                    DICT_TF2_ENCRYPTION);

@@ -754,6 +754,8 @@ retry:
 		if (!space->crypt_data) { // read if it is not yet read for logs etc.
          	  space->crypt_data = fil_space_read_crypt_data(
 				page_size_t(space->flags), page);
+
+            
                 
                   if (space->crypt_data && fil_set_encryption(space->id,
                                        Encryption::ROTATED_KEYS,
@@ -846,19 +848,29 @@ retry:
 			}
 		}
 
-		if (space->crypt_data
-		    && !recv_recovery_is_on()) {
-                        // TODO:For some reason system tablespaces do not go through reading dict flags
-                        //ut_ad(space->id == srv_sys_space.space_id() || FSP_FLAGS_GET_ENCRYPTION(flags)); 
-                        // TODO:Robert tu chyba bardziej powinienem sprawdzić czy encryption_type != Encryption::NONE ?
-			if (space->encryption_type != Encryption::ROTATED_KEYS) {
-				ib::error()
-					<< "Can't read encryption"
-					<< " key from file "
-					<< node->name << "!";
-				return(false);
-			}
-		}
+                //For recovery this should be checked by validate_for_recovery ?
+               if (space->crypt_data && Encryption::tablespace_key_exists(space->crypt_data->key_id) == false &&
+                   !recv_recovery_is_on())
+               {
+                 //TODO:Robert: Dlaczego w MK jest tylko gdy recv_recovery_is_on to sprawdzane ?
+                 //Muszę mieć pewność, że crypt data zostanie sparsowane jako pierwsze - w log0recv
+                 ib::error() << "There is no key for tablespace " << space->name;
+                 return (false);
+               }
+
+		//if (space->crypt_data
+		    //&& !recv_recovery_is_on()) {
+                        //// TODO:For some reason system tablespaces do not go through reading dict flags
+                        ////ut_ad(space->id == srv_sys_space.space_id() || FSP_FLAGS_GET_ENCRYPTION(flags)); 
+                        //// TODO:Robert tu chyba bardziej powinienem sprawdzić czy encryption_type != Encryption::NONE ?
+			//if (space->encryption_type != Encryption::ROTATED_KEYS) {
+				//ib::error()
+					//<< "Can't read encryption"
+					//<< " key from file "
+					//<< node->name << "!";
+				//return(false);
+			//}
+		//}
 
 
 		if (node->size == 0) {
@@ -4108,6 +4120,8 @@ fil_ibd_open(
 	const char*	space_name,
 	const char*	path_in)
 {
+        ib::error() << "Robert: fil_ibd_open space " << space_name;
+
 	dberr_t		err = DB_SUCCESS;
 	bool		dict_filepath_same_as_default = false;
 	bool		link_file_found = false;
@@ -4244,6 +4258,8 @@ fil_ibd_open(
 
 		goto skip_validate;
 	}
+
+        ib::error() << "Robert: Validating first page of space " << space_name; 
 
 	/* Read and validate the first page of these three tablespace
 	locations, if found. */
@@ -5911,7 +5927,13 @@ fil_io_set_encryption(
                       //ut_ad(false);
                     if (bpage->encrypt)
                     {
-                      ut_ad(bpage->encryption_key != NULL); //TODO: Tutaj zamiast tego assertu będzie musiałbyć zwrócony błąd
+                      if (bpage->encryption_key == NULL)
+                      {
+                        ib::error() << "Robert: No encryption key for space: " << space->name << " id= " << space->id;
+			os_thread_sleep(3000000); // poczekaj az wiadomosc znajdzie sie w logu
+                      }
+
+                      ut_ad(bpage->encryption_key != NULL); 
                       //{
                         key = bpage->encryption_key;
                         key_version = bpage->encryption_key_version;

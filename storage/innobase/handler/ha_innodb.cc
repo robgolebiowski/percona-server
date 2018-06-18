@@ -6871,6 +6871,7 @@ ha_innobase::open(
                                     "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
                                     space()->crypt_data->key_id);
 
+                        //TODO:Robert - change this to Encryption::tablespace_key_exists
 			if (!encryption_key_id_exists(key_name)) {
 				push_warning_printf(
 					thd, Sql_condition::SL_WARNING,
@@ -11293,6 +11294,16 @@ err_col:
 
                 fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
                 uint32_t encryption_key_id;
+
+                if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
+                   encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
+                                                                        // TODO: To będzie też sprawdzane w check_table z crypt_data
+                                                                       // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
+                else
+                  encryption_key_id= THDVAR(m_thd, default_encryption_key_id);
+
+
+
                 //LEX_STRING encryption_key_id; //TODO:Robert:For now it is LEX_STRING
                 if (!Encryption::is_master_key_encryption(encrypt))
                 {
@@ -11304,9 +11315,26 @@ err_col:
                   {
                       rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
                       DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+
+                      uint tablespace_key_version;
+                      byte *tablespace_key; 
+
+                      //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
+                      Encryption::get_latest_tablespace_key_or_create_new_one(encryption_key_id, &tablespace_key_version, &tablespace_key);
+                      if (tablespace_key == NULL)
+                      {
+                         my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, //TODO: Inny błąd?
+                                           MYF(0));
+                         err = DB_UNSUPPORTED;
+                         dict_mem_table_free(table);
+                      }
+                      else
+                        my_free(tablespace_key);
+
                   }
                   else if(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str))
                   {
+                      //default encryption key should exists - this is checked on server startup
                       rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
                       DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
                   }
@@ -11383,13 +11411,6 @@ err_col:
                 //ut_ad(!Encryption::is_none(m_create_info->encrypt_type.str) &&
                 //      !Encryption::is_rotated_keys(m_create_info->encrypt_type.str) &&
                 //      m_create_info->encryption_key_id.length == 0);
-
-                if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
-                   encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
-                                                                        // TODO: To będzie też sprawdzane w check_table z crypt_data
-                                                                       // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
-                else
-                  encryption_key_id= THDVAR(m_thd, default_encryption_key_id);
 
 
 
@@ -23466,7 +23487,7 @@ innodb_encrypt_tables_validate(
 	//array_elements(srv_encrypt_tables_names)-1, 0, srv_encrypt_tables_names,
 	//NULL
 //}
-  //TODO: Robert:For now I am not evaluating anything!!!
+  //TODO: Robert:For now I am not evaluating anything!!! // I have added evaluation if key_id exists
 
 	const char*	innodb_encrypt_tables_input;
 	char		buff[STRING_BUFFER_USUAL_SIZE];
@@ -23498,15 +23519,15 @@ innodb_encrypt_tables_validate(
 
         ulong encrypt_tables = *(ulong*)save;
 
-        //TODO:Still to implement!
-        //if (encrypt_tables
-            //&& !encryption_key_id_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
-                //push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                                    //HA_ERR_UNSUPPORTED,
-                                    //"InnoDB: cannot enable encryption, "
-                                    //"encryption plugin is not available");
-                //return 1;
-        //}
+        //TODO:Should not this abort the server?
+        if (encrypt_tables
+            && !Encryption::tablespace_key_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
+                push_warning_printf(thd, Sql_condition::SL_WARNING,
+                                    HA_ERR_UNSUPPORTED,
+                                    "InnoDB: cannot enable encryption, "
+                                    "encryption plugin is not available");
+                return 1;
+        }
 
         if (!srv_fil_crypt_rotate_key_age) {
                 const char *msg = (encrypt_tables ? "enable" : "disable");

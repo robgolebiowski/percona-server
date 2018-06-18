@@ -412,6 +412,32 @@ fsp_header_get_encryption_offset(
 fil_space_crypt_t*
 fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 {
+        //memcpy(encrypt_info_ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
+        //encrypt_info_ptr += ENCRYPTION_MAGIC_SIZE;
+        //mach_write_to_1(encrypt_info_ptr, iv_len);
+        //encrypt_info_ptr += 1;
+
+	//mach_write_to_4(encrypt_info_ptr, space->id); //TODO:Robert - I do not think this is needed - it is suppliec in log0recv.cc and can be passed to fil_parse_write_crypt_data
+	//encrypt_info_ptr += 4;
+	//mach_write_to_2(encrypt_info_ptr, offset);
+        //encrypt_info_ptr += 2;
+
+	//mach_write_to_4(encrypt_info_ptr, space->flags);
+	//encrypt_info_ptr += 4;
+
+        //mach_write_to_1(encrypt_info_ptr, type);
+        //encrypt_info_ptr += 1;
+        //mach_write_to_4(encrypt_info_ptr, min_key_version);
+        //encrypt_info_ptr += 4;
+        //mach_write_to_4(encrypt_info_ptr, key_id);
+        //encrypt_info_ptr += 4;
+        //mach_write_to_1(encrypt_info_ptr, encryption);
+        //encrypt_info_ptr += 1;
+
+        //memcpy(encrypt_info_ptr, iv, iv_len);
+
+        ulint bytes_read = 0;
+
 	const ulint offset = FSP_HEADER_OFFSET
 		+ fsp_header_get_encryption_offset(page_size);
 
@@ -420,8 +446,17 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 		return NULL;
 	}
 
-	uint8_t type = mach_read_from_1(page + offset + ENCRYPTION_MAGIC_SIZE + 0);
-	uint8_t iv_length = mach_read_from_1(page + offset + ENCRYPTION_MAGIC_SIZE + 1);
+        bytes_read += ENCRYPTION_MAGIC_SIZE;
+
+	uint8_t iv_length = mach_read_from_1(page + offset + bytes_read);
+        bytes_read += 1;
+        bytes_read += 4; // skip space_id
+        bytes_read += 2; // skip offset
+        //bytes_read += 4; // skip flags
+        
+	uint8_t type = mach_read_from_1(page + offset + bytes_read);
+        bytes_read += 1;
+
 	fil_space_crypt_t* crypt_data;
 
 	if (!(type == CRYPT_SCHEME_UNENCRYPTED ||
@@ -440,17 +475,20 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	}
 
 	uint min_key_version = mach_read_from_4
-		(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length);
+		(page + offset + bytes_read);
+        bytes_read += 4;
 
 	uint key_id = mach_read_from_4
-		(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length + 4);
+		(page + offset + bytes_read);
+        bytes_read += 4;
 
         if (key_id != 0)
           ib::error() << "Read crypt_data: key_id: " << key_id << " type: " << ((type == CRYPT_SCHEME_UNENCRYPTED) ? "schema unencrypted"
                                                                                                                    : "schema encrypted");
 
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(
-		page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length + 8);
+		page + offset + bytes_read);
+        bytes_read += 1;
 
 	crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
         
@@ -459,7 +497,7 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	crypt_data->type = type;
 	crypt_data->min_key_version = min_key_version;
 	crypt_data->page0_offset = offset;
-	memcpy(crypt_data->iv, page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv_length);
+	memcpy(crypt_data->iv, page + offset + bytes_read, iv_length);
 
 	return crypt_data;
 }
@@ -688,7 +726,7 @@ fil_space_crypt_t::write_page0(
                                        + 1       //length of iv
                                        + 4       //space id
                                        + 2       //offset
-                                       //+ 4     //space->flags
+                                       //+ 4       //space->flags
                                        + 1       //type 
                                        + 4       //min_key_version
                                        + 4       //key_id
@@ -705,6 +743,8 @@ fil_space_crypt_t::write_page0(
 		//log_ptr += 2;
 
 
+        mlog_write_ulint(page + FSP_HEADER_OFFSET + FSP_SPACE_FLAGS, space->flags, MLOG_4BYTES, mtr); // done
+
         memcpy(encrypt_info_ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
         encrypt_info_ptr += ENCRYPTION_MAGIC_SIZE;
         mach_write_to_1(encrypt_info_ptr, iv_len);
@@ -717,6 +757,7 @@ fil_space_crypt_t::write_page0(
 
 	//mach_write_to_4(encrypt_info_ptr, space->flags);
 	//encrypt_info_ptr += 4;
+
         mach_write_to_1(encrypt_info_ptr, type);
         encrypt_info_ptr += 1;
         mach_write_to_4(encrypt_info_ptr, min_key_version);
@@ -1097,7 +1138,7 @@ fil_parse_write_crypt_data(
                                        + 1      //length of iv
                                        + 4      //space id
                                        + 2      //offset
-                                       //+ 4    //space->flags
+                                       //+ 4      //space->flags
                                        + 1      //type 
                                        + 4      //min_key_version
                                        + 4      //key_id
@@ -1228,12 +1269,19 @@ fil_parse_write_crypt_data(
 		crypt_data = fil_space_set_crypt_data(space, crypt_data);
                 //TODO: Robert: Added by me
                 //space->flags |= FSP_FLAGS_MASK_ROTATED_KEYS;
+                //TODO:Robert: Need to set flags to with or without encryption flag
+                //TODO:Robert: Czy flagi space'a będą ustawione na stronie 0 jeżeli system się scrashuje?
+                //TODO:Robert: Do usunięcia
+                //space->flags = space_flags;
                 //***
 		fil_space_release(space);
 		/* Check is used key found from encryption plugin */
 		if (crypt_data->should_encrypt()
-		    && !crypt_data->is_key_found()) {
-                        recv_sys->set_corrupt_log();
+		    //&& !crypt_data->is_key_found()) {
+                    && Encryption::tablespace_key_exists(crypt_data->key_id) == false) 
+                {
+                      ib::error() << "Key cannot be read for SPACE ID = " << space_id;
+                      recv_sys->set_corrupt_log();
 		}
 	} else {
 		fil_space_destroy_crypt_data(&crypt_data);

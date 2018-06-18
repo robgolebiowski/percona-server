@@ -150,9 +150,11 @@ struct fil_space_rotate_state_t
 	} scrubbing;
 };
 
-#ifndef UNIV_INNOCHECKSUM
 
 bool encryption_key_id_exists(const char *key_id);
+
+#ifndef UNIV_INNOCHECKSUM
+
 
 struct fil_space_crypt_t : st_encryption_scheme
 {
