@@ -1097,8 +1097,9 @@ buf_flush_write_block_low(
        //if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
          
        if (space->crypt_data != NULL && //space->encryption_type == Encryption::ROTATED_KEYS &&
-           (space->crypt_data->encryption == FIL_ENCRYPTION_ON ||
-            (space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
+           space->crypt_data->should_encrypt())
+           //(space->crypt_data->encryption == FIL_ENCRYPTION_ON ||
+            //(space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
        {
          //space->encryption_type = Encryption::ROTATED_KEYS;
          ut_ad(space->crypt_data != NULL);// && space->crypt_data->iv[0] != '\0');

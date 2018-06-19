@@ -9462,6 +9462,20 @@ bool Encryption::tablespace_key_exists(uint key_id)
   return true;
 }
 
+bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id)
+{
+  uint tablespace_key_version;
+  byte *tablespace_key;
+
+  get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
+
+  if (tablespace_key == NULL)
+    return false;
+
+  my_free(tablespace_key);
+  return true;
+}
+
 void
 Encryption::get_latest_tablespace_key_or_create_new_one(uint key_id,
                                                         uint *tablespace_key_version,

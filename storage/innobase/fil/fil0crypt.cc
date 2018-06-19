@@ -202,7 +202,6 @@ bool encryption_key_id_exists(const char *key_id)
     //system_key == NULL);
 //}
 
-
 uint encryption_get_latest_version(uint key_id)
 {
   size_t key_len;
@@ -222,19 +221,12 @@ uint encryption_get_latest_version(uint key_id)
   size_t system_key_len = 0;
   uchar *system_key = NULL;
 
-  //DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch",
-                  //{ return true; } );
   if (my_key_fetch(key_name, &system_key_type, NULL,
                    reinterpret_cast<void**>(&system_key), &system_key_len) ||
-      (system_key == NULL &&
-       (my_key_generate(key_name, "AES", NULL, ENCRYPTION_KEY_LEN) ||
-        my_key_fetch(key_name, &system_key_type, NULL,
-                     reinterpret_cast<void**>(&system_key), &system_key_len) ||
-        system_key == NULL)))
+      system_key == NULL)
          return ENCRYPTION_KEY_VERSION_INVALID;
 
   my_free(system_key_type);
-  //DBUG_ASSERT(strncmp(system_key_type, "AES", 3) == 0);
 
   if (parse_system_key(system_key, system_key_len, &key_version, &key, &key_len) == reinterpret_cast<uchar*>(NullS))
   {
@@ -246,18 +238,60 @@ uint encryption_get_latest_version(uint key_id)
 
   return key_version;
 }
+
+
+//uint encryption_get_latest_version(uint key_id)
+//{
+  //size_t key_len;
+  //char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+
+  //uchar *key;
+  //uint key_version;
+
+  //memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+
+  //// The form of the key is percona_innodb-<number>, where <number> == key_id
+  //ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+	      //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+	      //key_id);
+
+  //char *system_key_type = NULL;
+  //size_t system_key_len = 0;
+  //uchar *system_key = NULL;
+
+  //if (my_key_fetch(key_name, &system_key_type, NULL,
+                   //reinterpret_cast<void**>(&system_key), &system_key_len) ||
+      //(system_key == NULL &&
+       //(my_key_generate(key_name, "AES", NULL, ENCRYPTION_KEY_LEN) ||
+        //my_key_fetch(key_name, &system_key_type, NULL,
+                     //reinterpret_cast<void**>(&system_key), &system_key_len) ||
+        //system_key == NULL)))
+         //return ENCRYPTION_KEY_VERSION_INVALID;
+
+  //my_free(system_key_type);
+
+  //if (parse_system_key(system_key, system_key_len, &key_version, &key, &key_len) == reinterpret_cast<uchar*>(NullS))
+  //{
+    //my_free(system_key);
+    //return ENCRYPTION_KEY_VERSION_INVALID;
+  //}
+  //my_free(system_key);
+  //my_free(key);
+
+  //return key_version;
+//}
 /**
 Get latest key version from encryption plugin.
 @return key version or ENCRYPTION_KEY_VERSION_INVALID */
 uint
 fil_space_crypt_t::key_get_latest_version(void)
 {
-	uint key_version = key_found;
+        uint key_version = ENCRYPTION_KEY_VERSION_INVALID;
 
-	if (is_key_found()) {
+	if (is_key_found()) { //TODO:Robert:This blocks new version from being found - if it once read - it stays the same
 		key_version = encryption_get_latest_version(key_id);
 		srv_stats.n_key_requests.inc();
-		key_found = key_version;
+		//found_key_version = key_version;
 	}
 
 	return key_version;
@@ -540,7 +574,7 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 		//ib_logf(IB_LOG_LEVEL_ERROR,
 			//"Found non sensible iv length: %lu for space %lu "
 			//" offset: %lu type: %lu bytes: "
-			//"[ %.2x %.2x %.2x %.2x %.2x %.2x ].",
+			//"[ %.2x %.2x %.2x %.2x %.2x %.2x ].",key_found
 			//iv_length, space, offset, type,
 			//page[offset + 0 + ENCRYPTION_MAGIC_SIZE],
 			//page[offset + 1 + ENCRYPTION_MAGIC_SIZE],
@@ -722,6 +756,14 @@ fil_space_crypt_t::write_page0(
 		+ fsp_header_get_encryption_offset(page_size_t(space->flags));
 	page0_offset = offset;
 
+        // We have those current variable set when crypt_data is being flush, after the flush those variable will get
+        // assigned to the corresponding variables in crypt_data. First we need to flush the page0 before we update
+        // in memory crypt_data, that is read by information_schema.
+
+	uint current_min_key_version = rotate_state.flushing ? rotate_state.min_key_version_found : min_key_version;
+        uint current_type = current_min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
+                                                                                            : type;
+
         const uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE
                                        + 1       //length of iv
                                        + 4       //space id
@@ -758,9 +800,9 @@ fil_space_crypt_t::write_page0(
 	//mach_write_to_4(encrypt_info_ptr, space->flags);
 	//encrypt_info_ptr += 4;
 
-        mach_write_to_1(encrypt_info_ptr, type);
+        mach_write_to_1(encrypt_info_ptr, current_type);
         encrypt_info_ptr += 1;
-        mach_write_to_4(encrypt_info_ptr, min_key_version);
+        mach_write_to_4(encrypt_info_ptr, current_min_key_version);
         encrypt_info_ptr += 4;
         mach_write_to_4(encrypt_info_ptr, key_id);
         encrypt_info_ptr += 4;
@@ -1256,7 +1298,7 @@ fil_parse_write_crypt_data(
 		//return NULL;
 	//}
 
-	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id);
+	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
 	/* Need to overwrite these as above will initialize fields. */
 	crypt_data->page0_offset = offset;
 	crypt_data->min_key_version = min_key_version;
@@ -1277,8 +1319,8 @@ fil_parse_write_crypt_data(
 		fil_space_release(space);
 		/* Check is used key found from encryption plugin */
 		if (crypt_data->should_encrypt()
-		    //&& !crypt_data->is_key_found()) {
-                    && Encryption::tablespace_key_exists(crypt_data->key_id) == false) 
+                    && !crypt_data->is_key_found())
+                    //&& Encryption::tablespace_key_exists(crypt_data->key_id) == false) 
                 {
                       ib::error() << "Key cannot be read for SPACE ID = " << space_id;
                       recv_sys->set_corrupt_log();
@@ -1780,7 +1822,11 @@ fil_crypt_start_encrypting_space(
 
 	/* 1 - create crypt data */
 	//crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
-	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+        //
+        //TODO:Robert: Should it not be default encryption key variable - so when the default key gets changed it would be used here?
+        //For now when innodb_encrypt_tables is turned on it is checked if DEFAULT_ENCRYPTION_KEY exist and if not it is created
+        //thus there is no need to create it here
+	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY, false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
 
 	if (crypt_data == NULL) {
 		mutex_exit(&fil_crypt_threads_mutex);
@@ -3350,22 +3396,27 @@ fil_crypt_flush_space(
         //ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
         //ib::error() << "innodb-tables-encrypt: " << srv_encrypt_tables << '\n';
 
+        // We do not assign the type to crypt_data just yet. We do it after write_page0 so the in-memory crypt_data
+        // would be in sync with the crypt_data on disk
+        ut_ad(crypt_data->rotate_state.flushing);
+        uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
+                                                                                                                   : crypt_data->type;
 
-	if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-		crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
-	}
+	//if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+		//crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
+	//}
 
         if (strcmp(space->name, "mysql/plugin") == 0)
         {
           ib::error() << "Updating encryption flag for mysql/plugin" << '\n';
           ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
-          ib::error() << "crypt_data->type = " << crypt_data->type << '\n';
+          ib::error() << "crypt_data->type = " << current_type << '\n';
         }
 
         if (space->id != 0)
         {
-          if ( (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
-               (crypt_data->type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
+          if ( (current_type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
+               (current_type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
           {
             if (DB_SUCCESS != fil_toggle_encrypted_flag(space))
             {
@@ -3404,6 +3455,9 @@ fil_crypt_flush_space(
 	}
 
 	mtr.commit();
+
+        crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
+        crypt_data->type = current_type;
 
         //(void)fil_update_encrypted_flag;
         //while (DB_SUCCESS != fil_update_encrypted_flag(space))
@@ -3473,8 +3527,8 @@ fil_crypt_complete_rotate_space(
 		if (should_flush) {
 			/* we're the last active thread */
 			crypt_data->rotate_state.flushing = true;
-			crypt_data->min_key_version =
-				crypt_data->rotate_state.min_key_version_found;
+			//crypt_data->min_key_version =
+				//crypt_data->rotate_state.min_key_version_found;
                 //TODO:Robert - tutaj chyba może być wyścig
                 //TODO:Robert: Jeszcze nie było flush a nowe crypt_data->min_key_version
                 //TODO:Robert: jest już ustawione

@@ -38,8 +38,11 @@ Created 2011/12/19
 #include "srv0srv.h"
 #include "page0zip.h"
 #include "trx0sys.h"
+#include "fil0crypt.h"
+
 
 #ifndef UNIV_HOTBACKUP
+
 
 /** The doublewrite buffer */
 buf_dblwr_t*	buf_dblwr = NULL;
@@ -1221,6 +1224,23 @@ buf_dblwr_flush_buffered_writes(
 		const buf_block_t*	block;
 
 		block = (buf_block_t*)dblwr_shard->buf_block_arr[i];
+
+                //TODO:Temporarily encrypt pages once for writing data into tablespace file and the second time when writing data to double write buffer
+                buf_page_t *bpage = &(((buf_block_t*)dblwr_shard->buf_block_arr[i])->page);
+                FilSpace space (bpage->id.space()); // this is a guard
+                
+                //TODO:Those keys will need to be fried somewhere
+                if (space() && space()->crypt_data && space()->crypt_data->should_encrypt()) //TODO:Robert Space might be already dropped - one more reason to
+                                                                                             //have encryption earlier
+                {
+                  Encryption::get_latest_tablespace_key(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+                  ////It seems that it can reach here before variable encrypt_tables is validated - which is weird .. -
+                  //if (space()->crypt_data->key_id == 0 && bpage->encryption_key == NULL)
+                    //Encryption::get_latest_tablespace_key_or_create_new_one(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+                  ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
+                  bpage->encrypt = true; //TODO:Robert!: For now double write buffer stays unencrypted!
+                  bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
+                }
 
 		if (buf_block_get_state(block) != BUF_BLOCK_FILE_PAGE
 		    || block->page.zip.data) {

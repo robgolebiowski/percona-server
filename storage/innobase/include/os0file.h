@@ -497,6 +497,8 @@ struct Encryption {
         @param[in,out]	master_key	master key */
 	static void create_master_key(byte** master_key);
 
+        static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id);
+
         static bool tablespace_key_exists(uint key_id);
 
        //TODO:Robert: Te dwa są potrzebne.

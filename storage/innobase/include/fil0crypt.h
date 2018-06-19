@@ -173,7 +173,9 @@ struct fil_space_crypt_t : st_encryption_scheme
 		min_key_version(new_min_key_version),
 		page0_offset(0),
 		encryption(new_encryption),
-		key_found(0),
+		//found_key_version(ENCRYPTION_KEY_VERSION_INVALID),
+                key_found(false),
+                //key_found(0),
 		rotate_state(),
                 encryption_rotation(encryption_rotation)
 	{
@@ -192,21 +194,23 @@ struct fil_space_crypt_t : st_encryption_scheme
                         //ut_ad(0);
 		} else {
 			type = CRYPT_SCHEME_1;
-                        if (create_key)
-                        {
+                        //if (create_key)
+                        //{
+                                key_found = true; // cheat key_get_latest_version that the key exists - if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
          			min_key_version= key_get_latest_version(); //This means table was created with ROTATED_KEYS = thus we know that this table is encrypted
                                                                           //min_key_version should be set to key_version, when create_key is false it means it was not created
+                                key_found = min_key_version != ENCRYPTION_KEY_VERSION_INVALID;
                                                                           //with ROTATED_KEYS
                                 //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-                        }
-                        else
-                                min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; //it will be filled in later by a caller - which read crypto - if it going to be read from page0
+                        //}
+                        //else
+                                //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; //it will be filled in later by a caller - which read crypto - if it going to be read from page0
                                 //min_key_version = key_get_latest_version();
                         //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
                         //ut_ad(min_key_version == 0);
 		}
 
-		key_found = min_key_version; // TODO:This does not make much sense now - always true
+		//found_key_version = min_key_version; // TODO:This does not make much sense now - always true
 	}
 
 	/** Destructor */
@@ -224,7 +228,9 @@ struct fil_space_crypt_t : st_encryption_scheme
 	/** Returns true if key was found from encryption plugin
 	and false if not. */
 	bool is_key_found() const {
-		return true; //TODO:temporary key is always found //key_found != ENCRYPTION_KEY_VERSION_INVALID;
+		//return true; //TODO:temporary key is always found //key_found != ENCRYPTION_KEY_VERSION_INVALID;
+                //return found_key_version != ENCRYPTION_KEY_VERSION_INVALID;
+                return key_found;
 	}
 
 	/** Returns true if tablespace should be encrypted */
@@ -266,7 +272,9 @@ struct fil_space_crypt_t : st_encryption_scheme
 	could not find the key and there is no need to call
 	get_latest_key_version again as keys are read only
 	at startup. */
-	uint key_found;
+	//uint key_found;
+        //uint found_key_version;
+        bool key_found;
 
 	fil_space_rotate_state_t rotate_state;
 

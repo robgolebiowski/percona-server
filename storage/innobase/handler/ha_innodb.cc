@@ -4001,6 +4001,14 @@ innobase_init(
 		}
 	}
 
+	if (srv_encrypt_tables
+             && !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(FIL_DEFAULT_ENCRYPTION_KEY)) {
+		sql_print_error("InnoDB: cannot enable encryption, "
+				"keyring plugin is not available");
+
+		DBUG_RETURN(innobase_init_abort());
+	}
+
 	os_file_set_umask(my_umask);
 
 	/* Setup the memory alloc/free tracing mechanisms before calling
@@ -23520,8 +23528,9 @@ innodb_encrypt_tables_validate(
         ulong encrypt_tables = *(ulong*)save;
 
         //TODO:Should not this abort the server?
+        //This should create or get existing key
         if (encrypt_tables
-            && !Encryption::tablespace_key_exists(FIL_DEFAULT_ENCRYPTION_KEY)) {
+            && !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(FIL_DEFAULT_ENCRYPTION_KEY)) {
                 push_warning_printf(thd, Sql_condition::SL_WARNING,
                                     HA_ERR_UNSUPPORTED,
                                     "InnoDB: cannot enable encryption, "

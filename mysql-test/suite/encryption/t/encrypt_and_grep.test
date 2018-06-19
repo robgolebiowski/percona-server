@@ -212,6 +212,10 @@ SET GLOBAL innodb_encrypt_tables = on;
 --let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
 --source include/wait_condition.inc
 
+#--let $wait_timeout= 600
+#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG <> 8225
+#--source include/wait_condition.inc
+
 --let $assert_text= Only one table should stay unencrypted i.e. t3
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG <> 8225]" = 1
 --source include/assert.inc

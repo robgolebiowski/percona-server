@@ -5927,17 +5927,18 @@ fil_io_set_encryption(
                       //ut_ad(false);
                     if (bpage->encrypt)
                     {
-                      if (bpage->encryption_key == NULL)
-                      {
-                        ib::error() << "Robert: No encryption key for space: " << space->name << " id= " << space->id;
-			os_thread_sleep(3000000); // poczekaj az wiadomosc znajdzie sie w logu
-                      }
+                      //if (bpage->encryption_key == NULL)
+                      //{
+                        //ib::error() << "Robert: No encryption key for space: " << space->name << " id= " << space->id;
+                        //os_thread_sleep(3000000); // poczekaj az wiadomosc znajdzie sie w logu
+                      //}
 
                       ut_ad(bpage->encryption_key != NULL); 
                       //{
                         key = bpage->encryption_key;
                         key_version = bpage->encryption_key_version;
                         //Encryption::get_latest_tablespace_key(space->id, &key_version, &key);
+                        //key_len = ENCRYPTION_KEY_LEN;
                         key_len = bpage->encryption_key_length;
                       //}
                       //else
@@ -6107,7 +6108,8 @@ _fil_io(
 
 	fil_mutex_enter_and_prepare_for_io(page_id.space());
 
-	fil_space_t*	space = fil_space_get_by_id(page_id.space());
+	fil_space_t*	space = fil_space_get_by_id(page_id.space()); //TODO:Robert - should not it be changed to space acquire - so the space won't be dropped
+                                                                     
 
 	/* If we are deleting a tablespace we don't allow async read operations
 	on that. However, we do allow write operations and sync read operations. */
