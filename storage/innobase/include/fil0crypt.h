@@ -191,6 +191,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 			 new_encryption == FIL_ENCRYPTION_DEFAULT)) {
 			type = CRYPT_SCHEME_UNENCRYPTED;
                         min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                        key_found = true;
                         //ut_ad(0);
 		} else {
 			type = CRYPT_SCHEME_1;

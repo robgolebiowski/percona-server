@@ -128,7 +128,7 @@ SET GLOBAL innodb_encryption_threads = 4;
 let $cnt=600;
 while ($cnt)
 {
-    let $success=`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION == 0`;
+    let $success=`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0`;
     if ($success)
     {
         let $cnt=0;

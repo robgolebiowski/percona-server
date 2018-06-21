@@ -3277,7 +3277,8 @@ fil_toggle_encrypted_flag(fil_space_t *space)
 
   while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
   {
-    os_thread_sleep(6000);
+    //os_thread_sleep(6000);
+    os_thread_sleep(6);
     if (space->stop_new_ops) // space is about to be dropped
      return DB_SUCCESS;      // do not try to lock the DD
   }
@@ -3456,9 +3457,14 @@ fil_crypt_flush_space(
 
 	mtr.commit();
 
+        mutex_enter(&crypt_data->mutex);
         crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
         crypt_data->type = current_type;
+        crypt_data->rotate_state.flushing = false;
+        mutex_exit(&crypt_data->mutex);
 
+
+       
         //(void)fil_update_encrypted_flag;
         //while (DB_SUCCESS != fil_update_encrypted_flag(space))
         //{
@@ -3554,9 +3560,9 @@ fil_crypt_complete_rotate_space(
 		if (should_flush) {
 			fil_crypt_flush_space(state);
 
-			mutex_enter(&crypt_data->mutex);
-			crypt_data->rotate_state.flushing = false;
-			mutex_exit(&crypt_data->mutex);
+			//mutex_enter(&crypt_data->mutex);
+			//crypt_data->rotate_state.flushing = false;
+			//mutex_exit(&crypt_data->mutex);
 		}
 	} else {
 		mutex_enter(&crypt_data->mutex);
