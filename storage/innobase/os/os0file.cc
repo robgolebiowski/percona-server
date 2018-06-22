@@ -9705,10 +9705,10 @@ Encryption::encrypt(
 
 	ulint space_id =
 		mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 #ifdef UNIV_ENCRYPT_DEBUG
 	//ulint space_id =
 		//mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 
 	fprintf(stderr, "Encrypting page:%lu.%lu len:%lu\n",
 		space_id, page_no, src_len);
@@ -9923,19 +9923,6 @@ Encryption::encrypt(
 	memmove(dst, src, FIL_PAGE_DATA);
 	ut_ad(memcmp(src, dst, FIL_PAGE_DATA) == 0);
 
-        if (m_type == Encryption::ROTATED_KEYS)// && page_type == FIL_PAGE_ENCRYPTED)
-        {
-          if (page_type == FIL_PAGE_COMPRESSED)
-          {
-            //ut_ad((uint)(*(dst + FIL_PAGE_DATA + data_len)) == 0);
-            //memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
-            memcpy(dst + FIL_PAGE_DATA, &m_key_version, 4);
-          }
-          else
-	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
-            //memcpy(dst + FIL_PAGE_FILE_FLUSH_LSN, &m_key_version, 4);
-        }
-
 	/* Add encryption control information. Required for decrypting. */
 	if (page_type == FIL_PAGE_COMPRESSED) {
 		/* If the page is compressed, we don't need to save the
@@ -9953,6 +9940,34 @@ Encryption::encrypt(
 		mach_write_to_2(dst + FIL_PAGE_TYPE, FIL_PAGE_ENCRYPTED);
 		mach_write_to_2(dst + FIL_PAGE_ORIGINAL_TYPE_V1, page_type);
 	}
+
+        if (m_type == Encryption::ROTATED_KEYS)// && page_type == FIL_PAGE_ENCRYPTED)
+        {
+          /* handle post encryption checksum */
+          ib_uint32_t checksum = 0;
+
+          ut_ad(*dst_len == src_len);
+          checksum = fil_crypt_calculate_checksum(*dst_len, dst, type.is_zip_compressed());
+
+          ut_ad(fil_space_verify_crypt_checksum(dst, *dst_len,
+                                                space_id, page_no));
+
+
+
+          if (page_type == FIL_PAGE_COMPRESSED)
+          {
+            //ut_ad((uint)(*(dst + FIL_PAGE_DATA + data_len)) == 0);
+            //memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
+            memcpy(dst + FIL_PAGE_DATA, &m_key_version, 4);
+          }
+          else
+	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
+
+            // store the post-encryption checksum after the key-version
+	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, checksum);
+            //memcpy(dst + FIL_PAGE_FILE_FLUSH_LSN, &m_key_version, 4);
+        }
+
 
 #ifdef UNIV_ENCRYPT_DEBUG
 #ifndef UNIV_INNOCHECKSUM

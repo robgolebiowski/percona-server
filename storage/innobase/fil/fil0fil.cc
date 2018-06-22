@@ -6321,6 +6321,9 @@ _fil_io(
 		req_type.clear_compressed();
 	}
 
+        if (page_size.is_compressed())
+          req_type.mark_zip_compressed();
+
 	/* Set encryption information. */
         //ut_ad(message != NULL);
         if (space->crypt_data != NULL)

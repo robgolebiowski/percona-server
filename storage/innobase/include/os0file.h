@@ -659,7 +659,8 @@ public:
 		m_block_size(UNIV_SECTOR_SIZE),
 		m_type(READ),
 		m_compression(),
-		m_encryption()
+		m_encryption(),
+                m_is_zip_compressed(false)
 	{
 		/* No op */
 	}
@@ -672,7 +673,8 @@ public:
 		m_block_size(UNIV_SECTOR_SIZE),
 		m_type(static_cast<uint16_t>(type)),
 		m_compression(),
-		m_encryption()
+		m_encryption(),
+                m_is_zip_compressed(false)
 	{
 		if (is_log()) {
 			disable_compression();
@@ -807,6 +809,11 @@ public:
 		return(m_type == rhs.m_type);
 	}
 
+        void mark_zip_compressed()
+        {
+           is_zip_compressed = true;
+        }
+
 	/** Set compression algorithm
 	@param[in] compression	The compression algorithm to use */
 	void compression_algorithm(Compression::Type type)
@@ -834,6 +841,13 @@ public:
 	{
 		return(compression_algorithm().m_type != Compression::NONE);
 	}
+
+        bool is_zip_compressed() const
+		MY_ATTRIBUTE((warn_unused_result))
+        {
+            
+        
+        }
 
 	/** @return true if the page read should not be transformed. */
 	bool is_compression_enabled() const
@@ -959,6 +973,8 @@ private:
 
 	/** Encryption algorithm */
 	Encryption		m_encryption;
+
+        bool m_is_zip_compressed;
 };
 
 /* @} */

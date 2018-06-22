@@ -568,15 +568,39 @@ fil_space_decrypt(
 
 /******************************************************************
 Calculate post encryption checksum
-@param[in]	page_size	page size
-@param[in]	dst_frame	Block where checksum is calculated
+@param[in]	page_size	    page size
+@param[in]	page	            page where checksum is calculated
+@param[in]      is_zip_compressed   is page compressed with old schema 
 @return page checksum or BUF_NO_CHECKSUM_MAGIC
 not needed. */
 uint32_t
 fil_crypt_calculate_checksum(
-	const page_size_t&	page_size,
-	const byte*		dst_frame)
+	const ulint	        page_size,
+	const byte*		page,
+        const bool              is_zip_compressed)
 	MY_ATTRIBUTE((warn_unused_result));
+
+/**
+Verify that post encryption checksum match calculated checksum.
+This function should be called only if tablespace contains crypt_data
+metadata (this is strong indication that tablespace is encrypted).
+Function also verifies that traditional checksum does not match
+calculated checksum as if it does page could be valid unencrypted,
+encrypted, or corrupted.
+
+@param[in,out]	page		page frame (checksum is temporarily modified)
+@param[in]	page_size	page size
+@param[in]	space		tablespace identifier
+@param[in]	offset		page number
+@return true if page is encrypted AND OK, false otherwise */
+bool
+fil_space_verify_crypt_checksum(
+	byte* 			page,
+	const page_size_t&	page_size,
+	ulint			space,
+	ulint			offset)
+	MY_ATTRIBUTE((warn_unused_result));
+
 
 /*********************************************************************
 Adjust thread count for key rotation
@@ -654,25 +678,5 @@ fil_space_get_scrub_status(
 //#include "fil0crypt.ic"
 #endif /* !UNIV_INNOCHECKSUM */
 
-/**
-Verify that post encryption checksum match calculated checksum.
-This function should be called only if tablespace contains crypt_data
-metadata (this is strong indication that tablespace is encrypted).
-Function also verifies that traditional checksum does not match
-calculated checksum as if it does page could be valid unencrypted,
-encrypted, or corrupted.
-
-@param[in,out]	page		page frame (checksum is temporarily modified)
-@param[in]	page_size	page size
-@param[in]	space		tablespace identifier
-@param[in]	offset		page number
-@return true if page is encrypted AND OK, false otherwise */
-bool
-fil_space_verify_crypt_checksum(
-	byte* 			page,
-	const page_size_t&	page_size,
-	ulint			space,
-	ulint			offset)
-	MY_ATTRIBUTE((warn_unused_result));
 
 #endif /* fil0crypt_h */

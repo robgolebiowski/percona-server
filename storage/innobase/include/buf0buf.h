@@ -779,6 +779,34 @@ buf_block_unfix(
 #endif /* !UNIV_HOTBACKUP */
 #endif /* !UNIV_INNOCHECKSUM */
 
+bool
+buf_page_is_checksum_valid_crc32(
+	const byte*			read_buf,
+	ulint				checksum_field1,
+	ulint				checksum_field2,
+#ifdef UNIV_INNOCHECKSUM
+	uintmax_t			page_no,
+	bool				is_log_enabled,
+	FILE*				log_file,
+	const srv_checksum_algorithm_t	curr_algo,
+#endif /* UNIV_INNOCHECKSUM */
+	bool				use_legacy_big_endian);
+
+bool
+buf_page_is_checksum_valid_innodb(
+	const byte*			read_buf,
+	ulint				checksum_field1,
+	ulint				checksum_field2
+#ifdef UNIV_INNOCHECKSUM
+	,uintmax_t			page_no,
+	bool				is_log_enabled,
+	FILE*				log_file,
+	const srv_checksum_algorithm_t	curr_algo
+#endif /* UNIV_INNOCHECKSUM */
+);
+
+
+
 /** Checks if a page contains only zeroes.
 @param[in]	read_buf	database page
 @param[in]	page_size	page size
