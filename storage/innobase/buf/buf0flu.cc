@@ -1107,6 +1107,7 @@ buf_flush_write_block_low(
          //Encryption::get_latest_tablespace_key_or_create_new_one(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
          Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
          //ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
+         ut_ad(bpage->encryption_key != NULL);
          //TODO: Tutaj błąd, jeżeli klucz nie istnieje, albo przy ::decrypt zwrócić DB_IO_DECRYPT_FAILED
          bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
          bpage->encrypt= true;

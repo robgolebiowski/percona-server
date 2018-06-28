@@ -578,7 +578,6 @@ buf_page_is_zeroes(
 @param[in]	curr_algo		current checksum algorithm
 @param[in]	use_legacy_big_endian   use legacy big endian algorithm
 @return true if the page is in crc32 checksum format. */
-UNIV_INLINE
 bool
 buf_page_is_checksum_valid_crc32(
 	const byte*			read_buf,
@@ -627,7 +626,6 @@ buf_page_is_checksum_valid_crc32(
 @param[in]	log_file	file pointer to log_file
 @param[in]	curr_algo	current checksum algorithm
 @return true if the page is in innodb checksum format. */
-UNIV_INLINE
 bool
 buf_page_is_checksum_valid_innodb(
 	const byte*			read_buf,
@@ -777,6 +775,7 @@ buf_page_is_corrupted(
 
 		/* Stored log sequence numbers at the start and the end
 		of page do not match */
+                ut_ad(0);
 
 		return(TRUE);
 	}
@@ -5830,6 +5829,8 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         } else {
             err = DB_PAGE_CORRUPTED;
         }
+
+        //ut_ad(err != DB_PAGE_CORRUPTED);
       
 	/* Pages that we think are unencrypted but do not match the checksum
 	checks could be corrupted or encrypted or both. */

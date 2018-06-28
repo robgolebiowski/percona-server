@@ -4029,22 +4029,50 @@ bool
 fil_space_verify_crypt_checksum(
 	byte* 			page,
 	const ulint	        page_size,
-        bool                    is_zip_compressed,
-	ulint			space_id,
+        bool                    is_zip_compressed,             //TODO: Change is_zip_compressed and is_new_schema_compressed into
+                                                               //enum?
+        bool                    is_new_schema_compressed, 
+	//ulint			space_id,
 	ulint			offset)
 {
         //TODO: Consider changing FIL_PAGE_FILE_FLUSH_LSN to FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION
         //TODO: As in 
-	uint key_version = mach_read_from_4(page+ FIL_PAGE_ENCRYPTION_KEY_VERSION);
+	uint key_version = 0;
+        //mach_read_from_4(page+ FIL_PAGE_ENCRYPTION_KEY_VERSION);
+
+        // For compressed pages first is post encryption checksum,
+        // after that there is key_version
+        // ***post-encryption checksum
+        // ***key version
+
+        if (is_new_schema_compressed)
+        {
+          key_version = mach_read_from_4(page + FIL_PAGE_DATA + 4);
+        }
+        else
+        {
+          key_version = mach_read_from_4(page + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+        }
+
 
 	/* If page is not encrypted, return false */
-	if (key_version == 0) {
-		return false;
+	if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+                ut_ad(0);
+		//return false;
 	}
 
 	/* Read stored post encryption checksum. */
-	uint32_t checksum = mach_read_from_4(
-		page + FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM);
+	uint32_t checksum = 0;
+        
+        if (is_new_schema_compressed)
+        {
+          checksum = mach_read_from_4(page + FIL_PAGE_DATA);
+          memset(page + FIL_PAGE_DATA, 0, 4); // those bits were 0s before the checksum was calcualted thus -- need to calculate checksum with those
+        }
+        else
+        {
+          checksum = mach_read_from_4(page + UNIV_PAGE_SIZE - 4);
+        }
 
 	/* Declare empty pages non-corrupted */
         //TODO:Robert: Wyłączam to sprawdzenie tutaj, weryfikacja pustych stron odbywa się w
@@ -4058,9 +4086,9 @@ fil_space_verify_crypt_checksum(
 	/* Compressed and encrypted pages do not have checksum. Assume not
 	corrupted. Page verification happens after decompression in
 	buf_page_io_complete() using buf_page_is_corrupted(). */
-	if (mach_read_from_2(page+FIL_PAGE_TYPE) == FIL_PAGE_COMPRESSED_AND_ENCRYPTED) {
-		return (true);
-	}
+	//if (mach_read_from_2(page+FIL_PAGE_TYPE) == FIL_PAGE_COMPRESSED_AND_ENCRYPTED) {
+		//return (true);
+	//}
 
 	uint32 cchecksum1, cchecksum2;
 
@@ -4081,6 +4109,11 @@ fil_space_verify_crypt_checksum(
 			? 0
 			: buf_calc_page_new_checksum(page);
 	}
+
+        if (is_new_schema_compressed)
+          memcpy(page + FIL_PAGE_DATA, &checksum, 4); // put the checksum back
+
+        //TODO: It was never previosly calculated for encrypted pages - need to add this calculation
 
 	/* If stored checksum matches one of the calculated checksums
 	page is not corrupted. */
@@ -4120,6 +4153,10 @@ fil_space_verify_crypt_checksum(
 	if (is_zip_compressed) {
 		valid = checksum1 == cchecksum1;
 		checksum2 = checksum1;
+        }
+        else if (is_new_schema_compressed)
+        {
+           valid = false; // invalid is the correct value for properly encrypted pages
 	} else {
 		checksum2 = mach_read_from_4(
 			page + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
@@ -4132,6 +4169,9 @@ fil_space_verify_crypt_checksum(
 	}
 
 	if (encrypted && valid) {
+
+	        ulint space_id =
+		    mach_read_from_4(page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 		/* If page is encrypted and traditional checksums match,
 		page could be still encrypted, or not encrypted and valid or
 		corrupted. */

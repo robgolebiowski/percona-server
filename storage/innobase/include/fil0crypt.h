@@ -596,8 +596,10 @@ encrypted, or corrupted.
 bool
 fil_space_verify_crypt_checksum(
 	byte* 			page,
-	const page_size_t&	page_size,
-	ulint			space,
+	const ulint	        page_size,
+        bool                    is_zip_compressed,
+        bool                    is_new_schema_compressed, 
+	//ulint			space_id,
 	ulint			offset)
 	MY_ATTRIBUTE((warn_unused_result));
 

@@ -501,6 +501,8 @@ struct Encryption {
 
         static bool tablespace_key_exists(uint key_id);
 
+        static bool is_encrypted_and_compressed(const byte *page);
+
        //TODO:Robert: Te dwa są potrzebne.
         static void get_latest_tablespace_key(uint key_id,
                            uint *tablespace_key_version,
@@ -584,6 +586,8 @@ struct Encryption {
         uint                    m_key_version;
 
         uint                    m_key_id;
+
+        uint32                  m_checksum;
 
         //mutable bool            m_was_page_encrypted_when_read;
 
@@ -811,7 +815,7 @@ public:
 
         void mark_zip_compressed()
         {
-           is_zip_compressed = true;
+           m_is_zip_compressed = true;
         }
 
 	/** Set compression algorithm
@@ -845,8 +849,7 @@ public:
         bool is_zip_compressed() const
 		MY_ATTRIBUTE((warn_unused_result))
         {
-            
-        
+           return m_is_zip_compressed; 
         }
 
 	/** @return true if the page read should not be transformed. */

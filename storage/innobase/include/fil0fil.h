@@ -525,10 +525,11 @@ static const ulint FIL_PAGE_ORIGINAL_SIZE_V1 = FIL_PAGE_ORIGINAL_TYPE_V1 + 2;
 /** Size after compression (u16) */
 static const ulint FIL_PAGE_COMPRESS_SIZE_V1 = FIL_PAGE_ORIGINAL_SIZE_V1 + 2;
 
-//static const ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_ORIGINAL_SIZE_V1;
-static const ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_FILE_FLUSH_LSN;
+static const ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_ORIGINAL_SIZE_V1;
+//static const ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_FILE_FLUSH_LSN;
 
-static const ulint FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM = FIL_PAGE_ENCRYPTION_KEY_VERSION + 4;
+//static const ulint FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM = FIL_PAGE_ENCRYPTION_KEY_VERSION + 4;
+
 
 /** This overloads FIL_PAGE_FILE_FLUSH_LSN for RTREE Split Sequence Number */
 #define	FIL_RTREE_SPLIT_SEQ_NUM	FIL_PAGE_FILE_FLUSH_LSN
@@ -546,6 +547,9 @@ static const ulint FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM = FIL_PAGE_ENCRYPTION_
 					to store the page checksum, the
 					last 4 bytes should be identical
 					to the last 4 bytes of FIL_PAGE_LSN */
+
+//static const ulint FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM = FIL_PAGE_END_LSN_OLD_CHKSUM + 4;
+
 #define FIL_PAGE_DATA_END	8	/*!< size of the page trailer */
 /* @} */
 

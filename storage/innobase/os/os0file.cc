@@ -39,9 +39,14 @@ Created 10/21/1995 Heikki Tuuri
 
 #include "os0file.h"
 
+#include "fil0crypt.h"
+
 #ifdef UNIV_NONINL
 #include "os0file.ic"
 #endif
+
+
+#include "fil0crypt.h"
 
 #include "srv0srv.h"
 #include "srv0start.h"
@@ -62,6 +67,9 @@ Created 10/21/1995 Heikki Tuuri
 
 #include <vector>
 #include <functional>
+
+
+#include "fil0crypt.h"
 
 #ifdef LINUX_NATIVE_AIO
 #include <libaio.h>
@@ -87,6 +95,7 @@ bool	innodb_calling_exit;
 #include "system_key.h"
 #include "fil0crypt.h"
 #include <mysql/service_mysql_keyring.h>
+#include "buf0buf.h"
 
 /** Insert buffer segment id */
 static const ulint IO_IBUF_SEGMENT = 0;
@@ -1376,16 +1385,16 @@ os_file_compress_page(
 	/* Must compress to <= N-1 FS blocks. */
         /* There need to be at least 4 bytes for key version */
 
-        //TODO:Robert: Myśl o tym w następujący sposób - zwiększasz rozmiar headera o 4
+        //TODO:Robert: Myśl o tym w następujący sposób - zwiększasz rozmiar headera o 8
 
-	ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
+	ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 8 : 0));
 
 	/* This is the original data page size - the page header. */
 	ulint		content_len = src_len - FIL_PAGE_DATA;
 
-	ut_ad(out_len >= block_size - FIL_PAGE_DATA + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
+	ut_ad(out_len >= block_size - FIL_PAGE_DATA + ((will_be_encrypted_with_rotated_keys) ? 8 : 0));
 	//ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA)- ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
-	ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys ? 4 : 0)));
+	ut_ad(out_len <= src_len - (block_size + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys ? 8 : 0)));
 
 	/* Only compress the data + trailer, leave the header alone */
 
@@ -1467,13 +1476,13 @@ os_file_compress_page(
           //len += 4;
 
         if (will_be_encrypted_with_rotated_keys)
-          len += 4;
+          len += 8;
 
         // For encryption with rotated keys we required that there will be at least 4 bytes left - when alliging to the block limit
 	*dst_len = ut_calc_align(len, block_size);
 
 	//ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
-	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys) ? 4 : 0);
+	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys) ? 8 : 0);
 
 	/* Clear out the unused portion of the page. */
 	if (len % block_size) {
@@ -1722,6 +1731,17 @@ os_file_read_string(
 @param[in]	len		Used buffer length for write and output
 				buf len for read
 @return DB_SUCCESS or error code */
+
+//bool
+//fil_space_verify_crypt_checksum();
+	//byte* 			page,
+	//const ulint	        page_size,
+        //bool                    is_zip_compressed,
+        //bool                    is_new_schema_compressed, 
+	////ulint			space_id,
+	//ulint			offset);
+
+
 static
 dberr_t
 os_file_io_complete(
@@ -1749,6 +1769,42 @@ os_file_io_complete(
 
                 //TODO:Tutaj zapisać czy jest encrypted
                 bool was_page_encrypted= encryption.is_encrypted_page(buf);
+
+                // Before we try to decrypt, first we need to validate if checksum is valid
+                // for ROTATED_KEYS encrypted tables
+                if (was_page_encrypted)
+                {
+                   //if (encryption.is_encrypted_and_compressed(buf))
+                   //{
+                     //if (memcmp(buf + FIL_PAGE_DATA, "rotated", 7) == 0)
+                     //{
+                             //if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_zip_compressed(), type.is_compressed(), offset))
+                       //{
+                          //ut_ad(0);
+                          //ib::error() << "Post - encryption checksum verification failed - decryption failed"; 
+                          //return (DB_IO_DECRYPT_FAIL);
+                       //}
+                     //}
+                   //}
+                   //else 
+                   //{
+                     // here assume it is MK if space verify fails
+                      //uint checksum = mach_read_from_4(buf + src_len - 4);
+                      //if (checksum != 0) // it's rotated keys
+                      //{
+                         // For now it only works with RK encryption
+                         //TODO:The same here will need to be done for zip compressed tables
+                         if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_zip_compressed(), encryption.is_encrypted_and_compressed(buf), offset))
+                         {
+                            ut_ad(0);
+                            ib::error() << "Post - encryption checksum verification failed - decryption failed"; 
+                            return (DB_IO_DECRYPT_FAIL);
+                         }
+                      //}
+                   //}
+                }
+               
+
 		ret = encryption.decrypt(type, buf, src_len, scratch, len);
 		if (ret == DB_SUCCESS) {
                 //TODO:Jeżeli było encrypted to po dekompresji przypisać wersje klucza
@@ -1759,12 +1815,13 @@ os_file_io_complete(
                         {
          	            ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
         //if (original_type != FIL_PAGE_TYPE_ALLOCATED && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
-                            if(page_type != FIL_PAGE_TYPE_ALLOCATED)
+                            if(page_type != FIL_PAGE_TYPE_ALLOCATED) // page allocated needs to be all zeros
                             {
-                              if (was_page_encrypted) // page allocated needs to be all zeros
+                              if (was_page_encrypted) 
                               {
                                 mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
                                 mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
+                                //mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, encryption.m_checksum);
                               }
                               else
                                 mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
@@ -5760,6 +5817,7 @@ os_file_io(
                   Block*	compressed_block = block;
                   ut_ad(offset > 0);
 
+                  ut_ad(type.encryption_algorithm().m_key != NULL);
                   block = os_file_encrypt_page(type, buf, &n);
 
                   if (compressed_block != NULL) {
@@ -7429,35 +7487,39 @@ AIO::reserve_slot(
 	if (srv_use_native_aio
 	    && offset > 0
 	    && type.is_write()
-	    && type.is_encrypted()) {
-		ulint		encrypted_len = slot->len;
-		Block*		encrypted_block;
+	    && type.is_encrypted()
+            ) {
+                if (type.encryption_algorithm().m_type != Encryption::ROTATED_KEYS || type.encryption_algorithm().m_key != NULL) // TODO: Ten warunek przesunąć do
+                {  
+                  ulint		encrypted_len = slot->len;
+                  Block*		encrypted_block;
 
-		ut_ad(!type.is_log());
+                  ut_ad(!type.is_log());
 
-		release();
+                  release();
 
-		void* src_buf = slot->buf;
-		encrypted_block = os_file_encrypt_page(
-			type,
-			src_buf,
-			&encrypted_len);
+                  void* src_buf = slot->buf;
+                  encrypted_block = os_file_encrypt_page(
+                          type,
+                          src_buf,
+                          &encrypted_len);
 
-		if (slot->buf_block != NULL) {
-			os_free_block(slot->buf_block);
-		}
+                  if (slot->buf_block != NULL) {
+                          os_free_block(slot->buf_block);
+                  }
 
-		slot->buf_block = encrypted_block;
-		slot->buf = static_cast<byte*>(src_buf);
-		slot->ptr = slot->buf;
+                  slot->buf_block = encrypted_block;
+                  slot->buf = static_cast<byte*>(src_buf);
+                  slot->ptr = slot->buf;
 
 #ifdef _WIN32
-		slot->len = static_cast<DWORD>(encrypted_len);
+                  slot->len = static_cast<DWORD>(encrypted_len);
 #else
-		slot->len = static_cast<ulint>(encrypted_len);
+                  slot->len = static_cast<ulint>(encrypted_len);
 #endif /* _WIN32 */
 
-		acquire();
+                  acquire();
+                }
         }
 
 #ifdef WIN_ASYNC_IO
@@ -9679,6 +9741,25 @@ Encryption::is_encrypted_page(const byte* page)
 	       || page_type == FIL_PAGE_ENCRYPTED_RTREE);
 }
 
+bool
+Encryption::is_encrypted_and_compressed(const byte *page)
+{
+	ulint	page_type = mach_read_from_2(page + FIL_PAGE_TYPE);
+
+        return page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED;
+}
+
+//bool
+//fil_space_verify_crypt_checksum(
+	//byte* 			page,
+	//const ulint	        page_size,
+        //bool                    is_zip_compressed,
+        //bool                    is_new_schema_compressed, 
+	////ulint			space_id,
+	//ulint			offset)
+	//MY_ATTRIBUTE((warn_unused_result));
+
+
 /** Encrypt the page data contents. Page type can't be
 FIL_PAGE_ENCRYPTED, FIL_PAGE_COMPRESSED_AND_ENCRYPTED,
 FIL_PAGE_ENCRYPTED_RTREE.
@@ -9705,11 +9786,13 @@ Encryption::encrypt(
 
 	ulint space_id =
 		mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
+
+        ut_ad(m_key != NULL);
 #ifdef UNIV_ENCRYPT_DEBUG
 	//ulint space_id =
 		//mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
+	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 	fprintf(stderr, "Encrypting page:%lu.%lu len:%lu\n",
 		space_id, page_no, src_len);
         fprintf(stderr, "with key:");
@@ -9732,9 +9815,9 @@ Encryption::encrypt(
         //}
 #endif
 
-        // Destination header might need to acommodate key_version
+        // Destination header might need to acommodate key_version and checksum after encryption
         const uint DST_HEADER_SIZE = (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED)
-                                     ? FIL_PAGE_DATA + 4 : FIL_PAGE_DATA;
+                                     ? FIL_PAGE_DATA + 8 : FIL_PAGE_DATA;
 
 	//ulint page_numer = mach_read_from_4(src + FIL_PAGE_OFFSET);
         //ut_ad(page_numer != 0);
@@ -9801,8 +9884,13 @@ Encryption::encrypt(
 	//data_len = src_len - FIL_PAGE_DATA;
         if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED)
         {
-          data_len = src_len - FIL_PAGE_DATA - 4; // We need those 4 bytes for key_version
-          ut_ad((uint)(*(src + src_len -4)) == 0); // There need to be at least 4 bytes left
+          data_len = src_len - FIL_PAGE_DATA - 8; // We need those 8 bytes for key_version and post-encryption checksum
+          ut_ad((uint)(*(src + src_len -8)) == 0); // There need to be at least 8 bytes left
+        }
+        else if (m_type == Encryption::ROTATED_KEYS)
+        {
+	  data_len = src_len - FIL_PAGE_DATA - 4; // For rotated keys we do not encrypt last four bytes which are equal to the LSN bytes in header
+                                                  // So whey are not encrypted anyways
         }
         else
 	  data_len = src_len - FIL_PAGE_DATA;
@@ -9944,29 +10032,52 @@ Encryption::encrypt(
         if (m_type == Encryption::ROTATED_KEYS)// && page_type == FIL_PAGE_ENCRYPTED)
         {
           /* handle post encryption checksum */
-          ib_uint32_t checksum = 0;
+          m_checksum = 0;
 
           ut_ad(*dst_len == src_len);
-          checksum = fil_crypt_calculate_checksum(*dst_len, dst, type.is_zip_compressed());
+          
+          if (page_type == FIL_PAGE_COMPRESSED)
+            memset(dst + FIL_PAGE_DATA, 0, 4); // set the checksum data to 0s before the checksum is calculated
 
-          ut_ad(fil_space_verify_crypt_checksum(dst, *dst_len,
-                                                space_id, page_no));
+          if (page_type == FIL_PAGE_COMPRESSED)
+            memcpy(dst + FIL_PAGE_DATA + 4, &m_key_version, 4); //Add it here so it would be included in the checksum //TODO:Change everyone to mach_write
 
-
+#ifndef UNIV_INNOCHECKSUM //TODO: Robert - this might need to be included in innodbchecksum
+          m_checksum = fil_crypt_calculate_checksum(*dst_len, dst, type.is_zip_compressed());
+#endif
 
           if (page_type == FIL_PAGE_COMPRESSED)
           {
             //ut_ad((uint)(*(dst + FIL_PAGE_DATA + data_len)) == 0);
             //memcpy(dst + FIL_PAGE_DATA + data_len, &m_key_version, 4);
-            memcpy(dst + FIL_PAGE_DATA, &m_key_version, 4);
+	    mach_write_to_4(dst +  FIL_PAGE_DATA, m_checksum);
+            //memcpy(dst + FIL_PAGE_DATA, &m_checksum, 4);
           }
           else
+          {
 	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
+            ut_ad(m_checksum != 0);
+            mach_write_to_4(dst + *dst_len - 4, m_checksum);
+          }
 
-            // store the post-encryption checksum after the key-version
-	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, checksum);
-            //memcpy(dst + FIL_PAGE_FILE_FLUSH_LSN, &m_key_version, 4);
+          #ifdef UNIV_ENCRYPT_DEBUG
+          //restore LSN
+          //memcpy(dst + src_len - 4, src + FIL_PAGE_LSN + 4, 4);
+          //memcpy(dst +  FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, src + FIL_PAGE_LSN + 4, 4);
+
+          ut_ad(fil_space_verify_crypt_checksum(dst, *dst_len, type.is_zip_compressed(), type.is_compressed(),
+                                                page_no));
+
+          //put back checksum in place of LSN
+          //memcpy(dst + FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, &m_checksum, 4);
+          #endif 
         }
+        //else if (page_type != FIL_PAGE_COMPRESSED)
+        //{
+          //m_checksum = 0;
+          //mach_write_to_4(dst + *dst+len - 4, m_checksum); // TODO:Robert!!: I need to change this to a separate field
+        //}
+
 
 
 #ifdef UNIV_ENCRYPT_DEBUG
@@ -9974,6 +10085,7 @@ Encryption::encrypt(
 #if 1
         if (m_type == Encryption::ROTATED_KEYS)
         {
+
           byte*	check_buf = static_cast<byte*>(ut_malloc_nokey(src_len));
           byte*	buf2 = static_cast<byte*>(ut_malloc_nokey(src_len));
 
@@ -9993,7 +10105,7 @@ Encryption::encrypt(
 
           if (err != DB_SUCCESS || memcmp(src + FIL_PAGE_DATA,
                                           check_buf + FIL_PAGE_DATA,
-                                          src_len - FIL_PAGE_DATA) != 0) {
+                                          src_len - FIL_PAGE_DATA - 4) != 0) {
 
 	          fprintf(stderr, "Robert: After and before encryption are different:");
                   ut_print_buf(stderr, src, src_len);
@@ -10036,7 +10148,7 @@ Encryption::decrypt(
 	byte*			src,
 	ulint			src_len,
 	byte*			dst,
-	ulint			dst_len)
+	ulint			dst_len) // Robert:TODO: Po co jest dst_len ?
 {
 	ulint		data_len;
 	ulint		main_len;
@@ -10074,8 +10186,12 @@ Encryption::decrypt(
 #endif
 	}
 
+
+        
+
+
         const uint HEADER_SIZE = (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
-                                 ? FIL_PAGE_DATA + 4 : FIL_PAGE_DATA;
+                                 ? FIL_PAGE_DATA + 8 : FIL_PAGE_DATA;
 
 	original_type = static_cast<uint16_t>(
 		mach_read_from_2(src + FIL_PAGE_ORIGINAL_TYPE_V1));
@@ -10096,17 +10212,21 @@ Encryption::decrypt(
 		block = NULL;
 	}
 
+
         if (m_type == Encryption::ROTATED_KEYS)
         {
           //uint key_version;
           if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
           {
             //memcpy(&key_version, ptr + data_len, 4); // get the key_version
-            memcpy(&m_key_version, src + FIL_PAGE_DATA, 4); // get the key_version
+            memcpy(&m_key_version, src + FIL_PAGE_DATA + 4, 4); // get the key_version
+            //memcpy(&m_checksum, src + FIL_PAGE_DATA + 4, 4); // get the checksum
+
           }
           else
           {
 	    m_key_version= mach_read_from_4(src + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+	    //m_checksum= mach_read_from_4(src + FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM);
             //memcpy(&key_version, src + FIL_PAGE_FILE_FLUSH_LSN, 4);
             ut_ad(page_type == FIL_PAGE_ENCRYPTED);
           }
@@ -10134,6 +10254,11 @@ Encryption::decrypt(
         //else
             //data_len = src_len - FIL_PAGE_DATA;
         data_len = src_len - HEADER_SIZE;
+
+        if (page_type == FIL_PAGE_ENCRYPTED && m_type == Encryption::ROTATED_KEYS)
+        {
+                data_len -= 4; //last 4 bytes are not encrypted
+        }
       
 	main_len = (data_len / MY_AES_BLOCK_SIZE) * MY_AES_BLOCK_SIZE;
 	remain_len = data_len - main_len;
@@ -10209,8 +10334,10 @@ Encryption::decrypt(
 
                 if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
                 {
-                  ptr -= 4; //key_version is not needed - overwrite with decrypted data
-                  memset(ptr + data_len, 0, 4); // and set the unused space from the bottom of the page to zeros
+                  //TODO:ROBERT Be careful - you have just changed data_len - check if it will work here
+                  ptr -= 8; //This much is unused as it was previously used by key version and encrypted checksum
+                            //It is not needed - overwrite this with decrypted data
+                  memset(ptr + data_len, 0, 8);
                 }
 
 		/* Then decrypt the main data */
@@ -10261,13 +10388,15 @@ Encryption::decrypt(
 		return(DB_UNSUPPORTED);
 	}
 
-	/* Restore the original page type. If it's a compressed and
-	encrypted page, just reset it as compressed page type, since
-	we will do uncompress later. */
 
-        if (m_type == Encryption::ROTATED_KEYS)
+
+        if (m_type == Encryption::ROTATED_KEYS && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
         {
           //restore LSN
+          //uint dead_meat = 0xDEADAAAA;
+          memcpy(src + src_len - FIL_PAGE_END_LSN_OLD_CHKSUM + 4, src + FIL_PAGE_LSN + 4, 4); // TODO:Should be needed only for rotated keys
+          //memcpy(dst + src_len - FIL_PAGE_END_LSN_OLD_CHKSUM + 4, &dead_meat , 4); // TODO:Should be needed only for rotated keys
+          
           //uint high_4_bytes_of_fil_page_lsn;
           //memcpy(&high_4_bytes_of_fil_page_lsn, src + FIL_PAGE_LSN + 4, 4);
           //if (high_4_bytes_of_fil_page_lsn == 0)
@@ -10280,6 +10409,9 @@ Encryption::decrypt(
             //memcpy(ptr + data_len, &high_4_bytes_of_fil_page_lsn, 4); 
         }
 
+	/* Restore the original page type. If it's a compressed and
+	encrypted page, just reset it as compressed page type, since
+	we will do uncompress later. */
 	if (page_type == FIL_PAGE_ENCRYPTED) {
 		mach_write_to_2(src + FIL_PAGE_TYPE, original_type);
         } else if (page_type == FIL_PAGE_ENCRYPTED_RTREE) {
