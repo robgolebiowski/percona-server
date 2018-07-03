@@ -1653,30 +1653,30 @@ not needed. */
 
 //uint32_t
 //fil_crypt_calculate_checksum(
-	//const page_size_t&	page_size,
-	//const byte*		dst_frame)
+      //const page_size_t&	page_size,
+      //const byte*		dst_frame)
 //{
-	//[> For encrypted tables we use only crc32 and strict_crc32 <]
-	//return page_size.is_compressed()
-		//? page_zip_calc_checksum(dst_frame, page_size.physical(),
-					 //SRV_CHECKSUM_ALGORITHM_CRC32)
-		//: buf_calc_page_crc32(dst_frame);
+      //[> For encrypted tables we use only crc32 and strict_crc32 <]
+      //return page_size.is_compressed()
+              //? page_zip_calc_checksum(dst_frame, page_size.physical(),
+                                       //SRV_CHECKSUM_ALGORITHM_CRC32)
+              //: buf_calc_page_crc32(dst_frame);
 //}
 
 /***********************************************************************/
 
 /** A copy of global key state */
 struct key_state_t {
-  //TODO:Robert zmien
-	key_state_t() : key_id((~0)), key_version(ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED),
-			rotate_key_age(srv_fil_crypt_rotate_key_age) {}
-	bool operator==(const key_state_t& other) const {
-		return key_version == other.key_version &&
-			rotate_key_age == other.rotate_key_age;
-	}
-	uint key_id;
-	uint key_version;
-	uint rotate_key_age;
+//TODO:Robert zmien
+      key_state_t() : key_id((~0)), key_version(ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED),
+                      rotate_key_age(srv_fil_crypt_rotate_key_age) {}
+      bool operator==(const key_state_t& other) const {
+              return key_version == other.key_version &&
+                      rotate_key_age == other.rotate_key_age;
+      }
+      uint key_id;
+      uint key_version;
+      uint rotate_key_age;
 };
 
 /***********************************************************************
@@ -1686,18 +1686,18 @@ Copy global key state
 @param[in]	crypt_data	crypt data */
 static void
 fil_crypt_get_key_state(
-        key_state_t*			new_state,
-        fil_space_crypt_t*		crypt_data)
+      key_state_t*			new_state,
+      fil_space_crypt_t*		crypt_data)
 {
-        if (srv_encrypt_tables) {
-                new_state->key_version = crypt_data->key_get_latest_version();
-                new_state->rotate_key_age = srv_fil_crypt_rotate_key_age;
+      if (srv_encrypt_tables) {
+              new_state->key_version = crypt_data->key_get_latest_version();
+              new_state->rotate_key_age = srv_fil_crypt_rotate_key_age;
 
-                ut_a(new_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-        } else {
-                new_state->key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-                new_state->rotate_key_age = 0;
-        }
+              ut_a(new_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+      } else {
+              new_state->key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+              new_state->rotate_key_age = 0;
+      }
 }
 
 /***********************************************************************
@@ -1709,43 +1709,43 @@ Check if a key needs rotation given a key_state
 @return true if key needs rotation, false if not */
 static bool
 fil_crypt_needs_rotation(
-	fil_encryption_t	encrypt_mode,
-	uint			key_version,
-	uint			latest_key_version,
-	uint			rotate_key_age)
+      fil_encryption_t	encrypt_mode,
+      uint			key_version,
+      uint			latest_key_version,
+      uint			rotate_key_age)
 {
-	if (key_version == ENCRYPTION_KEY_VERSION_INVALID) {
-                ut_ad(0);
-		return false;
-	}
+      if (key_version == ENCRYPTION_KEY_VERSION_INVALID) {
+              ut_ad(0);
+              return false;
+      }
 
-	//if (key_version == 0 && latest_key_version != 0) {
-	//if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-	if (key_version != 0 && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+      //if (key_version == 0 && latest_key_version != 0) {
+      //if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+      if (key_version != 0 && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 
-		/* this is rotation unencrypted => encrypted
-		* ignore rotate_key_age */
-		return true;
-	}
+              /* this is rotation unencrypted => encrypted
+              * ignore rotate_key_age */
+              return true;
+      }
 
-	if (latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-                if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
-                         //this is rotation encrypted => unencrypted 
-			return true;
-                }
-                return false;
-	}
+      if (latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+              if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
+                       //this is rotation encrypted => unencrypted 
+                      return true;
+              }
+              return false;
+      }
 
-        //TODO:Robert dodałem to nie wiem co robić gdy oba są not_encrypted - czy to możliwe, żeby doszedł tutaj ?:
-        //ut_ad(!(latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  && key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED));
+      //TODO:Robert dodałem to nie wiem co robić gdy oba są not_encrypted - czy to możliwe, żeby doszedł tutaj ?:
+      //ut_ad(!(latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  && key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED));
 
-	/* this is rotation encrypted => encrypted,
-	* only reencrypt if key is sufficiently old */
-	if (key_version + rotate_key_age < latest_key_version) {
-		return true;
-	}
+      /* this is rotation encrypted => encrypted,
+      * only reencrypt if key is sufficiently old */
+      if (key_version + rotate_key_age < latest_key_version) {
+              return true;
+      }
 
-	return false;
+      return false;
 }
 
 /** Read page 0 and possible crypt data from there.
@@ -1754,34 +1754,34 @@ static inline
 void
 fil_crypt_read_crypt_data(fil_space_t* space)
 {
-        //if (strcmp(space->name, "test/t2") == 0)
-        //{
-          //ib::error() << "Reading crypt data for test/t2 <<'\n'";
-        //}
+      //if (strcmp(space->name, "test/t2") == 0)
+      //{
+        //ib::error() << "Reading crypt data for test/t2 <<'\n'";
+      //}
 
-        //if (encryption_klen != 0 || space->size) {
-        if (space->crypt_data && space->size) {
-		/* The encryption metadata has already been read, or
-		the tablespace is not encrypted and the file has been
-		opened already. */
-		return;
-	}
+      //if (encryption_klen != 0 || space->size) {
+      if (space->crypt_data && space->size) {
+              /* The encryption metadata has already been read, or
+              the tablespace is not encrypted and the file has been
+              opened already. */
+              return;
+      }
 
 
 
-	const page_size_t page_size(space->flags);
-	mtr_t	mtr;
-	mtr.start();
-	if (buf_block_t* block = buf_page_get(page_id_t(space->id, 0),
-					      page_size, RW_S_LATCH, &mtr)) {
-		mutex_enter(&fil_system->mutex);
-		if (!space->crypt_data) {
-			space->crypt_data = fil_space_read_crypt_data(
-				page_size, block->frame);
-		}
-		mutex_exit(&fil_system->mutex);
-	}
-	mtr.commit();
+      const page_size_t page_size(space->flags);
+      mtr_t	mtr;
+      mtr.start();
+      if (buf_block_t* block = buf_page_get(page_id_t(space->id, 0),
+                                            page_size, RW_S_LATCH, &mtr)) {
+              mutex_enter(&fil_system->mutex);
+              if (!space->crypt_data) {
+                      space->crypt_data = fil_space_read_crypt_data(
+                              page_size, block->frame);
+              }
+              mutex_exit(&fil_system->mutex);
+      }
+      mtr.commit();
 }
 
 /***********************************************************************
@@ -1791,129 +1791,129 @@ Start encrypting a space
 static
 bool
 fil_crypt_start_encrypting_space(
-	fil_space_t*	space)
+      fil_space_t*	space)
 {
-	bool recheck = false;
+      bool recheck = false;
 
-	mutex_enter(&fil_crypt_threads_mutex);
+      mutex_enter(&fil_crypt_threads_mutex);
 
-	fil_space_crypt_t *crypt_data = space->crypt_data;
+      fil_space_crypt_t *crypt_data = space->crypt_data;
 
-	/* If space is not encrypted and encryption is not enabled, then
-	do not continue encrypting the space. */
-	if (!crypt_data && !srv_encrypt_tables) {
-		mutex_exit(&fil_crypt_threads_mutex);
-		return false;
-	}
+      /* If space is not encrypted and encryption is not enabled, then
+      do not continue encrypting the space. */
+      if (!crypt_data && !srv_encrypt_tables) {
+              mutex_exit(&fil_crypt_threads_mutex);
+              return false;
+      }
 
-	if (crypt_data != NULL || fil_crypt_start_converting) {
-		/* someone beat us to it */
-		if (fil_crypt_start_converting) {
-			recheck = true;
-		}
+      if (crypt_data != NULL || fil_crypt_start_converting) {
+              /* someone beat us to it */
+              if (fil_crypt_start_converting) {
+                      recheck = true;
+              }
 
-		mutex_exit(&fil_crypt_threads_mutex);
-		return recheck;
-	}
+              mutex_exit(&fil_crypt_threads_mutex);
+              return recheck;
+      }
 
-	/* NOTE: we need to write and flush page 0 before publishing
-	* the crypt data. This so that after restart there is no
-	* risk of finding encrypted pages without having
-	* crypt data in page 0 */
+      /* NOTE: we need to write and flush page 0 before publishing
+      * the crypt data. This so that after restart there is no
+      * risk of finding encrypted pages without having
+      * crypt data in page 0 */
 
-	/* 1 - create crypt data */
-	//crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
-        //
-        //TODO:Robert: Should it not be default encryption key variable - so when the default key gets changed it would be used here?
-        //For now when innodb_encrypt_tables is turned on it is checked if DEFAULT_ENCRYPTION_KEY exist and if not it is created
-        //thus there is no need to create it here
-	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY, false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+      /* 1 - create crypt data */
+      //crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+      //
+      //TODO:Robert: Should it not be default encryption key variable - so when the default key gets changed it would be used here?
+      //For now when innodb_encrypt_tables is turned on it is checked if DEFAULT_ENCRYPTION_KEY exist and if not it is created
+      //thus there is no need to create it here
+      crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY, false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
 
-	if (crypt_data == NULL) {
-		mutex_exit(&fil_crypt_threads_mutex);
-		return false;
-	}
+      if (crypt_data == NULL) {
+              mutex_exit(&fil_crypt_threads_mutex);
+              return false;
+      }
 
-	crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
-	crypt_data->min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; // all pages are unencrypted
-	crypt_data->rotate_state.start_time = time(0);
-	crypt_data->rotate_state.starting = true;
-	crypt_data->rotate_state.active_threads = 1;
+      crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
+      crypt_data->min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; // all pages are unencrypted
+      crypt_data->rotate_state.start_time = time(0);
+      crypt_data->rotate_state.starting = true;
+      crypt_data->rotate_state.active_threads = 1;
 
-	mutex_enter(&crypt_data->mutex);
-	crypt_data = fil_space_set_crypt_data(space, crypt_data);
-	mutex_exit(&crypt_data->mutex);
+      mutex_enter(&crypt_data->mutex);
+      crypt_data = fil_space_set_crypt_data(space, crypt_data);
+      mutex_exit(&crypt_data->mutex);
 
-	fil_crypt_start_converting = true;
-	mutex_exit(&fil_crypt_threads_mutex);
+      fil_crypt_start_converting = true;
+      mutex_exit(&fil_crypt_threads_mutex);
 
-	do
-	{
-		mtr_t mtr;
-		mtr.start();
-		mtr.set_named_space(space);
+      do
+      {
+              mtr_t mtr;
+              mtr.start();
+              mtr.set_named_space(space);
 
-		/* 2 - get page 0 */
-		//dberr_t err = DB_SUCCESS; //TODO:Robert:Ja usunąłem
-		buf_block_t* block = buf_page_get_gen(
-			page_id_t(space->id, 0), page_size_t(space->flags),
-			RW_X_LATCH, NULL, BUF_GET,
-			__FILE__, __LINE__,
-			&mtr);
+              /* 2 - get page 0 */
+              //dberr_t err = DB_SUCCESS; //TODO:Robert:Ja usunąłem
+              buf_block_t* block = buf_page_get_gen(
+                      page_id_t(space->id, 0), page_size_t(space->flags),
+                      RW_X_LATCH, NULL, BUF_GET,
+                      __FILE__, __LINE__,
+                      &mtr);
 
 
-		/* 3 - write crypt data to page 0 */
-		byte* frame = buf_block_get_frame(block);
-		crypt_data->type = CRYPT_SCHEME_1;
-                //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
-		crypt_data->write_page0(space, frame, &mtr);
+              /* 3 - write crypt data to page 0 */
+              byte* frame = buf_block_get_frame(block);
+              crypt_data->type = CRYPT_SCHEME_1;
+              //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+              crypt_data->write_page0(space, frame, &mtr);
 
-		mtr.commit();
+              mtr.commit();
 
-                // TODO:Robert to bierze mutex na space - czy napewno bezpieczne ?
-                //if (fil_set_encryption(space->id, Encryption::ROTATED_KEYS, NULL, crypt_data->iv) != DB_SUCCESS)
-                  //ut_ad(0);
+              // TODO:Robert to bierze mutex na space - czy napewno bezpieczne ?
+              //if (fil_set_encryption(space->id, Encryption::ROTATED_KEYS, NULL, crypt_data->iv) != DB_SUCCESS)
+                //ut_ad(0);
 
-		/* record lsn of update */
-		lsn_t end_lsn = mtr.commit_lsn();
+              /* record lsn of update */
+              lsn_t end_lsn = mtr.commit_lsn();
 
-		/* 4 - sync tablespace before publishing crypt data */
+              /* 4 - sync tablespace before publishing crypt data */
 
-		bool success = false;
-		ulint sum_pages = 0;
+              bool success = false;
+              ulint sum_pages = 0;
 
-		do {
-			ulint n_pages = 0;
-			success = buf_flush_lists(ULINT_MAX, end_lsn, &n_pages);
-			buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
-			sum_pages += n_pages;
-		} while (!success);
+              do {
+                      ulint n_pages = 0;
+                      success = buf_flush_lists(ULINT_MAX, end_lsn, &n_pages);
+                      buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
+                      sum_pages += n_pages;
+              } while (!success);
 
-		/* 5 - publish crypt data */
-		mutex_enter(&fil_crypt_threads_mutex);
-		mutex_enter(&crypt_data->mutex);
-		crypt_data->type = CRYPT_SCHEME_1;
-		ut_a(crypt_data->rotate_state.active_threads == 1);
-		crypt_data->rotate_state.active_threads = 0;
-		crypt_data->rotate_state.starting = false;
+              /* 5 - publish crypt data */
+              mutex_enter(&fil_crypt_threads_mutex);
+              mutex_enter(&crypt_data->mutex);
+              crypt_data->type = CRYPT_SCHEME_1;
+              ut_a(crypt_data->rotate_state.active_threads == 1);
+              crypt_data->rotate_state.active_threads = 0;
+              crypt_data->rotate_state.starting = false;
 
-		fil_crypt_start_converting = false;
-		mutex_exit(&crypt_data->mutex);
-		mutex_exit(&fil_crypt_threads_mutex);
+              fil_crypt_start_converting = false;
+              mutex_exit(&crypt_data->mutex);
+              mutex_exit(&fil_crypt_threads_mutex);
 
-		return recheck;
-	} while (0);
+              return recheck;
+      } while (0);
 
-	mutex_enter(&crypt_data->mutex);
-	ut_a(crypt_data->rotate_state.active_threads == 1);
-	crypt_data->rotate_state.active_threads = 0;
-	mutex_exit(&crypt_data->mutex);
+      mutex_enter(&crypt_data->mutex);
+      ut_a(crypt_data->rotate_state.active_threads == 1);
+      crypt_data->rotate_state.active_threads = 0;
+      mutex_exit(&crypt_data->mutex);
 
-	mutex_enter(&fil_crypt_threads_mutex);
-	fil_crypt_start_converting = false;
-	mutex_exit(&fil_crypt_threads_mutex);
+      mutex_enter(&fil_crypt_threads_mutex);
+      fil_crypt_start_converting = false;
+      mutex_exit(&fil_crypt_threads_mutex);
 
-	return recheck;
+      return recheck;
 }
 
 /***********************************************************************
@@ -1923,164 +1923,164 @@ Start encrypting a space
 //static
 //bool
 //fil_crypt_start_encrypting_space(
-	//fil_space_t*	space)
+      //fil_space_t*	space)
 //{
-	//bool recheck = false;
+      //bool recheck = false;
 
-	//mutex_enter(&fil_crypt_threads_mutex);
+      //mutex_enter(&fil_crypt_threads_mutex);
 
-	//fil_space_crypt_t *crypt_data = space->crypt_data;
+      //fil_space_crypt_t *crypt_data = space->crypt_data;
 
-	//[> If space is not encrypted and encryption is not enabled, then
-	//do not continue encrypting the space. */
-	//if (!crypt_data && !srv_encrypt_tables) {
-		//mutex_exit(&fil_crypt_threads_mutex);
-		//return false;
-	//}
+      //[> If space is not encrypted and encryption is not enabled, then
+      //do not continue encrypting the space. */
+      //if (!crypt_data && !srv_encrypt_tables) {
+              //mutex_exit(&fil_crypt_threads_mutex);
+              //return false;
+      //}
 
-	//if (crypt_data != NULL || fil_crypt_start_converting) {
-		//[> someone beat us to it <]
-		//if (fil_crypt_start_converting) {
-			//recheck = true;
-		//}
+      //if (crypt_data != NULL || fil_crypt_start_converting) {
+              //[> someone beat us to it <]
+              //if (fil_crypt_start_converting) {
+                      //recheck = true;
+              //}
 
-		//mutex_exit(&fil_crypt_threads_mutex);
-		//return recheck;
-	//}
+              //mutex_exit(&fil_crypt_threads_mutex);
+              //return recheck;
+      //}
 
-	/* NOTE: we need to write and flush page 0 before publishing
-	* the crypt data. This so that after restart there is no
-	* risk of finding encrypted pages without having
-	* crypt data in page 0 */
+      /* NOTE: we need to write and flush page 0 before publishing
+      * the crypt data. This so that after restart there is no
+      * risk of finding encrypted pages without having
+      * crypt data in page 0 */
 
-	//[> 1 - create crypt data <]
-	//crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+      //[> 1 - create crypt data <]
+      //crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
 
-	//if (crypt_data == NULL) {
-		//mutex_exit(&fil_crypt_threads_mutex);
-		//return false;
-	//}
+      //if (crypt_data == NULL) {
+              //mutex_exit(&fil_crypt_threads_mutex);
+              //return false;
+      //}
 
-	//crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
-	//crypt_data->min_key_version = 0; // all pages are unencrypted
-	//crypt_data->rotate_state.start_time = time(0);
-	//crypt_data->rotate_state.starting = true;
-	//crypt_data->rotate_state.active_threads = 1;
+      //crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
+      //crypt_data->min_key_version = 0; // all pages are unencrypted
+      //crypt_data->rotate_state.start_time = time(0);
+      //crypt_data->rotate_state.starting = true;
+      //crypt_data->rotate_state.active_threads = 1;
 
-	//mutex_enter(&crypt_data->mutex);
-	//crypt_data = fil_space_set_crypt_data(space, crypt_data);
-	//mutex_exit(&crypt_data->mutex);
+      //mutex_enter(&crypt_data->mutex);
+      //crypt_data = fil_space_set_crypt_data(space, crypt_data);
+      //mutex_exit(&crypt_data->mutex);
 
-	//fil_crypt_start_converting = true;
-	//mutex_exit(&fil_crypt_threads_mutex);
+      //fil_crypt_start_converting = true;
+      //mutex_exit(&fil_crypt_threads_mutex);
 
-	//do
-	//{
-		//mtr_t mtr;
-		//mtr_start(&mtr);
+      //do
+      //{
+              //mtr_t mtr;
+              //mtr_start(&mtr);
 
-		//[> 2 - get page 0 <]
-		//ulint zip_size = fsp_flags_get_zip_size(space->flags);
-		//buf_block_t* block = buf_page_get_gen(space->id, zip_size, 0,
-						      //RW_X_LATCH,
-						      //NULL,
-						      //BUF_GET,
-						      //__FILE__, __LINE__,
-						      //&mtr);
+              //[> 2 - get page 0 <]
+              //ulint zip_size = fsp_flags_get_zip_size(space->flags);
+              //buf_block_t* block = buf_page_get_gen(space->id, zip_size, 0,
+                                                    //RW_X_LATCH,
+                                                    //NULL,
+                                                    //BUF_GET,
+                                                    //__FILE__, __LINE__,
+                                                    //&mtr);
 
 
-		//[> 3 - write crypt data to page 0 <]
-		//byte* frame = buf_block_get_frame(block);
-		//crypt_data->type = CRYPT_SCHEME_1;
-		//crypt_data->write_page0(frame, &mtr);
-		//mtr_commit(&mtr);
+              //[> 3 - write crypt data to page 0 <]
+              //byte* frame = buf_block_get_frame(block);
+              //crypt_data->type = CRYPT_SCHEME_1;
+              //crypt_data->write_page0(frame, &mtr);
+              //mtr_commit(&mtr);
 
-		//[> record lsn of update <]
-		//lsn_t end_lsn = mtr.end_lsn;
+              //[> record lsn of update <]
+              //lsn_t end_lsn = mtr.end_lsn;
 
-		//[> 4 - sync tablespace before publishing crypt data <]
+              //[> 4 - sync tablespace before publishing crypt data <]
 
-		//bool success = false;
-		//ulint sum_pages = 0;
+              //bool success = false;
+              //ulint sum_pages = 0;
 
-		//do {
-			//ulint n_pages = 0;
-			//success = buf_flush_list(ULINT_MAX, end_lsn, &n_pages);
-			//buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
-			//sum_pages += n_pages;
-		//} while (!success);
+              //do {
+                      //ulint n_pages = 0;
+                      //success = buf_flush_list(ULINT_MAX, end_lsn, &n_pages);
+                      //buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
+                      //sum_pages += n_pages;
+              //} while (!success);
 
-		//[> 5 - publish crypt data <]
-		//mutex_enter(&fil_crypt_threads_mutex);
-		//mutex_enter(&crypt_data->mutex);
-		//crypt_data->type = CRYPT_SCHEME_1;
-		//ut_a(crypt_data->rotate_state.active_threads == 1);
-		//crypt_data->rotate_state.active_threads = 0;
-		//crypt_data->rotate_state.starting = false;
+              //[> 5 - publish crypt data <]
+              //mutex_enter(&fil_crypt_threads_mutex);
+              //mutex_enter(&crypt_data->mutex);
+              //crypt_data->type = CRYPT_SCHEME_1;
+              //ut_a(crypt_data->rotate_state.active_threads == 1);
+              //crypt_data->rotate_state.active_threads = 0;
+              //crypt_data->rotate_state.starting = false;
 
-		//fil_crypt_start_converting = false;
-		//mutex_exit(&crypt_data->mutex);
-		//mutex_exit(&fil_crypt_threads_mutex);
+              //fil_crypt_start_converting = false;
+              //mutex_exit(&crypt_data->mutex);
+              //mutex_exit(&fil_crypt_threads_mutex);
 
-		//return recheck;
-	//} while (0);
+              //return recheck;
+      //} while (0);
 
-	//mutex_enter(&crypt_data->mutex);
-	//ut_a(crypt_data->rotate_state.active_threads == 1);
-	//crypt_data->rotate_state.active_threads = 0;
-	//mutex_exit(&crypt_data->mutex);
+      //mutex_enter(&crypt_data->mutex);
+      //ut_a(crypt_data->rotate_state.active_threads == 1);
+      //crypt_data->rotate_state.active_threads = 0;
+      //mutex_exit(&crypt_data->mutex);
 
-	//mutex_enter(&fil_crypt_threads_mutex);
-	//fil_crypt_start_converting = false;
-	//mutex_exit(&fil_crypt_threads_mutex);
+      //mutex_enter(&fil_crypt_threads_mutex);
+      //fil_crypt_start_converting = false;
+      //mutex_exit(&fil_crypt_threads_mutex);
 
-	//return recheck;
+      //return recheck;
 //}
 
 /** State of a rotation thread */
 struct rotate_thread_t {
-	explicit rotate_thread_t(uint no) {
-		memset(this, 0, sizeof(* this));
-		thread_no = no;
-		first = true;
-		estimated_max_iops = 20;
-	}
+      explicit rotate_thread_t(uint no) {
+              memset(this, 0, sizeof(* this));
+              thread_no = no;
+              first = true;
+              estimated_max_iops = 20;
+      }
 
-	uint thread_no;
-	bool first;		    /*!< is position before first space */
-	fil_space_t* space;	    /*!< current space or NULL */
-	ulint offset;		    /*!< current offset */
-	ulint batch;		    /*!< #pages to rotate */
-	uint  min_key_version_found;/*!< min key version found but not rotated */
-	lsn_t end_lsn;		    /*!< max lsn when rotating this space */
+      uint thread_no;
+      bool first;		    /*!< is position before first space */
+      fil_space_t* space;	    /*!< current space or NULL */
+      ulint offset;		    /*!< current offset */
+      ulint batch;		    /*!< #pages to rotate */
+      uint  min_key_version_found;/*!< min key version found but not rotated */
+      lsn_t end_lsn;		    /*!< max lsn when rotating this space */
 
-	uint estimated_max_iops;   /*!< estimation of max iops */
-	uint allocated_iops;	   /*!< allocated iops */
-	ulint cnt_waited;	   /*!< #times waited during this slot */
-	uintmax_t sum_waited_us;   /*!< wait time during this slot */
+      uint estimated_max_iops;   /*!< estimation of max iops */
+      uint allocated_iops;	   /*!< allocated iops */
+      ulint cnt_waited;	   /*!< #times waited during this slot */
+      uintmax_t sum_waited_us;   /*!< wait time during this slot */
 
-	fil_crypt_stat_t crypt_stat; // statistics
+      fil_crypt_stat_t crypt_stat; // statistics
 
-        //btr_scrub_t scrub_data;      [> thread local data used by btr_scrub-functions
-                                     // when iterating pages of tablespace */
+      //btr_scrub_t scrub_data;      [> thread local data used by btr_scrub-functions
+                                   // when iterating pages of tablespace */
 
 
-	/** @return whether this thread should terminate */
-	bool should_shutdown() const {
-		switch (srv_shutdown_state) {
-		case SRV_SHUTDOWN_NONE:
-			return thread_no >= srv_n_fil_crypt_threads;
-		case SRV_SHUTDOWN_EXIT_THREADS:
-			/* srv_init_abort() must have been invoked */
-		case SRV_SHUTDOWN_CLEANUP:
-			return true;
-		case SRV_SHUTDOWN_FLUSH_PHASE:
-		case SRV_SHUTDOWN_LAST_PHASE:
-			break;
-		}
-		ut_ad(0);
-		return true;
-	}
+      /** @return whether this thread should terminate */
+      bool should_shutdown() const {
+              switch (srv_shutdown_state) {
+              case SRV_SHUTDOWN_NONE:
+                      return thread_no >= srv_n_fil_crypt_threads;
+              case SRV_SHUTDOWN_EXIT_THREADS:
+                      /* srv_init_abort() must have been invoked */
+              case SRV_SHUTDOWN_CLEANUP:
+                      return true;
+              case SRV_SHUTDOWN_FLUSH_PHASE:
+              case SRV_SHUTDOWN_LAST_PHASE:
+                      break;
+              }
+              ut_ad(0);
+              return true;
+      }
 };
 
 /***********************************************************************
@@ -2092,123 +2092,123 @@ Check if space needs rotation given a key_state
 static
 bool
 fil_crypt_space_needs_rotation(
-	rotate_thread_t*	state,
-	key_state_t*		key_state,
-	bool*			recheck)
+      rotate_thread_t*	state,
+      key_state_t*		key_state,
+      bool*			recheck)
 {
-	fil_space_t* space = state->space;
+      fil_space_t* space = state->space;
 
-        //if (space->id == 23)
-        //{
-          //space->id = 23;
-        //}
-
-
-	/* Make sure that tablespace is normal tablespace */
-	if (space->purpose != FIL_TYPE_TABLESPACE) {
-		return false;
-	}
-
-	ut_ad(space->n_pending_ops > 0);
-
-	fil_space_crypt_t *crypt_data = space->crypt_data;
-
-	if (crypt_data == NULL) {
-		/**
-		* space has no crypt data
-		*   start encrypting it...
-		*/
-		*recheck = fil_crypt_start_encrypting_space(space);
-		crypt_data = space->crypt_data;
-                //TODO:Robert: To powinno być pod mutexem, albo z użyciem fil_set_encryption
-                //space->encryption_type = Encryption::ROTATED_KEYS;
-
-		if (crypt_data == NULL) {
-			return false;
-		}
-
-		crypt_data->key_get_latest_version();
-	}
-
-	/* If used key_id is not found from encryption plugin we can't
-	continue to rotate the tablespace */
-	if (!crypt_data->is_key_found()) {
-		return false;
-	}
-
-	mutex_enter(&crypt_data->mutex);
-
-	do {
-		/* prevent threads from starting to rotate space */
-		if (crypt_data->rotate_state.starting) {
-			/* recheck this space later */
-			*recheck = true;
-			break;
-		}
-
-		/* prevent threads from starting to rotate space */
-		if (space->is_stopping()) {
-			break;
-		}
-
-		if (crypt_data->rotate_state.flushing) {
-			break;
-		}
-
-		/* No need to rotate space if encryption is disabled */
-		if (crypt_data->not_encrypted()) {
-			break;
-		}
-
-                //TODO:Robert - od komentuj to jak już zaimplementujesz key_id //acha - to jest odswiezenie wartosci klucza
-                //bo fil_crypt_get_key_state później woła get latest version na tym key_id
-                if (crypt_data->key_id != key_state->key_id) {
-                        key_state->key_id= crypt_data->key_id;
-                        fil_crypt_get_key_state(key_state, crypt_data);
-                }
-
-		bool need_key_rotation = fil_crypt_needs_rotation(
-			crypt_data->encryption,
-			crypt_data->min_key_version,
-			key_state->key_version, key_state->rotate_key_age);
-
-                
-
-                if (crypt_data->min_key_version != 0)
-                  crypt_data->min_key_version= ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-
-                //TODO:Robert to jest tymczasowe i troche glupie - zeby umowliwic rotacje enkrytped -> not enkrypted
-                //if (need_key_rotation && key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
-                  //space->encryption_type = Encryption::NONE;
-
-		crypt_data->rotate_state.scrubbing.is_active = false;
-		//crypt_data->rotate_state.scrubbing.is_active =
-			//btr_scrub_start_space(space->id, &s iate->scrub_data);
-
-		//time_t diff = time(0) - crypt_data->rotate_state.scrubbing.
-			//last_scrub_completed;
-
-	/*	bool need_scrubbing =
-			(srv_background_scrub_data_uncompressed ||
-			 srv_background_scrub_data_compressed) &&
-			crypt_data->rotate_state.scrubbing.is_active
-			&& diff >= 0
-			&& ulint(diff) >= srv_background_scrub_data_interval;*/
-
-		//if (need_key_rotation == false && need_scrubbing == false) {
-		if (need_key_rotation == false) {
-			break;
-		}
-
-		mutex_exit(&crypt_data->mutex);
-
-		return true;
-	} while (0);
-
-	mutex_exit(&crypt_data->mutex);
+      //if (space->id == 23)
+      //{
+        //space->id = 23;
+      //}
 
 
-	return false;
+      /* Make sure that tablespace is normal tablespace */
+      if (space->purpose != FIL_TYPE_TABLESPACE) {
+              return false;
+      }
+
+      ut_ad(space->n_pending_ops > 0);
+
+      fil_space_crypt_t *crypt_data = space->crypt_data;
+
+      if (crypt_data == NULL) {
+              /**
+              * space has no crypt data
+              *   start encrypting it...
+              */
+              *recheck = fil_crypt_start_encrypting_space(space);
+              crypt_data = space->crypt_data;
+              //TODO:Robert: To powinno być pod mutexem, albo z użyciem fil_set_encryption
+              //space->encryption_type = Encryption::ROTATED_KEYS;
+
+              if (crypt_data == NULL) {
+                      return false;
+              }
+
+              crypt_data->key_get_latest_version();
+      }
+
+      /* If used key_id is not found from encryption plugin we can't
+      continue to rotate the tablespace */
+      if (!crypt_data->is_key_found()) {
+              return false;
+      }
+
+      mutex_enter(&crypt_data->mutex);
+
+      do {
+              /* prevent threads from starting to rotate space */
+              if (crypt_data->rotate_state.starting) {
+                      /* recheck this space later */
+                      *recheck = true;
+                      break;
+              }
+
+              /* prevent threads from starting to rotate space */
+              if (space->is_stopping()) {
+                      break;
+              }
+
+              if (crypt_data->rotate_state.flushing) {
+                      break;
+              }
+
+              /* No need to rotate space if encryption is disabled */
+              if (crypt_data->not_encrypted()) {
+                      break;
+              }
+
+              //TODO:Robert - od komentuj to jak już zaimplementujesz key_id //acha - to jest odswiezenie wartosci klucza
+              //bo fil_crypt_get_key_state później woła get latest version na tym key_id
+              if (crypt_data->key_id != key_state->key_id) {
+                      key_state->key_id= crypt_data->key_id;
+                      fil_crypt_get_key_state(key_state, crypt_data);
+              }
+
+              bool need_key_rotation = fil_crypt_needs_rotation(
+                      crypt_data->encryption,
+                      crypt_data->min_key_version,
+                      key_state->key_version, key_state->rotate_key_age);
+
+              
+
+              if (crypt_data->min_key_version != 0)
+                crypt_data->min_key_version= ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+
+              //TODO:Robert to jest tymczasowe i troche glupie - zeby umowliwic rotacje enkrytped -> not enkrypted
+              //if (need_key_rotation && key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+                //space->encryption_type = Encryption::NONE;
+
+              crypt_data->rotate_state.scrubbing.is_active = false;
+              //crypt_data->rotate_state.scrubbing.is_active =
+                      //btr_scrub_start_space(space->id, &s iate->scrub_data);
+
+              //time_t diff = time(0) - crypt_data->rotate_state.scrubbing.
+                      //last_scrub_completed;
+
+      /*	bool need_scrubbing =
+                      (srv_background_scrub_data_uncompressed ||
+                       srv_background_scrub_data_compressed) &&
+                      crypt_data->rotate_state.scrubbing.is_active
+                      && diff >= 0
+                      && ulint(diff) >= srv_background_scrub_data_interval;*/
+
+              //if (need_key_rotation == false && need_scrubbing == false) {
+              if (need_key_rotation == false) {
+                      break;
+              }
+
+              mutex_exit(&crypt_data->mutex);
+
+              return true;
+      } while (0);
+
+      mutex_exit(&crypt_data->mutex);
+
+
+      return false;
 }
 
 /***********************************************************************
@@ -2216,25 +2216,25 @@ Update global statistics with thread statistics
 @param[in,out]	state		key rotation statistics */
 static void
 fil_crypt_update_total_stat(
-	rotate_thread_t *state)
+      rotate_thread_t *state)
 {
-	mutex_enter(&crypt_stat_mutex);
-	crypt_stat.pages_read_from_cache +=
-		state->crypt_stat.pages_read_from_cache;
-	crypt_stat.pages_read_from_disk +=
-		state->crypt_stat.pages_read_from_disk;
-	crypt_stat.pages_modified += state->crypt_stat.pages_modified;
-	crypt_stat.pages_flushed += state->crypt_stat.pages_flushed;
-	// remote old estimate
-	crypt_stat.estimated_iops -= state->crypt_stat.estimated_iops;
-	// add new estimate
-	crypt_stat.estimated_iops += state->estimated_max_iops;
-	mutex_exit(&crypt_stat_mutex);
+      mutex_enter(&crypt_stat_mutex);
+      crypt_stat.pages_read_from_cache +=
+              state->crypt_stat.pages_read_from_cache;
+      crypt_stat.pages_read_from_disk +=
+              state->crypt_stat.pages_read_from_disk;
+      crypt_stat.pages_modified += state->crypt_stat.pages_modified;
+      crypt_stat.pages_flushed += state->crypt_stat.pages_flushed;
+      // remote old estimate
+      crypt_stat.estimated_iops -= state->crypt_stat.estimated_iops;
+      // add new estimate
+      crypt_stat.estimated_iops += state->estimated_max_iops;
+      mutex_exit(&crypt_stat_mutex);
 
-	// make new estimate "current" estimate
-	memset(&state->crypt_stat, 0, sizeof(state->crypt_stat));
-	// record our old (current) estimate
-	state->crypt_stat.estimated_iops = state->estimated_max_iops;
+      // make new estimate "current" estimate
+      memset(&state->crypt_stat, 0, sizeof(state->crypt_stat));
+      // record our old (current) estimate
+      state->crypt_stat.estimated_iops = state->estimated_max_iops;
 }
 
 /***********************************************************************
@@ -2245,35 +2245,35 @@ used before starting to rotate a space.
 static
 bool
 fil_crypt_alloc_iops(
-	rotate_thread_t *state)
+      rotate_thread_t *state)
 {
-	ut_ad(state->allocated_iops == 0);
+      ut_ad(state->allocated_iops == 0);
 
-	/* We have not yet selected the space to rotate, thus
-	state might not contain space and we can't check
-	its status yet. */
+      /* We have not yet selected the space to rotate, thus
+      state might not contain space and we can't check
+      its status yet. */
 
-	uint max_iops = state->estimated_max_iops;
-	mutex_enter(&fil_crypt_threads_mutex);
+      uint max_iops = state->estimated_max_iops;
+      mutex_enter(&fil_crypt_threads_mutex);
 
-	if (n_fil_crypt_iops_allocated >= srv_n_fil_crypt_iops) {
-		/* this can happen when user decreases srv_fil_crypt_iops */
-		mutex_exit(&fil_crypt_threads_mutex);
-		return false;
-	}
+      if (n_fil_crypt_iops_allocated >= srv_n_fil_crypt_iops) {
+              /* this can happen when user decreases srv_fil_crypt_iops */
+              mutex_exit(&fil_crypt_threads_mutex);
+              return false;
+      }
 
-	uint alloc = srv_n_fil_crypt_iops - n_fil_crypt_iops_allocated;
+      uint alloc = srv_n_fil_crypt_iops - n_fil_crypt_iops_allocated;
 
-	if (alloc > max_iops) {
-		alloc = max_iops;
-	}
+      if (alloc > max_iops) {
+              alloc = max_iops;
+      }
 
-	n_fil_crypt_iops_allocated += alloc;
-	mutex_exit(&fil_crypt_threads_mutex);
+      n_fil_crypt_iops_allocated += alloc;
+      mutex_exit(&fil_crypt_threads_mutex);
 
-	state->allocated_iops = alloc;
+      state->allocated_iops = alloc;
 
-	return alloc > 0;
+      return alloc > 0;
 }
 
 /***********************************************************************
@@ -2283,92 +2283,92 @@ used when inside a space
 static
 void
 fil_crypt_realloc_iops(
-	rotate_thread_t *state)
+      rotate_thread_t *state)
 {
-	ut_a(state->allocated_iops > 0);
+      ut_a(state->allocated_iops > 0);
 
-	if (10 * state->cnt_waited > state->batch) {
-		/* if we waited more than 10% re-estimate max_iops */
-		ulint avg_wait_time_us =
-			ulint(state->sum_waited_us / state->cnt_waited);
+      if (10 * state->cnt_waited > state->batch) {
+              /* if we waited more than 10% re-estimate max_iops */
+              ulint avg_wait_time_us =
+                      ulint(state->sum_waited_us / state->cnt_waited);
 
-		if (avg_wait_time_us == 0) {
-			avg_wait_time_us = 1; // prevent division by zero
-		}
+              if (avg_wait_time_us == 0) {
+                      avg_wait_time_us = 1; // prevent division by zero
+              }
 
-		DBUG_PRINT("ib_crypt",
-			("thr_no: %u - update estimated_max_iops from %u to "
-			 ULINTPF ".",
-			state->thread_no,
-			state->estimated_max_iops,
-			1000000 / avg_wait_time_us));
+              DBUG_PRINT("ib_crypt",
+                      ("thr_no: %u - update estimated_max_iops from %u to "
+                       ULINTPF ".",
+                      state->thread_no,
+                      state->estimated_max_iops,
+                      1000000 / avg_wait_time_us));
 
-		state->estimated_max_iops = uint(1000000 / avg_wait_time_us);
-		state->cnt_waited = 0;
-		state->sum_waited_us = 0;
-	} else {
-		DBUG_PRINT("ib_crypt",
-			   ("thr_no: %u only waited " ULINTPF
-			    "%% skip re-estimate.",
-			    state->thread_no,
-			    (100 * state->cnt_waited)
-			    / (state->batch ? state->batch : 1)));
-	}
+              state->estimated_max_iops = uint(1000000 / avg_wait_time_us);
+              state->cnt_waited = 0;
+              state->sum_waited_us = 0;
+      } else {
+              DBUG_PRINT("ib_crypt",
+                         ("thr_no: %u only waited " ULINTPF
+                          "%% skip re-estimate.",
+                          state->thread_no,
+                          (100 * state->cnt_waited)
+                          / (state->batch ? state->batch : 1)));
+      }
 
-	if (state->estimated_max_iops <= state->allocated_iops) {
-		/* return extra iops */
-		uint extra = state->allocated_iops - state->estimated_max_iops;
+      if (state->estimated_max_iops <= state->allocated_iops) {
+              /* return extra iops */
+              uint extra = state->allocated_iops - state->estimated_max_iops;
 
-		if (extra > 0) {
-			mutex_enter(&fil_crypt_threads_mutex);
-			if (n_fil_crypt_iops_allocated < extra) {
-				/* unknown bug!
-				* crash in debug
-				* keep n_fil_crypt_iops_allocated unchanged
-				* in release */
-				ut_ad(0);
-				extra = 0;
-			}
-			n_fil_crypt_iops_allocated -= extra;
-			state->allocated_iops -= extra;
+              if (extra > 0) {
+                      mutex_enter(&fil_crypt_threads_mutex);
+                      if (n_fil_crypt_iops_allocated < extra) {
+                              /* unknown bug!
+                              * crash in debug
+                              * keep n_fil_crypt_iops_allocated unchanged
+                              * in release */
+                              ut_ad(0);
+                              extra = 0;
+                      }
+                      n_fil_crypt_iops_allocated -= extra;
+                      state->allocated_iops -= extra;
 
-			if (state->allocated_iops == 0) {
-				/* no matter how slow io system seems to be
-				* never decrease allocated_iops to 0... */
-				state->allocated_iops ++;
-				n_fil_crypt_iops_allocated ++;
-			}
+                      if (state->allocated_iops == 0) {
+                              /* no matter how slow io system seems to be
+                              * never decrease allocated_iops to 0... */
+                              state->allocated_iops ++;
+                              n_fil_crypt_iops_allocated ++;
+                      }
 
-			os_event_set(fil_crypt_threads_event);
-			mutex_exit(&fil_crypt_threads_mutex);
-		}
-	} else {
-		/* see if there are more to get */
-		mutex_enter(&fil_crypt_threads_mutex);
-		if (n_fil_crypt_iops_allocated < srv_n_fil_crypt_iops) {
-			/* there are extra iops free */
-			uint extra = srv_n_fil_crypt_iops -
-				n_fil_crypt_iops_allocated;
-			if (state->allocated_iops + extra >
-			    state->estimated_max_iops) {
-				/* but don't alloc more than our max */
-				extra = state->estimated_max_iops -
-					state->allocated_iops;
-			}
-			n_fil_crypt_iops_allocated += extra;
-			state->allocated_iops += extra;
+                      os_event_set(fil_crypt_threads_event);
+                      mutex_exit(&fil_crypt_threads_mutex);
+              }
+      } else {
+              /* see if there are more to get */
+              mutex_enter(&fil_crypt_threads_mutex);
+              if (n_fil_crypt_iops_allocated < srv_n_fil_crypt_iops) {
+                      /* there are extra iops free */
+                      uint extra = srv_n_fil_crypt_iops -
+                              n_fil_crypt_iops_allocated;
+                      if (state->allocated_iops + extra >
+                          state->estimated_max_iops) {
+                              /* but don't alloc more than our max */
+                              extra = state->estimated_max_iops -
+                                      state->allocated_iops;
+                      }
+                      n_fil_crypt_iops_allocated += extra;
+                      state->allocated_iops += extra;
 
-			DBUG_PRINT("ib_crypt",
-				("thr_no: %u increased iops from %u to %u.",
-				state->thread_no,
-				state->allocated_iops - extra,
-				state->allocated_iops));
+                      DBUG_PRINT("ib_crypt",
+                              ("thr_no: %u increased iops from %u to %u.",
+                              state->thread_no,
+                              state->allocated_iops - extra,
+                              state->allocated_iops));
 
-		}
-		mutex_exit(&fil_crypt_threads_mutex);
-	}
+              }
+              mutex_exit(&fil_crypt_threads_mutex);
+      }
 
-	fil_crypt_update_total_stat(state);
+      fil_crypt_update_total_stat(state);
 }
 
 /***********************************************************************
@@ -2377,27 +2377,27 @@ Return allocated iops to global
 static
 void
 fil_crypt_return_iops(
-	rotate_thread_t *state)
+      rotate_thread_t *state)
 {
-	if (state->allocated_iops > 0) {
-		uint iops = state->allocated_iops;
-		mutex_enter(&fil_crypt_threads_mutex);
-		if (n_fil_crypt_iops_allocated < iops) {
-			/* unknown bug!
-			* crash in debug
-			* keep n_fil_crypt_iops_allocated unchanged
-			* in release */
-			ut_ad(0);
-			iops = 0;
-		}
+      if (state->allocated_iops > 0) {
+              uint iops = state->allocated_iops;
+              mutex_enter(&fil_crypt_threads_mutex);
+              if (n_fil_crypt_iops_allocated < iops) {
+                      /* unknown bug!
+                      * crash in debug
+                      * keep n_fil_crypt_iops_allocated unchanged
+                      * in release */
+                      ut_ad(0);
+                      iops = 0;
+              }
 
-		n_fil_crypt_iops_allocated -= iops;
-		state->allocated_iops = 0;
-		os_event_set(fil_crypt_threads_event);
-		mutex_exit(&fil_crypt_threads_mutex);
-	}
+              n_fil_crypt_iops_allocated -= iops;
+              state->allocated_iops = 0;
+              os_event_set(fil_crypt_threads_event);
+              mutex_exit(&fil_crypt_threads_mutex);
+      }
 
-	fil_crypt_update_total_stat(state);
+      fil_crypt_update_total_stat(state);
 }
 
 /***********************************************************************
@@ -2408,63 +2408,63 @@ Search for a space needing rotation
 static
 bool
 fil_crypt_find_space_to_rotate(
-	key_state_t*		key_state,
-	rotate_thread_t*	state,
-	bool*			recheck)
+      key_state_t*		key_state,
+      rotate_thread_t*	state,
+      bool*			recheck)
 {
-	/* we need iops to start rotating */
-	while (!state->should_shutdown() && !fil_crypt_alloc_iops(state)) {
-		os_event_reset(fil_crypt_threads_event);
-		os_event_wait_time(fil_crypt_threads_event, 100000);
-	}
+      /* we need iops to start rotating */
+      while (!state->should_shutdown() && !fil_crypt_alloc_iops(state)) {
+              os_event_reset(fil_crypt_threads_event);
+              os_event_wait_time(fil_crypt_threads_event, 100000);
+      }
 
-	if (state->should_shutdown()) {
-		if (state->space) {
-			fil_space_release(state->space);
-			state->space = NULL;
-		}
-		return false;
-	}
+      if (state->should_shutdown()) {
+              if (state->space) {
+                      fil_space_release(state->space);
+                      state->space = NULL;
+              }
+              return false;
+      }
 
-	if (state->first) {
-		state->first = false;
-		if (state->space) {
-			fil_space_release(state->space);
-		}
-		state->space = NULL;
-	}
+      if (state->first) {
+              state->first = false;
+              if (state->space) {
+                      fil_space_release(state->space);
+              }
+              state->space = NULL;
+      }
 
-	/* If key rotation is enabled (default) we iterate all tablespaces.
-	If key rotation is not enabled we iterate only the tablespaces
-	added to keyrotation list. */
-	if (srv_fil_crypt_rotate_key_age) {
-		state->space = fil_space_next(state->space);
-	} else {
-		state->space = fil_space_keyrotate_next(state->space);
-	}
+      /* If key rotation is enabled (default) we iterate all tablespaces.
+      If key rotation is not enabled we iterate only the tablespaces
+      added to keyrotation list. */
+      if (srv_fil_crypt_rotate_key_age) {
+              state->space = fil_space_next(state->space);
+      } else {
+              state->space = fil_space_keyrotate_next(state->space);
+      }
 
-	while (!state->should_shutdown() && state->space) {
-	        fil_crypt_read_crypt_data(state->space);
+      while (!state->should_shutdown() && state->space) {
+              fil_crypt_read_crypt_data(state->space);
 
-	if (fil_crypt_space_needs_rotation(state, key_state, recheck)) {
-                        ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-			/* init state->min_key_version_found before
-			* starting on a space */
-			state->min_key_version_found = key_state->key_version;
-			return true;
-		}
+      if (fil_crypt_space_needs_rotation(state, key_state, recheck)) {
+                      ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+                      /* init state->min_key_version_found before
+                      * starting on a space */
+                      state->min_key_version_found = key_state->key_version;
+                      return true;
+              }
 
-		if (srv_fil_crypt_rotate_key_age) {
-			state->space = fil_space_next(state->space);
-		} else {
-			state->space = fil_space_keyrotate_next(state->space);
-		}
-	}
+              if (srv_fil_crypt_rotate_key_age) {
+                      state->space = fil_space_next(state->space);
+              } else {
+                      state->space = fil_space_keyrotate_next(state->space);
+              }
+      }
 
-	/* if we didn't find any space return iops */
-	fil_crypt_return_iops(state);
+      /* if we didn't find any space return iops */
+      fil_crypt_return_iops(state);
 
-	return false;
+      return false;
 
 }
 
@@ -2475,57 +2475,57 @@ Start rotating a space
 static
 void
 fil_crypt_start_rotate_space(
-	const key_state_t*	key_state,
-	rotate_thread_t*	state)
+      const key_state_t*	key_state,
+      rotate_thread_t*	state)
 {
-	fil_space_crypt_t *crypt_data = state->space->crypt_data;
+      fil_space_crypt_t *crypt_data = state->space->crypt_data;
 
-	ut_ad(crypt_data);
-	mutex_enter(&crypt_data->mutex);
-        ut_ad(key_state->key_id == crypt_data->key_id);
+      ut_ad(crypt_data);
+      mutex_enter(&crypt_data->mutex);
+      ut_ad(key_state->key_id == crypt_data->key_id);
 
-	if (crypt_data->rotate_state.active_threads == 0) {
-		/* only first thread needs to init */
-		crypt_data->rotate_state.next_offset = 1; // skip page 0
-		/* no need to rotate beyond current max
-		* if space extends, it will be encrypted with newer version */
-		/* FIXME: max_offset could be removed and instead
-		space->size consulted.*/
-                if (strcmp(state->space->name, "test/t2") == 0 && state->space->size == 0)
-                {
-                  ib::error() << "Setting max_offset to " << state->space->size << " for test/t2'\n'";
-                }
+      if (crypt_data->rotate_state.active_threads == 0) {
+              /* only first thread needs to init */
+              crypt_data->rotate_state.next_offset = 1; // skip page 0
+              /* no need to rotate beyond current max
+              * if space extends, it will be encrypted with newer version */
+              /* FIXME: max_offset could be removed and instead
+              space->size consulted.*/
+              if (strcmp(state->space->name, "test/t2") == 0 && state->space->size == 0)
+              {
+                ib::error() << "Setting max_offset to " << state->space->size << " for test/t2'\n'";
+              }
 
-		crypt_data->rotate_state.max_offset = state->space->size;
-		crypt_data->rotate_state.end_lsn = 0;
-		crypt_data->rotate_state.min_key_version_found =
-			key_state->key_version;
+              crypt_data->rotate_state.max_offset = state->space->size;
+              crypt_data->rotate_state.end_lsn = 0;
+              crypt_data->rotate_state.min_key_version_found =
+                      key_state->key_version;
 
-		crypt_data->rotate_state.start_time = time(0);
+              crypt_data->rotate_state.start_time = time(0);
 
-		if (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED &&
-			crypt_data->is_encrypted() &&
-			key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-			/* this is rotation unencrypted => encrypted */
-			crypt_data->type = CRYPT_SCHEME_1;
-		}
-	}
+              if (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED &&
+                      crypt_data->is_encrypted() &&
+                      key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+                      /* this is rotation unencrypted => encrypted */
+                      crypt_data->type = CRYPT_SCHEME_1;
+              }
+      }
 
-        if (strcmp(state->space->name, "test/t2") == 0)
-        {
-          ut_ad(crypt_data->rotate_state.max_offset);
-          //ib::error() << "Getting to rotate " << thr.space->name << '\n';
-        }
+      if (strcmp(state->space->name, "test/t2") == 0)
+      {
+        ut_ad(crypt_data->rotate_state.max_offset);
+        //ib::error() << "Getting to rotate " << thr.space->name << '\n';
+      }
 
-	/* count active threads in space */
-	crypt_data->rotate_state.active_threads++;
+      /* count active threads in space */
+      crypt_data->rotate_state.active_threads++;
 
-	/* Initialize thread local state */
-	state->end_lsn = crypt_data->rotate_state.end_lsn;
-	state->min_key_version_found =
-		crypt_data->rotate_state.min_key_version_found;
+      /* Initialize thread local state */
+      state->end_lsn = crypt_data->rotate_state.end_lsn;
+      state->min_key_version_found =
+              crypt_data->rotate_state.min_key_version_found;
 
-	mutex_exit(&crypt_data->mutex);
+      mutex_exit(&crypt_data->mutex);
 }
 
 /***********************************************************************
@@ -2536,59 +2536,59 @@ Search for batch of pages needing rotation
 static
 bool
 fil_crypt_find_page_to_rotate(
-	const key_state_t*	key_state,
-	rotate_thread_t*	state)
+      const key_state_t*	key_state,
+      rotate_thread_t*	state)
 {
-	ulint batch = srv_alloc_time * state->allocated_iops;
-	fil_space_t* space = state->space;
+      ulint batch = srv_alloc_time * state->allocated_iops;
+      fil_space_t* space = state->space;
 
-	ut_ad(!space || space->n_pending_ops > 0);
+      ut_ad(!space || space->n_pending_ops > 0);
 
-	/* If space is marked to be dropped stop rotation. */
-	if (!space || space->is_stopping()) {
-		return false;
-	}
+      /* If space is marked to be dropped stop rotation. */
+      if (!space || space->is_stopping()) {
+              return false;
+      }
 
-	fil_space_crypt_t *crypt_data = space->crypt_data;
+      fil_space_crypt_t *crypt_data = space->crypt_data;
 
-	mutex_enter(&crypt_data->mutex);
-        ut_ad(key_state->key_id == crypt_data->key_id);
+      mutex_enter(&crypt_data->mutex);
+      ut_ad(key_state->key_id == crypt_data->key_id);
 
-	bool found = crypt_data->rotate_state.max_offset >=
-		crypt_data->rotate_state.next_offset;
+      bool found = crypt_data->rotate_state.max_offset >=
+              crypt_data->rotate_state.next_offset;
 
-        if (strcmp(state->space->name, "test/t2") == 0)
-        {
-          if (found)
-            ib::error() << "Page is to be rotated for space=" << state->space->name << '\n';
-          else {
-            ib::error() << "Page is NOT to be rotated for space= " << state->space->name << '\n';
-            ib::error() << "crypt_data->rotate_state.max_offset= " << crypt_data->rotate_state.max_offset << '\n';
-            ib::error() << "crypt_data->rotate_state.next_offset= " << crypt_data->rotate_state.next_offset << '\n';
-          }
+      if (strcmp(state->space->name, "test/t2") == 0)
+      {
+        if (found)
+          ib::error() << "Page is to be rotated for space=" << state->space->name << '\n';
+        else {
+          ib::error() << "Page is NOT to be rotated for space= " << state->space->name << '\n';
+          ib::error() << "crypt_data->rotate_state.max_offset= " << crypt_data->rotate_state.max_offset << '\n';
+          ib::error() << "crypt_data->rotate_state.next_offset= " << crypt_data->rotate_state.next_offset << '\n';
         }
+      }
 
 
-	if (found) {
-		state->offset = crypt_data->rotate_state.next_offset;
-		ulint remaining = crypt_data->rotate_state.max_offset -
-			crypt_data->rotate_state.next_offset;
+      if (found) {
+              state->offset = crypt_data->rotate_state.next_offset;
+              ulint remaining = crypt_data->rotate_state.max_offset -
+                      crypt_data->rotate_state.next_offset;
 
-		if (batch <= remaining) {
-			state->batch = batch;
-		} else {
-			state->batch = remaining;
-		}
-	}
+              if (batch <= remaining) {
+                      state->batch = batch;
+              } else {
+                      state->batch = remaining;
+              }
+      }
 
-	crypt_data->rotate_state.next_offset += batch;
-	mutex_exit(&crypt_data->mutex);
-	return found;
+      crypt_data->rotate_state.next_offset += batch;
+      mutex_exit(&crypt_data->mutex);
+      return found;
 }
 
 #define fil_crypt_get_page_throttle(state,offset,mtr,sleeptime_ms) \
-	fil_crypt_get_page_throttle_func(state, offset, mtr, \
-					 sleeptime_ms, __FILE__, __LINE__)
+      fil_crypt_get_page_throttle_func(state, offset, mtr, \
+                                       sleeptime_ms, __FILE__, __LINE__)
 
 /***********************************************************************
 Get a page and compute sleep time
@@ -2602,80 +2602,80 @@ Get a page and compute sleep time
 static
 buf_block_t*
 fil_crypt_get_page_throttle_func(
-	rotate_thread_t*	state,
-	ulint 			offset,
-	mtr_t*			mtr,
-	ulint*			sleeptime_ms,
-	const char*		file,
-	unsigned		line)
+      rotate_thread_t*	state,
+      ulint 			offset,
+      mtr_t*			mtr,
+      ulint*			sleeptime_ms,
+      const char*		file,
+      unsigned		line)
 {
-	fil_space_t* space = state->space;
+      fil_space_t* space = state->space;
 
 
-	const page_size_t page_size = page_size_t(space->flags);
-	const page_id_t page_id(space->id, offset);
-	ut_ad(space->n_pending_ops > 0);
+      const page_size_t page_size = page_size_t(space->flags);
+      const page_id_t page_id(space->id, offset);
+      ut_ad(space->n_pending_ops > 0);
 
-        if (space->id == 0 && page_id.page_no() == 13)
-          space->id = 0;
+      if (space->id == 0 && page_id.page_no() == 13)
+        space->id = 0;
 
-	/* Before reading from tablespace we need to make sure that
-	the tablespace is not about to be dropped or truncated. */
-	if (space->is_stopping()) {
-		return NULL;
-	}
+      /* Before reading from tablespace we need to make sure that
+      the tablespace is not about to be dropped or truncated. */
+      if (space->is_stopping()) {
+              return NULL;
+      }
 
-	//dberr_t err = DB_SUCCESS;
-	buf_block_t* block = buf_page_get_gen(page_id, page_size, RW_X_LATCH,
-					      NULL,
-					      BUF_PEEK_IF_IN_POOL, file, line,
-					      mtr);
+      //dberr_t err = DB_SUCCESS;
+      buf_block_t* block = buf_page_get_gen(page_id, page_size, RW_X_LATCH,
+                                            NULL,
+                                            BUF_PEEK_IF_IN_POOL, file, line,
+                                            mtr);
 
-	if (block != NULL) {
-		/* page was in buffer pool */
+      if (block != NULL) {
+              /* page was in buffer pool */
 
-                //ut_ad(fil_page_get_type(block->frame) != 0);
-		state->crypt_stat.pages_read_from_cache++;
-		return block;
-	}
+              //ut_ad(fil_page_get_type(block->frame) != 0);
+              state->crypt_stat.pages_read_from_cache++;
+              return block;
+      }
 
-	if (space->is_stopping()) {
-		return NULL;
-	}
+      if (space->is_stopping()) {
+              return NULL;
+      }
 
-	state->crypt_stat.pages_read_from_disk++;
+      state->crypt_stat.pages_read_from_disk++;
 
-	uintmax_t start = ut_time_us(NULL);
-	block = buf_page_get_gen(page_id, page_size,
-				 RW_X_LATCH,
-				 NULL, BUF_GET_POSSIBLY_FREED,
-				file, line, mtr);
-	uintmax_t end = ut_time_us(NULL);
+      uintmax_t start = ut_time_us(NULL);
+      block = buf_page_get_gen(page_id, page_size,
+                               RW_X_LATCH,
+                               NULL, BUF_GET_POSSIBLY_FREED,
+                              file, line, mtr);
+      uintmax_t end = ut_time_us(NULL);
 
-        //ut_ad(fil_page_get_type(block->frame) != 0);
+      //ut_ad(fil_page_get_type(block->frame) != 0);
 
-	if (end < start) {
-		end = start; // safety...
-	}
+      if (end < start) {
+              end = start; // safety...
+      }
 
-	state->cnt_waited++;
-	state->sum_waited_us += (end - start);
+      state->cnt_waited++;
+      state->sum_waited_us += (end - start);
 
-	/* average page load */
-	ulint add_sleeptime_ms = 0;
-	ulint avg_wait_time_us =ulint(state->sum_waited_us / state->cnt_waited);
-	ulint alloc_wait_us = 1000000 / state->allocated_iops;
+      /* average page load */
+      ulint add_sleeptime_ms = 0;
+      ulint avg_wait_time_us =ulint(state->sum_waited_us / state->cnt_waited);
+      ulint alloc_wait_us = 1000000 / state->allocated_iops;
 
-	if (avg_wait_time_us < alloc_wait_us) {
-		/* we reading faster than we allocated */
-		add_sleeptime_ms = (alloc_wait_us - avg_wait_time_us) / 1000;
-	} else {
-		/* if page load time is longer than we want, skip sleeping */
-	}
+      if (avg_wait_time_us < alloc_wait_us) {
+              /* we reading faster than we allocated */
+              add_sleeptime_ms = (alloc_wait_us - avg_wait_time_us) / 1000;
+      } else {
+              /* if page load time is longer than we want, skip sleeping */
+      }
 
-	*sleeptime_ms += add_sleeptime_ms;
+      *sleeptime_ms += add_sleeptime_ms;
 
-	return block;
+      return block;
 }
 
 
@@ -2695,49 +2695,49 @@ but locks block and then fil_space_latch when freeing page.
 //static
 //buf_block_t*
 //btr_scrub_get_block_and_allocation_status(
-	//rotate_thread_t*	state,
-	//ulint 			offset,
-	//mtr_t*			mtr,
-	//btr_scrub_page_allocation_status_t *allocation_status,
-	//ulint*			sleeptime_ms)
+      //rotate_thread_t*	state,
+      //ulint 			offset,
+      //mtr_t*			mtr,
+      //btr_scrub_page_allocation_status_t *allocation_status,
+      //ulint*			sleeptime_ms)
 //{
-	//mtr_t local_mtr;
-	//buf_block_t *block = NULL;
-	//fil_space_t* space = state->space;
+      //mtr_t local_mtr;
+      //buf_block_t *block = NULL;
+      //fil_space_t* space = state->space;
 
-	//ut_ad(space->n_pending_ops > 0);
+      //ut_ad(space->n_pending_ops > 0);
 
-	//mtr_start(&local_mtr);
+      //mtr_start(&local_mtr);
 
-	//*allocation_status = fseg_page_is_free(space, offset) ?
-		//BTR_SCRUB_PAGE_FREE :
-		//BTR_SCRUB_PAGE_ALLOCATED;
+      //*allocation_status = fseg_page_is_free(space, offset) ?
+              //BTR_SCRUB_PAGE_FREE :
+              //BTR_SCRUB_PAGE_ALLOCATED;
 
-	//if (*allocation_status == BTR_SCRUB_PAGE_FREE) {
-		//[> this is easy case, we lock fil_space_latch first and
-		//then block */
-		//block = fil_crypt_get_page_throttle(state,
-						    //offset, mtr,
-						    //sleeptime_ms);
-		//mtr_commit(&local_mtr);
-	//} else {
-		//[> page is allocated according to xdes <]
+      //if (*allocation_status == BTR_SCRUB_PAGE_FREE) {
+              //[> this is easy case, we lock fil_space_latch first and
+              //then block */
+              //block = fil_crypt_get_page_throttle(state,
+                                                  //offset, mtr,
+                                                  //sleeptime_ms);
+              //mtr_commit(&local_mtr);
+      //} else {
+              //[> page is allocated according to xdes <]
 
-		//[> release fil_space_latch *before* fetching block <]
-		//mtr_commit(&local_mtr);
+              //[> release fil_space_latch *before* fetching block <]
+              //mtr_commit(&local_mtr);
 
-		/* NOTE: when we have locked dict_index_get_lock(),
-		* it's safe to release fil_space_latch and then fetch block
-		* as dict_index_get_lock() is needed to make tree modifications
-		* such as free-ing a page
-		*/
+              /* NOTE: when we have locked dict_index_get_lock(),
+              * it's safe to release fil_space_latch and then fetch block
+              * as dict_index_get_lock() is needed to make tree modifications
+              * such as free-ing a page
+              */
 
-		//block = fil_crypt_get_page_throttle(state,
-						    //offset, mtr,
-						    //sleeptime_ms);
-	//}
+              //block = fil_crypt_get_page_throttle(state,
+                                                  //offset, mtr,
+                                                  //sleeptime_ms);
+      //}
 
-	//return block;
+      //return block;
 //}
 
 
@@ -2748,193 +2748,193 @@ Rotate one page
 static
 void
 fil_crypt_rotate_page(
-	const key_state_t*	key_state,
-	rotate_thread_t*	state)
+      const key_state_t*	key_state,
+      rotate_thread_t*	state)
 {
-	fil_space_t*space = state->space;
-	ulint space_id = space->id;
-	ulint offset = state->offset;
-	ulint sleeptime_ms = 0;
-	fil_space_crypt_t *crypt_data = space->crypt_data;
+      fil_space_t*space = state->space;
+      ulint space_id = space->id;
+      ulint offset = state->offset;
+      ulint sleeptime_ms = 0;
+      fil_space_crypt_t *crypt_data = space->crypt_data;
 
-	ut_ad(space->n_pending_ops > 0);
-	ut_ad(offset > 0);
+      ut_ad(space->n_pending_ops > 0);
+      ut_ad(offset > 0);
 
-	/* In fil_crypt_thread where key rotation is done we have
-	acquired space and checked that this space is not yet
-	marked to be dropped. Similarly, in fil_crypt_find_page_to_rotate().
-	Check here also to give DROP TABLE or similar a change. */
-	if (space->is_stopping()) {
-		return;
-	}
+      /* In fil_crypt_thread where key rotation is done we have
+      acquired space and checked that this space is not yet
+      marked to be dropped. Similarly, in fil_crypt_find_page_to_rotate().
+      Check here also to give DROP TABLE or similar a change. */
+      if (space->is_stopping()) {
+              return;
+      }
 
-	if (space_id == TRX_SYS_SPACE && offset == TRX_SYS_PAGE_NO) {
-		/* don't encrypt this as it contains address to dblwr buffer */
-		return;
-	}
+      if (space_id == TRX_SYS_SPACE && offset == TRX_SYS_PAGE_NO) {
+              /* don't encrypt this as it contains address to dblwr buffer */
+              return;
+      }
 
-	//ut_d(const bool was_free = fseg_page_is_free(space, offset)); //TODO:Robert: For the time being removed
+      //ut_d(const bool was_free = fseg_page_is_free(space, offset)); //TODO:Robert: For the time being removed
 
-	mtr_t mtr;
-	mtr.start();
-	if (buf_block_t* block = fil_crypt_get_page_throttle(state,
-							     offset, &mtr,
-							     &sleeptime_ms)) {
-
-
-		bool modified = false;
-		//int needs_scrubbing = BTR_SCRUB_SKIP_PAGE;
-		lsn_t block_lsn = block->page.newest_modification;
-		byte* frame = buf_block_get_frame(block);
-                //TODO:Robert  - musze po dekrypcji dodac nowe pole do block - tak, zeby trzymac tam kv
-		//uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
+      mtr_t mtr;
+      mtr.start();
+      if (buf_block_t* block = fil_crypt_get_page_throttle(state,
+                                                           offset, &mtr,
+                                                           &sleeptime_ms)) {
 
 
-	        uint kv= mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
-                if (strcmp(space->name, "test/t2") == 0)
-                {
-                  ib::error() << "Trying to write to " << space->name << '\n';
-                  ib::error() << "Encryption: " << crypt_data->encryption << '\n';
-                  ib::error() << "kv: " << kv << '\n';
-                  ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
-                }
+              bool modified = false;
+              //int needs_scrubbing = BTR_SCRUB_SKIP_PAGE;
+              lsn_t block_lsn = block->page.newest_modification;
+              byte* frame = buf_block_get_frame(block);
+              //TODO:Robert  - musze po dekrypcji dodac nowe pole do block - tak, zeby trzymac tam kv
+              //uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
 
 
-		if (space->is_stopping()) {
-			/* The tablespace is closing (in DROP TABLE or
-			TRUNCATE TABLE or similar): avoid further access */
-		} else if (!*reinterpret_cast<uint32_t*>(FIL_PAGE_OFFSET
-							 + frame)) {
-			/* It looks like this page was never
-			allocated. Because key rotation is accessing
-			pages in a pattern that is unlike the normal
-			B-tree and undo log access pattern, we cannot
-			invoke fseg_page_is_free() here, because that
-			could result in a deadlock. If we invoked
-			fseg_page_is_free() and released the
-			tablespace latch before acquiring block->lock,
-			then the fseg_page_is_free() information
-			could be stale already. */
-			//ut_ad(was_free); //TODO: Robert for the time being commented out
-			//ut_ad(kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED); // TODO: Robert - nie powinno to zostać zmienione na moją flage ?
-			ut_ad(page_get_space_id(frame) == 0);
-		} else if (fil_crypt_needs_rotation(
-				   crypt_data->encryption,
-				   kv, key_state->key_version,
-				   key_state->rotate_key_age)) {
+              uint kv= mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+              if (strcmp(space->name, "test/t2") == 0)
+              {
+                ib::error() << "Trying to write to " << space->name << '\n';
+                ib::error() << "Encryption: " << crypt_data->encryption << '\n';
+                ib::error() << "kv: " << kv << '\n';
+                ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
+              }
 
-			mtr.set_named_space(space);
-			modified = true;
 
-                        if (strcmp(space->name, "test/t2") == 0)
-                          ib::error() << "Write to  " << space->name << '\n';
-			/* force rotation by dummy updating page */
-			mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
-					 space_id, MLOG_4BYTES, &mtr);
+              if (space->is_stopping()) {
+                      /* The tablespace is closing (in DROP TABLE or
+                      TRUNCATE TABLE or similar): avoid further access */
+              } else if (!*reinterpret_cast<uint32_t*>(FIL_PAGE_OFFSET
+                                                       + frame)) {
+                      /* It looks like this page was never
+                      allocated. Because key rotation is accessing
+                      pages in a pattern that is unlike the normal
+                      B-tree and undo log access pattern, we cannot
+                      invoke fseg_page_is_free() here, because that
+                      could result in a deadlock. If we invoked
+                      fseg_page_is_free() and released the
+                      tablespace latch before acquiring block->lock,
+                      then the fseg_page_is_free() information
+                      could be stale already. */
+                      //ut_ad(was_free); //TODO: Robert for the time being commented out
+                      //ut_ad(kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED); // TODO: Robert - nie powinno to zostać zmienione na moją flage ?
+                      ut_ad(page_get_space_id(frame) == 0);
+              } else if (fil_crypt_needs_rotation(
+                                 crypt_data->encryption,
+                                 kv, key_state->key_version,
+                                 key_state->rotate_key_age)) {
 
-			/* statistics */
-			state->crypt_stat.pages_modified++;
-		} else { // TO jest else - czyli key version jest tylko pobierane jeżeli nie ma potrzeby rotacji ...
-			if (crypt_data->is_encrypted()) {
-                          //TODO:Robert, o cholera ...
-				if (kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  || kv < state->min_key_version_found) {
-					state->min_key_version_found = kv; //TODO:Teraz:Czy nie byłoby tu lepiej dać PAGE_TYPE?
-				}
-			}
+                      mtr.set_named_space(space);
+                      modified = true;
 
-			//needs_scrubbing = btr_page_needs_scrubbing(
-				//&state->scrub_data, block,
-				//BTR_SCRUB_PAGE_ALLOCATION_UNKNOWN);
-		}
+                      if (strcmp(space->name, "test/t2") == 0)
+                        ib::error() << "Write to  " << space->name << '\n';
+                      /* force rotation by dummy updating page */
+                      mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
+                                       space_id, MLOG_4BYTES, &mtr);
 
-		mtr.commit();
-		lsn_t end_lsn = mtr.commit_lsn();
+                      /* statistics */
+                      state->crypt_stat.pages_modified++;
+              } else { // TO jest else - czyli key version jest tylko pobierane jeżeli nie ma potrzeby rotacji ...
+                      if (crypt_data->is_encrypted()) {
+                        //TODO:Robert, o cholera ...
+                              if (kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  || kv < state->min_key_version_found) {
+                                      state->min_key_version_found = kv; //TODO:Teraz:Czy nie byłoby tu lepiej dać PAGE_TYPE?
+                              }
+                      }
 
-		//if (needs_scrubbing == BTR_SCRUB_PAGE) {
-			//mtr.start();
-			/*
-			* refetch page and allocation status
-			*/
-			//btr_scrub_page_allocation_status_t allocated;
+                      //needs_scrubbing = btr_page_needs_scrubbing(
+                              //&state->scrub_data, block,
+                              //BTR_SCRUB_PAGE_ALLOCATION_UNKNOWN);
+              }
 
-			//block = btr_scrub_get_block_and_allocation_status(
-				//state, offset, &mtr,
-				//&allocated,
-				//&sleeptime_ms);
+              mtr.commit();
+              lsn_t end_lsn = mtr.commit_lsn();
 
-			//if (block) {
-				//mtr.set_named_space(space);
+              //if (needs_scrubbing == BTR_SCRUB_PAGE) {
+                      //mtr.start();
+                      /*
+                      * refetch page and allocation status
+                      */
+                      //btr_scrub_page_allocation_status_t allocated;
 
-				//[> get required table/index and index-locks <]
-				//needs_scrubbing = btr_scrub_recheck_page(
-					//&state->scrub_data, block, allocated, &mtr);
+                      //block = btr_scrub_get_block_and_allocation_status(
+                              //state, offset, &mtr,
+                              //&allocated,
+                              //&sleeptime_ms);
 
-				//if (needs_scrubbing == BTR_SCRUB_PAGE) {
-					/* we need to refetch it once more now that we have
-					* index locked */
-					//block = btr_scrub_get_block_and_allocation_status(
-						//state, offset, &mtr,
-						//&allocated,
-						//&sleeptime_ms);
+                      //if (block) {
+                              //mtr.set_named_space(space);
 
-					//needs_scrubbing = btr_scrub_page(&state->scrub_data,
-						//block, allocated,
-						//&mtr);
-				//}
+                              //[> get required table/index and index-locks <]
+                              //needs_scrubbing = btr_scrub_recheck_page(
+                                      //&state->scrub_data, block, allocated, &mtr);
 
-				/* NOTE: mtr is committed inside btr_scrub_recheck_page()
-				* and/or btr_scrub_page. This is to make sure that
-				* locks & pages are latched in corrected order,
-				* the mtr is in some circumstances restarted.
-				* (mtr_commit() + mtr_start())
-				*/
-			//}
-		//}
+                              //if (needs_scrubbing == BTR_SCRUB_PAGE) {
+                                      /* we need to refetch it once more now that we have
+                                      * index locked */
+                                      //block = btr_scrub_get_block_and_allocation_status(
+                                              //state, offset, &mtr,
+                                              //&allocated,
+                                              //&sleeptime_ms);
 
-		//if (needs_scrubbing != BTR_SCRUB_PAGE) {
-			//[> if page didn't need scrubbing it might be that cleanups
-			//are needed. do those outside of any mtr to prevent deadlocks.
+                                      //needs_scrubbing = btr_scrub_page(&state->scrub_data,
+                                              //block, allocated,
+                                              //&mtr);
+                              //}
 
-			//the information what kinds of cleanups that are needed are
-			//encoded inside the needs_scrubbing, but this is opaque to
-			//this function (except the value BTR_SCRUB_PAGE) */
-			//btr_scrub_skip_page(&state->scrub_data, needs_scrubbing);
-		//}
+                              /* NOTE: mtr is committed inside btr_scrub_recheck_page()
+                              * and/or btr_scrub_page. This is to make sure that
+                              * locks & pages are latched in corrected order,
+                              * the mtr is in some circumstances restarted.
+                              * (mtr_commit() + mtr_start())
+                              */
+                      //}
+              //}
 
-		//if (needs_scrubbing == BTR_SCRUB_TURNED_OFF) {
-			/* if we just detected that scrubbing was turned off
-			* update global state to reflect this */
-			//ut_ad(crypt_data);
-			//mutex_enter(&crypt_data->mutex);
-			//crypt_data->rotate_state.scrubbing.is_active = false;
-			//mutex_exit(&crypt_data->mutex);
-		//}
+              //if (needs_scrubbing != BTR_SCRUB_PAGE) {
+                      //[> if page didn't need scrubbing it might be that cleanups
+                      //are needed. do those outside of any mtr to prevent deadlocks.
 
-		if (modified) {
-			/* if we modified page, we take lsn from mtr */
-			ut_a(end_lsn > state->end_lsn);
-			ut_a(end_lsn > block_lsn);
-			state->end_lsn = end_lsn;
-		} else {
-			/* if we did not modify page, check for max lsn */
-			if (block_lsn > state->end_lsn) {
-				state->end_lsn = block_lsn;
-			}
-		}
-	} else {
-		/* If block read failed mtr memo and log should be empty. */
-		ut_ad(!mtr.has_modifications());
-		ut_ad(!mtr.is_dirty());
-		ut_ad(mtr.get_memo()->size() == 0);
-		ut_ad(mtr.get_log()->size() == 0);
-		mtr.commit();
-	}
+                      //the information what kinds of cleanups that are needed are
+                      //encoded inside the needs_scrubbing, but this is opaque to
+                      //this function (except the value BTR_SCRUB_PAGE) */
+                      //btr_scrub_skip_page(&state->scrub_data, needs_scrubbing);
+              //}
 
-	if (sleeptime_ms) {
-		os_event_reset(fil_crypt_throttle_sleep_event);
-		os_event_wait_time(fil_crypt_throttle_sleep_event,
-				   1000 * sleeptime_ms);
-	}
+              //if (needs_scrubbing == BTR_SCRUB_TURNED_OFF) {
+                      /* if we just detected that scrubbing was turned off
+                      * update global state to reflect this */
+                      //ut_ad(crypt_data);
+                      //mutex_enter(&crypt_data->mutex);
+                      //crypt_data->rotate_state.scrubbing.is_active = false;
+                      //mutex_exit(&crypt_data->mutex);
+              //}
+
+              if (modified) {
+                      /* if we modified page, we take lsn from mtr */
+                      ut_a(end_lsn > state->end_lsn);
+                      ut_a(end_lsn > block_lsn);
+                      state->end_lsn = end_lsn;
+              } else {
+                      /* if we did not modify page, check for max lsn */
+                      if (block_lsn > state->end_lsn) {
+                              state->end_lsn = block_lsn;
+                      }
+              }
+      } else {
+              /* If block read failed mtr memo and log should be empty. */
+              ut_ad(!mtr.has_modifications());
+              ut_ad(!mtr.is_dirty());
+              ut_ad(mtr.get_memo()->size() == 0);
+              ut_ad(mtr.get_log()->size() == 0);
+              mtr.commit();
+      }
+
+      if (sleeptime_ms) {
+              os_event_reset(fil_crypt_throttle_sleep_event);
+              os_event_wait_time(fil_crypt_throttle_sleep_event,
+                                 1000 * sleeptime_ms);
+      }
 }
 
 /***********************************************************************
@@ -2944,38 +2944,38 @@ Rotate a batch of pages
 static
 void
 fil_crypt_rotate_pages(
-	const key_state_t*	key_state,
-	rotate_thread_t*	state)
+      const key_state_t*	key_state,
+      rotate_thread_t*	state)
 {
-	ulint space = state->space->id;
-	ulint end = std::min(state->offset + state->batch,
-			     state->space->free_limit);
+      ulint space = state->space->id;
+      ulint end = std::min(state->offset + state->batch,
+                           state->space->free_limit);
 
-	ut_ad(state->space->n_pending_ops > 0);
+      ut_ad(state->space->n_pending_ops > 0);
 
-	for (; state->offset < end; state->offset++) {
+      for (; state->offset < end; state->offset++) {
 
-		/* we can't rotate pages in dblwr buffer as
-		* it's not possible to read those due to lots of asserts
-		* in buffer pool.
-		*
-		* However since these are only (short-lived) copies of
-		* real pages, they will be updated anyway when the
-		* real page is updated
-		*/
-		if (space == TRX_SYS_SPACE &&
-		    buf_dblwr_page_inside(state->offset)) {
-			continue;
-		}
+              /* we can't rotate pages in dblwr buffer as
+              * it's not possible to read those due to lots of asserts
+              * in buffer pool.
+              *
+              * However since these are only (short-lived) copies of
+              * real pages, they will be updated anyway when the
+              * real page is updated
+              */
+              if (space == TRX_SYS_SPACE &&
+                  buf_dblwr_page_inside(state->offset)) {
+                      continue;
+              }
 
-		fil_crypt_rotate_page(key_state, state);
-	}
+              fil_crypt_rotate_page(key_state, state);
+      }
 }
 
 struct Encrypted_flag_data
 {
-  bool set_flag;
-  ib_uint32_t		flags;
+bool set_flag;
+ib_uint32_t		flags;
 };
 
 /******************************************************************//**
@@ -2985,34 +2985,34 @@ SYS_TABLES. The flags is stored in MIX_LEN column.
 static
 ibool
 fts_set_encrypted_flag_for_table(
-        void*		row,		// in: sel_node_t* 
-        void*		user_arg)	// in: bool set/unset flag
+      void*		row,		// in: sel_node_t* 
+      void*		user_arg)	// in: bool set/unset flag
 {
-        sel_node_t*	node = static_cast<sel_node_t*>(row);
-        dfield_t*	dfield = que_node_get_val(node->select_list);
+      sel_node_t*	node = static_cast<sel_node_t*>(row);
+      dfield_t*	dfield = que_node_get_val(node->select_list);
 
-        ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-        ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-        // There should be at most one matching record. So the value
-        // must be the default value.
-        ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-              == ULINT32_UNDEFINED);
-        //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
-                //== ULINT32_UNDEFINED);
+      ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+      ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+      // There should be at most one matching record. So the value
+      // must be the default value.
+      ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+            == ULINT32_UNDEFINED);
+      //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
+              //== ULINT32_UNDEFINED);
 
-        ulint		flags = mach_read_from_4(
-                        static_cast<byte*>(dfield_get_data(dfield)));
+      ulint		flags = mach_read_from_4(
+                      static_cast<byte*>(dfield_get_data(dfield)));
 
-        //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
-        //DICT_TF2_ENCRYPTION
-        //flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
-        flags ^= DICT_TF2_ENCRYPTION;
+      //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
+      //DICT_TF2_ENCRYPTION
+      //flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+      flags ^= DICT_TF2_ENCRYPTION;
 
-        mach_write_to_4(static_cast<byte*>(user_arg), flags);
-        //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
+      mach_write_to_4(static_cast<byte*>(user_arg), flags);
+      //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
 
 
-        return(FALSE);
+      return(FALSE);
 }
 
 
@@ -3021,335 +3021,335 @@ static
 dberr_t
 fts_update_table_encrypted_flag_sql(
 /*=======================*/
-	trx_t*		trx,		/*!< in/out: transaction that
-					covers the update */
-	table_id_t	table_id)	/*!< in: Table for which we want
-					to set the root table->flags2 */
+      trx_t*		trx,		/*!< in/out: transaction that
+                                      covers the update */
+      table_id_t	table_id)	/*!< in: Table for which we want
+                                      to set the root table->flags2 */
 {
-	pars_info_t*		info;
-	ib_uint32_t		flags2;
+      pars_info_t*		info;
+      ib_uint32_t		flags2;
 
-	static const char	sql[] =
-		"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-		"DECLARE FUNCTION my_func;\n"
-		"DECLARE CURSOR c IS\n"
-		" SELECT MIX_LEN"
-		" FROM SYS_TABLES"
-		" WHERE ID = :table_id FOR UPDATE;"
-		"\n"
-		"BEGIN\n"
-		"OPEN c;\n"
-		"WHILE 1 = 1 LOOP\n"
-		"  FETCH c INTO my_func();\n"
-		"  IF c % NOTFOUND THEN\n"
-		"    EXIT;\n"
-		"  END IF;\n"
-		"END LOOP;\n"
-		"UPDATE SYS_TABLES"
-		" SET MIX_LEN = :flags2"
-		" WHERE ID = :table_id;\n"
-		"CLOSE c;\n"
-		"END;\n";
+      static const char	sql[] =
+              "PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+              "DECLARE FUNCTION my_func;\n"
+              "DECLARE CURSOR c IS\n"
+              " SELECT MIX_LEN"
+              " FROM SYS_TABLES"
+              " WHERE ID = :table_id FOR UPDATE;"
+              "\n"
+              "BEGIN\n"
+              "OPEN c;\n"
+              "WHILE 1 = 1 LOOP\n"
+              "  FETCH c INTO my_func();\n"
+              "  IF c % NOTFOUND THEN\n"
+              "    EXIT;\n"
+              "  END IF;\n"
+              "END LOOP;\n"
+              "UPDATE SYS_TABLES"
+              " SET MIX_LEN = :flags2"
+              " WHERE ID = :table_id;\n"
+              "CLOSE c;\n"
+              "END;\n";
 
-	flags2 = ULINT32_UNDEFINED;
+      flags2 = ULINT32_UNDEFINED;
 
-	info = pars_info_create();
+      info = pars_info_create();
 
-	pars_info_add_ull_literal(info, "table_id", table_id);
-	pars_info_bind_int4_literal(info, "flags2", &flags2);
+      pars_info_add_ull_literal(info, "table_id", table_id);
+      pars_info_bind_int4_literal(info, "flags2", &flags2);
 
-	pars_info_bind_function(
-		info, "my_func", fts_set_encrypted_flag_for_table, &flags2);
+      pars_info_bind_function(
+              info, "my_func", fts_set_encrypted_flag_for_table, &flags2);
 
-	if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
-		trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
-	}
+      if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
+              trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
+      }
 
-	dberr_t err = que_eval_sql(info, sql, false, trx);
+      dberr_t err = que_eval_sql(info, sql, false, trx);
 
-	ut_a(flags2 != ULINT32_UNDEFINED);
+      ut_a(flags2 != ULINT32_UNDEFINED);
 
-        //TODO: Data dictionary was not updated - do another try later
-        if (flags2 == ULINT32_UNDEFINED)
-            return DB_ERROR;
-        //ut_a(flags2 != ULINT32_UNDEFINED);
+      //TODO: Data dictionary was not updated - do another try later
+      if (flags2 == ULINT32_UNDEFINED)
+          return DB_ERROR;
+      //ut_a(flags2 != ULINT32_UNDEFINED);
 
-	return(err);
+      return(err);
 }
 
 //static
 //ibool
 //fts_set_encrypted_flag(
-        //void*		row,		// in: sel_node_t* 
-        //void*		user_arg)	// in: bool set/unset flag
+      //void*		row,		// in: sel_node_t* 
+      //void*		user_arg)	// in: bool set/unset flag
 //{
-        //sel_node_t*	node = static_cast<sel_node_t*>(row);
-        //dfield_t*	dfield = que_node_get_val(node->select_list);
+      //sel_node_t*	node = static_cast<sel_node_t*>(row);
+      //dfield_t*	dfield = que_node_get_val(node->select_list);
 
-        //ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-        //ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-        //// There should be at most one matching record. So the value
-        //// must be the default value.
-        //ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-              //== ULINT32_UNDEFINED);
+      //ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+      //ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+      //// There should be at most one matching record. So the value
+      //// must be the default value.
+      //ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+            //== ULINT32_UNDEFINED);
 
-        //ulint		flags2 = mach_read_from_4(
-                        //static_cast<byte*>(dfield_get_data(dfield)));
+      //ulint		flags2 = mach_read_from_4(
+                      //static_cast<byte*>(dfield_get_data(dfield)));
 
-        //flags2 |=  DICT_TF2_ENCRYPTION;
+      //flags2 |=  DICT_TF2_ENCRYPTION;
 
-        //mach_write_to_4(static_cast<byte*>(user_arg), flags2);
+      //mach_write_to_4(static_cast<byte*>(user_arg), flags2);
 
-        //return(FALSE);
+      //return(FALSE);
 //}
 
 static
 ibool
 fts_set_encrypted_flag_for_tablespace(
-        void*		row,		// in: sel_node_t* 
-        void*		user_arg)	// in: bool set/unset flag
+      void*		row,		// in: sel_node_t* 
+      void*		user_arg)	// in: bool set/unset flag
 {
-        sel_node_t*	node = static_cast<sel_node_t*>(row);
-        dfield_t*	dfield = que_node_get_val(node->select_list);
+      sel_node_t*	node = static_cast<sel_node_t*>(row);
+      dfield_t*	dfield = que_node_get_val(node->select_list);
 
-        ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-        ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-        // There should be at most one matching record. So the value
-        // must be the default value.
-        ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-              == ULINT32_UNDEFINED);
-        //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
-                //== ULINT32_UNDEFINED);
+      ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+      ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+      // There should be at most one matching record. So the value
+      // must be the default value.
+      ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+            == ULINT32_UNDEFINED);
+      //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
+              //== ULINT32_UNDEFINED);
 
-        ulint		flags = mach_read_from_4(
-                        static_cast<byte*>(dfield_get_data(dfield)));
+      ulint		flags = mach_read_from_4(
+                      static_cast<byte*>(dfield_get_data(dfield)));
 
-        //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
-        flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+      //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
+      flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
 
-        mach_write_to_4(static_cast<byte*>(user_arg), flags);
-        //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
+      mach_write_to_4(static_cast<byte*>(user_arg), flags);
+      //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
 
 
-        return(FALSE);
+      return(FALSE);
 }
 
 static
 dberr_t
 //fts_update_encrypted_flag_sql(
-        //trx_t*		trx,		// in/out: transaction that
-                                        //// covers the update 
-        //dict_table_t* table)
+      //trx_t*		trx,		// in/out: transaction that
+                                      //// covers the update 
+      //dict_table_t* table)
 fts_update_encrypted_flag_sql(
-        trx_t*		trx,		// in/out: transaction that
-                                        // covers the update 
-        fil_space_t *space)
+      trx_t*		trx,		// in/out: transaction that
+                                      // covers the update 
+      fil_space_t *space)
 {
-        pars_info_t*		info;
-        ib_uint32_t		flags;
-        //Encrypted_flag_data encrypted_flag_data;
+      pars_info_t*		info;
+      ib_uint32_t		flags;
+      //Encrypted_flag_data encrypted_flag_data;
 
-        //static const char	sql[] =
-                //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-                //"DECLARE FUNCTION my_func;\n"
-                //"DECLARE CURSOR c IS\n"
-                //" SELECT MIX_LEN"
-                //" FROM SYS_TABLESPACES"
-                //" WHERE SPACE=:table_id FOR UPDATE;"
-                //"\n"
-                //"BEGIN\n"
-                //"OPEN c;\n"
-                //"WHILE 1 = 1 LOOP\n"
-                //"  FETCH c INTO my_func();\n"
-                //"  IF c % NOTFOUND THEN\n"
-                //"    EXIT;\n"
-                //"  END IF;\n"
-                //"END LOOP;\n"
-                //"UPDATE SYS_TABLESPACES"
-                //" SET MIX_LEN=:flags2"
-                //" WHERE SPACE=:table_id;\n"
-                //"CLOSE c;\n"
-                //"END;\n";
+      //static const char	sql[] =
+              //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+              //"DECLARE FUNCTION my_func;\n"
+              //"DECLARE CURSOR c IS\n"
+              //" SELECT MIX_LEN"
+              //" FROM SYS_TABLESPACES"
+              //" WHERE SPACE=:table_id FOR UPDATE;"
+              //"\n"
+              //"BEGIN\n"
+              //"OPEN c;\n"
+              //"WHILE 1 = 1 LOOP\n"
+              //"  FETCH c INTO my_func();\n"
+              //"  IF c % NOTFOUND THEN\n"
+              //"    EXIT;\n"
+              //"  END IF;\n"
+              //"END LOOP;\n"
+              //"UPDATE SYS_TABLESPACES"
+              //" SET MIX_LEN=:flags2"
+              //" WHERE SPACE=:table_id;\n"
+              //"CLOSE c;\n"
+              //"END;\n";
 
-        
-        static const char	sql[] =
-                "PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-                "DECLARE FUNCTION my_func;\n"
-                "DECLARE CURSOR c IS\n"
-                " SELECT FLAGS"
-                " FROM SYS_TABLESPACES"
-                " WHERE SPACE=:space_id FOR UPDATE;"
-                "\n"
-                "BEGIN\n"
-                "OPEN c;\n"
-                "WHILE 1 = 1 LOOP\n"
-                "  FETCH c INTO my_func();\n"
-                "  IF c % NOTFOUND THEN\n"
-                "    EXIT;\n"
-                "  END IF;\n"
-                "END LOOP;\n"
-                "UPDATE SYS_TABLESPACES"
-                " SET FLAGS=:flags"
-                " WHERE SPACE=:space_id;\n"
-                "CLOSE c;\n"
-                "END;\n";
+      
+      static const char	sql[] =
+              "PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+              "DECLARE FUNCTION my_func;\n"
+              "DECLARE CURSOR c IS\n"
+              " SELECT FLAGS"
+              " FROM SYS_TABLESPACES"
+              " WHERE SPACE=:space_id FOR UPDATE;"
+              "\n"
+              "BEGIN\n"
+              "OPEN c;\n"
+              "WHILE 1 = 1 LOOP\n"
+              "  FETCH c INTO my_func();\n"
+              "  IF c % NOTFOUND THEN\n"
+              "    EXIT;\n"
+              "  END IF;\n"
+              "END LOOP;\n"
+              "UPDATE SYS_TABLESPACES"
+              " SET FLAGS=:flags"
+              " WHERE SPACE=:space_id;\n"
+              "CLOSE c;\n"
+              "END;\n";
 
-        //static const char	sql[] =
-                //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-                //"DECLARE FUNCTION my_func;\n"
-                //"DECLARE CURSOR c IS\n"
-                //" SELECT MIX_LEN"
-                //" FROM SYS_TABLES"
-                //" WHERE ID=:table_id FOR UPDATE;"
-                //"\n"
-                //"BEGIN\n"
-                //"OPEN c;\n"
-                //"WHILE 1 = 1 LOOP\n"
-                //"  FETCH c INTO my_func();\n"
-                //"  IF c % NOTFOUND THEN\n"
-                //"    EXIT;\n"
-                //"  END IF;\n"
-                //"END LOOP;\n"
-                //"UPDATE SYS_TABLES"
-                //" SET MIX_LEN=:flags2"
-                //" WHERE ID=:table_id;\n"
-                //"CLOSE c;\n"
-                //"END;\n";
+      //static const char	sql[] =
+              //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+              //"DECLARE FUNCTION my_func;\n"
+              //"DECLARE CURSOR c IS\n"
+              //" SELECT MIX_LEN"
+              //" FROM SYS_TABLES"
+              //" WHERE ID=:table_id FOR UPDATE;"
+              //"\n"
+              //"BEGIN\n"
+              //"OPEN c;\n"
+              //"WHILE 1 = 1 LOOP\n"
+              //"  FETCH c INTO my_func();\n"
+              //"  IF c % NOTFOUND THEN\n"
+              //"    EXIT;\n"
+              //"  END IF;\n"
+              //"END LOOP;\n"
+              //"UPDATE SYS_TABLES"
+              //" SET MIX_LEN=:flags2"
+              //" WHERE ID=:table_id;\n"
+              //"CLOSE c;\n"
+              //"END;\n";
 
-        //static const char	sql[] =
-                //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-                //"DECLARE FUNCTION my_func;\n"
-                //"DECLARE CURSOR c IS\n"
-                //" SELECT MIX_LEN"
-                //" FROM SYS_TABLES"
-                //" WHERE SPACE=:table_id FOR UPDATE;"
-                //"\n"
-                //"BEGIN\n"
-                //"OPEN c;\n"
-                //"WHILE 1 = 1 LOOP\n"
-                //"  FETCH c INTO my_func();\n"
-                //"  IF c % NOTFOUND THEN\n"
-                //"    EXIT;\n"
-                //"  END IF;\n"
-                //"END LOOP;\n"
-                //"UPDATE SYS_TABLES"
-                //" SET MIX_LEN=:flags2"
-                //" WHERE SPACE=:table_id;\n"
-                //"CLOSE c;\n"
-                //"END;\n";
-
-
-
-        flags = ULINT32_UNDEFINED;
-
-        info = pars_info_create();
-
-        //pars_info_add_ull_literal(info, "table_id", table->id);
-	pars_info_add_int4_literal(info, "space_id", space->id);
-        //pars_info_add_ull_literal(info, "table_id", space->id);
-        //pars_info_bind_int4_literal(info, "flags2", &flags2);
-        pars_info_bind_int4_literal(info, "flags", &flags);
-
-        pars_info_bind_function(
-                info, "my_func", fts_set_encrypted_flag_for_tablespace, &flags);
-
-        if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
-                trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
-        }
-
-        dberr_t err = que_eval_sql(info, sql, false, trx);
+      //static const char	sql[] =
+              //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+              //"DECLARE FUNCTION my_func;\n"
+              //"DECLARE CURSOR c IS\n"
+              //" SELECT MIX_LEN"
+              //" FROM SYS_TABLES"
+              //" WHERE SPACE=:table_id FOR UPDATE;"
+              //"\n"
+              //"BEGIN\n"
+              //"OPEN c;\n"
+              //"WHILE 1 = 1 LOOP\n"
+              //"  FETCH c INTO my_func();\n"
+              //"  IF c % NOTFOUND THEN\n"
+              //"    EXIT;\n"
+              //"  END IF;\n"
+              //"END LOOP;\n"
+              //"UPDATE SYS_TABLES"
+              //" SET MIX_LEN=:flags2"
+              //" WHERE SPACE=:table_id;\n"
+              //"CLOSE c;\n"
+              //"END;\n";
 
 
-        ut_a(flags != ULINT32_UNDEFINED);
-        //TODO: Data dictionary was not updated - do another try later
-        if (flags == ULINT32_UNDEFINED)
-            return DB_ERROR;
-        //ut_a(flags2 != ULINT32_UNDEFINED);
 
-        return(err);
+      flags = ULINT32_UNDEFINED;
+
+      info = pars_info_create();
+
+      //pars_info_add_ull_literal(info, "table_id", table->id);
+      pars_info_add_int4_literal(info, "space_id", space->id);
+      //pars_info_add_ull_literal(info, "table_id", space->id);
+      //pars_info_bind_int4_literal(info, "flags2", &flags2);
+      pars_info_bind_int4_literal(info, "flags", &flags);
+
+      pars_info_bind_function(
+              info, "my_func", fts_set_encrypted_flag_for_tablespace, &flags);
+
+      if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
+              trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
+      }
+
+      dberr_t err = que_eval_sql(info, sql, false, trx);
+
+
+      ut_a(flags != ULINT32_UNDEFINED);
+      //TODO: Data dictionary was not updated - do another try later
+      if (flags == ULINT32_UNDEFINED)
+          return DB_ERROR;
+      //ut_a(flags2 != ULINT32_UNDEFINED);
+
+      return(err);
 }
 
 static
 dberr_t
 fil_toggle_encrypted_flag(fil_space_t *space)
 {
-  trx_t* trx_set_encrypted = trx_allocate_for_background();
-  trx_set_encrypted->op_info = "setting encrypted flag";
+trx_t* trx_set_encrypted = trx_allocate_for_background();
+trx_set_encrypted->op_info = "setting encrypted flag";
 
-  while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
-  {
-    //os_thread_sleep(6000);
-    os_thread_sleep(6);
-    if (space->stop_new_ops) // space is about to be dropped
-     return DB_SUCCESS;      // do not try to lock the DD
-  }
+while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
+{
+  //os_thread_sleep(6000);
+  os_thread_sleep(6);
+  if (space->stop_new_ops) // space is about to be dropped
+   return DB_SUCCESS;      // do not try to lock the DD
+}
 
-  trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
-  mutex_enter(&dict_sys->mutex);
+trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
+mutex_enter(&dict_sys->mutex);
 
-  //rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
+//rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
 
-  //row_mysql_lock_data_dictionary(trx_set_encrypted);
+//row_mysql_lock_data_dictionary(trx_set_encrypted);
 
-  dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
-                                                DICT_ERR_IGNORE_NONE);
-  if (table == NULL) // table went away - has been dropped
-  {
-    //ut_ad(false);
-
-    row_mysql_unlock_data_dictionary(trx_set_encrypted);
-    trx_free_for_background(trx_set_encrypted);
-    return DB_SUCCESS;
-  }
-
-  //dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
-                                                //table);
-
-  dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
-                                                space);
-  if (error == DB_SUCCESS)
-    error = fts_update_table_encrypted_flag_sql(trx_set_encrypted,
-                                                table->id);
-
-	//table_id_t	table_id)	[>!< in: Table for which we want
-
-  if (error != DB_SUCCESS)
-  {
-      ut_ad(0);
-      fts_sql_rollback(trx_set_encrypted);
-  }
-  else
-  {
-      fts_sql_commit(trx_set_encrypted);
-
-
-      space->flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
-
-      if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
-      {
-        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
-        ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
-      }
-      else
-      {
-        DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-        ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
-      }
-
-      //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
-		//flags |= FSP_FLAGS_MASK_ENCRYPTION;
-      //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-      //ib::error() << "Successfuly updated for table = " << table->name
-                     //<< " table_id= " << table->id << " space_id = " << space->id;
-  }
-
-  dict_table_close(table, TRUE, FALSE);
+dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
+                                              DICT_ERR_IGNORE_NONE);
+if (table == NULL) // table went away - has been dropped
+{
+  //ut_ad(false);
 
   row_mysql_unlock_data_dictionary(trx_set_encrypted);
-
   trx_free_for_background(trx_set_encrypted);
+  return DB_SUCCESS;
+}
 
-  return error;
+//dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
+                                              //table);
+
+dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
+                                              space);
+if (error == DB_SUCCESS)
+  error = fts_update_table_encrypted_flag_sql(trx_set_encrypted,
+                                              table->id);
+
+      //table_id_t	table_id)	[>!< in: Table for which we want
+
+if (error != DB_SUCCESS)
+{
+    ut_ad(0);
+    fts_sql_rollback(trx_set_encrypted);
+}
+else
+{
+    fts_sql_commit(trx_set_encrypted);
+
+
+    space->flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+
+    if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
+    {
+      DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+      ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
+    }
+    else
+    {
+      DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+      ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
+    }
+
+    //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+              //flags |= FSP_FLAGS_MASK_ENCRYPTION;
+    //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+    //ib::error() << "Successfuly updated for table = " << table->name
+                   //<< " table_id= " << table->id << " space_id = " << space->id;
+}
+
+dict_table_close(table, TRUE, FALSE);
+
+row_mysql_unlock_data_dictionary(trx_set_encrypted);
+
+trx_free_for_background(trx_set_encrypted);
+
+return error;
 }
 
 /***********************************************************************
@@ -3359,124 +3359,124 @@ Flush rotated pages and then update page 0
 static
 void
 fil_crypt_flush_space(
-	rotate_thread_t*	state)
+      rotate_thread_t*	state)
 {
-	fil_space_t* space = state->space;
-	fil_space_crypt_t *crypt_data = space->crypt_data;
+      fil_space_t* space = state->space;
+      fil_space_crypt_t *crypt_data = space->crypt_data;
 
-	ut_ad(space->n_pending_ops > 0);
+      ut_ad(space->n_pending_ops > 0);
 
-	/* flush tablespace pages so that there are no pages left with old key */
-	lsn_t end_lsn = crypt_data->rotate_state.end_lsn;
+      /* flush tablespace pages so that there are no pages left with old key */
+      lsn_t end_lsn = crypt_data->rotate_state.end_lsn;
 
-	if (end_lsn > 0 && !space->is_stopping()) {
-		bool success = false;
-		ulint n_pages = 0;
-		ulint sum_pages = 0;
-		uintmax_t start = ut_time_us(NULL);
+      if (end_lsn > 0 && !space->is_stopping()) {
+              bool success = false;
+              ulint n_pages = 0;
+              ulint sum_pages = 0;
+              uintmax_t start = ut_time_us(NULL);
 
-		do {
-			success = buf_flush_lists(ULINT_MAX, end_lsn, &n_pages);
-			buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
-			sum_pages += n_pages;
-		} while (!success && !space->is_stopping());
+              do {
+                      success = buf_flush_lists(ULINT_MAX, end_lsn, &n_pages);
+                      buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
+                      sum_pages += n_pages;
+              } while (!success && !space->is_stopping());
 
 
 
-		uintmax_t end = ut_time_us(NULL);
+              uintmax_t end = ut_time_us(NULL);
 
-		if (sum_pages && end > start) {
-			state->cnt_waited += sum_pages;
-			state->sum_waited_us += (end - start);
+              if (sum_pages && end > start) {
+                      state->cnt_waited += sum_pages;
+                      state->sum_waited_us += (end - start);
 
-			/* statistics */
-			state->crypt_stat.pages_flushed += sum_pages;
-		}
-	}
+                      /* statistics */
+                      state->crypt_stat.pages_flushed += sum_pages;
+              }
+      }
 
-        //ib::error() << "Robert: flushed for space: " << space->name << '\n';
-        //ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
-        //ib::error() << "innodb-tables-encrypt: " << srv_encrypt_tables << '\n';
+      //ib::error() << "Robert: flushed for space: " << space->name << '\n';
+      //ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
+      //ib::error() << "innodb-tables-encrypt: " << srv_encrypt_tables << '\n';
 
-        // We do not assign the type to crypt_data just yet. We do it after write_page0 so the in-memory crypt_data
-        // would be in sync with the crypt_data on disk
-        ut_ad(crypt_data->rotate_state.flushing);
-        uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
-                                                                                                                   : crypt_data->type;
+      // We do not assign the type to crypt_data just yet. We do it after write_page0 so the in-memory crypt_data
+      // would be in sync with the crypt_data on disk
+      ut_ad(crypt_data->rotate_state.flushing);
+      uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
+                                                                                                                 : crypt_data->type;
 
-	//if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-		//crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
-	//}
+      //if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+              //crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
+      //}
 
-        if (strcmp(space->name, "mysql/plugin") == 0)
+      if (strcmp(space->name, "mysql/plugin") == 0)
+      {
+        ib::error() << "Updating encryption flag for mysql/plugin" << '\n';
+        ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
+        ib::error() << "crypt_data->type = " << current_type << '\n';
+      }
+
+      if (space->id != 0)
+      {
+        if ( (current_type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
+             (current_type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
         {
-          ib::error() << "Updating encryption flag for mysql/plugin" << '\n';
-          ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
-          ib::error() << "crypt_data->type = " << current_type << '\n';
-        }
-
-        if (space->id != 0)
-        {
-          if ( (current_type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
-               (current_type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
+          if (DB_SUCCESS != fil_toggle_encrypted_flag(space))
           {
-            if (DB_SUCCESS != fil_toggle_encrypted_flag(space))
-            {
-              ut_ad(0);
-              return; //TODO:Robert przemysl to jeszcze czy to jest bezpieczne tu robic return
-            }
-            //we need to flip the encryption bit
-            //while (DB_SUCCESS != fil_toggle_encrypted_flag(space)) //TODO: Robert: Zmień to na if a nie while
-            //{
-              //ib::error() << "Could not set ENCRYPTED flag for table " << space->name
-                          //<< " Not updating page0 for this table. Will retry updating the flag"
-                          //<< " and page 0 when rotation thread will pick this table for re-encryption. "
-                          //<< " Please note that although table " << space->name  << "does not have encryption flag set "
-                          //<< " and page 0 updated. All its pages have been encrypted";
-                //os_thread_sleep(1000);
-                // waiting for DD to be available
-            //}
+            ut_ad(0);
+            return; //TODO:Robert przemysl to jeszcze czy to jest bezpieczne tu robic return
           }
+          //we need to flip the encryption bit
+          //while (DB_SUCCESS != fil_toggle_encrypted_flag(space)) //TODO: Robert: Zmień to na if a nie while
+          //{
+            //ib::error() << "Could not set ENCRYPTED flag for table " << space->name
+                        //<< " Not updating page0 for this table. Will retry updating the flag"
+                        //<< " and page 0 when rotation thread will pick this table for re-encryption. "
+                        //<< " Please note that although table " << space->name  << "does not have encryption flag set "
+                        //<< " and page 0 updated. All its pages have been encrypted";
+              //os_thread_sleep(1000);
+              // waiting for DD to be available
+          //}
         }
+      }
 
 
-	/* update page 0 */
-	mtr_t mtr;
-	mtr.start();
+      /* update page 0 */
+      mtr_t mtr;
+      mtr.start();
 
-	//dberr_t err;
+      //dberr_t err;
 
-	if (buf_block_t* block = buf_page_get_gen(
-		    page_id_t(space->id, 0), page_size_t(space->flags),
-		    RW_X_LATCH, NULL, BUF_GET,
-		    __FILE__, __LINE__, &mtr)) {
-		    //__FILE__, __LINE__, &mtr, &err)) {
-		mtr.set_named_space(space);
-		crypt_data->write_page0(space, block->frame, &mtr);
-                //ib::error() << "Successfuly updated page0 for table = " << space->name;
-	}
+      if (buf_block_t* block = buf_page_get_gen(
+                  page_id_t(space->id, 0), page_size_t(space->flags),
+                  RW_X_LATCH, NULL, BUF_GET,
+                  __FILE__, __LINE__, &mtr)) {
+                  //__FILE__, __LINE__, &mtr, &err)) {
+              mtr.set_named_space(space);
+              crypt_data->write_page0(space, block->frame, &mtr);
+              //ib::error() << "Successfuly updated page0 for table = " << space->name;
+      }
 
-	mtr.commit();
+      mtr.commit();
 
-        mutex_enter(&crypt_data->mutex);
-        crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
-        crypt_data->type = current_type;
-        crypt_data->rotate_state.flushing = false;
-        mutex_exit(&crypt_data->mutex);
+      mutex_enter(&crypt_data->mutex);
+      crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
+      crypt_data->type = current_type;
+      crypt_data->rotate_state.flushing = false;
+      mutex_exit(&crypt_data->mutex);
 
 
-       
-        //(void)fil_update_encrypted_flag;
-        //while (DB_SUCCESS != fil_update_encrypted_flag(space))
-        //{
-          ////ib::error() << "Could not set ENCRYPTED flag for table " << space->name
-                      ////<< " Not updating page0 for this table. Will retry updating the flag"
-                      ////<< " and page 0 when rotation thread will pick this table for re-encryption. "
-                      ////<< " Please note that although table " << space->name  << "does not have encryption flag set "
-                      ////<< " and page 0 updated. All its pages have been encrypted";
-           //os_thread_sleep(1000);
-           //// TODO: waiting for DD to be available
-        //}
+     
+      //(void)fil_update_encrypted_flag;
+      //while (DB_SUCCESS != fil_update_encrypted_flag(space))
+      //{
+        ////ib::error() << "Could not set ENCRYPTED flag for table " << space->name
+                    ////<< " Not updating page0 for this table. Will retry updating the flag"
+                    ////<< " and page 0 when rotation thread will pick this table for re-encryption. "
+                    ////<< " Please note that although table " << space->name  << "does not have encryption flag set "
+                    ////<< " and page 0 updated. All its pages have been encrypted";
+         //os_thread_sleep(1000);
+         //// TODO: waiting for DD to be available
+      //}
 
 
 }
@@ -3488,89 +3488,89 @@ Complete rotating a space
 static
 void
 fil_crypt_complete_rotate_space(
-	const key_state_t*	key_state,
-	rotate_thread_t*	state)
+      const key_state_t*	key_state,
+      rotate_thread_t*	state)
 {
-	fil_space_crypt_t *crypt_data = state->space->crypt_data;
+      fil_space_crypt_t *crypt_data = state->space->crypt_data;
 
-	ut_ad(crypt_data);
-	ut_ad(state->space->n_pending_ops > 0);
+      ut_ad(crypt_data);
+      ut_ad(state->space->n_pending_ops > 0);
 
-	/* Space might already be dropped */
-	if (!state->space->is_stopping()) {
-		mutex_enter(&crypt_data->mutex);
+      /* Space might already be dropped */
+      if (!state->space->is_stopping()) {
+              mutex_enter(&crypt_data->mutex);
 
-		/**
-		* Update crypt data state with state from thread
-		*/
-		if (state->min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED || state->min_key_version_found <
-			crypt_data->rotate_state.min_key_version_found) {
-			crypt_data->rotate_state.min_key_version_found =
-				state->min_key_version_found;
-		}
+              /**
+              * Update crypt data state with state from thread
+              */
+              if (state->min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED || state->min_key_version_found <
+                      crypt_data->rotate_state.min_key_version_found) {
+                      crypt_data->rotate_state.min_key_version_found =
+                              state->min_key_version_found;
+              }
 
-		if (state->end_lsn > crypt_data->rotate_state.end_lsn) {
-			crypt_data->rotate_state.end_lsn = state->end_lsn;
-		}
+              if (state->end_lsn > crypt_data->rotate_state.end_lsn) {
+                      crypt_data->rotate_state.end_lsn = state->end_lsn;
+              }
 
-		ut_a(crypt_data->rotate_state.active_threads > 0);
-		crypt_data->rotate_state.active_threads--;
-		bool last = crypt_data->rotate_state.active_threads == 0;
+              ut_a(crypt_data->rotate_state.active_threads > 0);
+              crypt_data->rotate_state.active_threads--;
+              bool last = crypt_data->rotate_state.active_threads == 0;
 
-		/**
-		* check if space is fully done
-		* this as when threads shutdown, it could be that we "complete"
-		* iterating before we have scanned the full space.
-		*/
-		bool done = crypt_data->rotate_state.next_offset >=
-			crypt_data->rotate_state.max_offset;
+              /**
+              * check if space is fully done
+              * this as when threads shutdown, it could be that we "complete"
+              * iterating before we have scanned the full space.
+              */
+              bool done = crypt_data->rotate_state.next_offset >=
+                      crypt_data->rotate_state.max_offset;
 
-		/**
-		* we should flush space if we're last thread AND
-		* the iteration is done
-		*/
-		bool should_flush = last && done;
+              /**
+              * we should flush space if we're last thread AND
+              * the iteration is done
+              */
+              bool should_flush = last && done;
 
-		if (should_flush) {
-			/* we're the last active thread */
-			crypt_data->rotate_state.flushing = true;
-			//crypt_data->min_key_version =
-				//crypt_data->rotate_state.min_key_version_found;
-                //TODO:Robert - tutaj chyba może być wyścig
-                //TODO:Robert: Jeszcze nie było flush a nowe crypt_data->min_key_version
-                //TODO:Robert: jest już ustawione
+              if (should_flush) {
+                      /* we're the last active thread */
+                      crypt_data->rotate_state.flushing = true;
+                      //crypt_data->min_key_version =
+                              //crypt_data->rotate_state.min_key_version_found;
+              //TODO:Robert - tutaj chyba może być wyścig
+              //TODO:Robert: Jeszcze nie było flush a nowe crypt_data->min_key_version
+              //TODO:Robert: jest już ustawione
 
-		}
+              }
 
-		/* inform scrubbing */
-		crypt_data->rotate_state.scrubbing.is_active = false;
-		mutex_exit(&crypt_data->mutex); 
-		/* all threads must call btr_scrub_complete_space wo/ mutex held */
-		//if (state->scrub_data.scrubbing) {
-			//btr_scrub_complete_space(&state->scrub_data);
-			//if (should_flush) {
-				//[> only last thread updates last_scrub_completed <]
-				//ut_ad(crypt_data);
-				//mutex_enter(&crypt_data->mutex);
-				//crypt_data->rotate_state.scrubbing.
-					//last_scrub_completed = time(0);
-				//mutex_exit(&crypt_data->mutex);
-			//}
-		//}
+              /* inform scrubbing */
+              crypt_data->rotate_state.scrubbing.is_active = false;
+              mutex_exit(&crypt_data->mutex); 
+              /* all threads must call btr_scrub_complete_space wo/ mutex held */
+              //if (state->scrub_data.scrubbing) {
+                      //btr_scrub_complete_space(&state->scrub_data);
+                      //if (should_flush) {
+                              //[> only last thread updates last_scrub_completed <]
+                              //ut_ad(crypt_data);
+                              //mutex_enter(&crypt_data->mutex);
+                              //crypt_data->rotate_state.scrubbing.
+                                      //last_scrub_completed = time(0);
+                              //mutex_exit(&crypt_data->mutex);
+                      //}
+              //}
 
-		if (should_flush) {
-			fil_crypt_flush_space(state);
+              if (should_flush) {
+                      fil_crypt_flush_space(state);
 
-			//mutex_enter(&crypt_data->mutex);
-			//crypt_data->rotate_state.flushing = false;
-			//mutex_exit(&crypt_data->mutex);
-		}
-	} else {
-		mutex_enter(&crypt_data->mutex);
-		ut_a(crypt_data->rotate_state.active_threads > 0);
-		crypt_data->rotate_state.active_threads--;
-		mutex_exit(&crypt_data->mutex);
-	}
+                      //mutex_enter(&crypt_data->mutex);
+                      //crypt_data->rotate_state.flushing = false;
+                      //mutex_exit(&crypt_data->mutex);
+              }
+      } else {
+              mutex_enter(&crypt_data->mutex);
+              ut_a(crypt_data->rotate_state.active_threads > 0);
+              crypt_data->rotate_state.active_threads--;
+              mutex_exit(&crypt_data->mutex);
+      }
 }
 
 /*********************************************************************//**
@@ -3580,136 +3580,136 @@ extern "C"
 os_thread_ret_t
 DECLARE_THREAD(fil_crypt_thread)(
 /*=============================*/
-	void*	arg __attribute__((unused))) /*!< in: a dummy parameter required
-					     * by os_thread_create */
+      void*	arg __attribute__((unused))) /*!< in: a dummy parameter required
+                                           * by os_thread_create */
 {
-	UT_NOT_USED(arg);
+      UT_NOT_USED(arg);
 
-	mutex_enter(&fil_crypt_threads_mutex);
-	uint thread_no = srv_n_fil_crypt_threads_started;
-	srv_n_fil_crypt_threads_started++;
-	os_event_set(fil_crypt_event); /* signal that we started */
-	mutex_exit(&fil_crypt_threads_mutex);
+      mutex_enter(&fil_crypt_threads_mutex);
+      uint thread_no = srv_n_fil_crypt_threads_started;
+      srv_n_fil_crypt_threads_started++;
+      os_event_set(fil_crypt_event); /* signal that we started */
+      mutex_exit(&fil_crypt_threads_mutex);
 
-	/* state of this thread */
-	rotate_thread_t thr(thread_no);
+      /* state of this thread */
+      rotate_thread_t thr(thread_no);
 
-	/* if we find a space that is starting, skip over it and recheck it later */
-	bool recheck = false;
+      /* if we find a space that is starting, skip over it and recheck it later */
+      bool recheck = false;
 
-	while (!thr.should_shutdown()) {
+      while (!thr.should_shutdown()) {
 
-		key_state_t new_state;
+              key_state_t new_state;
 
-		//time_t wait_start = time(0);
+              //time_t wait_start = time(0);
 
-		while (!thr.should_shutdown()) {
+              while (!thr.should_shutdown()) {
 
-			/* wait for key state changes
-			* i.e either new key version of change or
-			* new rotate_key_age */
-			os_event_reset(fil_crypt_threads_event);
+                      /* wait for key state changes
+                      * i.e either new key version of change or
+                      * new rotate_key_age */
+                      os_event_reset(fil_crypt_threads_event);
 
-			if (os_event_wait_time(fil_crypt_threads_event, 1000000) == 0) {
-				break;
-			}
+                      if (os_event_wait_time(fil_crypt_threads_event, 1000000) == 0) {
+                              break;
+                      }
 
-			if (recheck) {
-				/* check recheck here, after sleep, so
-				* that we don't busy loop while when one thread is starting
-				* a space*/
-				break;
-			}
+                      if (recheck) {
+                              /* check recheck here, after sleep, so
+                              * that we don't busy loop while when one thread is starting
+                              * a space*/
+                              break;
+                      }
 
-			//time_t waited = time(0) - wait_start;
+                      //time_t waited = time(0) - wait_start;
 
-			/* Break if we have waited the background scrub
-			internal and background scrubbing is enabled */
-			//if (waited >= 0
-			    //&& ulint(waited) >= srv_background_scrub_data_check_interval
-			    //&& (srv_background_scrub_data_uncompressed
-				//|| srv_background_scrub_data_compressed)) {
-				//break;
-			//}
-		}
+                      /* Break if we have waited the background scrub
+                      internal and background scrubbing is enabled */
+                      //if (waited >= 0
+                          //&& ulint(waited) >= srv_background_scrub_data_check_interval
+                          //&& (srv_background_scrub_data_uncompressed
+                              //|| srv_background_scrub_data_compressed)) {
+                              //break;
+                      //}
+              }
 
-		recheck = false;
-		thr.first = true;      // restart from first tablespace
+              recheck = false;
+              thr.first = true;      // restart from first tablespace
 
-		/* iterate all spaces searching for those needing rotation */
-		while (!thr.should_shutdown() &&
-		       fil_crypt_find_space_to_rotate(&new_state, &thr, &recheck)) {
+              /* iterate all spaces searching for those needing rotation */
+              while (!thr.should_shutdown() &&
+                     fil_crypt_find_space_to_rotate(&new_state, &thr, &recheck)) {
 
-                        if (strcmp(thr.space->name, "test/t2") == 0)
-                        {
-                          ib::error() << "Getting to rotate " << thr.space->name << '\n';
-                        }
+                      if (strcmp(thr.space->name, "test/t2") == 0)
+                      {
+                        ib::error() << "Getting to rotate " << thr.space->name << '\n';
+                      }
 
-			/* we found a space to rotate */
-			fil_crypt_start_rotate_space(&new_state, &thr);
+                      /* we found a space to rotate */
+                      fil_crypt_start_rotate_space(&new_state, &thr);
 
-			/* iterate all pages (cooperativly with other threads) */
-			while (!thr.should_shutdown() &&
-			       fil_crypt_find_page_to_rotate(&new_state, &thr)) {
+                      /* iterate all pages (cooperativly with other threads) */
+                      while (!thr.should_shutdown() &&
+                             fil_crypt_find_page_to_rotate(&new_state, &thr)) {
 
-                                if (strcmp(thr.space->name, "test/t2") == 0)
-                                {
-                                  ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
-                                }
+                              if (strcmp(thr.space->name, "test/t2") == 0)
+                              {
+                                ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
+                              }
 
 
-				if (!thr.space->is_stopping()) {
-					/* rotate a (set) of pages */
-					fil_crypt_rotate_pages(&new_state, &thr);
-				}
+                              if (!thr.space->is_stopping()) {
+                                      /* rotate a (set) of pages */
+                                      fil_crypt_rotate_pages(&new_state, &thr);
+                              }
 
-				/* If space is marked as stopping, release
-				space and stop rotation. */
-				if (thr.space->is_stopping()) {
-					fil_crypt_complete_rotate_space(
-						&new_state, &thr);
-					fil_space_release(thr.space);
-					thr.space = NULL;
-					break;
-				}
+                              /* If space is marked as stopping, release
+                              space and stop rotation. */
+                              if (thr.space->is_stopping()) {
+                                      fil_crypt_complete_rotate_space(
+                                              &new_state, &thr);
+                                      fil_space_release(thr.space);
+                                      thr.space = NULL;
+                                      break;
+                              }
 
-				/* realloc iops */
-				fil_crypt_realloc_iops(&thr);
-			}
+                              /* realloc iops */
+                              fil_crypt_realloc_iops(&thr);
+                      }
 
-			/* complete rotation */
-			if (thr.space) {
-				fil_crypt_complete_rotate_space(&new_state, &thr);
-			}
+                      /* complete rotation */
+                      if (thr.space) {
+                              fil_crypt_complete_rotate_space(&new_state, &thr);
+                      }
 
-			/* force key state refresh */
-			new_state.key_id = (~0); //TODO:Robert - co to robi?
+                      /* force key state refresh */
+                      new_state.key_id = (~0); //TODO:Robert - co to robi?
 
-			/* return iops */
-			fil_crypt_return_iops(&thr);
-		}
-	}
+                      /* return iops */
+                      fil_crypt_return_iops(&thr);
+              }
+      }
 
-	/* return iops if shutting down */
-	fil_crypt_return_iops(&thr);
+      /* return iops if shutting down */
+      fil_crypt_return_iops(&thr);
 
-	/* release current space if shutting down */
-	if (thr.space) {
-		fil_space_release(thr.space);
-		thr.space = NULL;
-	}
+      /* release current space if shutting down */
+      if (thr.space) {
+              fil_space_release(thr.space);
+              thr.space = NULL;
+      }
 
-	mutex_enter(&fil_crypt_threads_mutex);
-	srv_n_fil_crypt_threads_started--;
-	os_event_set(fil_crypt_event); /* signal that we stopped */
-	mutex_exit(&fil_crypt_threads_mutex);
+      mutex_enter(&fil_crypt_threads_mutex);
+      srv_n_fil_crypt_threads_started--;
+      os_event_set(fil_crypt_event); /* signal that we stopped */
+      mutex_exit(&fil_crypt_threads_mutex);
 
-	/* We count the number of threads in os_thread_exit(). A created
-	thread should always use that to exit and not use return() to exit. */
+      /* We count the number of threads in os_thread_exit(). A created
+      thread should always use that to exit and not use return() to exit. */
 
-	os_thread_exit();
+      os_thread_exit();
 
-	OS_THREAD_DUMMY_RETURN;
+      OS_THREAD_DUMMY_RETURN;
 }
 
 /*********************************************************************
@@ -3718,42 +3718,42 @@ Adjust thread count for key rotation
 
 void
 fil_crypt_set_thread_cnt(
-	const uint	new_cnt)
+      const uint	new_cnt)
 {
-	if (!fil_crypt_threads_inited) {
-		fil_crypt_threads_init();
-	}
+      if (!fil_crypt_threads_inited) {
+              fil_crypt_threads_init();
+      }
 
-	mutex_enter(&fil_crypt_threads_mutex);
+      mutex_enter(&fil_crypt_threads_mutex);
 
-	if (new_cnt > srv_n_fil_crypt_threads) {
-		uint add = new_cnt - srv_n_fil_crypt_threads;
-		srv_n_fil_crypt_threads = new_cnt;
-		for (uint i = 0; i < add; i++) {
-			os_thread_id_t rotation_thread_id;
-			os_thread_create(fil_crypt_thread, NULL, &rotation_thread_id);
-			ib::info() << "Creating #"
-				   << i+1 << " encryption thread id "
-				   << os_thread_pf(rotation_thread_id)
-				   << " total threads " << new_cnt << ".";
-		}
-	} else if (new_cnt < srv_n_fil_crypt_threads) {
-		srv_n_fil_crypt_threads = new_cnt;
-		os_event_set(fil_crypt_threads_event);
-	}
+      if (new_cnt > srv_n_fil_crypt_threads) {
+              uint add = new_cnt - srv_n_fil_crypt_threads;
+              srv_n_fil_crypt_threads = new_cnt;
+              for (uint i = 0; i < add; i++) {
+                      os_thread_id_t rotation_thread_id;
+                      os_thread_create(fil_crypt_thread, NULL, &rotation_thread_id);
+                      ib::info() << "Creating #"
+                                 << i+1 << " encryption thread id "
+                                 << os_thread_pf(rotation_thread_id)
+                                 << " total threads " << new_cnt << ".";
+              }
+      } else if (new_cnt < srv_n_fil_crypt_threads) {
+              srv_n_fil_crypt_threads = new_cnt;
+              os_event_set(fil_crypt_threads_event);
+      }
 
-	mutex_exit(&fil_crypt_threads_mutex);
+      mutex_exit(&fil_crypt_threads_mutex);
 
-	while(srv_n_fil_crypt_threads_started != srv_n_fil_crypt_threads) {
-		os_event_reset(fil_crypt_event);
-		os_event_wait_time(fil_crypt_event, 100000);
-	}
+      while(srv_n_fil_crypt_threads_started != srv_n_fil_crypt_threads) {
+              os_event_reset(fil_crypt_event);
+              os_event_wait_time(fil_crypt_event, 100000);
+      }
 
-	/* Send a message to encryption threads that there could be
-	something to do. */
-	if (srv_n_fil_crypt_threads) {
-		os_event_set(fil_crypt_threads_event);
-	}
+      /* Send a message to encryption threads that there could be
+      something to do. */
+      if (srv_n_fil_crypt_threads) {
+              os_event_set(fil_crypt_threads_event);
+      }
 }
 
 /*********************************************************************
@@ -3762,10 +3762,10 @@ Adjust max key age
 
 void
 fil_crypt_set_rotate_key_age(
-	uint	val)
+      uint	val)
 {
-	srv_fil_crypt_rotate_key_age = val;
-	os_event_set(fil_crypt_threads_event);
+      srv_fil_crypt_rotate_key_age = val;
+      os_event_set(fil_crypt_threads_event);
 }
 
 /*********************************************************************
@@ -3774,10 +3774,10 @@ Adjust rotation iops
 
 void
 fil_crypt_set_rotation_iops(
-	uint val)
+      uint val)
 {
-	srv_n_fil_crypt_iops = val;
-	os_event_set(fil_crypt_threads_event);
+      srv_n_fil_crypt_iops = val;
+      os_event_set(fil_crypt_threads_event);
 }
 
 /*********************************************************************
@@ -3786,10 +3786,10 @@ Adjust encrypt tables
 
 void
 fil_crypt_set_encrypt_tables(
-	uint val)
+      uint val)
 {
-	srv_encrypt_tables = val;
-	os_event_set(fil_crypt_threads_event);
+      srv_encrypt_tables = val;
+      os_event_set(fil_crypt_threads_event);
 }
 
 /*********************************************************************
@@ -3798,17 +3798,17 @@ Init threads for key rotation */
 void
 fil_crypt_threads_init()
 {
-	if (!fil_crypt_threads_inited) {
-		fil_crypt_event = os_event_create(0);
-		fil_crypt_threads_event = os_event_create(0);
-                mutex_create(LATCH_ID_FIL_CRYPT_THREADS_MUTEX,
-                     &fil_crypt_threads_mutex);
+      if (!fil_crypt_threads_inited) {
+              fil_crypt_event = os_event_create(0);
+              fil_crypt_threads_event = os_event_create(0);
+              mutex_create(LATCH_ID_FIL_CRYPT_THREADS_MUTEX,
+                   &fil_crypt_threads_mutex);
 
-		uint cnt = srv_n_fil_crypt_threads;
-		srv_n_fil_crypt_threads = 0;
-		fil_crypt_threads_inited = true;
-		fil_crypt_set_thread_cnt(cnt);
-	}
+              uint cnt = srv_n_fil_crypt_threads;
+              srv_n_fil_crypt_threads = 0;
+              fil_crypt_threads_inited = true;
+              fil_crypt_set_thread_cnt(cnt);
+      }
 }
 
 /*********************************************************************
@@ -3817,14 +3817,14 @@ Clean up key rotation threads resources */
 void
 fil_crypt_threads_cleanup()
 {
-	if (!fil_crypt_threads_inited) {
-		return;
-	}
-	ut_a(!srv_n_fil_crypt_threads_started);
-	os_event_destroy(fil_crypt_event);
-	os_event_destroy(fil_crypt_threads_event);
-        mutex_free(&fil_crypt_threads_mutex);
-	fil_crypt_threads_inited = false;
+      if (!fil_crypt_threads_inited) {
+              return;
+      }
+      ut_a(!srv_n_fil_crypt_threads_started);
+      os_event_destroy(fil_crypt_event);
+      os_event_destroy(fil_crypt_threads_event);
+      mutex_free(&fil_crypt_threads_mutex);
+      fil_crypt_threads_inited = false;
 }
 
 /*********************************************************************
@@ -3833,56 +3833,56 @@ Wait for crypt threads to stop accessing space
 
 void
 fil_space_crypt_close_tablespace(
-	const fil_space_t*	space)
+      const fil_space_t*	space)
 {
-	fil_space_crypt_t* crypt_data = space->crypt_data;
+      fil_space_crypt_t* crypt_data = space->crypt_data;
 
-	if (!crypt_data) {
-		return;
-	}
+      if (!crypt_data) {
+              return;
+      }
 
-	mutex_enter(&fil_crypt_threads_mutex);
+      mutex_enter(&fil_crypt_threads_mutex);
 
-	time_t start = time(0);
-	time_t last = start;
+      time_t start = time(0);
+      time_t last = start;
 
-	mutex_enter(&crypt_data->mutex);
-	mutex_exit(&fil_crypt_threads_mutex);
+      mutex_enter(&crypt_data->mutex);
+      mutex_exit(&fil_crypt_threads_mutex);
 
-	ulint cnt = crypt_data->rotate_state.active_threads;
-	bool flushing = crypt_data->rotate_state.flushing;
+      ulint cnt = crypt_data->rotate_state.active_threads;
+      bool flushing = crypt_data->rotate_state.flushing;
 
-	while (cnt > 0 || flushing) {
-		mutex_exit(&crypt_data->mutex);
-		/* release dict mutex so that scrub threads can release their
-		* table references */
-                dict_mutex_exit_for_mysql();
+      while (cnt > 0 || flushing) {
+              mutex_exit(&crypt_data->mutex);
+              /* release dict mutex so that scrub threads can release their
+              * table references */
+              dict_mutex_exit_for_mysql();
 
-		/* wakeup throttle (all) sleepers */
-		os_event_set(fil_crypt_throttle_sleep_event);
+              /* wakeup throttle (all) sleepers */
+              os_event_set(fil_crypt_throttle_sleep_event);
 
-		os_thread_sleep(20000);
-                dict_mutex_enter_for_mysql();
+              os_thread_sleep(20000);
+              dict_mutex_enter_for_mysql();
 
-		mutex_enter(&crypt_data->mutex);
-		cnt = crypt_data->rotate_state.active_threads;
-		flushing = crypt_data->rotate_state.flushing;
+              mutex_enter(&crypt_data->mutex);
+              cnt = crypt_data->rotate_state.active_threads;
+              flushing = crypt_data->rotate_state.flushing;
 
-		time_t now = time(0);
+              time_t now = time(0);
 
-		if (now >= last + 30) {
-			ib::warn() << "Waited "
-				   << now - start
-				   << " seconds to drop space: "
-				   << space->name << " ("
-				   << space->id << ") active threads "
-				   << cnt << "flushing="
-				   << flushing << ".";
-			last = now;
-		}
-	}
+              if (now >= last + 30) {
+                      ib::warn() << "Waited "
+                                 << now - start
+                                 << " seconds to drop space: "
+                                 << space->name << " ("
+                                 << space->id << ") active threads "
+                                 << cnt << "flushing="
+                                 << flushing << ".";
+                      last = now;
+              }
+      }
 
-	mutex_exit(&crypt_data->mutex);
+      mutex_exit(&crypt_data->mutex);
 }
 
 /*********************************************************************
@@ -3892,49 +3892,49 @@ Get crypt status for a space (used by information_schema)
 
 void
 fil_space_crypt_get_status(
-	const fil_space_t*			space,
-	struct fil_space_crypt_status_t*	status)
+      const fil_space_t*			space,
+      struct fil_space_crypt_status_t*	status)
 {
-	memset(status, 0, sizeof(*status));
+      memset(status, 0, sizeof(*status));
 
-	ut_ad(space->n_pending_ops > 0);
+      ut_ad(space->n_pending_ops > 0);
 
-	/* If there is no crypt data and we have not yet read
-	page 0 for this tablespace, we need to read it before
-	we can continue. */
-	if (!space->crypt_data) {
-		fil_crypt_read_crypt_data(const_cast<fil_space_t*>(space));
-	}
+      /* If there is no crypt data and we have not yet read
+      page 0 for this tablespace, we need to read it before
+      we can continue. */
+      if (!space->crypt_data) {
+              fil_crypt_read_crypt_data(const_cast<fil_space_t*>(space));
+      }
 
-	status->space = ULINT_UNDEFINED;
+      status->space = ULINT_UNDEFINED;
 
-	if (fil_space_crypt_t* crypt_data = space->crypt_data) {
-		status->space = space->id;
-		mutex_enter(&crypt_data->mutex);
-		status->scheme = crypt_data->type;
-		status->keyserver_requests = crypt_data->keyserver_requests;
-		status->min_key_version = crypt_data->min_key_version;
-		//status->key_id = 0;//crypt_data->key_id;
-		status->key_id= crypt_data->key_id;
+      if (fil_space_crypt_t* crypt_data = space->crypt_data) {
+              status->space = space->id;
+              mutex_enter(&crypt_data->mutex);
+              status->scheme = crypt_data->type;
+              status->keyserver_requests = crypt_data->keyserver_requests;
+              status->min_key_version = crypt_data->min_key_version;
+              //status->key_id = 0;//crypt_data->key_id;
+              status->key_id= crypt_data->key_id;
 
-		if (crypt_data->rotate_state.active_threads > 0 ||
-		    crypt_data->rotate_state.flushing) {
-			status->rotating = true;
-			status->flushing =
-				crypt_data->rotate_state.flushing;
-			status->rotate_next_page_number =
-				crypt_data->rotate_state.next_offset;
-			status->rotate_max_page_number =
-				crypt_data->rotate_state.max_offset;
-		}
+              if (crypt_data->rotate_state.active_threads > 0 ||
+                  crypt_data->rotate_state.flushing) {
+                      status->rotating = true;
+                      status->flushing =
+                              crypt_data->rotate_state.flushing;
+                      status->rotate_next_page_number =
+                              crypt_data->rotate_state.next_offset;
+                      status->rotate_max_page_number =
+                              crypt_data->rotate_state.max_offset;
+              }
 
-		mutex_exit(&crypt_data->mutex);
+              mutex_exit(&crypt_data->mutex);
 
-		if (srv_encrypt_tables || crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-			status->current_key_version =
-				fil_crypt_get_latest_key_version(crypt_data);
-		}
-	}
+              if (srv_encrypt_tables || crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+                      status->current_key_version =
+                              fil_crypt_get_latest_key_version(crypt_data);
+              }
+      }
 }
 
 /*********************************************************************
@@ -3943,11 +3943,11 @@ Return crypt statistics
 
 void
 fil_crypt_total_stat(
-	fil_crypt_stat_t *stat)
+      fil_crypt_stat_t *stat)
 {
-	mutex_enter(&crypt_stat_mutex);
-	*stat = crypt_stat;
-	mutex_exit(&crypt_stat_mutex);
+      mutex_enter(&crypt_stat_mutex);
+      *stat = crypt_stat;
+      mutex_exit(&crypt_stat_mutex);
 }
 
 /*********************************************************************
@@ -3958,36 +3958,36 @@ Get scrub status for a space (used by information_schema)
 
 void
 fil_space_get_scrub_status(
-	const fil_space_t*			space,
-	struct fil_space_scrub_status_t*	status)
+      const fil_space_t*			space,
+      struct fil_space_scrub_status_t*	status)
 {
-	memset(status, 0, sizeof(*status));
+      memset(status, 0, sizeof(*status));
 
-	ut_ad(space->n_pending_ops > 0);
-	fil_space_crypt_t* crypt_data = space->crypt_data;
+      ut_ad(space->n_pending_ops > 0);
+      fil_space_crypt_t* crypt_data = space->crypt_data;
 
-	status->space = space->id;
+      status->space = space->id;
 
-	if (crypt_data != NULL) {
-		status->compressed = FSP_FLAGS_GET_ZIP_SSIZE(space->flags) > 0;
-		mutex_enter(&crypt_data->mutex);
-		status->last_scrub_completed =
-			crypt_data->rotate_state.scrubbing.last_scrub_completed;
-		if (crypt_data->rotate_state.active_threads > 0 &&
-		    crypt_data->rotate_state.scrubbing.is_active) {
-			status->scrubbing = true;
-			status->current_scrub_started =
-				crypt_data->rotate_state.start_time;
-			status->current_scrub_active_threads =
-				crypt_data->rotate_state.active_threads;
-			status->current_scrub_page_number =
-				crypt_data->rotate_state.next_offset;
-			status->current_scrub_max_page_number =
-				crypt_data->rotate_state.max_offset;
-		}
+      if (crypt_data != NULL) {
+              status->compressed = FSP_FLAGS_GET_ZIP_SSIZE(space->flags) > 0;
+              mutex_enter(&crypt_data->mutex);
+              status->last_scrub_completed =
+                      crypt_data->rotate_state.scrubbing.last_scrub_completed;
+              if (crypt_data->rotate_state.active_threads > 0 &&
+                  crypt_data->rotate_state.scrubbing.is_active) {
+                      status->scrubbing = true;
+                      status->current_scrub_started =
+                              crypt_data->rotate_state.start_time;
+                      status->current_scrub_active_threads =
+                              crypt_data->rotate_state.active_threads;
+                      status->current_scrub_page_number =
+                              crypt_data->rotate_state.next_offset;
+                      status->current_scrub_max_page_number =
+                              crypt_data->rotate_state.max_offset;
+              }
 
-		mutex_exit(&crypt_data->mutex);
-	}
+              mutex_exit(&crypt_data->mutex);
+      }
 }
 #endif /* UNIV_INNOCHECKSUM */
 
@@ -4007,7 +4007,7 @@ fil_crypt_calculate_checksum(
 	/* For encrypted tables we use only crc32 and strict_crc32 */
 	return is_zip_compressed
 		? page_zip_calc_checksum(page, page_size,
-					 SRV_CHECKSUM_ALGORITHM_CRC32)
+					 SRV_CHECKSUM_ALGORITHM_CRC32, false, true) // calculate for checksum
 		: buf_calc_page_crc32(page);
 }
 
@@ -4069,9 +4069,15 @@ fil_space_verify_crypt_checksum(
           checksum = mach_read_from_4(page + FIL_PAGE_DATA);
           memset(page + FIL_PAGE_DATA, 0, 4); // those bits were 0s before the checksum was calcualted thus -- need to calculate checksum with those
         }
-        else
+        else if (!is_zip_compressed)
         {
-          checksum = mach_read_from_4(page + UNIV_PAGE_SIZE - 4);
+          //checksum = mach_read_from_4(page + UNIV_PAGE_SIZE - 4);
+          // page_size can be smaller than UNIV_PAGE_SIZE for row compressed tables
+          checksum = mach_read_from_4(page + page_size - 4);
+        }
+        else if (is_zip_compressed)
+        {
+          checksum = mach_read_from_4(page + FIL_PAGE_LSN + 4);
         }
 
 	/* Declare empty pages non-corrupted */
@@ -4096,13 +4102,13 @@ fil_space_verify_crypt_checksum(
 	if (is_zip_compressed) {
 		cchecksum1 = page_zip_calc_checksum(
 			page, page_size,
-			SRV_CHECKSUM_ALGORITHM_CRC32);
+			SRV_CHECKSUM_ALGORITHM_CRC32, false, true);
 
 		cchecksum2 = (cchecksum1 == checksum)
 			? 0
 			: page_zip_calc_checksum(
 				page, page_size,
-				SRV_CHECKSUM_ALGORITHM_INNODB);
+				SRV_CHECKSUM_ALGORITHM_INNODB, false, true);
 	} else {
 		cchecksum1 = buf_calc_page_crc32(page);
 		cchecksum2 = (cchecksum1 == checksum)

@@ -4932,7 +4932,8 @@ page_zip_calc_checksum(
 	const void*			data,
 	ulint				size,
 	srv_checksum_algorithm_t	algo,
-	bool				use_legacy_big_endian /* = false */)
+	bool				use_legacy_big_endian /* = false */,
+        bool                            calculate_for_rk /* = false */)
 {
 	uint32_t	adler;
 	const Bytef*	s = static_cast<const byte*>(data);
@@ -4958,7 +4959,7 @@ page_zip_calc_checksum(
 					s + FIL_PAGE_TYPE, 2)
 				^ crc32_func(
 					s + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID,
-					size - FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+					size - FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID  - (calculate_for_rk ? 4 : 0)); // exlude post-encryption checksum from checksum calculation
 
 			return(crc32);
 		}
@@ -4972,7 +4973,7 @@ page_zip_calc_checksum(
 		adler = adler32(
 			adler, s + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID,
 			static_cast<uInt>(size)
-			- FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+			- FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID - (calculate_for_rk ? 4 : 0));
 
 		return(adler);
 	case SRV_CHECKSUM_ALGORITHM_NONE:

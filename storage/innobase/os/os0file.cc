@@ -1822,6 +1822,10 @@ os_file_io_complete(
                                 mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
                                 mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
                                 //mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, encryption.m_checksum);
+                                if (type.is_zip_compressed())
+                                {
+                                  mach_write_to_4(buf + FIL_PAGE_LSN + 4, *(uint*)(buf + UNIV_PAGE_SIZE - 4)); // TODO: maybe change to memcpy
+                                }
                               }
                               else
                                 mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
@@ -9887,10 +9891,10 @@ Encryption::encrypt(
           data_len = src_len - FIL_PAGE_DATA - 8; // We need those 8 bytes for key_version and post-encryption checksum
           ut_ad((uint)(*(src + src_len -8)) == 0); // There need to be at least 8 bytes left
         }
-        else if (m_type == Encryption::ROTATED_KEYS)
+        else if (m_type == Encryption::ROTATED_KEYS && !type.is_zip_compressed())
         {
 	  data_len = src_len - FIL_PAGE_DATA - 4; // For rotated keys we do not encrypt last four bytes which are equal to the LSN bytes in header
-                                                  // So whey are not encrypted anyways
+                                                  // So they are not encrypted anyways
         }
         else
 	  data_len = src_len - FIL_PAGE_DATA;
@@ -10053,11 +10057,17 @@ Encryption::encrypt(
 	    mach_write_to_4(dst +  FIL_PAGE_DATA, m_checksum);
             //memcpy(dst + FIL_PAGE_DATA, &m_checksum, 4);
           }
-          else
+          else if (!type.is_zip_compressed())
           {
 	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
             ut_ad(m_checksum != 0);
             mach_write_to_4(dst + *dst_len - 4, m_checksum);
+          }
+          else if (type.is_zip_compressed())
+          {
+	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
+            ut_ad(m_checksum != 0);
+            mach_write_to_4(dst + FIL_PAGE_LSN + 4, m_checksum);
           }
 
           #ifdef UNIV_ENCRYPT_DEBUG
@@ -10255,7 +10265,7 @@ Encryption::decrypt(
             //data_len = src_len - FIL_PAGE_DATA;
         data_len = src_len - HEADER_SIZE;
 
-        if (page_type == FIL_PAGE_ENCRYPTED && m_type == Encryption::ROTATED_KEYS)
+        if (page_type == FIL_PAGE_ENCRYPTED && m_type == Encryption::ROTATED_KEYS && !type.is_zip_compressed())
         {
                 data_len -= 4; //last 4 bytes are not encrypted
         }
@@ -10390,7 +10400,8 @@ Encryption::decrypt(
 
 
 
-        if (m_type == Encryption::ROTATED_KEYS && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
+        if (m_type == Encryption::ROTATED_KEYS && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED
+            && !type.is_zip_compressed())
         {
           //restore LSN
           //uint dead_meat = 0xDEADAAAA;
