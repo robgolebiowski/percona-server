@@ -4007,8 +4007,8 @@ fil_crypt_calculate_checksum(
 	/* For encrypted tables we use only crc32 and strict_crc32 */
 	return is_zip_compressed
 		? page_zip_calc_checksum(page, page_size,
-					 SRV_CHECKSUM_ALGORITHM_CRC32, false, true) // calculate for checksum
-		: buf_calc_page_crc32(page);
+					 SRV_CHECKSUM_ALGORITHM_CRC32) // calculate for checksum
+		: buf_calc_page_crc32_compressed_and_encrypted_with_rk(page, page_size);
 }
 
 /**
@@ -4028,7 +4028,8 @@ encrypted, or corrupted.
 bool
 fil_space_verify_crypt_checksum(
 	byte* 			page,
-	const ulint	        page_size,
+	//const ulint	        page_size,
+	ulint	        page_size,
         bool                    is_zip_compressed,             //TODO: Change is_zip_compressed and is_new_schema_compressed into
                                                                //enum?
         bool                    is_new_schema_compressed, 
@@ -4048,6 +4049,7 @@ fil_space_verify_crypt_checksum(
         if (is_new_schema_compressed)
         {
           key_version = mach_read_from_4(page + FIL_PAGE_DATA + 4);
+          page_size = static_cast<uint16_t>(mach_read_from_2(page + FIL_PAGE_COMPRESS_SIZE_V1));
         }
         else
         {
@@ -4110,14 +4112,30 @@ fil_space_verify_crypt_checksum(
 				page, page_size,
 				SRV_CHECKSUM_ALGORITHM_INNODB, false, true);
 	} else {
-		cchecksum1 = buf_calc_page_crc32(page);
+		//cchecksum1 = buf_calc_page_crc32(page);
+                cchecksum1 = buf_calc_page_crc32_compressed_and_encrypted_with_rk(page, page_size);
 		cchecksum2 = (cchecksum1 == checksum)
 			? 0
 			: buf_calc_page_new_checksum(page);
 	}
 
         if (is_new_schema_compressed)
-          memcpy(page + FIL_PAGE_DATA, &checksum, 4); // put the checksum back
+          mach_write_to_4(page + FIL_PAGE_DATA, checksum);
+
+
+#ifdef UNIV_ENCRYPT_DEBUG
+	ulint space_id =
+		mach_read_from_4(page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+
+	ulint page_no = mach_read_from_4(page + FIL_PAGE_OFFSET);
+
+        if (space_id == 24 && page_no == 4)
+        {
+	    fprintf(stderr, "Robert: Checksum for 24:4:%d", checksum);
+        }
+#endif
+
+          //memcpy(page + FIL_PAGE_DATA, &checksum, 4); // put the checksum back
 
         //TODO: It was never previosly calculated for encrypted pages - need to add this calculation
 
@@ -4151,53 +4169,53 @@ fil_space_verify_crypt_checksum(
 	when FIL_PAGE_FILE_FLUSH_LSN does not contain 0.
 	*/
 
-	uint32_t checksum1 = mach_read_from_4(page + FIL_PAGE_SPACE_OR_CHKSUM);
-	uint32_t checksum2;
+	//uint32_t checksum1 = mach_read_from_4(page + FIL_PAGE_SPACE_OR_CHKSUM);
+	//uint32_t checksum2;
 
-	bool valid;
+	//bool valid;
 
-	if (is_zip_compressed) {
-		valid = checksum1 == cchecksum1;
-		checksum2 = checksum1;
-        }
-        else if (is_new_schema_compressed)
-        {
-           valid = false; // invalid is the correct value for properly encrypted pages
-	} else {
-		checksum2 = mach_read_from_4(
-			page + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
-		valid = buf_page_is_checksum_valid_crc32(
-			page, checksum1, checksum2, false
-			/* FIXME: also try the original crc32 that was
-			buggy on big-endian architectures? */)
-			|| buf_page_is_checksum_valid_innodb(
-				page, checksum1, checksum2);
-	}
+	//if (is_zip_compressed) {
+		//valid = checksum1 == cchecksum1;
+		//checksum2 = checksum1;
+        //}
+        //else if (is_new_schema_compressed)
+        //{
+           //valid = false; // invalid is the correct value for properly encrypted pages
+	//} else {
+		//checksum2 = mach_read_from_4(
+			//page + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
+		//valid = buf_page_is_checksum_valid_crc32(
+			//page, checksum1, checksum2, false
+			//[> FIXME: also try the original crc32 that was
+			//buggy on big-endian architectures? */)
+			//|| buf_page_is_checksum_valid_innodb(
+				//page, checksum1, checksum2);
+	//}
 
-	if (encrypted && valid) {
+	//if (encrypted && valid) {
 
-	        ulint space_id =
-		    mach_read_from_4(page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-		/* If page is encrypted and traditional checksums match,
-		page could be still encrypted, or not encrypted and valid or
-		corrupted. */
-#ifdef UNIV_INNOCHECKSUM
-		fprintf(log_file ? log_file : stderr,
-			"Page " ULINTPF ":" ULINTPF " may be corrupted."
-			" Post encryption checksum %u"
-			" stored [%u:%u] key_version %u\n",
-			space, offset, checksum, checksum1, checksum2,
-			key_version);
-#else /* UNIV_INNOCHECKSUM */
-		ib::error()
-			<< " Page " << space_id << ":" << offset
-			<< " may be corrupted."
-			" Post encryption checksum " << checksum
-			<< " stored [" << checksum1 << ":" << checksum2
-			<< "] key_version " << key_version;
-#endif
-		encrypted = false;
-	}
+		//ulint space_id =
+		    //mach_read_from_4(page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+		//[> If page is encrypted and traditional checksums match,
+		//page could be still encrypted, or not encrypted and valid or
+		//corrupted. */
+//#ifdef UNIV_INNOCHECKSUM
+		//fprintf(log_file ? log_file : stderr,
+			//"Page " ULINTPF ":" ULINTPF " may be corrupted."
+			//" Post encryption checksum %u"
+			//" stored [%u:%u] key_version %u\n",
+			//space, offset, checksum, checksum1, checksum2,
+			//key_version);
+//#else [> UNIV_INNOCHECKSUM <]
+		//ib::error()
+			//<< " Page " << space_id << ":" << offset
+			//<< " may be corrupted."
+			//" Post encryption checksum " << checksum
+			//<< " stored [" << checksum1 << ":" << checksum2
+			//<< "] key_version " << key_version;
+//#endif
+		//encrypted = false;
+	//}
 
 	return(encrypted);
 }

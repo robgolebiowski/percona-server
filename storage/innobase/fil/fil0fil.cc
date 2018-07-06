@@ -6322,7 +6322,11 @@ _fil_io(
 	}
 
         if (page_size.is_compressed())
-          req_type.mark_zip_compressed();
+        {
+          req_type.mark_page_zip_compressed();
+          req_type.set_zip_page_physical_size(page_size.physical());
+          ut_ad(page_size.physical() > 0);
+        }
 
 	/* Set encryption information. */
         //ut_ad(message != NULL);

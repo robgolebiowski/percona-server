@@ -43,6 +43,9 @@ commit;
 --let $restart_parameters=restart:--innodb-encrypt-tables=OFF
 --source include/restart_mysqld.inc
 
+select * from innodb_compact;
+select * from innodb_dynamic;
+
 # zlib
 #set global innodb_compression_algorithm = 1;
 set innodb_default_encryption_key_id = DEFAULT;

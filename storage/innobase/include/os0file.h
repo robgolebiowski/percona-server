@@ -611,6 +611,13 @@ private:
 #define IORequestLogRead	IORequest(IORequest::LOG | IORequest::READ)
 #define IORequestLogWrite	IORequest(IORequest::LOG | IORequest::WRITE)
 
+struct Zip_compressed_info
+{
+  bool is_zip_compressed;
+
+
+};
+
 /**
 The IO Context that is passed down to the low level IO code */
 class IORequest {
@@ -664,7 +671,9 @@ public:
 		m_type(READ),
 		m_compression(),
 		m_encryption(),
-                m_is_zip_compressed(false)
+                m_is_zip_compressed(false),
+                m_zip_physical_size(0)
+   
 	{
 		/* No op */
 	}
@@ -678,7 +687,8 @@ public:
 		m_type(static_cast<uint16_t>(type)),
 		m_compression(),
 		m_encryption(),
-                m_is_zip_compressed(false)
+                m_is_zip_compressed(false),
+                m_zip_physical_size(0)
 	{
 		if (is_log()) {
 			disable_compression();
@@ -813,11 +823,6 @@ public:
 		return(m_type == rhs.m_type);
 	}
 
-        void mark_zip_compressed()
-        {
-           m_is_zip_compressed = true;
-        }
-
 	/** Set compression algorithm
 	@param[in] compression	The compression algorithm to use */
 	void compression_algorithm(Compression::Type type)
@@ -846,10 +851,26 @@ public:
 		return(compression_algorithm().m_type != Compression::NONE);
 	}
 
-        bool is_zip_compressed() const
-		MY_ATTRIBUTE((warn_unused_result))
+        void mark_page_zip_compressed() const
+                MY_ATTRIBUTE((warn_unused_result))
         {
-           return m_is_zip_compressed; 
+          m_is_page_zip_compressed = true;
+        }
+
+        bool is_page_zip_compressed() const
+                MY_ATTRIBUTE((warn_unused_result))
+        {
+           return m_is_page_zip_compressed; 
+        }
+        
+        ulint get_zip_page_physical_size() const
+        {
+          return m_zip_page_physical_size;
+        }
+
+        void set_zip_page_physical_size(ulint zip_page_physical_size)
+        {
+          m_zip_page_physical_size = zip_page_physical_size;
         }
 
 	/** @return true if the page read should not be transformed. */
@@ -977,7 +998,9 @@ private:
 	/** Encryption algorithm */
 	Encryption		m_encryption;
 
-        bool m_is_zip_compressed;
+        bool m_is_page_zip_compressed;
+
+        ulint m_zip_physical_page_size;
 };
 
 /* @} */
