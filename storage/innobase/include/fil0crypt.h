@@ -260,7 +260,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 	@param[in]	space	tablespace
 	@param[in,out]	page0	first page of the tablespace
 	@param[in,out]	mtr	mini-transaction */
-	void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr);
+	void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr,
+                         uint a_min_key_version, uint a_type);
 
 	uint min_key_version; // min key version for this space
 	ulint page0_offset;   // byte offset on page 0 for crypt data

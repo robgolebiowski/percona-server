@@ -738,7 +738,9 @@ void
 fil_space_crypt_t::write_page0(
 	const fil_space_t*	space,
 	byte* 			page,
-	mtr_t*			mtr)
+	mtr_t*			mtr,
+        uint a_min_key_version,
+        uint a_type)
 {
 
         //byte encrypt_info[ENCRYPTION_INFO_SIZE_V2];
@@ -761,9 +763,9 @@ fil_space_crypt_t::write_page0(
         // assigned to the corresponding variables in crypt_data. First we need to flush the page0 before we update
         // in memory crypt_data, that is read by information_schema.
 
-	uint current_min_key_version = rotate_state.flushing ? rotate_state.min_key_version_found : min_key_version;
-        uint current_type = current_min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
-                                                                                            : type;
+	//uint current_min_key_version = rotate_state.flushing ? rotate_state.min_key_version_found : min_key_version;
+        //uint current_type = current_min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
+                                                                                            //: type;
 
         const uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE
                                        + 1       //length of iv
@@ -801,9 +803,9 @@ fil_space_crypt_t::write_page0(
 	//mach_write_to_4(encrypt_info_ptr, space->flags);
 	//encrypt_info_ptr += 4;
 
-        mach_write_to_1(encrypt_info_ptr, current_type);
+        mach_write_to_1(encrypt_info_ptr, a_type);
         encrypt_info_ptr += 1;
-        mach_write_to_4(encrypt_info_ptr, current_min_key_version);
+        mach_write_to_4(encrypt_info_ptr, a_min_key_version);
         encrypt_info_ptr += 4;
         mach_write_to_4(encrypt_info_ptr, key_id);
         encrypt_info_ptr += 4;
@@ -1866,7 +1868,7 @@ fil_crypt_start_encrypting_space(
               byte* frame = buf_block_get_frame(block);
               crypt_data->type = CRYPT_SCHEME_1;
               //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
-              crypt_data->write_page0(space, frame, &mtr);
+              crypt_data->write_page0(space, frame, &mtr, crypt_data->min_key_version, crypt_data->type);
 
               mtr.commit();
 
@@ -2172,7 +2174,12 @@ fil_crypt_space_needs_rotation(
                       crypt_data->min_key_version,
                       key_state->key_version, key_state->rotate_key_age);
 
-              
+
+              if (need_key_rotation && crypt_data->rotate_state.active_threads > 0 &&
+                  crypt_data->rotate_state.next_offset > crypt_data->rotate_state.max_offset)
+              {
+                    break; // the space is already being processed and there are no more pages to rotate
+              }
 
               if (crypt_data->min_key_version != 0)
                 crypt_data->min_key_version= ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
@@ -2199,6 +2206,7 @@ fil_crypt_space_needs_rotation(
               if (need_key_rotation == false) {
                       break;
               }
+
 
               mutex_exit(&crypt_data->mutex);
 
@@ -2446,11 +2454,22 @@ fil_crypt_find_space_to_rotate(
       while (!state->should_shutdown() && state->space) {
               fil_crypt_read_crypt_data(state->space);
 
+      if (strcmp(state->space->name, "test/t2") == 0)
+      {
+        ib::error() << "Checking if test/t2 needs rotation" << '\n';
+      }
+
+
       if (fil_crypt_space_needs_rotation(state, key_state, recheck)) {
                       ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
                       /* init state->min_key_version_found before
                       * starting on a space */
                       state->min_key_version_found = key_state->key_version;
+
+                      if (strcmp(state->space->name, "test/t2") == 0)
+                      {
+                        ib::error() << "test/t2 min_key_version_found = " << state->min_key_version_found << '\n';
+                      }
                       return true;
               }
 
@@ -2491,7 +2510,7 @@ fil_crypt_start_rotate_space(
               * if space extends, it will be encrypted with newer version */
               /* FIXME: max_offset could be removed and instead
               space->size consulted.*/
-              if (strcmp(state->space->name, "test/t2") == 0 && state->space->size == 0)
+              if (strcmp(state->space->name, "test/t2") == 0)
               {
                 ib::error() << "Setting max_offset to " << state->space->size << " for test/t2'\n'";
               }
@@ -3401,6 +3420,12 @@ fil_crypt_flush_space(
       // We do not assign the type to crypt_data just yet. We do it after write_page0 so the in-memory crypt_data
       // would be in sync with the crypt_data on disk
       ut_ad(crypt_data->rotate_state.flushing);
+
+//#define CRYPT_SCHEME_1 1
+//#define CRYPT_SCHEME_1_IV_LEN 16
+//#define CRYPT_SCHEME_UNENCRYPTED 0
+
+
       uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
                                                                                                                  : crypt_data->type;
 
@@ -3408,11 +3433,14 @@ fil_crypt_flush_space(
               //crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
       //}
 
-      if (strcmp(space->name, "mysql/plugin") == 0)
+      ib::error() << "Updating encryption flag for table : " << space->name;
+
+      if (strcmp(space->name, "test/t2") == 0)
       {
         ib::error() << "Updating encryption flag for mysql/plugin" << '\n';
         ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
         ib::error() << "crypt_data->type = " << current_type << '\n';
+        ib::error() << "min_key_version_found = " << crypt_data->rotate_state.min_key_version_found << '\n';
       }
 
       if (space->id != 0)
@@ -3437,8 +3465,9 @@ fil_crypt_flush_space(
               // waiting for DD to be available
           //}
         }
+        else
+          ut_ad(0);
       }
-
 
       /* update page 0 */
       mtr_t mtr;
@@ -3452,17 +3481,17 @@ fil_crypt_flush_space(
                   __FILE__, __LINE__, &mtr)) {
                   //__FILE__, __LINE__, &mtr, &err)) {
               mtr.set_named_space(space);
-              crypt_data->write_page0(space, block->frame, &mtr);
+              crypt_data->write_page0(space, block->frame, &mtr, crypt_data->rotate_state.min_key_version_found, current_type);
               //ib::error() << "Successfuly updated page0 for table = " << space->name;
       }
 
       mtr.commit();
 
-      mutex_enter(&crypt_data->mutex);
-      crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
-      crypt_data->type = current_type;
-      crypt_data->rotate_state.flushing = false;
-      mutex_exit(&crypt_data->mutex);
+      //mutex_enter(&crypt_data->mutex);
+      //crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
+      //crypt_data->type = current_type;
+      //crypt_data->rotate_state.flushing = false;
+      //mutex_exit(&crypt_data->mutex);
 
 
      
@@ -3493,6 +3522,11 @@ fil_crypt_complete_rotate_space(
 {
       fil_space_crypt_t *crypt_data = state->space->crypt_data;
 
+      if (strcmp(state->space->name, "test/t2") == 0)
+      {
+        ib::error() << "fil_crypt_complete_rotate_space test/t2" << '\n';
+      }
+
       ut_ad(crypt_data);
       ut_ad(state->space->n_pending_ops > 0);
 
@@ -3514,8 +3548,12 @@ fil_crypt_complete_rotate_space(
               }
 
               ut_a(crypt_data->rotate_state.active_threads > 0);
-              crypt_data->rotate_state.active_threads--;
-              bool last = crypt_data->rotate_state.active_threads == 0;
+              // Not updaing here - as MariaDB is doing only after flush
+              // threads should not be added to a space if there is no pages left to rotate
+              // so it does not anymore relay only on min_key_version from crypt_data - thus I am upating it
+              // after DD and page0 have been updated
+              //crypt_data->rotate_state.active_threads--;
+              bool last = crypt_data->rotate_state.active_threads - 1 == 0;
 
               /**
               * check if space is fully done
@@ -3525,6 +3563,11 @@ fil_crypt_complete_rotate_space(
               bool done = crypt_data->rotate_state.next_offset >=
                       crypt_data->rotate_state.max_offset;
 
+              if (strcmp(state->space->name, "test/t2") == 0)
+              {
+                 ib::error() << "crypt_data->rotate_state.active_threads =" << crypt_data->rotate_state.active_threads << '\n';
+              }
+
               /**
               * we should flush space if we're last thread AND
               * the iteration is done
@@ -3533,7 +3576,9 @@ fil_crypt_complete_rotate_space(
 
               if (should_flush) {
                       /* we're the last active thread */
+                      ut_ad(crypt_data->rotate_state.flushing == false);
                       crypt_data->rotate_state.flushing = true;
+                      ut_ad(crypt_data->min_key_version != crypt_data->rotate_state.min_key_version_found);
                       //crypt_data->min_key_version =
                               //crypt_data->rotate_state.min_key_version_found;
               //TODO:Robert - tutaj chyba może być wyścig
@@ -3561,10 +3606,27 @@ fil_crypt_complete_rotate_space(
               if (should_flush) {
                       fil_crypt_flush_space(state);
 
-                      //mutex_enter(&crypt_data->mutex);
+                      uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
+                                                                                                                 : crypt_data->type;
+                      mutex_enter(&crypt_data->mutex);
+                      crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
+                      crypt_data->type = current_type;
+                      crypt_data->rotate_state.flushing = false;
+
                       //crypt_data->rotate_state.flushing = false;
-                      //mutex_exit(&crypt_data->mutex);
+                      //
+                      //ut_a(crypt_data->rotate_state.active_threads > 0);
+                      //crypt_data->rotate_state.active_threads--;
               }
+
+              if (!should_flush) // If we are flushing we have already optained the mutex
+                mutex_enter(&crypt_data->mutex);
+
+              ut_a(crypt_data->rotate_state.active_threads > 0);
+              crypt_data->rotate_state.active_threads--;
+              mutex_exit(&crypt_data->mutex);
+
+
       } else {
               mutex_enter(&crypt_data->mutex);
               ut_a(crypt_data->rotate_state.active_threads > 0);
@@ -3636,12 +3698,15 @@ DECLARE_THREAD(fil_crypt_thread)(
               recheck = false;
               thr.first = true;      // restart from first tablespace
 
+              ib::error() << "Restarting from first table" << '\n';
+
               /* iterate all spaces searching for those needing rotation */
               while (!thr.should_shutdown() &&
                      fil_crypt_find_space_to_rotate(&new_state, &thr, &recheck)) {
 
                       if (strcmp(thr.space->name, "test/t2") == 0)
                       {
+                        ib::error() << "Recheck = " << recheck << '\n';
                         ib::error() << "Getting to rotate " << thr.space->name << '\n';
                       }
 
@@ -4104,13 +4169,13 @@ fil_space_verify_crypt_checksum(
 	if (is_zip_compressed) {
 		cchecksum1 = page_zip_calc_checksum(
 			page, page_size,
-			SRV_CHECKSUM_ALGORITHM_CRC32, false, true);
+			SRV_CHECKSUM_ALGORITHM_CRC32);
 
 		cchecksum2 = (cchecksum1 == checksum)
 			? 0
 			: page_zip_calc_checksum(
 				page, page_size,
-				SRV_CHECKSUM_ALGORITHM_INNODB, false, true);
+				SRV_CHECKSUM_ALGORITHM_INNODB);
 	} else {
 		//cchecksum1 = buf_calc_page_crc32(page);
                 cchecksum1 = buf_calc_page_crc32_compressed_and_encrypted_with_rk(page, page_size);

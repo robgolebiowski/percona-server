@@ -356,6 +356,10 @@ static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = 9;
 
+static const char ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC[] = "RK";
+
+static const ulint ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN = 2;
+
 /** Encryption master key prifix */
 //TODO: Change this to percona_innodb_idb
 static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb";
@@ -368,6 +372,7 @@ static const ulint ENCRYPTION_MASTER_KEY_NAME_MAX_LEN = 100;
 
 /** UUID of server instance, it's needed for composing master key name */
 static const ulint ENCRYPTION_SERVER_UUID_LEN = 36;
+
 
 /** Encryption information total size for 5.7.11: magic number + master_key_id +
 key + iv + checksum */
@@ -671,8 +676,8 @@ public:
 		m_type(READ),
 		m_compression(),
 		m_encryption(),
-                m_is_zip_compressed(false),
-                m_zip_physical_size(0)
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
    
 	{
 		/* No op */
@@ -687,8 +692,8 @@ public:
 		m_type(static_cast<uint16_t>(type)),
 		m_compression(),
 		m_encryption(),
-                m_is_zip_compressed(false),
-                m_zip_physical_size(0)
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
 	{
 		if (is_log()) {
 			disable_compression();
@@ -851,8 +856,7 @@ public:
 		return(compression_algorithm().m_type != Compression::NONE);
 	}
 
-        void mark_page_zip_compressed() const
-                MY_ATTRIBUTE((warn_unused_result))
+        void mark_page_zip_compressed()
         {
           m_is_page_zip_compressed = true;
         }
@@ -1000,7 +1004,7 @@ private:
 
         bool m_is_page_zip_compressed;
 
-        ulint m_zip_physical_page_size;
+        ulint m_zip_page_physical_size;
 };
 
 /* @} */

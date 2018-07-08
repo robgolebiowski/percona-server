@@ -61,7 +61,9 @@ select * from t4;
 --echo $encrypted_tables_counts
 --let $wait_timeout= 600
 #--let $wait_timeout= 60
+#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND ROTATING_OR_FLUSHING = 0
 --let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+#--let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND ROTATING_OR_FLUSHING = 0
 --let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
@@ -120,7 +122,7 @@ SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 -- let SEARCH_FILE=$ib1_IBD
 -- source include/search_pattern_in_file.inc
 
---let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
 #--let $restart_parameters=restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 -- source include/start_mysqld.inc
 
@@ -128,8 +130,13 @@ SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 #SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 
-#SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
-#SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
+--echo # HERE ROBERT
+
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
+
+SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
+SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 SET GLOBAL innodb_encrypt_tables = off;
 
@@ -151,10 +158,16 @@ SET GLOBAL innodb_encrypt_tables = off;
 #echo ======alll-from-information_schema====
 #select * from information_schema.tables where engine = 'InnoDB'; 
 --echo # Only two tables should stayed encrypted - the ones with explicite encryption
+#--let $wait_condition=SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND ROTATING_OR_FLUSHING = 0
 --let $wait_timeout= 600
 --let $wait_condition=SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
-#AND CURRENT_KEY_VERSION = 0;
 --source include/wait_condition.inc
+
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
+
+SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
+SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 --let $assert_text= Only two tables should stayed encrypted - the ones with explicite encryption t1 and t4
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225]" = 2
@@ -164,11 +177,14 @@ SET GLOBAL innodb_encrypt_tables = off;
 #
 #--sleep 70
 
-SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
-SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
+SELECT NAME, MIN_KEY_VERSION, ROTATING_OR_FLUSHING FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+SELECT NAME, MIN_KEY_VERSION, ROTATING_OR_FLUSHING FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
+
+#--die
+
 
 --source include/shutdown_mysqld.inc
 
@@ -209,6 +225,7 @@ SET GLOBAL innodb_encrypt_tables = on;
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
+#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND ROTATING_OR_FLUSHING = 0;
 --let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
 --source include/wait_condition.inc
 
@@ -261,6 +278,7 @@ alter table t4 encryption='n';
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces (apart from t1,t3 and t4)
 --let $wait_timeout= 600
+#--let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND ROTATING_OR_FLUSHING = 0
 --let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
 --source include/wait_condition.inc
 

@@ -1890,8 +1890,8 @@ os_file_io_complete(
         if (type.is_write()) {
 	  Encryption	encryption(type.encryption_algorithm());
           bool was_page_encrypted= encryption.is_encrypted_page(buf);
-          if (was_page_encrypted) {
-            if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_zip_compressed(), encryption.is_encrypted_and_compressed(buf), offset))
+          if (was_page_encrypted && type.is_page_zip_compressed()) {
+            if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(), encryption.is_encrypted_and_compressed(buf), offset))
             {
               ut_ad(0);
               ib::error() << "Post - encryption checksum verification failed - decryption failed"; 
@@ -10076,6 +10076,10 @@ Encryption::encrypt(
             mach_write_to_4(dst + FIL_PAGE_DATA + 4, m_key_version);
             //memcpy(dst + FIL_PAGE_DATA + 4, &m_key_version, 4); //Add it here so it would be included in the checksum //TODO:Change everyone to mach_write
 
+          if (type.is_page_zip_compressed())
+            memcpy(dst + FIL_PAGE_ZIP_ROTATED_KEYS_MAGIC, ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC,
+                   ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN);
+
 #ifndef UNIV_INNOCHECKSUM //TODO: Robert - this might need to be included in innodbchecksum
           uint page_size = *dst_len;
           if (page_type == FIL_PAGE_COMPRESSED)
@@ -10234,6 +10238,8 @@ Encryption::decrypt(
 		return(DB_SUCCESS);
 	}
 
+
+#ifndef UNIV_INNOCHECKSUM
         if (m_type == Encryption::ROTATED_KEYS && type.is_page_zip_compressed())
         { 
           uint32 post_enc_checksum = fil_crypt_calculate_checksum(type.get_zip_page_physical_size(), dst, type.is_page_zip_compressed());
@@ -10244,6 +10250,7 @@ Encryption::decrypt(
 	  mach_write_to_4(dst +  FIL_PAGE_SPACE_OR_CHKSUM, innodb_checksum);
           ut_ad(innodb_checksum != 0);
         }
+#endif
 
 #ifdef UNIV_ENCRYPT_DEBUG
         ulint space_id =

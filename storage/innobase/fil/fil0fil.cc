@@ -2126,13 +2126,13 @@ fil_space_release_for_io(fil_space_t* space)
 	mutex_exit(&fil_system->mutex);
 }
 
-bool space_should_not_be_rotated(fil_space_t *space)
-{
-  ut_ad(space != NULL);
-  //TODO:Robert now allowing spaces with ENCRYPTION set to be rottated - need to find a way to exclude MK tablespaces
-  //return FSP_FLAGS_GET_ENCRYPTION(space->flags);
-  return false;
-}
+//bool space_should_not_be_rotated(fil_space_t *space)
+//{
+  //ut_ad(space != NULL);
+  ////TODO:Robert now allowing spaces with ENCRYPTION set to be rottated - need to find a way to exclude MK tablespaces
+  ////return FSP_FLAGS_GET_ENCRYPTION(space->flags);
+  //return false;
+//}
 
 fil_space_t*
 fil_space_next(fil_space_t* prev_space)
@@ -2149,8 +2149,13 @@ fil_space_next(fil_space_t* prev_space)
                 space->n_pending_ops++;
 	}
        
-       if (prev_space != NULL || space_should_not_be_rotated(space)) {
+       if (prev_space != NULL ) { //|| space_should_not_be_rotated(space)) {
 		ut_ad(space->n_pending_ops > 0);
+
+                if (strcmp(prev_space->name, "test/t2") == 0)
+                {
+                  ib::error() << "Prev space is test/t2" << '\n';
+                }
 
 		/* Move on to the next fil_space_t */
 		space->n_pending_ops--;
@@ -2160,7 +2165,7 @@ fil_space_next(fil_space_t* prev_space)
 		fil_ibd_create(), or dropped, or !tablespace. */
 		while (space != NULL
                             && (UT_LIST_GET_LEN(space->chain) == 0
-			       || space_should_not_be_rotated(space)
+			       //|| space_should_not_be_rotated(space)
                                || space->is_stopping()
 			       || space->purpose != FIL_TYPE_TABLESPACE)
                             //|| FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
@@ -2259,7 +2264,7 @@ fil_space_keyrotate_next(
 	while (space != NULL
 	       && (UT_LIST_GET_LEN(space->chain) == 0
 		   || space->is_stopping()
-                   || space_should_not_be_rotated(space)
+                   //|| space_should_not_be_rotated(space)
                   )) {
 
 		old = space;

@@ -1153,7 +1153,7 @@ fsp_header_init(
 	  if (space->crypt_data &&
 	    (space->crypt_data->should_encrypt() ||
 	     space->crypt_data->not_encrypted())) {
-		space->crypt_data->write_page0(space, page, mtr);
+		space->crypt_data->write_page0(space, page, mtr, space->crypt_data->min_key_version, space->crypt_data->type);
 	  }
         }
 
