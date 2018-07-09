@@ -116,6 +116,8 @@ struct Block {
 
 	byte		pad[CACHE_LINE_SIZE - sizeof(ulint)];
 	lock_word_t	m_in_use;
+
+        std::string desc;
 };
 
 /** For storing the allocated blocks */
@@ -924,7 +926,7 @@ os_aio_windows_handler(
 @return pointer to page */
 static
 Block*
-os_alloc_block()
+os_alloc_block(std::string desc)
 {
 	size_t		pos;
 	Blocks&		blocks = *block_cache;
@@ -951,6 +953,8 @@ os_alloc_block()
 				ptr + sizeof(*block));
 			block->m_in_use = 1;
 
+                        block->desc = desc;
+
 			break;
 		}
 
@@ -958,6 +962,7 @@ os_alloc_block()
 
 		if (TAS(&blocks[pos].m_in_use, 1) == 0) {
 			block = &blocks[pos];
+                        block->desc = desc;
 			break;
 		}
 
@@ -1273,7 +1278,8 @@ AIOHandler::post_io_processing(Slot* slot)
 			ut_ad(err == DB_SUCCESS
 			      || err == DB_UNSUPPORTED
 			      || err == DB_CORRUPTION
-			      || err == DB_IO_DECOMPRESS_FAIL);
+			      || err == DB_IO_DECOMPRESS_FAIL
+                              || err == DB_IO_DECRYPT_FAIL);
 		} else {
 
 			err = DB_SUCCESS;
@@ -1797,8 +1803,13 @@ os_file_io_complete(
                          //TODO:The same here will need to be done for zip compressed tables
                          if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(), encryption.is_encrypted_and_compressed(buf), offset))
                          {
-                            ut_ad(0);
-                            ib::error() << "Post - encryption checksum verification failed - decryption failed"; 
+                            ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                            ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
+
+                            //ut_ad(0);
+                            ib::error() << "Post - encryption checksum verification failed - decryption failed for space id = " << space_id
+                                        << " page_no = " << page_no;
+
                             return (DB_IO_DECRYPT_FAIL);
                          }
                       //}
@@ -2227,7 +2238,7 @@ os_file_compress_page(
 	ut_a(type.compression_algorithm().m_type != Compression::LZ4
 	     || static_cast<ulint>(LZ4_COMPRESSBOUND(*n)) < n_alloc);
 
-	Block*  block = os_alloc_block();
+	Block*  block = os_alloc_block("os_file_compress_page");
 
 	ulint	old_compressed_len;
 	ulint	compressed_len = *n;
@@ -2340,7 +2351,7 @@ os_file_encrypt_page(
 	ut_ad(type.is_write());
 	ut_ad(type.is_encrypted());
 
-	Block*  block = os_alloc_block();
+	Block*  block = os_alloc_block("os_file_encrypt_page");
 
 	encrypted_page = static_cast<byte*>(
 		ut_align(block->m_ptr, os_io_ptr_align));
@@ -6136,7 +6147,8 @@ os_file_read_page(
                         /*The page decryption failed - will handled by buf_io_comptelete*/
 
                         if (err == DB_IO_DECRYPT_FAIL)
-                          return (DB_SUCCESS);
+                          return (DB_IO_DECRYPT_FAIL);
+                          //return (DB_SUCCESS);
 
 			/** The read will succeed but decompress can fail
 			for various reasons. */
@@ -8981,8 +8993,9 @@ typedef byte	Block;
 @return pointer to page */
 static
 Block*
-os_alloc_block()
+os_alloc_block(std::string desc)
 {
+        (void)desc;
 	return(reinterpret_cast<byte*>(malloc(UNIV_PAGE_SIZE_MAX * 2)));
 }
 
@@ -9111,7 +9124,7 @@ Compression::deserialize(
 	/* The caller doesn't know what to expect */
 	if (dst == NULL) {
 
-		block = os_alloc_block();
+		block = os_alloc_block("Compression::deserialize");
 
 #ifdef UNIV_INNOCHECKSUM
 		dst = block;
@@ -10131,7 +10144,7 @@ Encryption::encrypt(
           //memcpy(dst + src_len - 4, src + FIL_PAGE_LSN + 4, 4);
           //memcpy(dst +  FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, src + FIL_PAGE_LSN + 4, 4);
 
-          ut_ad(!type.is_page_zip_compressed() &&
+          ut_ad(type.is_page_zip_compressed() ||
                 fil_space_verify_crypt_checksum(dst, *dst_len, type.is_page_zip_compressed(), type.is_compressed(),
                                                 page_no)); // This works only for not zipped compressed pages
 
@@ -10182,11 +10195,11 @@ Encryption::encrypt(
           ut_free(buf2);
           ut_free(check_buf);
 
-          ut_ad(!type.is_page_zip_compressed() &&
+          ut_ad(type.is_page_zip_compressed() ||
                 fil_space_verify_crypt_checksum(dst, *dst_len, type.is_page_zip_compressed(), type.is_compressed(),
                                                 page_no));
 
-          ut_ad(!type.is_page_zip_compressed() &&
+          ut_ad(type.is_page_zip_compressed() ||
                 fil_space_verify_crypt_checksum(dst, *dst_len, type.is_page_zip_compressed(), type.is_compressed(),
                                                 page_no));
         }
@@ -10242,12 +10255,12 @@ Encryption::decrypt(
 #ifndef UNIV_INNOCHECKSUM
         if (m_type == Encryption::ROTATED_KEYS && type.is_page_zip_compressed())
         { 
-          uint32 post_enc_checksum = fil_crypt_calculate_checksum(type.get_zip_page_physical_size(), dst, type.is_page_zip_compressed());
+          uint32 post_enc_checksum = fil_crypt_calculate_checksum(type.get_zip_page_physical_size(), src, type.is_page_zip_compressed());
 
-          uint32 xor_checksum = mach_read_from_4(dst + FIL_PAGE_SPACE_OR_CHKSUM);
+          uint32 xor_checksum = mach_read_from_4(src + FIL_PAGE_SPACE_OR_CHKSUM);
           ut_ad(xor_checksum != 0);
           uint32 innodb_checksum = xor_checksum ^ post_enc_checksum;
-	  mach_write_to_4(dst +  FIL_PAGE_SPACE_OR_CHKSUM, innodb_checksum);
+	  mach_write_to_4(src +  FIL_PAGE_SPACE_OR_CHKSUM, innodb_checksum);
           ut_ad(innodb_checksum != 0);
         }
 #endif
@@ -10290,7 +10303,9 @@ Encryption::decrypt(
 	/* The caller doesn't know what to expect */
 	if (dst == NULL) {
 
-		block = os_alloc_block();
+                std::ostringstream sstream;
+                sstream << "Encryption::decrypt, is_zipped=" << type.is_page_zip_compressed() << " is compressed= " << type.is_compressed();
+		block = os_alloc_block(sstream.str());
 #ifdef UNIV_INNOCHECKSUM
 		dst = block;
 #else
@@ -10329,7 +10344,11 @@ Encryption::decrypt(
           //m_key = NULL;
           size_t key_len;
           if (get_tablespace_key(m_key_id, uuid, m_key_version, &m_key, &key_len) == false)
+          {
+            if (block != NULL)
+              os_free_block(block);
             return (DB_IO_DECRYPT_FAIL);
+          }
           //get_tablespace_key(m_key_id, uuid, 0, &m_key, &key_len);
           m_klen = static_cast<ulint>(key_len);
           //if (m_key == NULL)

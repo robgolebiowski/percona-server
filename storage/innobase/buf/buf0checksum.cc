@@ -80,7 +80,7 @@ buf_calc_page_crc32(
 }
 
 uint32_t
-buf_calc_page_crc32_compressed_and_encrypted_with_rk(
+buf_calc_page_crc32_encrypted_with_rk(
         const byte*	page,
         uint            page_size,
         bool		use_legacy_big_endian /* = false */)

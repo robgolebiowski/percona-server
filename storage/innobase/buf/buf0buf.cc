@@ -775,7 +775,7 @@ buf_page_is_corrupted(
 
 		/* Stored log sequence numbers at the start and the end
 		of page do not match */
-                ut_ad(0);
+                //ut_ad(0); //Robert: Added by me
 
 		return(TRUE);
 	}
@@ -5766,6 +5766,9 @@ static
 dberr_t 
 buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 {
+  //    bpage->is_corrupted and bpage_encrypted could be set to true when we come here in case post-encryption checksum failed
+  //
+
 	//DBUG_ENTER("buf_page_check_corrupt");
         //TODO:Robert - to trzeba jeszcze dodać
 	//ut_ad(space->n_pending_ios > 0);
@@ -5785,12 +5788,12 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 #else
 
         dberr_t err = DB_SUCCESS;
-	bool corrupted = false;
+	bool corrupted = bpage->is_corrupt;
         fil_space_crypt_t* crypt_data = space->crypt_data;
         ulint page_type= mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
         ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
-        //bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
-        bpage->encrypted = original_page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED_RTREE ||
+        //bpage->encrypted can be already set if post-encryption checksum verification failed
+        bpage->encrypted = bpage->encrypted || original_page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED_RTREE ||
                            page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED; // TODO:Robert może rozdzielić to na dwie zmienne
                                                                                                         // TODO:is_encrypted i was_page_read_encrypted
         
@@ -5821,7 +5824,8 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 	//if (was_encrypted) {
         /* If traditional checksums match, we assume that page is
 	   not anymore encrypted. */
-       corrupted = buf_page_is_corrupted(
+       //bpage->is_corrupt can be already set if post-encryption checksum verification failed
+       corrupted = bpage->is_corrupt || buf_page_is_corrupted(
 			true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
 
         if (!corrupted) {

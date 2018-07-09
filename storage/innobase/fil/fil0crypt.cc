@@ -4073,7 +4073,7 @@ fil_crypt_calculate_checksum(
 	return is_zip_compressed
 		? page_zip_calc_checksum(page, page_size,
 					 SRV_CHECKSUM_ALGORITHM_CRC32) // calculate for checksum
-		: buf_calc_page_crc32_compressed_and_encrypted_with_rk(page, page_size);
+		: buf_calc_page_crc32_encrypted_with_rk(page, page_size);
 }
 
 /**
@@ -4178,7 +4178,7 @@ fil_space_verify_crypt_checksum(
 				SRV_CHECKSUM_ALGORITHM_INNODB);
 	} else {
 		//cchecksum1 = buf_calc_page_crc32(page);
-                cchecksum1 = buf_calc_page_crc32_compressed_and_encrypted_with_rk(page, page_size);
+                cchecksum1 = buf_calc_page_crc32_encrypted_with_rk(page, page_size);
 		cchecksum2 = (cchecksum1 == checksum)
 			? 0
 			: buf_calc_page_new_checksum(page);

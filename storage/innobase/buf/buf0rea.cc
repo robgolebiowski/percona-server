@@ -212,6 +212,9 @@ buf_read_page_low(
 		thd_wait_end(NULL);
 	}
 
+        // assume bpage to not be corrupted after a read
+        bpage->is_corrupt = bpage->encrypted = false;
+
 	if (*err != DB_SUCCESS) {
                 // TODO: Robert: Maybe I should add handling decryption error here too - instead of returning DB_SUCCESS and later checking
                 // TODO: Robert: that checksums are not valid
@@ -232,9 +235,14 @@ buf_read_page_low(
 			   || *err == DB_TABLESPACE_DELETED) {
 			buf_read_page_handle_error(bpage);
 			return(0);
-		}
+		} else if (*err == DB_IO_DECRYPT_FAIL)
+                {
+                        //Robert: The most probably post-encryption verification failed
+                        bpage->is_corrupt= true;
+                        bpage->encrypted= true;
+                }
 
-		SRV_CORRUPT_TABLE_CHECK(*err == DB_SUCCESS,
+		SRV_CORRUPT_TABLE_CHECK(*err == DB_SUCCESS || bpage->encrypted,
 					bpage->is_corrupt = true;);
 
 	}
@@ -422,6 +430,7 @@ read_ahead:
 			case DB_SUCCESS:
 			case DB_TABLESPACE_TRUNCATED:
 			case DB_ERROR:
+                        case DB_IO_DECRYPT_FAIL:
 				break;
 			case DB_TABLESPACE_DELETED:
 				ib::info() << "Random readahead trying to"
