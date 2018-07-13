@@ -558,6 +558,13 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 	char*		prev_filepath;
 	const char*	error_txt = NULL;
 
+        if (m_space_id == 24)
+        {
+          int x = 1;
+          x=2;
+          (void)x;
+        }
+
 	m_is_valid = true;
 
 	if (m_first_page == NULL
@@ -711,6 +718,10 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			m_encryption_iv = NULL;
 		}
             }
+
+            // We do not validate if tablespace key exists for ROTATED_KEY here - it will be validated in
+            // ha_innobase::open and appropriate error that key is missing will be produceed
+            
             else
             {
                 if (Encryption::tablespace_key_exists(crypt_data->key_id) == false)
@@ -721,7 +732,8 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 
                    m_is_valid = false;
                    free_first_page();
-                   return (DB_CORRUPTION);
+                   fil_space_destroy_crypt_data(&crypt_data);
+                   return (DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND);
                 }
             }
 	}

@@ -6775,18 +6775,38 @@ ha_innobase::open(
 
 		/* Mark this table as corrupted, so the drop table
 		or force recovery can still use it, but not others. */
-
-          if (space() == NULL || space()->crypt_data == NULL) //TODO:Robert: Do not go there for ROTATED_KEYS 
+          if (space() == NULL)// || space()->crypt_data == NULL) //TODO:Robert: Do not go there for ROTATED_KEYS 
                                                               //For ROTATED_KEYS there is separate handler below
+                                                              //space should be NULL also for ROTATED KEYS - but leaving that
+                                                              //check just in case
+
+                              
           {
+                int ret_err= HA_ERR_TABLE_CORRUPT;
+                if (ib_table->is_rotated_keys_encryption_key_missing())
+                {
+                   //push_warning_printf(
+		     //thd, Sql_condition::SL_WARNING,
+                      //HA_ERR_DECRYPTION_FAILED,
+                      //"Table %s in file %s is encrypted but encryption service or"
+                      //" used key_id %u is not available. "
+                      //" Can't continue reading table.",
+                      //table_share->table_name.str,
+                      //space()->chain.start->name,
+                      //space()->crypt_data->key_id);
+
+                    ret_err= HA_ERR_DECRYPTION_FAILED;
+                }
+                else 
+		  my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+
 		dict_table_close(ib_table, FALSE, FALSE);
 		ib_table = NULL;
 		is_part = NULL;
 
 		free_share(m_share);
-		my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
 
-		DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
+		DBUG_RETURN(ret_err);
           }
 	}
 
@@ -6880,19 +6900,19 @@ ha_innobase::open(
                                     space()->crypt_data->key_id);
 
                         //TODO:Robert - change this to Encryption::tablespace_key_exists
-			if (!encryption_key_id_exists(key_name)) {
-				push_warning_printf(
-					thd, Sql_condition::SL_WARNING,
-					HA_ERR_DECRYPTION_FAILED,
-					"Table %s in file %s is encrypted but encryption service or"
-					" used key_id %u is not available. "
-					" Can't continue reading table.",
-					table_share->table_name.str,
-					space()->chain.start->name,
-					space()->crypt_data->key_id);
-				ret_err = HA_ERR_DECRYPTION_FAILED;
-				warning_pushed = true;
-			}
+			//if (!encryption_key_id_exists(key_name)) {
+				//push_warning_printf(
+					//thd, Sql_condition::SL_WARNING,
+					//HA_ERR_DECRYPTION_FAILED,
+					//"Table %s in file %s is encrypted but encryption service or"
+					//" used key_id %u is not available. "
+					//" Can't continue reading table.",
+					//table_share->table_name.str,
+					//space()->chain.start->name,
+					//space()->crypt_data->key_id);
+				//ret_err = HA_ERR_DECRYPTION_FAILED;
+				//warning_pushed = true;
+			//}
 
 			/* If table is marked as encrypted then we push
 			warning if it has not been already done as used

@@ -172,6 +172,8 @@ enum dberr_t {
 					placed on the base column of
 					stored column */
 
+        DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND = 997,
+
 	DB_DECRYPTION_FAILED = 998,     /* Tablespace encrypted and
 					decrypt operation failed because
 					of missing key management plugin,

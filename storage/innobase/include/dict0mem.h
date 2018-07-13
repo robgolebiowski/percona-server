@@ -1366,6 +1366,16 @@ struct dict_table_t {
                 file_unreadable = false;
         }
 
+        void set_rotated_keys_encryption_key_is_missing()
+        {
+                rk_encryption_key_is_missing = true;
+        }
+
+        bool is_rotated_keys_encryption_key_missing()
+        {
+                return rk_encryption_key_is_missing;
+        }
+
 	/** Id of the table. */
 	table_id_t				id;
 
@@ -1424,6 +1434,7 @@ struct dict_table_t {
 
 	/*!< whether this is in a single-table tablespace and the .ibd
 	file is missing or page decryption failed and page is corrupted */
+
 	unsigned				file_unreadable:1;
 
 	/** TRUE if the table object has been added to the dictionary cache. */
@@ -1762,6 +1773,8 @@ public:
 
 	/** encryption iv, it's only for export/import */
 	byte*					encryption_iv;
+
+        bool                                    rk_encryption_key_is_missing; // initlialized in dict_mem_table_create
 };
 
 inline bool dict_index_t::is_readable() const

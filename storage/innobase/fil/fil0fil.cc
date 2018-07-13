@@ -4142,6 +4142,7 @@ fil_ibd_open(
 	ulint		tablespaces_found = 0;
 	ulint		valid_tablespaces_found = 0;
 	bool		for_import = (purpose == FIL_TYPE_IMPORT);
+        bool was_rotated_keys_encryption_key_not_found = false;
 
 	ut_ad(!fix_dict || rw_lock_own(dict_operation_lock, RW_LOCK_X));
 
@@ -4149,6 +4150,11 @@ fil_ibd_open(
 	ut_ad(!fix_dict || !srv_read_only_mode);
 	ut_ad(!fix_dict || srv_log_file_size != 0);
 	ut_ad(fil_type_is_data(purpose));
+
+        if (strcmp(space_name, "test/t2") == 0)
+          ib::error() << "fil_ibd_open test/t2";
+
+
 
 	if (!fsp_flags_is_valid(flags)) {
 		return(DB_CORRUPTION);
@@ -4266,19 +4272,28 @@ fil_ibd_open(
 
         ib::error() << "Robert: Validating first page of space " << space_name; 
 
+
 	/* Read and validate the first page of these three tablespace
 	locations, if found. */
 	valid_tablespaces_found +=
-		(df_remote.validate_to_dd(id, flags, for_import)
-			== DB_SUCCESS) ? 1 : 0;
+		(err = df_remote.validate_to_dd(id, flags, for_import))
+			== DB_SUCCESS ? 1 : 0;
+
+        was_rotated_keys_encryption_key_not_found = err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND;
 
 	valid_tablespaces_found +=
-		(df_default.validate_to_dd(id, flags, for_import)
-			== DB_SUCCESS) ? 1 : 0;
+		(err = df_default.validate_to_dd(id, flags, for_import))
+			== DB_SUCCESS ? 1 : 0;
+        
+        was_rotated_keys_encryption_key_not_found = was_rotated_keys_encryption_key_not_found ? true
+                                                    : err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND;
 
 	valid_tablespaces_found +=
-		(df_dict.validate_to_dd(id, flags, for_import)
-			== DB_SUCCESS) ? 1 : 0;
+		(err = df_dict.validate_to_dd(id, flags, for_import))
+			== DB_SUCCESS ? 1 : 0;
+
+        was_rotated_keys_encryption_key_not_found = was_rotated_keys_encryption_key_not_found ? true
+                                                    : err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND;
 
 	/* Make sense of these three possible locations.
 	First, bail out if no tablespace files were found. */
@@ -4291,6 +4306,9 @@ fil_ibd_open(
 			ib::error() << "Could not find a valid tablespace file for `"
 				<< space_name << "`. " << TROUBLESHOOT_DATADICT_MSG;
 		}
+                else
+                  return was_rotated_keys_encryption_key_not_found ? DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND 
+                                                                   : DB_CORRUPTION;
 
 		return(DB_CORRUPTION);
 	}

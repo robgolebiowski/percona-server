@@ -3167,6 +3167,11 @@ dict_load_tablespace(
 		table->set_file_unreadable();
 	}
 
+        if (err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND)
+        {
+                table->set_rotated_keys_encryption_key_is_missing();
+        }
+
 	ut_free(shared_space_name);
 	ut_free(filepath);
 }
