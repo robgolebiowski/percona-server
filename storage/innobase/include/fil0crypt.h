@@ -177,7 +177,8 @@ struct fil_space_crypt_t : st_encryption_scheme
                 key_found(false),
                 //key_found(0),
 		rotate_state(),
-                encryption_rotation(encryption_rotation)
+                encryption_rotation(encryption_rotation),
+                tablespace_key(NULL)
 	{
 		key_id = new_key_id;
 		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
@@ -218,6 +219,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 	~fil_space_crypt_t()
 	{
                 mutex_free(&mutex);
+                if (tablespace_key != NULL)
+                  ut_free(tablespace_key);
 	}
 
 	/** Get latest key version from encryption plugin
@@ -263,6 +266,22 @@ struct fil_space_crypt_t : st_encryption_scheme
 	void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr,
                          uint a_min_key_version, uint a_type);
 
+        void set_tablespace_key(const uchar *tablespace_key)
+        {
+          if (tablespace_key == NULL)
+          {
+            if (this->tablespace_key != NULL)
+              ut_free(this->tablespace_key);
+            this->tablespace_key = NULL;
+          }
+          else
+          {
+            if (this->tablespace_key == NULL)
+              this->tablespace_key = (byte*)ut_malloc_nokey(ENCRYPTION_KEY_LEN);
+            memcpy(this->tablespace_key, tablespace_key, ENCRYPTION_KEY_LEN); 
+          }
+        }
+
 	uint min_key_version; // min key version for this space
 	ulint page0_offset;   // byte offset on page 0 for crypt data
 	fil_encryption_t encryption; // Encryption setup
@@ -281,6 +300,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 	fil_space_rotate_state_t rotate_state;
 
         ENCRYPTION_ROTATION encryption_rotation;
+
+        uchar *tablespace_key; //TODO:Make it private ?
 };
 
 

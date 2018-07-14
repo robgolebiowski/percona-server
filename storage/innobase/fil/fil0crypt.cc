@@ -534,6 +534,26 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	crypt_data->page0_offset = offset;
 	memcpy(crypt_data->iv, page + offset + bytes_read, iv_length);
 
+        bytes_read += iv_length;
+
+        crypt_data->encryption_rotation = (ENCRYPTION_ROTATION) mach_read_from_4(page + offset + bytes_read);
+        bytes_read += 4;
+
+        uchar tablespace_key[ENCRYPTION_KEY_LEN];
+        memcpy(tablespace_key, page + offset + bytes_read, ENCRYPTION_KEY_LEN);
+        bytes_read += ENCRYPTION_KEY_LEN;
+
+        if (std::search_n(tablespace_key, tablespace_key + ENCRYPTION_KEY_LEN, ENCRYPTION_KEY_LEN,
+                          0) == tablespace_key) // tablespace_key is all zeroes which means there is no
+                                                // tablepsace in mtr log
+        {
+          crypt_data->set_tablespace_key(NULL);
+        }
+        else 
+        {
+          crypt_data->set_tablespace_key(tablespace_key);
+        }
+
 	return crypt_data;
 }
 
@@ -720,6 +740,22 @@ fil_space_destroy_crypt_data(
 	}
 }
 
+uint fil_get_encrypt_info_size(const uint iv_len)
+{
+  return ENCRYPTION_MAGIC_SIZE
+           + 1       //length of iv
+           + 4       //space id
+           + 2       //offset
+           //+ 4       //space->flags
+           + 1       //type 
+           + 4       //min_key_version
+           + 4       //key_id
+           + 1       //encryption
+           + iv_len  //iv
+           + 4       //encryption rotation type
+           + ENCRYPTION_KEY_LEN; //tablespace key
+}
+
 //#ifndef UNIV_HOTBACKUP
 /** Get the offset of encrytion information in page 0.
 @param[in]	page_size	page size.
@@ -767,17 +803,8 @@ fil_space_crypt_t::write_page0(
         //uint current_type = current_min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
                                                                                             //: type;
 
-        const uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE
-                                       + 1       //length of iv
-                                       + 4       //space id
-                                       + 2       //offset
-                                       //+ 4       //space->flags
-                                       + 1       //type 
-                                       + 4       //min_key_version
-                                       + 4       //key_id
-                                       + 1       //encryption
-                                       + iv_len; //iv
-
+        const uint encrypt_info_size = fil_get_encrypt_info_size(iv_len);
+        
 
         byte *encrypt_info = new byte[encrypt_info_size];
         byte *encrypt_info_ptr = encrypt_info;
@@ -813,7 +840,15 @@ fil_space_crypt_t::write_page0(
         encrypt_info_ptr += 1;
 
         memcpy(encrypt_info_ptr, iv, iv_len);
-        //encrypt_info_ptr += iv_len;
+        encrypt_info_ptr += iv_len;
+
+        mach_write_to_4(encrypt_info_ptr, encryption_rotation);
+        encrypt_info_ptr += 4;
+
+        if (tablespace_key == NULL)
+          memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN);
+        else
+          memcpy(encrypt_info_ptr, tablespace_key, ENCRYPTION_KEY_LEN);
 
 	mlog_write_string(page + offset,
 			  encrypt_info,
@@ -1179,16 +1214,17 @@ fil_parse_write_crypt_data(
 
         //uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE + 1 + iv_len + 4 + 1 + 4 + 4 + 1;
 
-        const uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE
-                                       + 1      //length of iv
-                                       + 4      //space id
-                                       + 2      //offset
-                                       //+ 4      //space->flags
-                                       + 1      //type 
-                                       + 4      //min_key_version
-                                       + 4      //key_id
-                                       + 1      //encryption
-                                       + iv_len;//iv
+        //const uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE
+                                       //+ 1      //length of iv
+                                       //+ 4      //space id
+                                       //+ 2      //offset
+                                       ////+ 4      //space->flags
+                                       //+ 1      //type 
+                                       //+ 4      //min_key_version
+                                       //+ 4      //key_id
+                                       //+ 1      //encryption
+                                       //+ iv_len;//iv
+        const uint encrypt_info_size = fil_get_encrypt_info_size(iv_len);
 
         if(len != encrypt_info_size)
         {
@@ -1308,6 +1344,23 @@ fil_parse_write_crypt_data(
 	crypt_data->encryption = encryption;
 	memcpy(crypt_data->iv, ptr, iv_len);
 	ptr += iv_len;
+        crypt_data->encryption_rotation = (ENCRYPTION_ROTATION) mach_read_from_4(ptr);
+        ptr += 4;
+        uchar tablespace_key[ENCRYPTION_KEY_LEN];
+        memcpy(tablespace_key, ptr, ENCRYPTION_KEY_LEN);
+        ptr += ENCRYPTION_KEY_LEN;
+
+        if (std::search_n(tablespace_key, tablespace_key + ENCRYPTION_KEY_LEN, ENCRYPTION_KEY_LEN,
+                          0) == tablespace_key) // tablespace_key is all zeroes which means there is no
+                                                // tablepsace in mtr log
+        {
+          crypt_data->set_tablespace_key(NULL);
+        }
+        else 
+        {
+          crypt_data->set_tablespace_key(tablespace_key);
+        }
+
 
 	/* update fil_space memory cache with crypt_data */
 	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
