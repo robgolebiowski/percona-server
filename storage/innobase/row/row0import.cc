@@ -3710,9 +3710,11 @@ row_import_for_mysql(
 		}
 
 		if (!dict_table_is_rotated_keys(table)
-		    && space_flags != 0
-		    && FSP_FLAGS_GET_ROTATED_KEYS(space_flags)) {
+		    && space_flags != 0) {
+		    //&& FSP_FLAGS_GET_ROTATED_KEYS(space_flags)) {
 
+                        //TODO:Robert : To nie ma sensu skoro FSP_FLAGS_GET_ROTATED_KEYS nie działa - trzeba to zmienieć
+                        //na czytanie crypt_data czy coś w tym stylu
 			ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
 				 ER_TABLE_SCHEMA_MISMATCH,
 				 "Table is not marked as encrypted with rotated keys, but"

@@ -6965,8 +6965,8 @@ ulint
 dict_tf_to_fsp_flags(
 	ulint	table_flags,
 	bool	is_temp,
-	bool	is_encrypted,
-        bool    is_rotated_keys)
+	bool	is_encrypted)
+        //bool    is_rotated_keys)
 {
 	DBUG_EXECUTE_IF("dict_tf_to_fsp_flags_failure",
 			return(ULINT_UNDEFINED););
@@ -6990,8 +6990,8 @@ dict_tf_to_fsp_flags(
 						   has_data_dir,
 						   is_shared,
 						   is_temp,
-						   is_encrypted,
-                                                   is_rotated_keys);
+						   is_encrypted);
+                                                   //is_rotated_keys);
 
 	return(fsp_flags);
 }

@@ -14221,8 +14221,8 @@ innobase_create_tablespace(
 		&& (!Encryption::is_none(alter_info->encrypt_type.str) ||
                     (srv_encrypt_tables && !Encryption::is_no(alter_info->encrypt_type.str)))) 
                 || srv_encrypt_tables); // TODO:Robert tu chyba nie powinno być || srv_encrypt_tables
-        bool is_rotated_key = (alter_info->encrypt 
-            && Encryption::is_rotated_keys(alter_info->encrypt_type.str));
+        //bool is_rotated_key = (alter_info->encrypt 
+            //&& Encryption::is_rotated_keys(alter_info->encrypt_type.str));
 
 	/* Create the filespace flags */
 	ulint	fsp_flags = fsp_flags_init(
@@ -14231,8 +14231,8 @@ innobase_create_tablespace(
 		false,		/* This is not a file-per-table tablespace */
 		true,		/* This is a general shared tablespace */
 		false,		/* Temporary General Tablespaces not allowed */
-		is_encrypted,	/* Create encrypted tablespace if needed */
-                is_rotated_key);
+		is_encrypted);	/* Create encrypted tablespace if needed */
+                //is_rotated_key);
 	tablespace.set_flags(fsp_flags);
 
 	err = dict_build_tablespace(&tablespace, NULL);

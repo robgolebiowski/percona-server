@@ -1626,8 +1626,8 @@ dict_check_sys_tables(
                 bool    is_rotated_keys = false;
 		ulint	fsp_flags = dict_tf_to_fsp_flags(flags,
 							 is_temp,
-							 is_encrypted,
-                                                         is_rotated_keys); //TODO:Robert is_rotated_keys passed here does not have sense anymore
+							 is_encrypted);
+                                                         //is_rotated_keys); //TODO:Robert is_rotated_keys passed here does not have sense anymore
                                                                            //to be removed
 
 		dberr_t	err = fil_ibd_open(

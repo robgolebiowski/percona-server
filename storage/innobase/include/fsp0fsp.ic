@@ -191,13 +191,13 @@ fsp_flags_init(
 	bool			has_data_dir,
 	bool			is_shared,
 	bool			is_temporary,
-	bool			is_encrypted,
-        bool                    is_rotated_keys)
+	bool			is_encrypted)
+        /*bool                    is_rotated_keys)*/
 {
 	ut_ad(page_size.physical() <= page_size.logical());
 	ut_ad(!page_size.is_compressed() || atomic_blobs);
         // when is_rotated_keys is true, also is_encrypted needs to be true
-        ut_ad(is_rotated_keys ? is_encrypted : true);
+        /*ut_ad(is_rotated_keys ? is_encrypted : true);*/
 
 	/* Page size should be a power of two between UNIV_PAGE_SIZE_MIN
 	and UNIV_PAGE_SIZE, but zip_size may be 0 if not compressed. */
@@ -232,9 +232,9 @@ fsp_flags_init(
 		flags |= FSP_FLAGS_MASK_ENCRYPTION;
 	}
 
-        if (is_rotated_keys) {
-                flags |= FSP_FLAGS_MASK_ROTATED_KEYS;
-        }
+        /*if (is_rotated_keys) {*/
+                /*flags |= FSP_FLAGS_MASK_ROTATED_KEYS;*/
+        /*}*/
 
 	return(flags);
 }

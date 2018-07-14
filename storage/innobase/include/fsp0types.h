@@ -252,7 +252,7 @@ it is for a single client and should be deleted upon startup if it exists. */
 is a tablespace with encryption. */
 #define FSP_FLAGS_WIDTH_ENCRYPTION	1
 
-#define FSP_FLAGS_WIDTH_ROTATED_KEYS    1
+//#define FSP_FLAGS_WIDTH_ROTATED_KEYS    1
 
 /** Width of all the currently known tablespace flags */
 // TODO:Robert change this to FSP_FLAGS_WIDTH_MYSQL
@@ -296,7 +296,7 @@ is a tablespace with encryption. */
 #define FSP_FLAGS_POS_UNUSED		(FSP_FLAGS_POS_ENCRYPTION	\
 					+ FSP_FLAGS_WIDTH_ENCRYPTION)
 
-#define FSP_FLAGS_POS_ROTATED_KEYS     31
+//#define FSP_FLAGS_POS_ROTATED_KEYS     31
 
 /** Bit mask of the POST_ANTELOPE field */
 #define FSP_FLAGS_MASK_POST_ANTELOPE				\
@@ -373,9 +373,9 @@ is a tablespace with encryption. */
 
 //TODO: Robert ^^ rename this to FSP_FLAGS_GET_UNUSED_MYSQL ?
 
-#define FSP_FLAGS_GET_ROTATED_KEYS(flags)			\
-		((flags & FSP_FLAGS_MASK_ROTATED_KEYS)		\
-		>> FSP_FLAGS_POS_ROTATED_KEYS)
+//#define FSP_FLAGS_GET_ROTATED_KEYS(flags)			
+		//((flags & FSP_FLAGS_MASK_ROTATED_KEYS)		
+		//>> FSP_FLAGS_POS_ROTATED_KEYS)
 
 
 /** Use an alias in the code for FSP_FLAGS_GET_SHARED() */
