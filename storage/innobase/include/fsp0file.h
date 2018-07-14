@@ -237,6 +237,24 @@ public:
 	@param[in]	name	Tablespace Name if known, NULL if not */
 	void set_name(const char*	name);
 
+        struct ValidateOutput
+        {
+           ValidateOutput()
+             : error(DB_ERROR)
+             , encryption_type(DO_NOT_KNOW)
+           {}
+
+           enum EncryptionType
+           {
+              DO_NOT_KNOW, /*error occured before we were able to read encryption type from first page*/
+              NONE,
+              ROTATED_KEYS,
+              MASTER_KEY
+           };
+           dberr_t error;
+           EncryptionType encryption_type;
+        };
+
 	/** Validates the datafile and checks that it conforms with
 	the expected space ID and flags.  The file should exist and be
 	successfully opened in order for this function to validate it.
@@ -245,7 +263,7 @@ public:
 	@param[in]	for_import	is it for importing
 	@retval DB_SUCCESS if tablespace is valid, DB_ERROR if not.
 	m_is_valid is also set true on success, else false. */
-	dberr_t validate_to_dd(
+	ValidateOutput validate_to_dd(
 		ulint		space_id,
 		ulint		flags,
 		bool		for_import)
@@ -259,7 +277,7 @@ public:
 	ry to restore that page.
 	@retval DB_SUCCESS if tablespace is valid, DB_ERROR if not.
 	m_is_valid is also set true on success, else false. */
-	dberr_t validate_for_recovery()
+	ValidateOutput validate_for_recovery()
 		MY_ATTRIBUTE((warn_unused_result));
 
 	/** Checks the consistency of the first page of a datafile when the
@@ -272,8 +290,9 @@ public:
 	@retval DB_SUCCESS on if the datafile is valid
 	@retval DB_CORRUPTION if the datafile is not readable
 	@retval DB_TABLESPACE_EXISTS if there is a duplicate space_id */
-	dberr_t validate_first_page(lsn_t*	flush_lsn,
-				    bool	for_import)
+	//dberr_t validate_first_page(lsn_t*	flush_lsn,
+	ValidateOutput validate_first_page(lsn_t*	flush_lsn,
+				           bool	        for_import)
 		MY_ATTRIBUTE((warn_unused_result));
 
 	/** Get Datafile::m_name.

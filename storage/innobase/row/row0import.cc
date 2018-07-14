@@ -3832,9 +3832,11 @@ row_import_for_mysql(
 		fsp_flags |= FSP_FLAGS_MASK_ENCRYPTION;
 	}
 
+        bool is_rotated_keys = false;
+
 	err = fil_ibd_open(
 		true, true, FIL_TYPE_IMPORT, table->space,
-		fsp_flags, table->name.m_name, filepath);
+		fsp_flags, table->name.m_name, filepath, is_rotated_keys);
 
 	DBUG_EXECUTE_IF("ib_import_open_tablespace_failure",
 			err = DB_TABLESPACE_NOT_FOUND;);
@@ -3853,11 +3855,13 @@ row_import_for_mysql(
 
 	/* For encrypted table, set encryption information. */
 	if (dict_table_is_encrypted(table)) {
-                ut_ad(dict_table_is_rotated_keys(table) == false);
+                ut_ad(dict_table_is_rotated_keys(table) == false); //TODO: dict_table_is_rotated_keys to be removed
 
 		err = fil_set_encryption(table->space,
-					 dict_table_is_rotated_keys(table) ? Encryption::ROTATED_KEYS 
-                                                                           : Encryption::AES,
+					 //dict_table_is_rotated_keys(table) ? Encryption::ROTATED_KEYS 
+                                                                           //: Encryption::AES,
+					 is_rotated_keys ? Encryption::ROTATED_KEYS 
+                                                         : Encryption::AES,
 					 table->encryption_key,
 					 table->encryption_iv);
 	}

@@ -1372,6 +1372,8 @@ dict_check_sys_tablespaces(
 		opened. */
 		char*	filepath = dict_get_first_path(space_id);
 
+                bool is_rotated_keys = false;
+
 		/* Check that the .ibd file exists. */
 		dberr_t	err = fil_ibd_open(
 			validate,
@@ -1380,7 +1382,8 @@ dict_check_sys_tablespaces(
 			space_id,
 			fsp_flags,
 			space_name,
-			filepath);
+			filepath,
+                        is_rotated_keys);
 
 		if (err != DB_SUCCESS) {
 			ib::warn() << "Ignoring tablespace "
@@ -1620,11 +1623,12 @@ dict_check_sys_tables(
 		/* Check that the .ibd file exists. */
 		bool	is_temp = flags2 & DICT_TF2_TEMPORARY;
 		bool	is_encrypted = flags2 & DICT_TF2_ENCRYPTION;
-                bool    is_rotated_keys = flags2 & DICT_TF2_ROTATED_KEYS;
+                bool    is_rotated_keys = false;
 		ulint	fsp_flags = dict_tf_to_fsp_flags(flags,
 							 is_temp,
 							 is_encrypted,
-                                                         is_rotated_keys);
+                                                         is_rotated_keys); //TODO:Robert is_rotated_keys passed here does not have sense anymore
+                                                                           //to be removed
 
 		dberr_t	err = fil_ibd_open(
 			validate,
@@ -1633,7 +1637,8 @@ dict_check_sys_tables(
 			space_id,
 			fsp_flags,
 			space_name,
-			filepath);
+			filepath,
+                        is_rotated_keys);
 
 		if (err != DB_SUCCESS) {
 			ib::warn() << "Ignoring tablespace "
@@ -3158,9 +3163,11 @@ dict_load_tablespace(
 	ulint fsp_flags = dict_tf_to_fsp_flags(table->flags,
 					       false,
 					       dict_table_is_encrypted(table));
+        bool is_rotated_keys = false;
+
 	dberr_t err = fil_ibd_open(
 		true, false, FIL_TYPE_TABLESPACE, table->space,
-		fsp_flags, space_name, filepath);
+		fsp_flags, space_name, filepath, is_rotated_keys);
 
 	if (err != DB_SUCCESS) {
 		/* We failed to find a sensible tablespace file */
@@ -3170,6 +3177,11 @@ dict_load_tablespace(
         if (err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND)
         {
                 table->set_rotated_keys_encryption_key_is_missing();
+        }
+
+        if (is_rotated_keys)
+        {
+                table->set_is_rotated_keys();
         }
 
 	ut_free(shared_space_name);

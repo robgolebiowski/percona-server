@@ -1259,7 +1259,8 @@ fil_ibd_open(
 	ulint		id,
 	ulint		flags,
 	const char*	tablename,
-	const char*	path_in)
+	const char*	path_in,
+        bool&           is_rotated_keys)
 	MY_ATTRIBUTE((warn_unused_result));
 
 enum fil_load_status {

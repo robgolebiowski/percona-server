@@ -4086,6 +4086,7 @@ error_exit_1:
 }
 
 #ifndef UNIV_HOTBACKUP
+
 /** Try to open a single-table tablespace and optionally check that the
 space id in it is correct. If this does not succeed, print an error message
 to the .err log. This function is used to open a tablespace when we start
@@ -4123,7 +4124,8 @@ fil_ibd_open(
 	ulint		id,
 	ulint		flags,
 	const char*	space_name,
-	const char*	path_in)
+	const char*	path_in,
+        bool&           is_rotated_keys)
 {
         ib::error() << "Robert: fil_ibd_open space " << space_name;
 
@@ -4143,6 +4145,7 @@ fil_ibd_open(
 	ulint		valid_tablespaces_found = 0;
 	bool		for_import = (purpose == FIL_TYPE_IMPORT);
         bool was_rotated_keys_encryption_key_not_found = false;
+        Datafile::ValidateOutput validate_output;
 
 	ut_ad(!fix_dict || rw_lock_own(dict_operation_lock, RW_LOCK_X));
 
@@ -4276,24 +4279,24 @@ fil_ibd_open(
 	/* Read and validate the first page of these three tablespace
 	locations, if found. */
 	valid_tablespaces_found +=
-		(err = df_remote.validate_to_dd(id, flags, for_import))
+		(validate_output = df_remote.validate_to_dd(id, flags, for_import)).error
 			== DB_SUCCESS ? 1 : 0;
 
-        was_rotated_keys_encryption_key_not_found = err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND;
+        is_rotated_keys = validate_output.encryption_type == Datafile::ValidateOutput::ROTATED_KEYS;
 
 	valid_tablespaces_found +=
-		(err = df_default.validate_to_dd(id, flags, for_import))
+		(validate_output = df_default.validate_to_dd(id, flags, for_import)).error
 			== DB_SUCCESS ? 1 : 0;
         
-        was_rotated_keys_encryption_key_not_found = was_rotated_keys_encryption_key_not_found ? true
-                                                    : err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND;
+        is_rotated_keys = is_rotated_keys ? true
+                                          : validate_output.encryption_type == Datafile::ValidateOutput::ROTATED_KEYS;
 
 	valid_tablespaces_found +=
-		(err = df_dict.validate_to_dd(id, flags, for_import))
+		(validate_output = df_dict.validate_to_dd(id, flags, for_import)).error
 			== DB_SUCCESS ? 1 : 0;
 
-        was_rotated_keys_encryption_key_not_found = was_rotated_keys_encryption_key_not_found ? true
-                                                    : err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND;
+        is_rotated_keys = is_rotated_keys ? true
+                                          : validate_output.encryption_type == Datafile::ValidateOutput::ROTATED_KEYS;
 
 	/* Make sense of these three possible locations.
 	First, bail out if no tablespace files were found. */
@@ -4715,7 +4718,7 @@ fil_ibd_discover(
 	df_def_gen.init(basename, 0);
 	df_def_gen.make_filepath(NULL, basename, IBD);
 	if (df_def_gen.open_read_only(false) == DB_SUCCESS
-	    && df_def_gen.validate_for_recovery() == DB_SUCCESS
+	    && df_def_gen.validate_for_recovery().error == DB_SUCCESS
 	    && df_def_gen.space_id() == space_id) {
 		df.set_filepath(df_def_gen.filepath());
 		df.open_read_only(false);
@@ -4735,7 +4738,7 @@ fil_ibd_discover(
 		df_def_per.init(db, 0);
 		df_def_per.make_filepath(NULL, db, IBD);
 		if (df_def_per.open_read_only(false) == DB_SUCCESS
-		    && df_def_per.validate_for_recovery() == DB_SUCCESS
+		    && df_def_per.validate_for_recovery().error == DB_SUCCESS
 		    && df_def_per.space_id() == space_id) {
 			df.set_filepath(df_def_per.filepath());
 			df.open_read_only(false);
@@ -4750,7 +4753,7 @@ fil_ibd_discover(
 
 		/* An ISL file was found with contents. */
 		if (df_rem_gen.open_read_only(false) != DB_SUCCESS
-		    || df_rem_gen.validate_for_recovery() != DB_SUCCESS) {
+		    || df_rem_gen.validate_for_recovery().error != DB_SUCCESS) {
 
 			/* Assume that this ISL file is intended to be used.
 			Do not continue looking for another if this file
@@ -4784,7 +4787,7 @@ fil_ibd_discover(
 
 			/* An ISL file was found with contents. */
 			if (df_rem_per.open_read_only(false) != DB_SUCCESS
-				|| df_rem_per.validate_for_recovery()
+				|| df_rem_per.validate_for_recovery().error
 				   != DB_SUCCESS) {
 
 				/* Assume that this ISL file is intended to
@@ -4819,7 +4822,7 @@ fil_ibd_discover(
 	/* No ISL files were found in the default location. Use the location
 	given in the redo log. */
 	if (df.open_read_only(false) == DB_SUCCESS
-	    && df.validate_for_recovery() == DB_SUCCESS
+	    && df.validate_for_recovery().error == DB_SUCCESS
 	    && df.space_id() == space_id) {
 		return(true);
 	}
@@ -4899,7 +4902,7 @@ fil_ibd_load(
 
 	/* Read and validate the first page of the tablespace.
 	Assign a tablespace name based on the tablespace type. */
-	switch (file.validate_for_recovery()) {
+	switch (file.validate_for_recovery().error) {
 		os_offset_t	minimum_size;
 	case DB_SUCCESS:
 		if (file.space_id() != space_id) {

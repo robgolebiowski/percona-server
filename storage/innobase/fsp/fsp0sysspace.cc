@@ -584,7 +584,7 @@ SysTablespace::read_lsn_and_check_flags(lsn_t* flushed_lsn)
         // TODO:Robert: Here is error - validate_first_page is called more than once even if it is successful!!
 	for (int retry = 0; retry < 2; ++retry) {
 
-		err = it->validate_first_page(flushed_lsn, false);
+		err = it->validate_first_page(flushed_lsn, false).error;
 
 
 		if (err != DB_SUCCESS

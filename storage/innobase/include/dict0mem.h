@@ -1376,6 +1376,16 @@ struct dict_table_t {
                 return rk_encryption_key_is_missing;
         }
 
+        void set_is_rotated_keys()
+        {
+                is_encrypted_with_rotated_keys = true;
+        }
+
+        bool is_rotated_keys()
+        {
+                return is_encrypted_with_rotated_keys;
+        }
+
 	/** Id of the table. */
 	table_id_t				id;
 
@@ -1733,6 +1743,8 @@ private:
 	itself check the number of open handles at DROP. */
 	ulint					n_ref_count;
 
+        bool            is_encrypted_with_rotated_keys;
+
 public:
 	/** List of locks on the table. Protected by lock_sys->mutex. */
 	table_lock_list_t			locks;
@@ -1754,6 +1766,7 @@ public:
 	/*----------------------*/
 
 	bool		is_corrupt;
+
 #endif /* !UNIV_HOTBACKUP */
 
 #ifdef UNIV_DEBUG

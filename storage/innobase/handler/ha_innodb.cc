@@ -6783,8 +6783,11 @@ ha_innobase::open(
                               
           {
                 int ret_err= HA_ERR_TABLE_CORRUPT;
-                if (ib_table->is_rotated_keys_encryption_key_missing())
+                if (ib_table->is_rotated_keys_encryption_key_missing() || ib_table->is_rotated_keys())
                 {
+                  /* Proper error message has been already printed by Datafile::validate_first_page,
+                   * thus we do not print anything here */
+                  
                    //push_warning_printf(
 		     //thd, Sql_condition::SL_WARNING,
                       //HA_ERR_DECRYPTION_FAILED,
