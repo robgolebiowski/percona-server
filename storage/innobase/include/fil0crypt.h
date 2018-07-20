@@ -282,6 +282,23 @@ struct fil_space_crypt_t : st_encryption_scheme
           }
         }
 
+        void set_tablespace_iv(const uchar *tablespace_iv)
+        {
+          if (tablespace_iv == NULL)
+          {
+            if (this->tablespace_iv != NULL)
+              ut_free(this->tablespace_iv);
+            this->tablespace_iv = NULL;
+          }
+          else
+          {
+            if (this->tablespace_iv == NULL)
+              this->tablespace_iv = (byte*)ut_malloc_nokey(ENCRYPTION_KEY_LEN);
+            memcpy(this->tablespace_iv, tablespace_iv, ENCRYPTION_KEY_LEN); 
+          }
+        }
+
+
 	uint min_key_version; // min key version for this space
 	ulint page0_offset;   // byte offset on page 0 for crypt data
 	fil_encryption_t encryption; // Encryption setup
@@ -302,6 +319,7 @@ struct fil_space_crypt_t : st_encryption_scheme
         ENCRYPTION_ROTATION encryption_rotation;
 
         uchar *tablespace_key; //TODO:Make it private ?
+        uchar *tablespace_iv;
 };
 
 

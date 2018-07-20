@@ -1779,42 +1779,60 @@ os_file_io_complete(
 
                 // Before we try to decrypt, first we need to validate if checksum is valid
                 // for ROTATED_KEYS encrypted tables
-                if (was_page_encrypted && !type.is_page_zip_compressed())
+                //
+                if (was_page_encrypted)
                 {
-                   //if (encryption.is_encrypted_and_compressed(buf))
-                   //{
-                     //if (memcmp(buf + FIL_PAGE_DATA, "rotated", 7) == 0)
-                     //{
-                             //if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_zip_compressed(), type.is_compressed(), offset))
-                       //{
-                          //ut_ad(0);
-                          //ib::error() << "Post - encryption checksum verification failed - decryption failed"; 
-                          //return (DB_IO_DECRYPT_FAIL);
-                       //}
-                     //}
-                   //}
-                   //else 
-                   //{
-                     // here assume it is MK if space verify fails
-                      //uint checksum = mach_read_from_4(buf + src_len - 4);
-                      //if (checksum != 0) // it's rotated keys
-                      //{
-                         // For now it only works with RK encryption
-                         //TODO:The same here will need to be done for zip compressed tables
-                         if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(), encryption.is_encrypted_and_compressed(buf), offset))
-                         {
-                            ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                            ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
+                  bool is_crypt_checksum_correct = false; // For MK encryption is_crypt_checksum_correct stays false
+                  if (encryption.m_type == Encryption::ROTATED_KEYS)
+                  {
+                    if (type.is_page_zip_compressed())
+                    {
+                      byte zip_magic[ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN];
+                      memcpy(zip_magic, buf + FIL_PAGE_ZIP_ROTATED_KEYS_MAGIC,
+                             ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN);
+                      is_crypt_checksum_correct = memcmp(zip_magic, ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC,
+                                                         ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN) == 0;
+                    }
 
-                            //ut_ad(0);
-                            ib::error() << "Post - encryption checksum verification failed - decryption failed for space id = " << space_id
-                                        << " page_no = " << page_no;
+                    is_crypt_checksum_correct = fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(),
+                                                                                encryption.is_encrypted_and_compressed(buf), offset);
 
-                            return (DB_IO_DECRYPT_FAIL);
-                         }
-                      //}
-                   //}
+                    if (encryption.m_encryption_rotation == NONE && !is_crypt_checksum_correct) // There is no re-encryption going on
+                    {
+                      ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                      ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
+                      //ut_ad(0);
+                      ib::error() << "Post - encryption checksum verification failed - decryption failed for space id = " << space_id
+                                  << " page_no = " << page_no;
+
+                      return (DB_IO_DECRYPT_FAIL);
+                    }
+                  }
+
+                  if (encryption.m_encryption_rotation != NONE) // There is re-encryption going on
+                  {
+                    if (is_crypt_checksum_correct) // assume page is RK encrypted
+                      encryption.m_type = Encryption::ROTATED_KEYS; 
+                    else
+                      encryption.m_type = Encryption::AES; // assume page is MK encrypted
+                  }
                 }
+                
+                
+                //if (was_page_encrypted && !type.is_page_zip_compressed() && encryption.m_type == Encryption::ROTATED_KEYS)
+                //{
+                   //if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(), encryption.is_encrypted_and_compressed(buf), offset))
+                   //{
+                      //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                      //ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
+
+                      ////ut_ad(0);
+                      //ib::error() << "Post - encryption checksum verification failed - decryption failed for space id = " << space_id
+                                  //<< " page_no = " << page_no;
+
+                      //return (DB_IO_DECRYPT_FAIL);
+                   //}
+                //}
                
 
 		ret = encryption.decrypt(type, buf, src_len, scratch, len);

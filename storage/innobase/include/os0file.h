@@ -443,7 +443,8 @@ struct Encryption {
 		m_klen(other.m_klen),
 		m_iv(other.m_iv),
                 m_key_version(other.m_key_version),
-		m_key_id(other.m_key_id)
+		m_key_id(other.m_key_id),
+                m_encryption_rotation(other.m_encryption_rotation)
                 //m_was_page_encrypted_when_read(false)
 	{ };
 
@@ -601,6 +602,8 @@ struct Encryption {
 
 	/** Current uuid of server instance */
 	static char		uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
+
+        ENCRYPTION_ROTATION     m_encryption_rotation;
 private:
 //TODO: Robert: Is it needed here?
         static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
@@ -677,7 +680,9 @@ public:
 		m_compression(),
 		m_encryption(),
                 m_is_page_zip_compressed(false),
-                m_zip_page_physical_size(0)
+                m_zip_page_physical_size(0),
+                m_encryption_rotation(ENCRYPTION_ROTATION::NONE)
+
    
 	{
 		/* No op */
@@ -693,7 +698,8 @@ public:
 		m_compression(),
 		m_encryption(),
                 m_is_page_zip_compressed(false),
-                m_zip_page_physical_size(0)
+                m_zip_page_physical_size(0),
+                m_encryption_rotation(ENCRYPTION_ROTATION::NONE)
 	{
 		if (is_log()) {
 			disable_compression();
@@ -919,6 +925,11 @@ public:
                 m_encryption.m_key_id = key_id;
 	}
 
+        void encryption_rotation(ENCRYPTION_ROTATION encryption_rotation)
+        {
+          m_encryption_rotation = encryption_rotation;
+        }
+
 	/** Get the encryption algorithm.
 	@return the encryption algorithm */
 	Encryption encryption_algorithm() const
@@ -941,6 +952,7 @@ public:
 		m_encryption.m_klen = 0;
 		m_encryption.m_iv = NULL;
 		m_encryption.m_type = Encryption::NONE;
+                m_encryption.m_encryption_rotation = ENCRYPTION_ROTATION::NONE;
 	}
 
         //bool was_page_encrypted_when_read() const

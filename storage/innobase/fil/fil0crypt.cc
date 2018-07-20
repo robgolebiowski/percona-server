@@ -548,10 +548,16 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
                                                 // tablepsace in mtr log
         {
           crypt_data->set_tablespace_key(NULL);
+          crypt_data->set_tablespace_iv(NULL); // No tablespace_key => no iv
         }
         else 
         {
-          crypt_data->set_tablespace_key(tablespace_key);
+          crypt_data->set_tablespace_key(tablespace_key); // Since there is tablespace_key present - we also need to read
+                                                          // tablespace_iv
+          uchar tablespace_iv[ENCRYPTION_KEY_LEN/2];
+          memcpy(tablespace_iv, page + offset + bytes_read, ENCRYPTION_KEY_LEN/2);
+          bytes_read += ENCRYPTION_KEY_LEN/2;
+          crypt_data->set_tablespace_iv(tablespace_iv);
         }
 
 	return crypt_data;
@@ -753,7 +759,8 @@ uint fil_get_encrypt_info_size(const uint iv_len)
            + 1       //encryption
            + iv_len  //iv
            + 4       //encryption rotation type
-           + ENCRYPTION_KEY_LEN; //tablespace key
+           + ENCRYPTION_KEY_LEN //tablespace key
+           + ENCRYPTION_KEY_LEN/2; // tablespace iv
 }
 
 //#ifndef UNIV_HOTBACKUP
@@ -845,10 +852,39 @@ fil_space_crypt_t::write_page0(
         mach_write_to_4(encrypt_info_ptr, encryption_rotation);
         encrypt_info_ptr += 4;
 
+
+        //ptr += ENCRYPTION_KEY_LEN;
+
+        //if (std::search_n(tablespace_key, tablespace_key + ENCRYPTION_KEY_LEN, ENCRYPTION_KEY_LEN,
+                          //0) == tablespace_key) // tablespace_key is all zeroes which means there is no
+                                                //// tablepsace in mtr log
+        //{
+          //crypt_data->set_tablespace_key(NULL);
+          //crypt_data->set_tablespace_iv(NULL); // No tablespace_key => no iv
+        //}
+        //else 
+        //{
+          //crypt_data->set_tablespace_key(tablespace_key);
+          //uchar tablespace_iv[ENCRYPTION_KEY_LEN/2];
+          //memcpy(tablespace_iv, ptr, ENCRYPTION_KEY_LEN/2);
+          //ptr += ENCRYPTION_KEY_LEN/2;
+          //crypt_data->set_tablespace_iv(tablespace_iv);
+        //}
+
         if (tablespace_key == NULL)
+        {
+          ut_ad(tablespace_iv == NULL);
           memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN);
+          encrypt_info_ptr += ENCRYPTION_KEY_LEN;
+        }
         else
+        {
+          ut_ad(tablespace_iv != NULL);
           memcpy(encrypt_info_ptr, tablespace_key, ENCRYPTION_KEY_LEN);
+          encrypt_info_ptr += ENCRYPTION_KEY_LEN;
+          memcpy(encrypt_info_ptr, tablespace_iv, ENCRYPTION_KEY_LEN/2);
+          encrypt_info_ptr += ENCRYPTION_KEY_LEN/2;
+        }
 
 	mlog_write_string(page + offset,
 			  encrypt_info,
@@ -1355,12 +1391,16 @@ fil_parse_write_crypt_data(
                                                 // tablepsace in mtr log
         {
           crypt_data->set_tablespace_key(NULL);
+          crypt_data->set_tablespace_iv(NULL); // No tablespace_key => no iv
         }
         else 
         {
           crypt_data->set_tablespace_key(tablespace_key);
+          uchar tablespace_iv[ENCRYPTION_KEY_LEN/2];
+          memcpy(tablespace_iv, ptr, ENCRYPTION_KEY_LEN/2);
+          ptr += ENCRYPTION_KEY_LEN/2;
+          crypt_data->set_tablespace_iv(tablespace_iv);
         }
-
 
 	/* update fil_space memory cache with crypt_data */
 	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
@@ -1895,10 +1935,19 @@ fil_crypt_start_encrypting_space(
       crypt_data->rotate_state.starting = true;
       crypt_data->rotate_state.active_threads = 1;
 
+      if (space->encryption_type == Encryption::AES) // We are re-encrypting space from MK encryption to RK encryption
+      {
+        crypt_data->encryption_rotation = MASTER_KEY_TO_ROTATED_KEY;
+        crypt_data->set_tablespace_key(space->encryption_key);
+      }
+
       mutex_enter(&crypt_data->mutex);
       crypt_data = fil_space_set_crypt_data(space, crypt_data);
       mutex_exit(&crypt_data->mutex);
 
+      space->encryption_type= Encryption::ROTATED_KEYS; // This works like this - if Encryption::ROTATED_KEYS is set - it means that
+                                                        // crypt_data for this space is already set. Do not I need fil_system->mutex locked here ?
+                                                        // fil_space_set_crypt_data is not locking this mutex though
       fil_crypt_start_converting = true;
       mutex_exit(&fil_crypt_threads_mutex);
 
@@ -3345,83 +3394,81 @@ static
 dberr_t
 fil_toggle_encrypted_flag(fil_space_t *space)
 {
-trx_t* trx_set_encrypted = trx_allocate_for_background();
-trx_set_encrypted->op_info = "setting encrypted flag";
+  trx_t* trx_set_encrypted = trx_allocate_for_background();
+  trx_set_encrypted->op_info = "setting encrypted flag";
 
-while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
-{
-  //os_thread_sleep(6000);
-  os_thread_sleep(6);
-  if (space->stop_new_ops) // space is about to be dropped
-   return DB_SUCCESS;      // do not try to lock the DD
-}
+  while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
+  {
+    //os_thread_sleep(6000);
+    os_thread_sleep(6);
+    if (space->stop_new_ops) // space is about to be dropped
+     return DB_SUCCESS;      // do not try to lock the DD
+  }
 
-trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
-mutex_enter(&dict_sys->mutex);
+  trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
+  mutex_enter(&dict_sys->mutex);
 
-//rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
+  //rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
 
-//row_mysql_lock_data_dictionary(trx_set_encrypted);
+  //row_mysql_lock_data_dictionary(trx_set_encrypted);
 
-dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
-                                              DICT_ERR_IGNORE_NONE);
-if (table == NULL) // table went away - has been dropped
-{
-  //ut_ad(false);
+  dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
+                                                DICT_ERR_IGNORE_NONE);
+  if (table == NULL) // table went away - has been dropped
+  {
+    //ut_ad(false);
+
+    row_mysql_unlock_data_dictionary(trx_set_encrypted);
+    trx_free_for_background(trx_set_encrypted);
+    return DB_SUCCESS;
+  }
+
+  //dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
+                                                //table);
+
+  dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
+                                                space);
+  if (error == DB_SUCCESS)
+    error = fts_update_table_encrypted_flag_sql(trx_set_encrypted,
+                                                table->id);
+
+        //table_id_t	table_id)	[>!< in: Table for which we want
+
+  if (error != DB_SUCCESS)
+  {
+      ut_ad(0);
+      fts_sql_rollback(trx_set_encrypted);
+  }
+  else
+  {
+      fts_sql_commit(trx_set_encrypted);
+
+
+      if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
+      {
+        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+        //ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
+      }
+      else
+      {
+        DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+        //ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
+      }
+
+      //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+                //flags |= FSP_FLAGS_MASK_ENCRYPTION;
+      //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+      //ib::error() << "Successfuly updated for table = " << table->name
+                     //<< " table_id= " << table->id << " space_id = " << space->id;
+  }
+
+  dict_table_close(table, TRUE, FALSE);
 
   row_mysql_unlock_data_dictionary(trx_set_encrypted);
+
   trx_free_for_background(trx_set_encrypted);
-  return DB_SUCCESS;
-}
 
-//dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
-                                              //table);
-
-dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
-                                              space);
-if (error == DB_SUCCESS)
-  error = fts_update_table_encrypted_flag_sql(trx_set_encrypted,
-                                              table->id);
-
-      //table_id_t	table_id)	[>!< in: Table for which we want
-
-if (error != DB_SUCCESS)
-{
-    ut_ad(0);
-    fts_sql_rollback(trx_set_encrypted);
-}
-else
-{
-    fts_sql_commit(trx_set_encrypted);
-
-
-    space->flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
-
-    if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
-    {
-      DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
-      ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
-    }
-    else
-    {
-      DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-      ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
-    }
-
-    //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
-              //flags |= FSP_FLAGS_MASK_ENCRYPTION;
-    //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-    //ib::error() << "Successfuly updated for table = " << table->name
-                   //<< " table_id= " << table->id << " space_id = " << space->id;
-}
-
-dict_table_close(table, TRUE, FALSE);
-
-row_mysql_unlock_data_dictionary(trx_set_encrypted);
-
-trx_free_for_background(trx_set_encrypted);
-
-return error;
+  return error;
 }
 
 /***********************************************************************
@@ -3506,6 +3553,10 @@ fil_crypt_flush_space(
             ut_ad(0);
             return; //TODO:Robert przemysl to jeszcze czy to jest bezpieczne tu robic return
           }
+
+          mutex_enter(&fil_system->mutex);
+          space->flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+          mutex_exit(&fil_system->mutex); // TODO:Robert - I am not sure if I need this mutex
           //we need to flip the encryption bit
           //while (DB_SUCCESS != fil_toggle_encrypted_flag(space)) //TODO: Robert: Zmień to na if a nie while
           //{
@@ -3642,6 +3693,17 @@ fil_crypt_complete_rotate_space(
 
               /* inform scrubbing */
               crypt_data->rotate_state.scrubbing.is_active = false;
+
+              if (crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY)
+              {
+                crypt_data->encryption_rotation = NONE;
+              }
+
+              crypt_data->set_tablespace_iv(NULL);
+              crypt_data->set_tablespace_key(NULL);
+
+
+
               mutex_exit(&crypt_data->mutex); 
               /* all threads must call btr_scrub_complete_space wo/ mutex held */
               //if (state->scrub_data.scrubbing) {
@@ -3666,6 +3728,7 @@ fil_crypt_complete_rotate_space(
                       crypt_data->type = current_type;
                       crypt_data->rotate_state.flushing = false;
 
+                      // TODO: Need to add what happens for crypt_data->encryption_rotation == ROTATED_KEY_TO_MASTER_KEY
                       //crypt_data->rotate_state.flushing = false;
                       //
                       //ut_a(crypt_data->rotate_state.active_threads > 0);

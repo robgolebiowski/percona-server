@@ -5942,7 +5942,7 @@ fil_io_set_encryption(
                     //(!srv_encrypt_tables && space->crypt_data->encryption == FIL_ENCRYPTION_ON)))
                   //ut_ad(bpage->encrypt != false);
 
-                if (space->encryption_type == Encryption::ROTATED_KEYS)
+                if (space->encryption_type == Encryption::ROTATED_KEYS) 
                 {
                   ut_ad(space->crypt_data != NULL);
                   //ut_ad(space->crypt_data->iv[0] != '\0'); //TO Chyba jest bez sensu assert, bo iv może się zaczynać od 0
@@ -5993,6 +5993,12 @@ fil_io_set_encryption(
 
                   }
                   key_id= space->crypt_data->key_id;
+
+                  if (req_type.is_read())
+                  {
+                    iv = space->crypt_data->tablespace_iv;
+                    key = space->crypt_data->tablespace_key;
+                  }
                   //else
                     //ut_ad(false); // we do not get encryption key here for ROTATED_KEYS when read
                 }
@@ -6016,7 +6022,8 @@ fil_io_set_encryption(
 
                                         
                 //if (space->encryption_type == Encryption::ROTATED_KEYS)
-                  req_type.encryption_algorithm(space->encryption_type);
+                req_type.encryption_algorithm(space->encryption_type);
+                req_type.encryption_rotation(space->crypt_data->encryption_rotation);
 	} else {
 		req_type.clear_encrypted();
 	}
@@ -6356,8 +6363,8 @@ _fil_io(
 
 	/* Set encryption information. */
         //ut_ad(message != NULL);
-        if (space->crypt_data != NULL)
-          space->encryption_type= Encryption::ROTATED_KEYS;
+        //if (space->crypt_data != NULL)
+          //space->encryption_type= Encryption::ROTATED_KEYS;
         if (message != NULL) //TODO: Just for now, later I will need to get a key here for such a message
           fil_io_set_encryption(req_type, page_id, space, static_cast<buf_page_t*>(message));
 
