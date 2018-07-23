@@ -53,13 +53,6 @@ static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {
 #define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
 #define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
 
-enum ENCRYPTION_ROTATION
-{
-   NONE,
-   MASTER_KEY_TO_ROTATED_KEY,
-   ROTATED_KEY_TO_MASTER_KEY
-};
-
 extern os_event_t fil_crypt_threads_event;
 
 /**
@@ -221,6 +214,8 @@ struct fil_space_crypt_t : st_encryption_scheme
                 mutex_free(&mutex);
                 if (tablespace_key != NULL)
                   ut_free(tablespace_key);
+                if (tablespace_iv != NULL)
+                  ut_free(tablespace_iv);
 	}
 
 	/** Get latest key version from encryption plugin
@@ -264,7 +259,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 	@param[in,out]	page0	first page of the tablespace
 	@param[in,out]	mtr	mini-transaction */
 	void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr,
-                         uint a_min_key_version, uint a_type);
+                         uint a_min_key_version, uint a_type,
+                         ENCRYPTION_ROTATION current_encryption_rotation);
 
         void set_tablespace_key(const uchar *tablespace_key)
         {
@@ -293,8 +289,8 @@ struct fil_space_crypt_t : st_encryption_scheme
           else
           {
             if (this->tablespace_iv == NULL)
-              this->tablespace_iv = (byte*)ut_malloc_nokey(ENCRYPTION_KEY_LEN);
-            memcpy(this->tablespace_iv, tablespace_iv, ENCRYPTION_KEY_LEN); 
+              this->tablespace_iv = (byte*)ut_malloc_nokey(ENCRYPTION_KEY_LEN/2);
+            memcpy(this->tablespace_iv, tablespace_iv, ENCRYPTION_KEY_LEN/2); 
           }
         }
 

@@ -1814,7 +1814,10 @@ os_file_io_complete(
                     if (is_crypt_checksum_correct) // assume page is RK encrypted
                       encryption.m_type = Encryption::ROTATED_KEYS; 
                     else
+                    {
                       encryption.m_type = Encryption::AES; // assume page is MK encrypted
+                      encryption.m_iv = encryption.m_tablespace_iv; // iv comes from tablespace header for MK encryption
+                    }
                   }
                 }
                 
@@ -9867,7 +9870,7 @@ Encryption::encrypt(
         fprintf(stderr, "\n");
         //ut_ad(page_no != 0);
         
-        if (space_id == 24 && page_no == 5)
+        if (space_id == 23 && page_no == 5)
         {
 	    fprintf(stderr, "Robert: Before encryption page 24:5:");
             ut_print_buf(stderr, src, src_len);

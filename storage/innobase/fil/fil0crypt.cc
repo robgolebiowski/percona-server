@@ -783,7 +783,8 @@ fil_space_crypt_t::write_page0(
 	byte* 			page,
 	mtr_t*			mtr,
         uint a_min_key_version,
-        uint a_type)
+        uint a_type,
+        ENCRYPTION_ROTATION current_encryption_rotation)
 {
 
         //byte encrypt_info[ENCRYPTION_INFO_SIZE_V2];
@@ -849,27 +850,8 @@ fil_space_crypt_t::write_page0(
         memcpy(encrypt_info_ptr, iv, iv_len);
         encrypt_info_ptr += iv_len;
 
-        mach_write_to_4(encrypt_info_ptr, encryption_rotation);
+        mach_write_to_4(encrypt_info_ptr, current_encryption_rotation);
         encrypt_info_ptr += 4;
-
-
-        //ptr += ENCRYPTION_KEY_LEN;
-
-        //if (std::search_n(tablespace_key, tablespace_key + ENCRYPTION_KEY_LEN, ENCRYPTION_KEY_LEN,
-                          //0) == tablespace_key) // tablespace_key is all zeroes which means there is no
-                                                //// tablepsace in mtr log
-        //{
-          //crypt_data->set_tablespace_key(NULL);
-          //crypt_data->set_tablespace_iv(NULL); // No tablespace_key => no iv
-        //}
-        //else 
-        //{
-          //crypt_data->set_tablespace_key(tablespace_key);
-          //uchar tablespace_iv[ENCRYPTION_KEY_LEN/2];
-          //memcpy(tablespace_iv, ptr, ENCRYPTION_KEY_LEN/2);
-          //ptr += ENCRYPTION_KEY_LEN/2;
-          //crypt_data->set_tablespace_iv(tablespace_iv);
-        //}
 
         if (tablespace_key == NULL)
         {
@@ -1939,6 +1921,9 @@ fil_crypt_start_encrypting_space(
       {
         crypt_data->encryption_rotation = MASTER_KEY_TO_ROTATED_KEY;
         crypt_data->set_tablespace_key(space->encryption_key);
+        crypt_data->set_tablespace_iv(space->encryption_iv); //If this is gibberish - i.e. encryption_key or iv have
+                                                             //not been set - they will not be used - as this mean there
+                                                             //were no pages encrypted
       }
 
       mutex_enter(&crypt_data->mutex);
@@ -1970,7 +1955,7 @@ fil_crypt_start_encrypting_space(
               byte* frame = buf_block_get_frame(block);
               crypt_data->type = CRYPT_SCHEME_1;
               //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
-              crypt_data->write_page0(space, frame, &mtr, crypt_data->min_key_version, crypt_data->type);
+              crypt_data->write_page0(space, frame, &mtr, crypt_data->min_key_version, crypt_data->type, crypt_data->encryption_rotation);
 
               mtr.commit();
 
@@ -2271,6 +2256,11 @@ fil_crypt_space_needs_rotation(
                       fil_crypt_get_key_state(key_state, crypt_data);
               }
 
+              if (space->id == 23)
+              {
+                 ib::error() << "Starting encrypting space 23 - before checking if key needs rotation";
+              }
+
               bool need_key_rotation = fil_crypt_needs_rotation(
                       crypt_data->encryption,
                       crypt_data->min_key_version,
@@ -2556,9 +2546,9 @@ fil_crypt_find_space_to_rotate(
       while (!state->should_shutdown() && state->space) {
               fil_crypt_read_crypt_data(state->space);
 
-      if (strcmp(state->space->name, "test/t2") == 0)
+      if (strcmp(state->space->name, "test/t1") == 0)
       {
-        ib::error() << "Checking if test/t2 needs rotation" << '\n';
+        ib::error() << "Checking if test/t1 needs rotation" << '\n';
       }
 
 
@@ -2568,9 +2558,9 @@ fil_crypt_find_space_to_rotate(
                       * starting on a space */
                       state->min_key_version_found = key_state->key_version;
 
-                      if (strcmp(state->space->name, "test/t2") == 0)
+                      if (strcmp(state->space->name, "test/t1") == 0)
                       {
-                        ib::error() << "test/t2 min_key_version_found = " << state->min_key_version_found << '\n';
+                        ib::error() << "test/t1 min_key_version_found = " << state->min_key_version_found << '\n';
                       }
                       return true;
               }
@@ -2678,7 +2668,7 @@ fil_crypt_find_page_to_rotate(
       bool found = crypt_data->rotate_state.max_offset >=
               crypt_data->rotate_state.next_offset;
 
-      if (strcmp(state->space->name, "test/t2") == 0)
+      if (strcmp(state->space->name, "test/t1") == 0)
       {
         if (found)
           ib::error() << "Page is to be rotated for space=" << state->space->name << '\n';
@@ -2911,8 +2901,11 @@ fil_crypt_rotate_page(
               //uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
 
 
-              uint kv= mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
-              if (strcmp(space->name, "test/t2") == 0)
+              uint kv= space->crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY
+                         ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
+                         : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+                
+              if (strcmp(space->name, "test/t1") == 0)
               {
                 ib::error() << "Trying to write to " << space->name << '\n';
                 ib::error() << "Encryption: " << crypt_data->encryption << '\n';
@@ -2947,7 +2940,7 @@ fil_crypt_rotate_page(
                       mtr.set_named_space(space);
                       modified = true;
 
-                      if (strcmp(space->name, "test/t2") == 0)
+                      if (strcmp(space->name, "test/t1") == 0)
                         ib::error() << "Write to  " << space->name << '\n';
                       /* force rotation by dummy updating page */
                       mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
@@ -3535,7 +3528,7 @@ fil_crypt_flush_space(
 
       ib::error() << "Updating encryption flag for table : " << space->name;
 
-      if (strcmp(space->name, "test/t2") == 0)
+      if (strcmp(space->name, "test/t1") == 0)
       {
         ib::error() << "Updating encryption flag for mysql/plugin" << '\n';
         ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
@@ -3543,7 +3536,15 @@ fil_crypt_flush_space(
         ib::error() << "min_key_version_found = " << crypt_data->rotate_state.min_key_version_found << '\n';
       }
 
-      if (space->id != 0)
+      if (crypt_data->encryption_rotation == ROTATED_KEY_TO_MASTER_KEY)
+      {
+        mutex_enter(&fil_system->mutex);
+        space->encryption_type = Encryption::AES;
+        mutex_exit(&fil_system->mutex); // TODO:Robert - I am not sure if I need this mutex
+      }
+
+
+      if (space->id != 0) // TODO: Robert  - when this can be true?
       {
         if ( (current_type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
              (current_type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
@@ -3570,7 +3571,8 @@ fil_crypt_flush_space(
           //}
         }
         else
-          ut_ad(0);
+          ut_ad(crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY && current_type == CRYPT_SCHEME_1 &&
+                FSP_FLAGS_GET_ENCRYPTION(space->flags));
       }
 
       /* update page 0 */
@@ -3585,7 +3587,7 @@ fil_crypt_flush_space(
                   __FILE__, __LINE__, &mtr)) {
                   //__FILE__, __LINE__, &mtr, &err)) {
               mtr.set_named_space(space);
-              crypt_data->write_page0(space, block->frame, &mtr, crypt_data->rotate_state.min_key_version_found, current_type);
+              crypt_data->write_page0(space, block->frame, &mtr, crypt_data->rotate_state.min_key_version_found, current_type, NONE);
               //ib::error() << "Successfuly updated page0 for table = " << space->name;
       }
 
@@ -3626,9 +3628,9 @@ fil_crypt_complete_rotate_space(
 {
       fil_space_crypt_t *crypt_data = state->space->crypt_data;
 
-      if (strcmp(state->space->name, "test/t2") == 0)
+      if (strcmp(state->space->name, "test/t1") == 0)
       {
-        ib::error() << "fil_crypt_complete_rotate_space test/t2" << '\n';
+        ib::error() << "fil_crypt_complete_rotate_space test/t1" << '\n';
       }
 
       ut_ad(crypt_data);
@@ -3694,10 +3696,6 @@ fil_crypt_complete_rotate_space(
               /* inform scrubbing */
               crypt_data->rotate_state.scrubbing.is_active = false;
 
-              if (crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY)
-              {
-                crypt_data->encryption_rotation = NONE;
-              }
 
               crypt_data->set_tablespace_iv(NULL);
               crypt_data->set_tablespace_key(NULL);
@@ -3727,6 +3725,9 @@ fil_crypt_complete_rotate_space(
                       crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
                       crypt_data->type = current_type;
                       crypt_data->rotate_state.flushing = false;
+                      crypt_data->encryption_rotation = NONE;
+
+
 
                       // TODO: Need to add what happens for crypt_data->encryption_rotation == ROTATED_KEY_TO_MASTER_KEY
                       //crypt_data->rotate_state.flushing = false;
@@ -3820,7 +3821,7 @@ DECLARE_THREAD(fil_crypt_thread)(
               while (!thr.should_shutdown() &&
                      fil_crypt_find_space_to_rotate(&new_state, &thr, &recheck)) {
 
-                      if (strcmp(thr.space->name, "test/t2") == 0)
+                      if (strcmp(thr.space->name, "test/t1") == 0)
                       {
                         ib::error() << "Recheck = " << recheck << '\n';
                         ib::error() << "Getting to rotate " << thr.space->name << '\n';
@@ -3833,7 +3834,7 @@ DECLARE_THREAD(fil_crypt_thread)(
                       while (!thr.should_shutdown() &&
                              fil_crypt_find_page_to_rotate(&new_state, &thr)) {
 
-                              if (strcmp(thr.space->name, "test/t2") == 0)
+                              if (strcmp(thr.space->name, "test/t1") == 0)
                               {
                                 ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
                               }

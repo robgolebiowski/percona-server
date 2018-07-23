@@ -43,6 +43,13 @@ Created 10/21/1995 Heikki Tuuri
 #include <time.h>
 #endif /* !_WIN32 */
 
+enum ENCRYPTION_ROTATION
+{
+   NONE,
+   MASTER_KEY_TO_ROTATED_KEY,
+   ROTATED_KEY_TO_MASTER_KEY
+};
+
 /** File node of a tablespace or the log data space */
 struct fil_node_t;
 
@@ -442,6 +449,7 @@ struct Encryption {
 		m_key(other.m_key),
 		m_klen(other.m_klen),
 		m_iv(other.m_iv),
+                m_tablespace_iv(other.m_tablespace_iv),
                 m_key_version(other.m_key_version),
 		m_key_id(other.m_key_id),
                 m_encryption_rotation(other.m_encryption_rotation)
@@ -589,6 +597,12 @@ struct Encryption {
 	/** Encrypt initial vector */
 	byte*			m_iv;
 
+        // We decide as the last step in decrypt (after reading the page)
+        // when re_encryption_type is MK_TO_RK whether page is 
+        // encrypted with MK or RK => thus we do not know which tablespace_iv we are
+        // going to use RK or MK
+        byte*                   m_tablespace_iv;
+
         uint                    m_key_version;
 
         uint                    m_key_id;
@@ -680,10 +694,7 @@ public:
 		m_compression(),
 		m_encryption(),
                 m_is_page_zip_compressed(false),
-                m_zip_page_physical_size(0),
-                m_encryption_rotation(ENCRYPTION_ROTATION::NONE)
-
-   
+                m_zip_page_physical_size(0)
 	{
 		/* No op */
 	}
@@ -698,8 +709,7 @@ public:
 		m_compression(),
 		m_encryption(),
                 m_is_page_zip_compressed(false),
-                m_zip_page_physical_size(0),
-                m_encryption_rotation(ENCRYPTION_ROTATION::NONE)
+                m_zip_page_physical_size(0)
 	{
 		if (is_log()) {
 			disable_compression();
@@ -915,7 +925,8 @@ public:
 			    ulint key_len,
 			    byte* iv,
                             uint key_version,
-                            uint key_id)
+                            uint key_id,
+                            byte *tablespace_iv)
 	{
                 //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
 		m_encryption.m_key = key;
@@ -923,11 +934,12 @@ public:
 		m_encryption.m_iv = iv;
                 m_encryption.m_key_version = key_version;
                 m_encryption.m_key_id = key_id;
+                m_encryption.m_tablespace_iv = tablespace_iv;
 	}
 
         void encryption_rotation(ENCRYPTION_ROTATION encryption_rotation)
         {
-          m_encryption_rotation = encryption_rotation;
+          m_encryption.m_encryption_rotation = encryption_rotation;
         }
 
 	/** Get the encryption algorithm.
@@ -952,7 +964,8 @@ public:
 		m_encryption.m_klen = 0;
 		m_encryption.m_iv = NULL;
 		m_encryption.m_type = Encryption::NONE;
-                m_encryption.m_encryption_rotation = ENCRYPTION_ROTATION::NONE;
+                m_encryption.m_encryption_rotation = NONE;
+                m_encryption.m_tablespace_iv = NULL;
 	}
 
         //bool was_page_encrypted_when_read() const
