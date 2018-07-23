@@ -1797,6 +1797,19 @@ os_file_io_complete(
                     is_crypt_checksum_correct = fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(),
                                                                                 encryption.is_encrypted_and_compressed(buf), offset);
 
+
+                    //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                    //if (space_id == 23)
+                    //{
+                      //DBUG_EXECUTE_IF(
+				//"encryption_post_enc_checksum_verification_fail_on_t1",
+                                //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                                //ib::error() << "Robert executing";
+                                //if (space_id == 23)
+                                  //is_crypt_checksum_correct = false;);
+                    //}
+
+
                     if (encryption.m_encryption_rotation == NONE && !is_crypt_checksum_correct) // There is no re-encryption going on
                     {
                       ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);

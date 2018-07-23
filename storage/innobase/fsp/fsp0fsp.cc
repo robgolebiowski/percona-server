@@ -1125,6 +1125,13 @@ fsp_header_init(
 	info to the page 0. */
 	if (FSP_FLAGS_GET_ENCRYPTION(space->flags) &&
             !space->crypt_data) {
+
+                if (space_id == 23)
+                {
+                  int x = 1;
+                  (void)x;
+                }
+
 		ulint	offset = fsp_header_get_encryption_offset(page_size);
 		byte	encryption_info[ENCRYPTION_INFO_SIZE_V2];
 

@@ -98,6 +98,23 @@ static uint n_fil_crypt_iops_allocated = 0;
 
 #define DEBUG_KEYROTATION_THROTTLING 0
 
+uint fil_get_encrypt_info_size(const uint iv_len)
+{
+  return ENCRYPTION_MAGIC_SIZE
+           + 1       //length of iv
+           + 4       //space id
+           + 2       //offset
+           //+ 4       //space->flags
+           + 1       //type 
+           + 4       //min_key_version
+           + 4       //key_id
+           + 1       //encryption
+           + iv_len  //iv
+           + 4       //encryption rotation type
+           + ENCRYPTION_KEY_LEN //tablespace key
+           + ENCRYPTION_KEY_LEN/2; // tablespace iv
+}
+
 /** Statistics variables */
 static fil_crypt_stat_t crypt_stat;
 static ib_mutex_t crypt_stat_mutex;
@@ -437,8 +454,7 @@ fsp_header_get_encryption_offset(
 #ifdef UNIV_DEBUG
 	left_size = page_size.physical() - FSP_HEADER_OFFSET - offset
 		- FIL_PAGE_DATA_END;
-
-	ut_ad(left_size >= ENCRYPTION_INFO_SIZE_V2);
+	ut_ad(left_size >= fil_get_encrypt_info_size(ENCRYPTION_KEY_LEN/2));
 #endif
 
 	return offset;
@@ -473,8 +489,7 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 
         ulint bytes_read = 0;
 
-	const ulint offset = FSP_HEADER_OFFSET
-		+ fsp_header_get_encryption_offset(page_size);
+	const ulint offset = fsp_header_get_encryption_offset(page_size);
 
 	if (memcmp(page + offset, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) != 0) {
 		/* Crypt data is not stored. */
@@ -746,22 +761,7 @@ fil_space_destroy_crypt_data(
 	}
 }
 
-uint fil_get_encrypt_info_size(const uint iv_len)
-{
-  return ENCRYPTION_MAGIC_SIZE
-           + 1       //length of iv
-           + 4       //space id
-           + 2       //offset
-           //+ 4       //space->flags
-           + 1       //type 
-           + 4       //min_key_version
-           + 4       //key_id
-           + 1       //encryption
-           + iv_len  //iv
-           + 4       //encryption rotation type
-           + ENCRYPTION_KEY_LEN //tablespace key
-           + ENCRYPTION_KEY_LEN/2; // tablespace iv
-}
+
 
 //#ifndef UNIV_HOTBACKUP
 /** Get the offset of encrytion information in page 0.
@@ -797,10 +797,15 @@ fil_space_crypt_t::write_page0(
 		//1; // fil_encryption_t
 
 
+        if (space->id == 23)
+        {
+           int x = 1;
+           (void)x;
+        }
+
 	ut_ad(this == space->crypt_data);
 	const uint iv_len = sizeof(iv);
-	const ulint offset = FSP_HEADER_OFFSET
-		+ fsp_header_get_encryption_offset(page_size_t(space->flags));
+	const ulint offset = fsp_header_get_encryption_offset(page_size_t(space->flags));
 	page0_offset = offset;
 
         // We have those current variable set when crypt_data is being flush, after the flush those variable will get
@@ -858,6 +863,8 @@ fil_space_crypt_t::write_page0(
           ut_ad(tablespace_iv == NULL);
           memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN);
           encrypt_info_ptr += ENCRYPTION_KEY_LEN;
+          memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN/2);
+          encrypt_info_ptr += ENCRYPTION_KEY_LEN/2;
         }
         else
         {
@@ -932,7 +939,7 @@ fil_space_crypt_t::write_page0(
           //x=x;
         //}
 
-        ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << min_key_version;
+        ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << a_min_key_version;
 
 }
 
@@ -1921,9 +1928,7 @@ fil_crypt_start_encrypting_space(
       {
         crypt_data->encryption_rotation = MASTER_KEY_TO_ROTATED_KEY;
         crypt_data->set_tablespace_key(space->encryption_key);
-        crypt_data->set_tablespace_iv(space->encryption_iv); //If this is gibberish - i.e. encryption_key or iv have
-                                                             //not been set - they will not be used - as this mean there
-                                                             //were no pages encrypted
+        crypt_data->set_tablespace_iv(space->encryption_iv); //space key and encryption are always initalized for MK encrypted tables
       }
 
       mutex_enter(&crypt_data->mutex);

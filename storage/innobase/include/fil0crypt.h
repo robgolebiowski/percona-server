@@ -296,7 +296,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 
 
 	uint min_key_version; // min key version for this space
-	ulint page0_offset;   // byte offset on page 0 for crypt data
+	ulint page0_offset;   // byte offset on page 0 for crypt data //TODO:Robert: po co to ?
 	fil_encryption_t encryption; // Encryption setup
 
 	ib_mutex_t mutex;   // mutex protecting following variables

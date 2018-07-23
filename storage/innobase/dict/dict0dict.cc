@@ -6052,6 +6052,7 @@ dict_table_set_corrupt_by_space(
 	while (table) {
 		if (table->space == space_id) {
 			table->is_corrupt = true;
+                        table->file_unreadable = true;
 			found = true;
 		}
 
