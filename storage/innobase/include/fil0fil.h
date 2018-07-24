@@ -220,6 +220,9 @@ struct fil_space_t {
 				/*!< true if this space is currently in
 				unflushed_spaces */
 	bool		is_corrupt;
+
+	bool		is_encrypted;
+
 	UT_LIST_NODE_T(fil_space_t) space_list;
 				/*!< list of all spaces */
 	UT_LIST_NODE_T(fil_space_t) rotation_list;
@@ -1877,6 +1880,11 @@ functions to access is_corrupt flag of fil_space_t*/
 
 void
 fil_space_set_corrupt(
+/*==================*/
+	ulint	space_id);
+
+void
+fil_space_set_encrypted(
 /*==================*/
 	ulint	space_id);
 

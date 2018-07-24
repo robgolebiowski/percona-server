@@ -1438,6 +1438,8 @@ fil_space_create(
 
 	space->is_corrupt = false;
 
+        space->is_encrypted = false;
+
 	UT_LIST_ADD_LAST(fil_system->space_list, space);
 
 	if (id < SRV_LOG_SPACE_FIRST_ID && id > fil_system->max_assigned_id) {
@@ -8418,6 +8420,24 @@ fil_space_set_corrupt(
 
 	if (space) {
 		space->is_corrupt = true;
+	}
+
+	mutex_exit(&fil_system->mutex);
+}
+
+void
+fil_space_set_encrypted(
+/*==================*/
+	ulint	space_id)
+{
+	fil_space_t*	space;
+
+	mutex_enter(&fil_system->mutex);
+
+	space = fil_space_get_by_id(space_id);
+
+	if (space) {
+		space->is_encrypted = true;
 	}
 
 	mutex_exit(&fil_system->mutex);

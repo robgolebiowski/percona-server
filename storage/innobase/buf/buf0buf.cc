@@ -6021,6 +6021,15 @@ buf_page_io_complete(
 		    || (err = buf_page_check_corrupt(bpage, space)) != DB_SUCCESS
 			    ) {
 
+                        // Here bpage should not be encrypted. If it is still encrypted it means
+                        // that decryption failed and whole space is not readable
+                        if (bpage->encrypted)
+                        {
+                          ib::error() << "Page is still encrypted - which means decryption failed. "
+                                         "Marking whole space as encrypted";
+                          fil_space_set_encrypted(bpage->id.space());
+                        }
+
 			/* Not a real corruption if it was triggered by
 			error injection */
 			DBUG_EXECUTE_IF(

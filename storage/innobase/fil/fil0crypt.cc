@@ -2551,24 +2551,25 @@ fil_crypt_find_space_to_rotate(
       while (!state->should_shutdown() && state->space) {
               fil_crypt_read_crypt_data(state->space);
 
-      if (strcmp(state->space->name, "test/t1") == 0)
-      {
-        ib::error() << "Checking if test/t1 needs rotation" << '\n';
-      }
-
-
-      if (fil_crypt_space_needs_rotation(state, key_state, recheck)) {
-                      ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-                      /* init state->min_key_version_found before
-                      * starting on a space */
-                      state->min_key_version_found = key_state->key_version;
-
-                      if (strcmp(state->space->name, "test/t1") == 0)
-                      {
-                        ib::error() << "test/t1 min_key_version_found = " << state->min_key_version_found << '\n';
-                      }
-                      return true;
+              if (strcmp(state->space->name, "test/t1") == 0)
+              {
+                ib::error() << "Checking if test/t1 needs rotation" << '\n';
               }
+
+
+              // if space is marked as encrytped this means some of the pages are encrypted and space should be skipped
+              if (!state->space->is_encrypted && fil_crypt_space_needs_rotation(state, key_state, recheck)) {
+                              ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+                              /* init state->min_key_version_found before
+                              * starting on a space */
+                              state->min_key_version_found = key_state->key_version;
+
+                              if (strcmp(state->space->name, "test/t1") == 0)
+                              {
+                                ib::error() << "test/t1 min_key_version_found = " << state->min_key_version_found << '\n';
+                              }
+                              return true;
+                      }
 
               if (srv_fil_crypt_rotate_key_age) {
                       state->space = fil_space_next(state->space);
@@ -3072,7 +3073,7 @@ fil_crypt_rotate_pages(
 
       ut_ad(state->space->n_pending_ops > 0);
 
-      for (; state->offset < end; state->offset++) {
+      for (; state->offset < end && !state->space->is_encrypted; state->offset++) {
 
               /* we can't rotate pages in dblwr buffer as
               * it's not possible to read those due to lots of asserts
@@ -3848,6 +3849,19 @@ DECLARE_THREAD(fil_crypt_thread)(
                               if (!thr.space->is_stopping()) {
                                       /* rotate a (set) of pages */
                                       fil_crypt_rotate_pages(&new_state, &thr);
+                              }
+
+                              if (thr.space->is_encrypted)
+                              {
+                                      /* There were some pages that were corrupted or could not have been
+                                       * decrypted - abort rotating space */
+  
+                                      ib::error() << "Found space with pages that cannot be decrypted - aborting encryption "
+                                                     "rotation for space id = " << thr.space->id << " table name = " << thr.space->name;
+
+                                      fil_space_release(thr.space);
+                                      thr.space = NULL;
+                                      break;
                               }
 
                               /* If space is marked as stopping, release
