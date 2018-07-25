@@ -562,8 +562,10 @@ ha_innobase::check_if_supported_inplace_alter(
 	char*	old_encryption = this->table->s->encrypt_type.str;
 	char*	new_encryption = altered_table->s->encrypt_type.str;
 
-	if (Encryption::is_none(old_encryption)
-	    != Encryption::is_none(new_encryption)) {
+	if ((Encryption::is_none(old_encryption) != Encryption::is_none(new_encryption)) ||
+            (Encryption::is_master_key_encryption(old_encryption) && Encryption::is_rotated_keys(new_encryption)) ||
+            (Encryption::is_rotated_keys(old_encryption) && Encryption::is_master_key_encryption(new_encryption))
+           ) {
 		ha_alter_info->unsupported_reason =
 			innobase_get_err_msg(
 				ER_UNSUPPORTED_ALTER_ENCRYPTION_INPLACE);
