@@ -48,6 +48,10 @@ static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {
 
 //static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb";
 
+#ifdef UNIV_INNOCHECKSUM //TODO:Robert INNOCHECKSUM ENCRYPTION_KEY_LEN is not defined - and probably all of this file should not be
+static const ulint ENCRYPTION_KEY_LEN = 32; //TODO:Robert kind of workaround
+#endif // UNIV_INNOCHECKSUM
+
 /* This key will be used if nothing else is given */
 #define FIL_DEFAULT_ENCRYPTION_KEY 0
 #define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
@@ -70,13 +74,13 @@ extern os_event_t fil_crypt_threads_event;
  */
 
 #define CRYPT_SCHEME_1 1
-#define CRYPT_SCHEME_1_IV_LEN 16
+//#define CRYPT_SCHEME_1_IV_LEN 16
 #define CRYPT_SCHEME_UNENCRYPTED 0
 
 
 //TODO:Robert:Those are mine
-#define MY_AES_MAX_KEY_LENGTH 16
-#define ENCRYPTION_SCHEME_BLOCK_LENGTH 16
+//#define MY_AES_MAX_KEY_LENGTH 16
+//#define ENCRYPTION_SCHEME_BLOCK_LENGTH 16
 
 
 /* Cached L or key for given key_version */
@@ -84,7 +88,7 @@ struct key_struct
 {
 	uint key_version;			/*!< Version of the key */
 	uint key_length;			/*!< Key length */
-	unsigned char key[MY_AES_MAX_KEY_LENGTH]; /*!< Cached key
+	unsigned char key[ENCRYPTION_KEY_LEN]; /*!< Cached key
                                                 (that is L in CRYPT_SCHEME_1) */
 };
 
@@ -99,11 +103,12 @@ struct key_struct
 
 struct st_encryption_scheme_key {
   unsigned int version;
-  unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
+  //unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
+  unsigned char key[ENCRYPTION_KEY_LEN];
 };
 
 struct st_encryption_scheme {
-  unsigned char iv[ENCRYPTION_SCHEME_BLOCK_LENGTH];
+  unsigned char iv[ENCRYPTION_KEY_LEN];
   struct st_encryption_scheme_key key[3]; //TODO : Why do I need this ?
   unsigned int keyserver_requests;
   //unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
@@ -289,8 +294,8 @@ struct fil_space_crypt_t : st_encryption_scheme
           else
           {
             if (this->tablespace_iv == NULL)
-              this->tablespace_iv = (byte*)ut_malloc_nokey(ENCRYPTION_KEY_LEN/2);
-            memcpy(this->tablespace_iv, tablespace_iv, ENCRYPTION_KEY_LEN/2); 
+              this->tablespace_iv = (byte*)ut_malloc_nokey(ENCRYPTION_KEY_LEN);
+            memcpy(this->tablespace_iv, tablespace_iv, ENCRYPTION_KEY_LEN); 
           }
         }
 

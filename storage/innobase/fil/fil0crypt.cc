@@ -101,7 +101,7 @@ static uint n_fil_crypt_iops_allocated = 0;
 uint fil_get_encrypt_info_size(const uint iv_len)
 {
   return ENCRYPTION_MAGIC_SIZE
-           + 1       //length of iv
+           + 2       //length of iv
            + 4       //space id
            + 2       //offset
            //+ 4       //space->flags
@@ -112,7 +112,7 @@ uint fil_get_encrypt_info_size(const uint iv_len)
            + iv_len  //iv
            + 4       //encryption rotation type
            + ENCRYPTION_KEY_LEN //tablespace key
-           + ENCRYPTION_KEY_LEN/2; // tablespace iv
+           + ENCRYPTION_KEY_LEN;// tablespace iv
 }
 
 /** Statistics variables */
@@ -454,7 +454,7 @@ fsp_header_get_encryption_offset(
 #ifdef UNIV_DEBUG
 	left_size = page_size.physical() - FSP_HEADER_OFFSET - offset
 		- FIL_PAGE_DATA_END;
-	ut_ad(left_size >= fil_get_encrypt_info_size(ENCRYPTION_KEY_LEN/2));
+	ut_ad(left_size >= fil_get_encrypt_info_size(ENCRYPTION_KEY_LEN));
 #endif
 
 	return offset;
@@ -498,8 +498,8 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 
         bytes_read += ENCRYPTION_MAGIC_SIZE;
 
-	uint8_t iv_length = mach_read_from_1(page + offset + bytes_read);
-        bytes_read += 1;
+	uint8_t iv_length = mach_read_from_2(page + offset + bytes_read);
+        bytes_read += 2;
         bytes_read += 4; // skip space_id
         bytes_read += 2; // skip offset
         //bytes_read += 4; // skip flags
@@ -569,9 +569,9 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
         {
           crypt_data->set_tablespace_key(tablespace_key); // Since there is tablespace_key present - we also need to read
                                                           // tablespace_iv
-          uchar tablespace_iv[ENCRYPTION_KEY_LEN/2];
-          memcpy(tablespace_iv, page + offset + bytes_read, ENCRYPTION_KEY_LEN/2);
-          bytes_read += ENCRYPTION_KEY_LEN/2;
+          uchar tablespace_iv[ENCRYPTION_KEY_LEN];
+          memcpy(tablespace_iv, page + offset + bytes_read, ENCRYPTION_KEY_LEN);
+          bytes_read += ENCRYPTION_KEY_LEN;
           crypt_data->set_tablespace_iv(tablespace_iv);
         }
 
@@ -832,8 +832,8 @@ fil_space_crypt_t::write_page0(
 
         memcpy(encrypt_info_ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
         encrypt_info_ptr += ENCRYPTION_MAGIC_SIZE;
-        mach_write_to_1(encrypt_info_ptr, iv_len);
-        encrypt_info_ptr += 1;
+        mach_write_to_2(encrypt_info_ptr, iv_len);
+        encrypt_info_ptr += 2;
 
 	mach_write_to_4(encrypt_info_ptr, space->id); //TODO:Robert - I do not think this is needed - it is suppliec in log0recv.cc and can be passed to fil_parse_write_crypt_data
 	encrypt_info_ptr += 4;
@@ -863,16 +863,16 @@ fil_space_crypt_t::write_page0(
           ut_ad(tablespace_iv == NULL);
           memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN);
           encrypt_info_ptr += ENCRYPTION_KEY_LEN;
-          memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN/2);
-          encrypt_info_ptr += ENCRYPTION_KEY_LEN/2;
+          memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN);
+          encrypt_info_ptr += ENCRYPTION_KEY_LEN;
         }
         else
         {
           ut_ad(tablespace_iv != NULL);
           memcpy(encrypt_info_ptr, tablespace_key, ENCRYPTION_KEY_LEN);
           encrypt_info_ptr += ENCRYPTION_KEY_LEN;
-          memcpy(encrypt_info_ptr, tablespace_iv, ENCRYPTION_KEY_LEN/2);
-          encrypt_info_ptr += ENCRYPTION_KEY_LEN/2;
+          memcpy(encrypt_info_ptr, tablespace_iv, ENCRYPTION_KEY_LEN);
+          encrypt_info_ptr += ENCRYPTION_KEY_LEN;
         }
 
 	mlog_write_string(page + offset,
@@ -1234,8 +1234,9 @@ fil_parse_write_crypt_data(
 	const buf_block_t*	block,
         ulint                   len)
 {
-        const uint iv_len = mach_read_from_1(ptr + ENCRYPTION_MAGIC_SIZE);
-	ut_a(iv_len == CRYPT_SCHEME_1_IV_LEN); // only supported
+        const uint iv_len = mach_read_from_2(ptr + ENCRYPTION_MAGIC_SIZE);
+	//ut_a(iv_len == CRYPT_SCHEME_1_IV_LEN); // only supported
+	ut_a(iv_len == ENCRYPTION_KEY_LEN); // only supported
 
         //uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE + 1 + iv_len + 4 + 1 + 4 + 4 + 1;
 
@@ -1385,9 +1386,9 @@ fil_parse_write_crypt_data(
         else 
         {
           crypt_data->set_tablespace_key(tablespace_key);
-          uchar tablespace_iv[ENCRYPTION_KEY_LEN/2];
-          memcpy(tablespace_iv, ptr, ENCRYPTION_KEY_LEN/2);
-          ptr += ENCRYPTION_KEY_LEN/2;
+          uchar tablespace_iv[ENCRYPTION_KEY_LEN];
+          memcpy(tablespace_iv, ptr, ENCRYPTION_KEY_LEN);
+          ptr += ENCRYPTION_KEY_LEN;
           crypt_data->set_tablespace_iv(tablespace_iv);
         }
 
