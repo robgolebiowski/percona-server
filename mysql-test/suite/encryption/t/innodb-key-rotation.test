@@ -18,6 +18,7 @@ eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 --let t2_IBD = $MYSQLD_DATADIR/test/t2.ibd
 --let t3_IBD = $MYSQLD_DATADIR/test/t3.ibd
 --let t4_IBD = $MYSQLD_DATADIR/test/t4.ibd
+--let t6_IBD = $MYSQLD_DATADIR/test/t6.ibd
 --let SEARCH_RANGE = 10000000
 
 --disable_warnings
@@ -76,7 +77,7 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --let $wait_timeout= 600
 # We should have $tables_count - 1 tables encrypted with version 2 (because of additional innodb_system table)
 # of default innodb key (id = 0) and one table t2 encrypted with version 0 of key 5 and t6 unencrypted
- --let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 2
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 2
 --source include/wait_condition.inc
 
 --let $assert_text= table t2 should not get re-encrypted as key 5 is still in version 0
@@ -84,7 +85,7 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --source include/assert.inc
 
 --let $assert_text= table t6 should stay unencrypted
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION > 100]" = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL]" = 1
 --source include/assert.inc
 
 
@@ -128,7 +129,7 @@ SET GLOBAL innodb_encryption_rotate_key_age = 1;
 --source include/assert.inc
 
 --let $wait_timeout= 600
- --let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 3 AND CURRENT_KEY_ID = 5
+--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 3 AND CURRENT_KEY_ID = 5
 --source include/wait_condition.inc
 
 --echo # Now turn the re-encryption off by setting innodb_encryption_rotate_key_age to 0
@@ -155,7 +156,7 @@ SET GLOBAL innodb_encryption_rotate_key_age = 0;
 --echo #Make sure t6 is still unencrypted
 
 --let $assert_text= table t6 should stay unencrypted
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION > 100]" = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL]" = 1
 --source include/assert.inc
 
 --echo # Now let's alter t6 so it become encrypted
@@ -175,6 +176,44 @@ alter table t6 encryption_key_id = 6;
 --let $assert_text= table t6 should get rebuilt with latest version of percona_innodb-6, i.e. version 0
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 and name=\\'test/t6\\' AND CURRENT_KEY_ID = 6]" = 1
 --source include/assert.inc
+
+--echo # Now change t6's encryption key to an existing key 5. It should have its latest
+--echo # key_version assigned, i.e. 4
+
+alter table t6 encryption_key_id = 5;
+
+--let $assert_text= table t6 should get rebuilt with latest version of percona_innodb-6, i.e. version 4
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 4 and name=\\'test/t6\\' AND CURRENT_KEY_ID = 5]" = 1
+--source include/assert.inc
+
+--echo # Turn off encryption for t6
+alter table t6 encryption='N';
+
+--echo # Wait for t6 to get decrypted
+
+#--let $wait_timeout= 600
+#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION > 100 and name="test/t6"
+#--source include/wait_condition.inc
+
+
+--let $assert_text= table t6 should be marked as unencrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL and name=\\'test/t6\\']" = 1
+--source include/assert.inc
+
+--source include/shutdown_mysqld.inc
+
+--echo # Make sure t6 is unencrypted
+--let SEARCH_PATTERN=nosecret
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$t6_IBD
+--source include/search_pattern_in_file.inc
+
+--source include/start_mysqld.inc
+
+--echo # Now turn
+
+
+
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --die

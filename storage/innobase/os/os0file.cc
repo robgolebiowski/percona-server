@@ -1793,9 +1793,9 @@ os_file_io_complete(
                       is_crypt_checksum_correct = memcmp(zip_magic, ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC,
                                                          ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN) == 0;
                     }
-
-                    is_crypt_checksum_correct = fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(),
-                                                                                encryption.is_encrypted_and_compressed(buf), offset);
+                    else
+                      is_crypt_checksum_correct = fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(),
+                                                                                  encryption.is_encrypted_and_compressed(buf), offset);
 
 
                     //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);

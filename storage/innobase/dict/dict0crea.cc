@@ -482,6 +482,10 @@ dict_build_tablespace_for_table(
 			DICT_TF2_FLAG_UNSET(table,
 					    DICT_TF2_FTS_AUX_HEX_NAME););
 
+        if (node && (node->mode == FIL_ENCRYPTION_ON ||
+                     (node->mode == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
+          DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+
 	if (needs_file_per_table) {
 		/* This table will need a new tablespace. */
 

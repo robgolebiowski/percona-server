@@ -1227,7 +1227,9 @@ buf_dblwr_flush_buffered_writes(
 
                 //TODO:Temporarily encrypt pages once for writing data into tablespace file and the second time when writing data to double write buffer
                 buf_page_t *bpage = &(((buf_block_t*)dblwr_shard->buf_block_arr[i])->page);
-                FilSpace space (bpage->id.space()); // this is a guard
+                //FilSpace space (bpage->id.space()); // this is a guard
+                FilSpace space (TRX_SYS_SPACE); // this is a guard
+                                                // Temporarily encrypt all pages in doulbe write buffer with system's tablespace key
                 
                 //TODO:Those keys will need to be fried somewhere
                 if (space() && space()->crypt_data && space()->crypt_data->should_encrypt()) //TODO:Robert Space might be already dropped - one more reason to

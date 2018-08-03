@@ -5955,47 +5955,43 @@ fil_io_set_encryption(
                   iv = space->crypt_data->iv;
                   if (req_type.is_write())
                   {
-                    //if (bpage->encryption_key == NULL)
-                      //ut_ad(false);
-                    if (bpage->encrypt)
-                    {
-                      //if (bpage->encryption_key == NULL)
-                      //{
-                        //ib::error() << "Robert: No encryption key for space: " << space->name << " id= " << space->id;
-                        //os_thread_sleep(3000000); // poczekaj az wiadomosc znajdzie sie w logu
-                      //}
+                     //static void get_latest_tablespace_key(uint key_id,
+                           //uint *tablespace_key_version,
+			   //byte** tablespace_key);
 
-                      ut_ad(bpage->encryption_key != NULL); 
-                      //{
-                        key = bpage->encryption_key;
-                        key_version = bpage->encryption_key_version;
-                        //Encryption::get_latest_tablespace_key(space->id, &key_version, &key);
-                        //key_len = ENCRYPTION_KEY_LEN;
-                        key_len = bpage->encryption_key_length;
-                      //}
-                      //else
-                      //{
-                        //ut_ad(key_version != (uint)(~0));
-                        //return; 
-                      //}
+                    if (space->crypt_data->should_encrypt())
+                    {
+                      Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &key_version, &key);
+                      key_len = 32;
                     }
                     else
                     {
-
-                      if (strcmp(space->name, "test/t2") == 0)
-                        ib::error() << "Setting key to unencrypted for space: " << space->name << '\n';
-
-                //TODO:Robert this test is invalid for MTR test create_or_replace.test
-                      //ut_ad((!srv_encrypt_tables && space->crypt_data->encryption != FIL_ENCRYPTION_ON) ||
-                            //(srv_encrypt_tables && space->crypt_data->encryption == FIL_ENCRYPTION_OFF));
-         	      key = NULL;
-		      key_len = 0;
-		      iv = NULL;
+                      key = NULL;
+                      key_len = 0;
+                      iv = NULL;
                       key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-
-                      //req_type.clear_encrypted();
-                      ut_ad(key_version != (uint)(~0));
                     }
+
+                    //if (bpage->encrypt)
+                    //{
+                      //ut_ad(bpage->encryption_key != NULL); 
+                      //key = bpage->encryption_key;
+                      //key_version = bpage->encryption_key_version;
+                      //key_len = bpage->encryption_key_length;
+                    //}
+                    //else
+                    //{
+
+                      //if (strcmp(space->name, "test/t2") == 0)
+                        //ib::error() << "Setting key to unencrypted for space: " << space->name << '\n';
+
+                       //key = NULL;
+		      //key_len = 0;
+		      //iv = NULL;
+                      //key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+
+                      //ut_ad(key_version != (uint)(~0));
+                    //}
 
                   }
                   key_id= space->crypt_data->key_id;
