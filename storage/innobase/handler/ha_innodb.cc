@@ -11342,9 +11342,12 @@ err_col:
                         rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
                   //else if((Encryption::is_none(m_create_info->encrypt_type.str) && srv_encrypt_tables)
                           //|| Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
-                  else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
+                  else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
+                          (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)))
                   {
-                      rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
+                      rotated_keys_encryption_option= Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
+                                                                  ? FIL_ENCRYPTION_ON
+                                                                  : FIL_ENCRYPTION_DEFAULT;
                       DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
 
                       uint tablespace_key_version;
@@ -11363,12 +11366,13 @@ err_col:
                         my_free(tablespace_key);
 
                   }
-                  else if(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str))
-                  {
-                      //default encryption key should exists - this is checked on server startup
-                      rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
-                      DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                  }
+                  //else if(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)) //TODO: Shouldn't here be also check for encryption_key_id
+                                                                                                     ////Thus this and the above should be merged ?
+                  //{
+                      ////default encryption key should exists - this is checked on server startup
+                      //rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
+                      //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+                  //}
                 }
 		else {
 

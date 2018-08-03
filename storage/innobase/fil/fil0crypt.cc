@@ -1805,8 +1805,8 @@ fil_crypt_needs_rotation(
       }
 
       //if (key_version == 0 && latest_key_version != 0) {
-      //if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-      if (key_version != 0 && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+      if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+      //if (key_version != 0 && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 
               /* this is rotation unencrypted => encrypted
               * ignore rotate_key_age */
@@ -1826,7 +1826,10 @@ fil_crypt_needs_rotation(
 
       /* this is rotation encrypted => encrypted,
       * only reencrypt if key is sufficiently old */
-      if (key_version + rotate_key_age < latest_key_version) {
+      if (key_version + rotate_key_age <= latest_key_version) {
+         ib::error() << "Rotating from key_version = " << key_version << " rotate_key_age = " << rotate_key_age
+                     << " latest_key_version = " << latest_key_version;
+
               return true;
       }
 
@@ -2261,11 +2264,18 @@ fil_crypt_space_needs_rotation(
                       key_state->key_id= crypt_data->key_id;
                       fil_crypt_get_key_state(key_state, crypt_data);
               }
-
-              if (space->id == 23)
+              if (strcmp(state->space->name, "test/t1") == 0)
               {
-                 ib::error() << "Starting encrypting space 23 - before checking if key needs rotation";
+                ib::error() << "In fil_crypt_space_needs_rotation for test/t1"
+                            << " min_key_version = " << crypt_data->min_key_version
+                            << " latest_key_version = " << key_state->key_version
+                            << " rotate_key_age = " << key_state->rotate_key_age << '\n';
               }
+
+              //if (space->id == 23)
+              //{
+                 //ib::error() << "Starting encrypting space 23 - before checking if key needs rotation";
+              //}
 
               bool need_key_rotation = fil_crypt_needs_rotation(
                       crypt_data->encryption,
@@ -2279,8 +2289,9 @@ fil_crypt_space_needs_rotation(
                     break; // the space is already being processed and there are no more pages to rotate
               }
 
-              if (crypt_data->min_key_version != 0)
-                crypt_data->min_key_version= ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+              //if (crypt_data->min_key_version != 0)
+              //if (crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+                //crypt_data->min_key_version= ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
 
               //TODO:Robert to jest tymczasowe i troche glupie - zeby umowliwic rotacje enkrytped -> not enkrypted
               //if (need_key_rotation && key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
@@ -3578,8 +3589,10 @@ fil_crypt_flush_space(
           //}
         }
         else
-          ut_ad(crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY && current_type == CRYPT_SCHEME_1 &&
-                FSP_FLAGS_GET_ENCRYPTION(space->flags));
+          ut_ad((crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY && current_type == CRYPT_SCHEME_1 &&
+                FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
+                (crypt_data->min_key_version + srv_fil_crypt_rotate_key_age == crypt_data->rotate_state.min_key_version_found && FSP_FLAGS_GET_ENCRYPTION(space->flags)));
+        //TODO:Would not it be better if srv_fil_crypt_rotate_key_age == 1 meant - rotate key_version every single key rotation?
       }
 
       /* update page 0 */
@@ -3691,8 +3704,8 @@ fil_crypt_complete_rotate_space(
                       /* we're the last active thread */
                       ut_ad(crypt_data->rotate_state.flushing == false);
                       crypt_data->rotate_state.flushing = true;
-                      ut_ad(crypt_data->min_key_version != crypt_data->rotate_state.min_key_version_found);
-                      //crypt_data->min_key_version =
+                      //ut_ad(crypt_data->min_key_version != crypt_data->rotate_state.min_key_version_found);
+                      //crypt_data->min_key_version = //This is done latter - after flush
                               //crypt_data->rotate_state.min_key_version_found;
               //TODO:Robert - tutaj chyba może być wyścig
               //TODO:Robert: Jeszcze nie było flush a nowe crypt_data->min_key_version
@@ -3822,17 +3835,17 @@ DECLARE_THREAD(fil_crypt_thread)(
               recheck = false;
               thr.first = true;      // restart from first tablespace
 
-              ib::error() << "Restarting from first table" << '\n';
+              //ib::error() << "Restarting from first table" << '\n';
 
               /* iterate all spaces searching for those needing rotation */
               while (!thr.should_shutdown() &&
                      fil_crypt_find_space_to_rotate(&new_state, &thr, &recheck)) {
 
-                      if (strcmp(thr.space->name, "test/t1") == 0)
-                      {
-                        ib::error() << "Recheck = " << recheck << '\n';
-                        ib::error() << "Getting to rotate " << thr.space->name << '\n';
-                      }
+                      //if (strcmp(thr.space->name, "test/t1") == 0)
+                      //{
+                        //ib::error() << "Recheck = " << recheck << '\n';
+                        //ib::error() << "Getting to rotate " << thr.space->name << '\n';
+                      //}
 
                       /* we found a space to rotate */
                       fil_crypt_start_rotate_space(&new_state, &thr);
@@ -3841,10 +3854,10 @@ DECLARE_THREAD(fil_crypt_thread)(
                       while (!thr.should_shutdown() &&
                              fil_crypt_find_page_to_rotate(&new_state, &thr)) {
 
-                              if (strcmp(thr.space->name, "test/t1") == 0)
-                              {
-                                ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
-                              }
+                              //if (strcmp(thr.space->name, "test/t1") == 0)
+                              //{
+                                //ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
+                              //}
 
 
                               if (!thr.space->is_stopping()) {

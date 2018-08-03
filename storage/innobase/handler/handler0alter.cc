@@ -4620,9 +4620,11 @@ prepare_inplace_alter_table_dict(
 
                 if (Encryption::is_no(encrypt))
                   mode= FIL_ENCRYPTION_OFF;
-                else if (Encryption::is_rotated_keys(encrypt))
+                else if (Encryption::is_rotated_keys(encrypt) || 
+                        (srv_encrypt_tables && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)))
                 {
-                  mode= FIL_ENCRYPTION_ON;
+                  mode= Encryption::is_rotated_keys(encrypt) ? FIL_ENCRYPTION_ON
+                                                             : FIL_ENCRYPTION_DEFAULT;
                   key_id= ha_alter_info->create_info->encryption_key_id;
 
                   uint tablespace_key_version;

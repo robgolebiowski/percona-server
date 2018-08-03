@@ -621,8 +621,9 @@ struct Encryption {
 private:
 //TODO: Robert: Is it needed here?
         static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
-        static void get_system_key(const char *system_key_name, byte **key, uint *key_version,
-                                   size_t *key_length);
+
+        static void get_latest_system_key(const char *system_key_name, byte **key, uint *key_version,
+                                          size_t *key_length);
 };
 
 /** Types for AIO operations @{ */
@@ -966,6 +967,7 @@ public:
 		m_encryption.m_type = Encryption::NONE;
                 m_encryption.m_encryption_rotation = NONE;
                 m_encryption.m_tablespace_iv = NULL;
+                m_encryption.m_key_id = 0;
 	}
 
         //bool was_page_encrypted_when_read() const

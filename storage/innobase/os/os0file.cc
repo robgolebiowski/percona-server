@@ -9480,37 +9480,32 @@ Encryption::get_tablespace_key(uint key_id,
 
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
-	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    key_id);
-
 	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    //"%s-%s-%lu:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    //srv_uuid, space_id, tablespace_key_version);
+		    //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    //key_id);
+  //std::ostringstream percona_binlog_with_ver_ss;
+  //percona_binlog_with_ver_ss << PERCONA_BINLOG_KEY_NAME << ':' << kv;
 
-        uint key_version_fetched = (~0);
-        get_system_key(key_name, tablespace_key, &key_version_fetched, key_len);
+        ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+                    "%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+                     key_id, tablespace_key_version);
+
+        //get_system_key(key_name, tablespace_key, &key_version_fetched, key_len);
 
         //get_keyring_key(key_name, tablespace_key, key_len);
         // TODO:For debug we always expect key_version to be fetched correctly
         //ut_ad(tablespace_key_version == key_version_fetched);
 
+
+        Encryption::get_keyring_key(key_name, tablespace_key, key_len);
+
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
 				" the keyring plugin is loaded. 2";
+                ut_ad(0);
                 result = false;
 	}
-        else if (key_version_fetched != tablespace_key_version)
-        {
-             	ib::error() << "Encryption can't find tablespace key with version: "
-                            << tablespace_key_version
-                            << " please check the keyring plugin is loaded. 2"
-                            << " If this key version does not seem sensible it is possible"
-                            << " that page is corrupted";
-                my_free(*tablespace_key);
-                *tablespace_key = NULL;
-                result = false;
-        }
+   
         //else 
 
 #ifdef UNIV_ENCRYPT_DEBUG
@@ -9525,7 +9520,7 @@ Encryption::get_tablespace_key(uint key_id,
 }
                             
 
-void Encryption::get_system_key(const char *system_key_name,
+void Encryption::get_latest_system_key(const char *system_key_name,
                                 byte **key,
                                 uint *key_version,
                                 size_t *key_length)
@@ -9570,7 +9565,7 @@ Encryption::get_latest_tablespace_key(uint key_id,
 		    //"%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 		    //uuid, space_id); // TODO:Robert make sure uuid is set till we get here
 
-        get_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
+        get_latest_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
 
         /* //TODO : For now, I am commenting this out maybe I will change this to error
          * TODO: If I decided to move creating innodb tablespace key creationg to fil_set_encryption
@@ -9880,6 +9875,7 @@ Encryption::encrypt(
         fprintf(stderr, "\nand iv:");
 	ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
         fprintf(stderr, "key_version:%u", m_key_version);
+        fprintf(stderr, "key_id:%u", m_key_id);
         fprintf(stderr, "\n");
         //ut_ad(page_no != 0);
         
@@ -10207,6 +10203,8 @@ Encryption::encrypt(
 
           fprintf(stderr, "Robert: Comparing before and after encryption");
 
+          byte *m_key_used = m_key;
+
           if (m_type == Encryption::ROTATED_KEYS) // TODO:Robert:For decryption ROTATED_KEYS page key needs to be set to NULL
             m_key = NULL;
 
@@ -10221,9 +10219,17 @@ Encryption::encrypt(
                                           check_buf + FIL_PAGE_DATA,
                                           src_len - FIL_PAGE_DATA - 4) != 0) {
 
-                  fprintf(stderr, "Robert: After and before encryption are different:");
-                  ut_print_buf(stderr, src, src_len);
-                  ut_print_buf(stderr, check_buf, src_len);
+                  fprintf(stderr, "Robert: After and before encryption are different. "
+                                  " key_version used for encryption: %d, key used for encryption:", m_key_version);
+                  ut_print_buf(stderr, m_key_used, 32);
+	          m_key_version= mach_read_from_4(check_buf + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+                  fprintf(stderr, "Robert: After and before encryption are different. "
+                                  " key_version used for decryption: %d, key used for decryption:", m_key_version);
+
+                  size_t key_len;
+                  get_tablespace_key(m_key_id, uuid, m_key_version, &m_key, &key_len);
+                  ut_print_buf(stderr, m_key, 32);
+
                   ut_ad(0);
           }
           ut_free(buf2);
@@ -10413,6 +10419,7 @@ Encryption::decrypt(
 	ut_print_buf(stderr, m_key, ENCRYPTION_KEY_LEN);
         fprintf(stderr, "\nand iv:");
 	ut_print_buf(stderr, m_iv, ENCRYPTION_KEY_LEN/2); //TODO:Robert Should not iv be of the length of the key?
+        fprintf(stderr, "key_id:%u", m_key_id);
         fprintf(stderr, "\n");
 
         if (space_id == 24 && page_no == 3)

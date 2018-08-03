@@ -5937,6 +5937,9 @@ fil_io_set_encryption(
                 uint key_version = 0;
                 uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 
+                if (strcmp(space->name, "test/t6") == 0)
+                  ib::error() << "dummy test for " << space->name << '\n';
+
                 //ut_ad(space->encryption_type != Encryption::ROTATED_KEYS); //TODO:Robert:Cannot be called for ROTATED_KEYS
 
                 //TODO:Robert this test is invalid for MTR test create_or_replace.test
@@ -5996,6 +5999,11 @@ fil_io_set_encryption(
 
                   }
                   key_id= space->crypt_data->key_id;
+
+                  if (strcmp(space->name, "test/t6") == 0)
+                    ib::error() << "dummy test for " << space->name << '\n';
+
+
 
                   if (req_type.is_read())
                   {
