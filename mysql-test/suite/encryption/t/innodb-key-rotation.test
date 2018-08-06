@@ -32,8 +32,6 @@ create table t3 (a varchar(255)) engine=innodb;
 create table t4 (a varchar(255)) engine=innodb encryption='Y'; # MK encryption - should get re-encrypted to ROTATED_KEYS
 create table t5 (a varchar(255)) engine=innodb;
 create table t6 (a varchar(255)) engine=innodb encryption='N';
-#create table t3 (a varchar(255)) engine=innodb encryption='N';
-#create table t5 (a varchar(255)) engine=innodb encryption='Y';
 
 insert t1 values (repeat('foobarsecret', 12));
 insert t2 values (repeat('tempsecret', 12));
@@ -49,12 +47,6 @@ insert t6 values (repeat('nosecret', 12));
 # contains an artificial tabe innodb_system and t6 should stay unencrypted
 --let $wait_condition=SELECT COUNT(*) = $tables_count  FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
-
-#select * from t1;
-#select * from t2;
-#select * from t3;
-#select * from t4;
-
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 
@@ -87,7 +79,6 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --let $assert_text= table t6 should stay unencrypted
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL]" = 1
 --source include/assert.inc
-
 
 --echo # Now, let's rotate key 5 twice
 
@@ -210,9 +201,22 @@ alter table t6 encryption='N';
 
 --source include/start_mysqld.inc
 
---echo # Now turn
+--echo # Now turn off the encryption. Only one table should remain encrypted - the one with explicite encryption
+--echo # ie. t1
 
+SET GLOBAL innodb_encrypt_tables = off;
 
+--let $tables_count= `select count(*) from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
+--let $wait_timeout= 600
+# We should have $tables_count - 2 tables encrypted unencrypted (-1 because of additional innodb_system table)
+# and one table t1 encrypted with version 3 of key 0 => thus $tables_count - 2
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL
+--source include/wait_condition.inc
+
+# Table t1 should stay encrypted with version 3 of key 0
+--let $assert_text= table t1 should stay encrypted with version 3 of key 0
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 3 and name=\\'test/t1\\' AND CURRENT_KEY_ID = 0]" = 1
+--source include/assert.inc
 
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
