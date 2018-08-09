@@ -43,12 +43,6 @@ Created 10/21/1995 Heikki Tuuri
 #include <time.h>
 #endif /* !_WIN32 */
 
-enum ENCRYPTION_ROTATION
-{
-   NONE,
-   MASTER_KEY_TO_ROTATED_KEY,
-   ROTATED_KEY_TO_MASTER_KEY
-};
 
 /** File node of a tablespace or the log data space */
 struct fil_node_t;
@@ -411,6 +405,14 @@ struct Encryption {
                 ROTATED_KEYS = 2
 	};
 
+        enum Encryption_rotation
+        {
+           NO_ROTATION,
+           MASTER_KEY_TO_ROTATED_KEY,
+           ROTATED_KEY_TO_MASTER_KEY
+        };
+
+
 	/** Encryption information format version */
 	enum Version {
 
@@ -422,13 +424,14 @@ struct Encryption {
 	};
 
 	/** Default constructor */
-	Encryption() : m_type(NONE) { } //, m_was_page_encrypted_when_read(false) { };
+	Encryption() : m_type(NONE), m_encryption_rotation(NO_ROTATION) { } //, m_was_page_encrypted_when_read(false) { };
 
 	/** Specific constructor
 	@param[in]	type		Algorithm type */
 	explicit Encryption(Type type)
 		:
-		m_type(type)
+		m_type(type),
+                m_encryption_rotation(NO_ROTATION) 
                 //m_was_page_encrypted_when_read(false)
 	{
 #ifdef UNIV_DEBUG
@@ -617,7 +620,7 @@ struct Encryption {
 	/** Current uuid of server instance */
 	static char		uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 
-        ENCRYPTION_ROTATION     m_encryption_rotation;
+        Encryption_rotation     m_encryption_rotation;
 private:
 //TODO: Robert: Is it needed here?
         static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
@@ -938,7 +941,7 @@ public:
                 m_encryption.m_tablespace_iv = tablespace_iv;
 	}
 
-        void encryption_rotation(ENCRYPTION_ROTATION encryption_rotation)
+        void encryption_rotation(Encryption::Encryption_rotation encryption_rotation)
         {
           m_encryption.m_encryption_rotation = encryption_rotation;
         }
@@ -965,7 +968,7 @@ public:
 		m_encryption.m_klen = 0;
 		m_encryption.m_iv = NULL;
 		m_encryption.m_type = Encryption::NONE;
-                m_encryption.m_encryption_rotation = NONE;
+                m_encryption.m_encryption_rotation = Encryption::NO_ROTATION;
                 m_encryption.m_tablespace_iv = NULL;
                 m_encryption.m_key_id = 0;
 	}

@@ -122,7 +122,8 @@ struct row_import {
 		m_n_indexes(),
 		m_indexes(),
 		m_missing(true),
-		m_cfp_missing(true)	{ }
+		m_cfp_missing(true),
+                m_is_rotated_keys(false) { }
 
 	~row_import() UNIV_NOTHROW;
 
@@ -220,6 +221,8 @@ struct row_import {
 
 	bool		m_cfp_missing;		/*!< true if a .cfp file was
 						found and was readable */
+
+        bool            m_is_rotated_keys;
 };
 
 /** Use the page cursor to iterate over records in a block. */
@@ -3107,6 +3110,9 @@ row_import_read_meta_data(
 	case IB_EXPORT_CFG_VERSION_V1:
 
 		return(row_import_read_v1(file, thd, &cfg));
+        case IB_EXPORT_CFG_VERSION_V1_WITH_RK:
+                cfg.m_is_rotated_keys = true;
+		return(row_import_read_v1(file, thd, &cfg));
 	default:
 		ib_errf(thd, IB_LOG_LEVEL_ERROR, ER_IO_READ_ERROR,
 			"Unsupported meta-data version number (%lu),"
@@ -3709,25 +3715,9 @@ row_import_for_mysql(
 			return(row_import_error(prebuilt, trx, err));
 		}
 
-		if (!dict_table_is_rotated_keys(table)
-		    && space_flags != 0) {
-		    //&& FSP_FLAGS_GET_ROTATED_KEYS(space_flags)) {
-
-                        //TODO:Robert : To nie ma sensu skoro FSP_FLAGS_GET_ROTATED_KEYS nie działa - trzeba to zmienieć
-                        //na czytanie crypt_data czy coś w tym stylu
-			ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
-				 ER_TABLE_SCHEMA_MISMATCH,
-				 "Table is not marked as encrypted with rotated keys, but"
-				 " the tablespace is marked as encrypted with rotated keys");
-
-			err = DB_ERROR;
-			return(row_import_error(prebuilt, trx, err));
-		}
-
-
 		/* If table is set to encrypted, but can't find
 		cfp file, then return error. */
-		if (cfg.m_cfp_missing== true
+		if (cfg.m_cfp_missing== true && !cfg.m_is_rotated_keys
 		    && ((space_flags != 0
 			 && FSP_FLAGS_GET_ENCRYPTION(space_flags))
 			|| dict_table_is_encrypted(table))) {
@@ -3830,7 +3820,7 @@ row_import_for_mysql(
 	fil_space_set_imported() to declare it a persistent tablespace. */
 
 	ulint	fsp_flags = dict_tf_to_fsp_flags(table->flags, false);
-	if (table->encryption_key != NULL) {
+	if (table->encryption_key != NULL || cfg.m_is_rotated_keys) {
 		fsp_flags |= FSP_FLAGS_MASK_ENCRYPTION;
 	}
 
@@ -3839,6 +3829,17 @@ row_import_for_mysql(
 	err = fil_ibd_open(
 		true, true, FIL_TYPE_IMPORT, table->space,
 		fsp_flags, table->name.m_name, filepath, is_rotated_keys);
+
+        if (err == DB_SUCCESS && cfg.m_is_rotated_keys != is_rotated_keys)
+        {
+              ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
+              ER_TABLE_SCHEMA_MISMATCH,
+              "Table is marked as encrypted with ROTATED_KEYS in cfg file, but there"
+              " is no ROTATED_KEYS encryption information in tablespace header"
+              " Please make sure that ibd and cfg files are match");
+              
+              err = DB_ERROR;
+        } 
 
 	DBUG_EXECUTE_IF("ib_import_open_tablespace_failure",
 			err = DB_TABLESPACE_NOT_FOUND;);
@@ -3965,7 +3966,7 @@ row_import_for_mysql(
 	ib::info() << "Phase IV - Flush complete";
 	fil_space_set_imported(prebuilt->table->space);
 
-	if (dict_table_is_encrypted(table)) {
+	if (dict_table_is_encrypted(table) && !cfg.m_is_rotated_keys) {
 		fil_space_t*	space;
 		mtr_t		mtr;
 		byte		encrypt_info[ENCRYPTION_INFO_SIZE_V2];

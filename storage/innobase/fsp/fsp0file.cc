@@ -682,6 +682,14 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
             ib::error() << "Table test/t2 has NOT crypt data in validate first page";
         }
  
+        //TODO:Robert: Based on this is_rotated_keys is set - but what about situation if we do not
+        //get here and ValidateOutput::DO_NOT_KNOW is set - will then an error be emited first
+        //and is_rotated_key will not be checked at all ?
+        output.encryption_type = FSP_FLAGS_GET_ENCRYPTION(m_flags) ? (crypt_data == NULL ? ValidateOutput::MASTER_KEY
+                                                                                         : ValidateOutput::ROTATED_KEYS)
+                                                                   : ValidateOutput::NONE;
+
+
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
@@ -689,7 +697,6 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
         { 
             if(crypt_data == NULL)
             {
-                output.encryption_type = ValidateOutput::MASTER_KEY;
 		m_encryption_key = static_cast<byte*>(
 			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 		m_encryption_iv = static_cast<byte*>(
@@ -736,7 +743,6 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
             
             else
             {
-                output.encryption_type = ValidateOutput::ROTATED_KEYS;
                 if (Encryption::tablespace_key_exists(crypt_data->key_id) == false)
                 {
                    ib::error() << "Table " << m_name << " in file " << m_filename << ' '
@@ -763,8 +769,6 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
                 }
             }
 	}
-        else
-           output.encryption_type = Datafile::ValidateOutput::NONE;
 
         if (crypt_data != NULL)
         {

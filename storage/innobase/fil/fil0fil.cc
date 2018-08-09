@@ -2154,10 +2154,10 @@ fil_space_next(fil_space_t* prev_space)
        if (prev_space != NULL ) { //|| space_should_not_be_rotated(space)) {
 		ut_ad(space->n_pending_ops > 0);
 
-                if (strcmp(prev_space->name, "test/t2") == 0)
-                {
-                  ib::error() << "Prev space is test/t2" << '\n';
-                }
+                //if (strcmp(prev_space->name, "test/t2") == 0)
+                //{
+                  //ib::error() << "Prev space is test/t2" << '\n';
+                //}
 
 		/* Move on to the next fil_space_t */
 		space->n_pending_ops--;
@@ -6034,7 +6034,7 @@ fil_io_set_encryption(
                 if (space->crypt_data != NULL)
                   req_type.encryption_rotation(space->crypt_data->encryption_rotation);
                 else 
-                  req_type.encryption_rotation(NONE);
+                  req_type.encryption_rotation(Encryption::NO_ROTATION);
 	} else {
 		req_type.clear_encrypted();
 	}
@@ -6403,8 +6403,8 @@ _fil_io(
         ib_uint32_t space_id = page_id.space();
         ib_uint32_t page_no = page_id.page_no();
 
-        if (space_id == 25 && page_no == 2)
-          space_id = 25;
+        if (space_id == 36 && page_no == 2)
+          space_id = 36;
 
 #else /* UNIV_HOTBACKUP */
 	/* Queue the aio request */
@@ -6997,11 +6997,14 @@ fil_iterate(
 
 	for (offset = iter.start; offset < iter.end; offset += n_bytes) {
 
+		IORequest	read_request(read_type);
+
 		byte*	io_buffer = iter.io_buffer;
 
 		block->frame = io_buffer;
 
 		if (callback.get_page_size().is_compressed()) {
+  
 			page_zip_des_init(&block->page.zip);
 			page_zip_set_size(&block->page.zip, iter.page_size);
 
@@ -7014,6 +7017,9 @@ fil_iterate(
 			ut_d(block->page.zip.m_external = true);
 			ut_ad(iter.page_size
 			      == callback.get_page_size().physical());
+
+                        read_request.mark_page_zip_compressed();
+                        read_request.set_zip_page_physical_size(iter.page_size);
 
 			/* Zip IO is done in the compressed page buffer. */
 			io_buffer = block->page.zip.data;
@@ -7033,30 +7039,34 @@ fil_iterate(
 
                 //TODO:Robert: I am not using those variables
                 const bool	encrypted_with_rotated_keys = iter.crypt_data != NULL
-                                                              && iter.crypt_data->should_encrypt(); // TODO:Robert: to jest chyba zle w MariaDB
-                                                                                                    // powinni sprawdzać czy tablica jest zaszyfrowana
+                                                              && iter.crypt_data->type != CRYPT_SCHEME_UNENCRYPTED; // TODO:Robert: to jest chyba zle w MariaDB
+                                                                                                    //// powinni sprawdzać czy tablica jest zaszyfrowana
                                                                                                     // a nie czy obecny server should encrypt
                 //bool		decrypted = false;
 
 		dberr_t		err;
-		IORequest	read_request(read_type);
 		//ulint	space_flags = callback.get_space_flags();
 
 
 		/* For encrypted table, set encryption information. */
 		if ((iter.encryption_key != NULL || encrypted_with_rotated_keys) && offset != 0) {
-			read_request.encryption_key(encrypted_with_rotated_keys ? NULL : iter.encryption_key,
+			read_request.encryption_key(encrypted_with_rotated_keys ? iter.crypt_data->tablespace_key : iter.encryption_key,
 						    ENCRYPTION_KEY_LEN,
 						    encrypted_with_rotated_keys ? iter.crypt_data->iv : iter.encryption_iv,
                                                     0, //TODO:Robert - maybe I should not set key version to 0 here, but to something like invalid key?
                                                     iter.encryption_key_id,
-                                                    NULL);
+                                                    iter.crypt_data->tablespace_iv);
 
 			//read_request.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space_flags) ? Encryption::ROTATED_KEYS
                                                                                                   //: Encryption::AES);
-                          read_request.encryption_algorithm(encrypted_with_rotated_keys ? Encryption::ROTATED_KEYS
-                                                                                        : Encryption::AES);
-
+                          read_request.encryption_algorithm(iter.crypt_data ? Encryption::ROTATED_KEYS
+                                                                            : Encryption::AES);
+                          if (iter.crypt_data)
+                          {
+                            read_request.encryption_rotation(iter.crypt_data->encryption_rotation);
+                          }
+                          else
+                            read_request.encryption_rotation(Encryption::NO_ROTATION);
 		}
 
 		err = os_file_read(
@@ -7139,6 +7149,11 @@ fil_iterate(
                                                      NULL);
 
                         write_request.encryption_algorithm(Encryption::ROTATED_KEYS);
+
+		        if (callback.get_page_size().is_compressed()) {
+                          write_request.mark_page_zip_compressed();
+                          write_request.set_zip_page_physical_size(iter.page_size);
+                        }
                 }
 
 		/* A page was updated in the set, write back to disk.
@@ -7288,8 +7303,9 @@ fil_tablespace_iterate(
 
 		/* read (optional) crypt data */
                 //if (FSP_FLAGS_GET_ROTATED_KEYS(space_flags))
-                if(iter.crypt_data)
+                if(iter.crypt_data && iter.crypt_data->type != CRYPT_SCHEME_UNENCRYPTED)
                 {
+                  ut_ad(FSP_FLAGS_GET_ENCRYPTION(space_flags));
                   // TODO:Robert I realy need to merge this with table->encryption_key below
                   //iter.crypt_data = fil_space_read_crypt_data(
                           //callback.get_page_size(), page);
@@ -7326,7 +7342,7 @@ fil_tablespace_iterate(
 		/* Check encryption is matched or not. */
 		//ulint	space_flags = callback.get_space_flags();
 		if (err == DB_SUCCESS && FSP_FLAGS_GET_ENCRYPTION(space_flags)) {  //TODO:Robert: For now disabling this for 'ROTATED_KEYS'
-			ut_ad(table->encryption_key != NULL);
+			ut_ad(iter.encryption_key != NULL);
 
 			if (!dict_table_is_encrypted(table)) {
 				ib::error() << "Table is not in an encrypted"

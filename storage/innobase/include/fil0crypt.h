@@ -166,7 +166,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 		uint new_key_id,
 		fil_encryption_t new_encryption,
                 bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
-                ENCRYPTION_ROTATION encryption_rotation = NONE)
+                Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION)
 		: st_encryption_scheme(),
 		min_key_version(new_min_key_version),
 		page0_offset(0),
@@ -265,7 +265,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 	@param[in,out]	mtr	mini-transaction */
 	void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr,
                          uint a_min_key_version, uint a_type,
-                         ENCRYPTION_ROTATION current_encryption_rotation);
+                         Encryption::Encryption_rotation current_encryption_rotation);
 
         void set_tablespace_key(const uchar *tablespace_key)
         {
@@ -317,7 +317,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 
 	fil_space_rotate_state_t rotate_state;
 
-        ENCRYPTION_ROTATION encryption_rotation;
+        Encryption::Encryption_rotation encryption_rotation;
 
         uchar *tablespace_key; //TODO:Make it private ?
         uchar *tablespace_iv;

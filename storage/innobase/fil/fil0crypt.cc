@@ -551,7 +551,7 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 
         bytes_read += iv_length;
 
-        crypt_data->encryption_rotation = (ENCRYPTION_ROTATION) mach_read_from_4(page + offset + bytes_read);
+        crypt_data->encryption_rotation = (Encryption::Encryption_rotation) mach_read_from_4(page + offset + bytes_read);
         bytes_read += 4;
 
         uchar tablespace_key[ENCRYPTION_KEY_LEN];
@@ -784,7 +784,7 @@ fil_space_crypt_t::write_page0(
 	mtr_t*			mtr,
         uint a_min_key_version,
         uint a_type,
-        ENCRYPTION_ROTATION current_encryption_rotation)
+        Encryption::Encryption_rotation current_encryption_rotation)
 {
 
         //byte encrypt_info[ENCRYPTION_INFO_SIZE_V2];
@@ -1370,7 +1370,7 @@ fil_parse_write_crypt_data(
 	crypt_data->encryption = encryption;
 	memcpy(crypt_data->iv, ptr, iv_len);
 	ptr += iv_len;
-        crypt_data->encryption_rotation = (ENCRYPTION_ROTATION) mach_read_from_4(ptr);
+        crypt_data->encryption_rotation = (Encryption::Encryption_rotation) mach_read_from_4(ptr);
         ptr += 4;
         uchar tablespace_key[ENCRYPTION_KEY_LEN];
         memcpy(tablespace_key, ptr, ENCRYPTION_KEY_LEN);
@@ -1930,7 +1930,7 @@ fil_crypt_start_encrypting_space(
 
       if (space->encryption_type == Encryption::AES) // We are re-encrypting space from MK encryption to RK encryption
       {
-        crypt_data->encryption_rotation = MASTER_KEY_TO_ROTATED_KEY;
+        crypt_data->encryption_rotation = Encryption::MASTER_KEY_TO_ROTATED_KEY;
         crypt_data->set_tablespace_key(space->encryption_key);
         crypt_data->set_tablespace_iv(space->encryption_iv); //space key and encryption are always initalized for MK encrypted tables
       }
@@ -2264,13 +2264,13 @@ fil_crypt_space_needs_rotation(
                       key_state->key_id= crypt_data->key_id;
                       fil_crypt_get_key_state(key_state, crypt_data);
               }
-              if (strcmp(state->space->name, "test/t1") == 0)
-              {
-                ib::error() << "In fil_crypt_space_needs_rotation for test/t1"
-                            << " min_key_version = " << crypt_data->min_key_version
-                            << " latest_key_version = " << key_state->key_version
-                            << " rotate_key_age = " << key_state->rotate_key_age << '\n';
-              }
+              //if (strcmp(state->space->name, "test/t1") == 0)
+              //{
+                //ib::error() << "In fil_crypt_space_needs_rotation for test/t1"
+                            //<< " min_key_version = " << crypt_data->min_key_version
+                            //<< " latest_key_version = " << key_state->key_version
+                            //<< " rotate_key_age = " << key_state->rotate_key_age << '\n';
+              //}
 
               //if (space->id == 23)
               //{
@@ -2563,10 +2563,10 @@ fil_crypt_find_space_to_rotate(
       while (!state->should_shutdown() && state->space) {
               fil_crypt_read_crypt_data(state->space);
 
-              if (strcmp(state->space->name, "test/t1") == 0)
-              {
-                ib::error() << "Checking if test/t1 needs rotation" << '\n';
-              }
+              //if (strcmp(state->space->name, "test/t1") == 0)
+              //{
+                //ib::error() << "Checking if test/t1 needs rotation" << '\n';
+              //}
 
 
               // if space is marked as encrytped this means some of the pages are encrypted and space should be skipped
@@ -2620,9 +2620,9 @@ fil_crypt_start_rotate_space(
               * if space extends, it will be encrypted with newer version */
               /* FIXME: max_offset could be removed and instead
               space->size consulted.*/
-              if (strcmp(state->space->name, "test/t2") == 0)
+              if (strcmp(state->space->name, "test/t6") == 0)
               {
-                ib::error() << "Setting max_offset to " << state->space->size << " for test/t2'\n'";
+                ib::error() << "Starting rotating t6" << '\n';
               }
 
               crypt_data->rotate_state.max_offset = state->space->size;
@@ -2686,7 +2686,7 @@ fil_crypt_find_page_to_rotate(
       bool found = crypt_data->rotate_state.max_offset >=
               crypt_data->rotate_state.next_offset;
 
-      if (strcmp(state->space->name, "test/t1") == 0)
+      if (strcmp(state->space->name, "test/t6") == 0)
       {
         if (found)
           ib::error() << "Page is to be rotated for space=" << state->space->name << '\n';
@@ -2919,11 +2919,11 @@ fil_crypt_rotate_page(
               //uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
 
 
-              uint kv= space->crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY
+              uint kv= space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY
                          ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
                          : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
                 
-              if (strcmp(space->name, "test/t1") == 0)
+              if (strcmp(space->name, "test/t6") == 0)
               {
                 ib::error() << "Trying to write to " << space->name << '\n';
                 ib::error() << "Encryption: " << crypt_data->encryption << '\n';
@@ -2958,7 +2958,7 @@ fil_crypt_rotate_page(
                       mtr.set_named_space(space);
                       modified = true;
 
-                      if (strcmp(space->name, "test/t1") == 0)
+                      if (strcmp(space->name, "test/t6") == 0)
                         ib::error() << "Write to  " << space->name << '\n';
                       /* force rotation by dummy updating page */
                       mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
@@ -3554,7 +3554,7 @@ fil_crypt_flush_space(
         ib::error() << "min_key_version_found = " << crypt_data->rotate_state.min_key_version_found << '\n';
       }
 
-      if (crypt_data->encryption_rotation == ROTATED_KEY_TO_MASTER_KEY)
+      if (crypt_data->encryption_rotation == Encryption::ROTATED_KEY_TO_MASTER_KEY)
       {
         mutex_enter(&fil_system->mutex);
         space->encryption_type = Encryption::AES;
@@ -3589,7 +3589,7 @@ fil_crypt_flush_space(
           //}
         }
         else
-          ut_ad((crypt_data->encryption_rotation == MASTER_KEY_TO_ROTATED_KEY && current_type == CRYPT_SCHEME_1 &&
+          ut_ad((crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY && current_type == CRYPT_SCHEME_1 &&
                 FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
                 (crypt_data->min_key_version + srv_fil_crypt_rotate_key_age == crypt_data->rotate_state.min_key_version_found && FSP_FLAGS_GET_ENCRYPTION(space->flags)));
         //TODO:Would not it be better if srv_fil_crypt_rotate_key_age == 1 meant - rotate key_version every single key rotation?
@@ -3607,7 +3607,8 @@ fil_crypt_flush_space(
                   __FILE__, __LINE__, &mtr)) {
                   //__FILE__, __LINE__, &mtr, &err)) {
               mtr.set_named_space(space);
-              crypt_data->write_page0(space, block->frame, &mtr, crypt_data->rotate_state.min_key_version_found, current_type, NONE);
+              crypt_data->write_page0(space, block->frame, &mtr, crypt_data->rotate_state.min_key_version_found, current_type,
+                                      Encryption::NO_ROTATION);
               //ib::error() << "Successfuly updated page0 for table = " << space->name;
       }
 
@@ -3745,7 +3746,7 @@ fil_crypt_complete_rotate_space(
                       crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
                       crypt_data->type = current_type;
                       crypt_data->rotate_state.flushing = false;
-                      crypt_data->encryption_rotation = NONE;
+                      crypt_data->encryption_rotation = Encryption::NO_ROTATION;
 
 
 

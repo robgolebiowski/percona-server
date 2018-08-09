@@ -218,6 +218,20 @@ SET GLOBAL innodb_encrypt_tables = off;
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 3 and name=\\'test/t1\\' AND CURRENT_KEY_ID = 0]" = 1
 --source include/assert.inc
 
+# t6 has been marked as unencrypted - turn on the encryption - it should stay unencrypted
+
+SET GLOBAL innodb_encrypt_tables = on;
+
+--let $wait_timeout= 600
+# Encrypted tables count should be equal all tables ($tables_count) - because INNODB_TABLESPACES_ENCRYPTION
+# contains an artificial tabe innodb_system and t6 should stay unencrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count  FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NOT NULL
+--source include/wait_condition.inc
+
+--let $assert_text= table t6 should be marked as unencrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL and name=\\'test/t6\\']" = 1
+--source include/assert.inc
+
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --die

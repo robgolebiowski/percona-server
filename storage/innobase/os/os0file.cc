@@ -1810,7 +1810,7 @@ os_file_io_complete(
                     //}
 
 
-                    if (encryption.m_encryption_rotation == NONE && !is_crypt_checksum_correct) // There is no re-encryption going on
+                    if (encryption.m_encryption_rotation == Encryption::NO_ROTATION && !is_crypt_checksum_correct) // There is no re-encryption going on
                     {
                       ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
                       ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
@@ -1822,7 +1822,7 @@ os_file_io_complete(
                     }
                   }
 
-                  if (encryption.m_encryption_rotation != NONE) // There is re-encryption going on
+                  if (encryption.m_encryption_rotation != Encryption::NO_ROTATION) // There is re-encryption going on
                   {
                     if (is_crypt_checksum_correct) // assume page is RK encrypted
                       encryption.m_type = Encryption::ROTATED_KEYS; 
@@ -9502,7 +9502,7 @@ Encryption::get_tablespace_key(uint key_id,
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
 				" the keyring plugin is loaded. 2";
-                ut_ad(0);
+                //ut_ad(0);
                 result = false;
 	}
    
@@ -9879,9 +9879,9 @@ Encryption::encrypt(
         fprintf(stderr, "\n");
         //ut_ad(page_no != 0);
         
-        if (space_id == 23 && page_no == 5)
+        if (space_id == 23 && page_no == 1)
         {
-	    fprintf(stderr, "Robert: Before encryption page 24:5:");
+	    fprintf(stderr, "Robert: Before encryption page 23:1:");
             ut_print_buf(stderr, src, src_len);
         }
         //if (m_type == Encryption::ROTATED_KEYS && page_type == FIL_PAGE_COMPRESSED)
@@ -10163,7 +10163,10 @@ Encryption::encrypt(
           }
           else if (type.is_page_zip_compressed())
           {
+	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
+            ut_ad(m_key_version == 0);
             uint32 innodb_checksum = mach_read_from_4(dst + FIL_PAGE_SPACE_OR_CHKSUM);
+            //ut_ad(innodb_checksum != 0);
             uint32 xor_checksum = innodb_checksum ^ m_checksum;
 	    mach_write_to_4(dst +  FIL_PAGE_SPACE_OR_CHKSUM, xor_checksum);
             ut_ad(m_checksum != 0);
@@ -10209,10 +10212,10 @@ Encryption::encrypt(
             m_key = NULL;
 
           dberr_t err = decrypt(type, check_buf, src_len, buf2, src_len);
-          if (space_id == 24 && page_no == 3)
+          if (space_id == 23 && page_no == 1)
           {
-              fprintf(stderr, "Robert: After encryption page 24:3:");
-              ut_print_buf(stderr, src, src_len);
+              fprintf(stderr, "Robert: After encrypting page 23:1:");
+              ut_print_buf(stderr, dst, src_len);
           }
 
           if (err != DB_SUCCESS || memcmp(src + FIL_PAGE_DATA,
@@ -10301,7 +10304,7 @@ Encryption::decrypt(
           ut_ad(xor_checksum != 0);
           uint32 innodb_checksum = xor_checksum ^ post_enc_checksum;
 	  mach_write_to_4(src +  FIL_PAGE_SPACE_OR_CHKSUM, innodb_checksum);
-          ut_ad(innodb_checksum != 0);
+          //ut_ad(innodb_checksum != 0);
         }
 #endif
 
@@ -10376,8 +10379,6 @@ Encryption::decrypt(
             ut_ad(page_type == FIL_PAGE_ENCRYPTED);
           }
 
-          //ut_ad(m_key_version == 0);
-
           ut_ad(m_key == NULL); // TODO:Robert: For rottated keys encryption we will just now fetch the key
           //if (m_key == NULL)
             //memset(m_key, 0, ENCRYPTION_KEY_LEN);
@@ -10422,11 +10423,11 @@ Encryption::decrypt(
         fprintf(stderr, "key_id:%u", m_key_id);
         fprintf(stderr, "\n");
 
-        if (space_id == 24 && page_no == 3)
-        {
-	    fprintf(stderr, "Robert: Before decrypting page 24:3:");
-            ut_print_buf(stderr, src, src_len);
-        }
+        //if (space_id == 24 && page_no == 3)
+        //{
+	    //fprintf(stderr, "Robert: Before decrypting page 24:3:");
+            //ut_print_buf(stderr, src, src_len);
+        //}
 
 #endif
 
@@ -10580,12 +10581,16 @@ Encryption::decrypt(
 		os_free_block(block);
 	}
 
+        if (m_type == Encryption::ROTATED_KEYS && type.is_page_zip_compressed())
+          memset(src + FIL_PAGE_ZIP_ROTATED_KEYS_MAGIC, 0, ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN);
+
+
 #ifdef UNIV_ENCRYPT_DEBUG
 	fprintf(stderr, "Decrypted page:%lu.%lu\n", space_id, page_no);
 
-        if (space_id == 24 && page_no == 3)
+        if (space_id == 23 && page_no == 1)
         {
-	    fprintf(stderr, "Robert: After decrypting page 24:3:");
+	    fprintf(stderr, "Robert: After decrypting page 23:1:");
             ut_print_buf(stderr, src, src_len);
         }
 #endif
