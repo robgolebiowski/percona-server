@@ -436,10 +436,6 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_PATTERN=barb
 # t6 is not encrypted, but unreadable as it is compressed
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=barf
---let SEARCH_FILE=$t6_IBD
---source include/search_pattern_in_file.inc
 --let SEARCH_FILE=$t7_IBD
 --source include/search_pattern_in_file.inc
 --let ABORT_ON=NOT_FOUND
@@ -447,9 +443,73 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 --let SEARCH_FILE=$t8_IBD
 --source include/search_pattern_in_file.inc
 
---let $restart_parameters=restart:--innodb_encrypt_tables=0 --innodb_encryption_threads=0
+--echo # Now let's backup keyring file, change encryption key id of encrypt-able tables (all but t7) 
+--echo # export and dicard them. Next restart the server with backuped keyring file and make sure that
+--echo # server starts, but tables cannot be imported gracefully
+
+SET GLOBAL innodb_encrypt_tables = on;
+
+--echo # Wait max 10 min for key encryption threads to encrypt all spaces
+--let $wait_timeout= 600
+# All tables should get encrypted. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
+# table and t7 is unencrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
+--source include/wait_condition.inc
+
+--copy_file $MYSQLTEST_VARDIR/tmp/mysecret_keyring $MYSQLTEST_VARDIR/tmp/mysecret_keyring_backup
+
+ALTER TABLE t1 encryption_key_id=5;
+ALTER TABLE t2 encryption_key_id=5;
+ALTER TABLE t3 encryption_key_id=5;
+ALTER TABLE t4 encryption_key_id=5;
+ALTER TABLE t5 encryption_key_id=5;
+ALTER TABLE t6 encryption_key_id=5;
+ALTER TABLE t8 encryption_key_id=5;
+
+--list_files $MYSQLD_DATADIR/test
+FLUSH TABLES t1, t2, t3, t4, t5, t6, t8 FOR EXPORT;
+
+perl;
+do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
+ib_backup_tablespaces("test", "t1","t2","t3", "t4", "t5", "t6", "t8");
+EOF
+--list_files $MYSQLD_DATADIR/test
+UNLOCK TABLES;
+
+ALTER TABLE t1 DISCARD TABLESPACE;
+ALTER TABLE t2 DISCARD TABLESPACE;
+ALTER TABLE t3 DISCARD TABLESPACE;
+ALTER TABLE t4 DISCARD TABLESPACE;
+ALTER TABLE t5 DISCARD TABLESPACE;
+ALTER TABLE t6 DISCARD TABLESPACE;
+ALTER TABLE t8 DISCARD TABLESPACE;
+
+perl;
+do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
+ib_discard_tablespaces("test", "t1","t2","t3","t4","t5","t6","t8");
+ib_restore_tablespaces("test", "t1","t2","t3","t4","t5","t6","t8");
+EOF
+
+--let $restart_parameters=restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring_backup
 --source include/restart_mysqld.inc
 
+--error ER_GET_ERRMSG
+ALTER TABLE t1 IMPORT TABLESPACE;
+--error ER_GET_ERRMSG
+ALTER TABLE t2 IMPORT TABLESPACE;
+--error ER_GET_ERRMSG
+ALTER TABLE t3 IMPORT TABLESPACE;
+--error ER_GET_ERRMSG
+ALTER TABLE t4 IMPORT TABLESPACE;
+--error ER_GET_ERRMSG
+ALTER TABLE t5 IMPORT TABLESPACE;
+--error ER_GET_ERRMSG
+ALTER TABLE t6 IMPORT TABLESPACE;
+--error ER_GET_ERRMSG
+ALTER TABLE t8 IMPORT TABLESPACE;
+
+--let $restart_parameters=restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring
+--source include/restart_mysqld.inc
 
 DROP PROCEDURE innodb_insert_proc;
 DROP TABLE t1, t2, t3, t4, t5, t6, t7, t8;

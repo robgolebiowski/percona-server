@@ -3899,7 +3899,7 @@ DECLARE_THREAD(fil_crypt_thread)(
                       }
 
                       /* force key state refresh */
-                      new_state.key_id = (~0); //TODO:Robert - co to robi?
+                      new_state.key_id = (~0); //TODO:Robert - co to robi? Marking key_id in new_state invalid - so it will have to be read from crypt_data
 
                       /* return iops */
                       fil_crypt_return_iops(&thr);
