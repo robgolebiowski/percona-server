@@ -1890,6 +1890,8 @@ os_file_io_complete(
                               else
                                 mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
                             }
+                            else
+                                mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, 0); //needs to be 0 for freshly allocated pages
                         }
                         else
                         {
@@ -9392,8 +9394,8 @@ Encryption::create_tablespace_key(byte** tablespace_key,
           return;
         }
         my_free(system_tablespace_key);
-        // Newly created key should have 0 assigned as its key version
-        ut_ad(tablespace_key_version == 0 && tablespace_key_data_length == ENCRYPTION_KEY_LEN);
+        // Newly created key should have 1 assigned as its key version
+        ut_ad(tablespace_key_version == 1 && tablespace_key_data_length == ENCRYPTION_KEY_LEN);
 #endif
 }
 
@@ -10164,7 +10166,7 @@ Encryption::encrypt(
           else if (type.is_page_zip_compressed())
           {
 	    mach_write_to_4(dst +  FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
-            ut_ad(m_key_version == 0);
+            ut_ad(m_key_version != 0);
             uint32 innodb_checksum = mach_read_from_4(dst + FIL_PAGE_SPACE_OR_CHKSUM);
             //ut_ad(innodb_checksum != 0);
             uint32 xor_checksum = innodb_checksum ^ m_checksum;

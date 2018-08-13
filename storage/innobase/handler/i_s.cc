@@ -9408,7 +9408,7 @@ static ST_FIELD_INFO	innodb_tablespaces_encryption_fields_info[] =
 	 STRUCT_FLD(field_length,	MAX_FULL_NAME_LEN + 1),
 	 STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
 	 STRUCT_FLD(value,		0),
-	 STRUCT_FLD(field_flags,	MY_I_S_UNSIGNED | MY_I_S_MAYBE_NULL),
+	 STRUCT_FLD(field_flags,	MY_I_S_MAYBE_NULL),
 	 STRUCT_FLD(old_name,		""),
 	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
 
@@ -9435,7 +9435,7 @@ static ST_FIELD_INFO	innodb_tablespaces_encryption_fields_info[] =
 	 STRUCT_FLD(field_length,	MY_INT32_NUM_DECIMAL_DIGITS),
 	 STRUCT_FLD(field_type,		MYSQL_TYPE_LONG),
 	 STRUCT_FLD(value,		0),
-	 STRUCT_FLD(field_flags,	MY_I_S_MAYBE_NULL),
+	 STRUCT_FLD(field_flags,        MY_I_S_UNSIGNED),
 	 STRUCT_FLD(old_name,		""),
 	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
 
@@ -9525,16 +9525,8 @@ i_s_dict_fill_tablespaces_encryption(
 		   status.scheme, true));
 	OK(fields[TABLESPACES_ENCRYPTION_KEYSERVER_REQUESTS]->store(
 		   status.keyserver_requests, true));
-        if (status.min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
-        {
-                 fields[TABLESPACES_ENCRYPTION_MIN_KEY_VERSION]->set_null();
-        }
-        else
-        {
-                 fields[TABLESPACES_ENCRYPTION_MIN_KEY_VERSION]->set_notnull();
-	         OK(fields[TABLESPACES_ENCRYPTION_MIN_KEY_VERSION]->store(
-		            status.min_key_version, true));
-        }
+        OK(fields[TABLESPACES_ENCRYPTION_MIN_KEY_VERSION]->store(
+                   status.min_key_version, true));
 	OK(fields[TABLESPACES_ENCRYPTION_CURRENT_KEY_VERSION]->store(
 		   status.current_key_version, true));
 	OK(fields[TABLESPACES_ENCRYPTION_CURRENT_KEY_ID]->store(

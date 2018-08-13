@@ -61,11 +61,11 @@ set autocommit=1;
 --let $wait_timeout= 600
 # All tables should get encrypted. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
 # table and t7 is unencrypted
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --let $assert_text= Make sure t7 is not encrypted
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL and name=\\'test/t7\\']" = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 and name=\\'test/t7\\']" = 1
 --source include/assert.inc
 
 --echo # tablespaces should be now encrypted
@@ -232,7 +232,7 @@ SELECT COUNT(1) FROM t8;
 
 
 --let $assert_text= Make sure all tables, apart from t2, are encrypted
---let $assert_cond= "[SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL]" = 1
+--let $assert_cond= "[SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0]" = 1
 --source include/assert.inc
 
 --list_files $MYSQLD_DATADIR/test
@@ -268,58 +268,58 @@ ALTER TABLE t1 IMPORT TABLESPACE;
 --let $assert_text= Make sure t1 has encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t1\\']" = 1
+--let $assert_text= Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t1\\']" = 1
 --source include/assert.inc
 SELECT COUNT(1) FROM t1;
 ALTER TABLE t2 IMPORT TABLESPACE;
 --let $assert_text= Make sure t2 has encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t2\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t2\\']" = 1
+--let $assert_text= Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t2\\']" = 1
 --source include/assert.inc
 SELECT COUNT(1) FROM t2;
 ALTER TABLE t3 IMPORT TABLESPACE;
 --let $assert_text= Make sure t3 has encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t3\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t3 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t3\\']" = 1
+--let $assert_text= Make sure t3 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t3\\']" = 1
 SELECT COUNT(1) FROM t3;
 ALTER TABLE t4 IMPORT TABLESPACE;
 --let $assert_text= Make sure t4 has encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t4\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t4 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t4\\']" = 1
+--let $assert_text= Make sure t4 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t4\\']" = 1
 SELECT COUNT(1) FROM t4;
 ALTER TABLE t5 IMPORT TABLESPACE;
 --let $assert_text= Make sure t5 has encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t5\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t5 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t5\\']" = 1
+--let $assert_text= Make sure t5 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t5\\']" = 1
 SELECT COUNT(1) FROM t5;
 ALTER TABLE t6 IMPORT TABLESPACE;
 --let $assert_text= Make sure t6 has encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t6\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t6 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t6\\']" = 1
+--let $assert_text= Make sure t6 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t6\\']" = 1
 ALTER TABLE t7 IMPORT TABLESPACE;
 --let $assert_text= Make sure t7 does not have encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t7\\']" = 0
 --source include/assert.inc
---let $assert_text= Make sure t7 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = NULL (i.e. unencrypted)
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t7\\']" = 1
+--let $assert_text= Make sure t7 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0 (i.e. unencrypted)
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t7\\']" = 1
 SELECT COUNT(1) FROM t7;
 ALTER TABLE t8 IMPORT TABLESPACE;
 --let $assert_text= Make sure t8 has encrypted flag set after importing
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t8\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t8 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t8\\']" = 1
+--let $assert_text= Make sure t8 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t8\\']" = 1
 SELECT COUNT(1) FROM t8;
 
 --echo # tablespaces should be encrypted, apart from t7
@@ -355,58 +355,58 @@ SET GLOBAL innodb_encryption_threads = 4;
 
 --echo # Wait max 10 min for key encryption threads to decrypt all spaces, apart from t1, t3 and t5
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NOT NULL
+--let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
 --source include/wait_condition.inc
 
 --let $assert_text= Make sure t1 has encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t1\\']" = 1
+--let $assert_text= Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t1\\']" = 1
 --source include/assert.inc
 SELECT COUNT(1) FROM t1;
 --let $assert_text= Make sure t2 does not have encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t2\\']" = 0
 --source include/assert.inc
---let $assert_text= Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t2\\']" = 1
+--let $assert_text= Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t2\\']" = 1
 --source include/assert.inc
 SELECT COUNT(1) FROM t2;
 --let $assert_text= Make sure t3 has encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t3\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t3 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t3\\']" = 1
+--let $assert_text= Make sure t3 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t3\\']" = 1
 SELECT COUNT(1) FROM t3;
 --let $assert_text= Make sure t4 does not have encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t4\\']" = 0
 --source include/assert.inc
---let $assert_text= Make sure t4 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t4\\']" = 1
+--let $assert_text= Make sure t4 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t4\\']" = 1
 SELECT COUNT(1) FROM t4;
 --let $assert_text= Make sure t5 has encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t5\\']" = 8192
 --source include/assert.inc
---let $assert_text= Make sure t5 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t5\\']" = 1
+--let $assert_text= Make sure t5 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME=\\'test/t5\\']" = 1
 SELECT COUNT(1) FROM t5;
 --let $assert_text= Make sure t6 does not have encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t6\\']" = 0
 --source include/assert.inc
---let $assert_text= Make sure t6 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t6\\']" = 1
+--let $assert_text= Make sure t6 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t6\\']" = 1
 SELECT COUNT(1) FROM t6;
 --let $assert_text= Make sure t7 does not have encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t7\\']" = 0
 --source include/assert.inc
---let $assert_text= Make sure t7 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = NULL (i.e. unencrypted)
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t7\\']" = 1
+--let $assert_text= Make sure t7 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0 (i.e. unencrypted)
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t7\\']" = 1
 SELECT COUNT(1) FROM t7;
 --let $assert_text= Make sure t8 does not have encrypted flag set
 --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t8\\']" = 0
 --source include/assert.inc
---let $assert_text= Make sure t8 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t8\\']" = 1
+--let $assert_text= Make sure t8 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t8\\']" = 1
 SELECT COUNT(1) FROM t8;
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
@@ -453,7 +453,7 @@ SET GLOBAL innodb_encrypt_tables = on;
 --let $wait_timeout= 600
 # All tables should get encrypted. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
 # table and t7 is unencrypted
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --copy_file $MYSQLTEST_VARDIR/tmp/mysecret_keyring $MYSQLTEST_VARDIR/tmp/mysecret_keyring_backup

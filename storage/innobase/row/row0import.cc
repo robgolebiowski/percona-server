@@ -3822,6 +3822,7 @@ row_import_for_mysql(
 	ulint	fsp_flags = dict_tf_to_fsp_flags(table->flags, false);
 	if (table->encryption_key != NULL || cfg.m_is_rotated_keys) {
 		fsp_flags |= FSP_FLAGS_MASK_ENCRYPTION;
+                ib::error() << "Setting encryptiong flag for " << table->name << '\n';
 	}
 
         bool is_rotated_keys = false;

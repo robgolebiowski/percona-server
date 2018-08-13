@@ -55,7 +55,8 @@ static const ulint ENCRYPTION_KEY_LEN = 32; //TODO:Robert kind of workaround
 /* This key will be used if nothing else is given */
 #define FIL_DEFAULT_ENCRYPTION_KEY 0
 #define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
-#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
+//#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
+#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  0
 
 extern os_event_t fil_crypt_threads_event;
 
@@ -74,7 +75,7 @@ extern os_event_t fil_crypt_threads_event;
  */
 
 #define CRYPT_SCHEME_1 1
-//#define CRYPT_SCHEME_1_IV_LEN 16
+#define CRYPT_SCHEME_1_IV_LEN 16
 #define CRYPT_SCHEME_UNENCRYPTED 0
 
 
@@ -108,7 +109,7 @@ struct st_encryption_scheme_key {
 };
 
 struct st_encryption_scheme {
-  unsigned char iv[ENCRYPTION_KEY_LEN];
+  unsigned char iv[16];
   struct st_encryption_scheme_key key[3]; //TODO : Why do I need this ?
   unsigned int keyserver_requests;
   //unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
@@ -320,6 +321,10 @@ struct fil_space_crypt_t : st_encryption_scheme
         Encryption::Encryption_rotation encryption_rotation;
 
         uchar *tablespace_key; //TODO:Make it private ?
+        //In Oracle's tablespace encryption is ENCRYPTION_KEY_LEN long,
+        //which is incorrect value - it should be always 128 bits,
+        //nevertheless we need ENCRYPTION_KEY_LEN tablespace_iv 
+        //to be able to store this IV.
         uchar *tablespace_iv;
 };
 

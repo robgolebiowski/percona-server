@@ -53,8 +53,11 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "dict0dict.h"
 #include "fts0priv.h"
 #include "lock0lock.h"
+#include "my_dbug.h"
 
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
+
+static int number_of_t1_pages_rotated = 0; //TODO:Robert - Can this be moved to some DEBUG ifdef together with DBUG_EXECUTE_IF ?
 
 /** Mutex for keys */
 static ib_mutex_t fil_crypt_key_mutex;
@@ -454,7 +457,7 @@ fsp_header_get_encryption_offset(
 #ifdef UNIV_DEBUG
 	left_size = page_size.physical() - FSP_HEADER_OFFSET - offset
 		- FIL_PAGE_DATA_END;
-	ut_ad(left_size >= fil_get_encrypt_info_size(ENCRYPTION_KEY_LEN));
+	ut_ad(left_size >= fil_get_encrypt_info_size(CRYPT_SCHEME_1_IV_LEN));
 #endif
 
 	return offset;
@@ -1236,7 +1239,7 @@ fil_parse_write_crypt_data(
 {
         const uint iv_len = mach_read_from_2(ptr + ENCRYPTION_MAGIC_SIZE);
 	//ut_a(iv_len == CRYPT_SCHEME_1_IV_LEN); // only supported
-	ut_a(iv_len == ENCRYPTION_KEY_LEN); // only supported
+	ut_a(iv_len == CRYPT_SCHEME_1_IV_LEN); // only supported
 
         //uint encrypt_info_size = ENCRYPTION_MAGIC_SIZE + 1 + iv_len + 4 + 1 + 4 + 4 + 1;
 
@@ -1324,6 +1327,36 @@ fil_parse_write_crypt_data(
 		//4 +  // size of key_id
 		//1; // fil_encryption_t
 
+        //memcpy(encrypt_info_ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
+        //encrypt_info_ptr += ENCRYPTION_MAGIC_SIZE;
+        //mach_write_to_2(encrypt_info_ptr, iv_len);
+        //encrypt_info_ptr += 2;
+
+	//mach_write_to_4(encrypt_info_ptr, space->id); //TODO:Robert - I do not think this is needed - it is suppliec in log0recv.cc and can be passed to fil_parse_write_crypt_data
+	//encrypt_info_ptr += 4;
+	//mach_write_to_2(encrypt_info_ptr, offset);
+        //encrypt_info_ptr += 2;
+
+	////mach_write_to_4(encrypt_info_ptr, space->flags);
+	////encrypt_info_ptr += 4;
+
+        //mach_write_to_1(encrypt_info_ptr, a_type);
+        //encrypt_info_ptr += 1;
+        //mach_write_to_4(encrypt_info_ptr, a_min_key_version);
+        //encrypt_info_ptr += 4;
+        //mach_write_to_4(encrypt_info_ptr, key_id);
+        //encrypt_info_ptr += 4;
+        //mach_write_to_1(encrypt_info_ptr, encryption);
+        //encrypt_info_ptr += 1;
+
+        //memcpy(encrypt_info_ptr, iv, iv_len);
+        //encrypt_info_ptr += iv_len;
+
+        //mach_write_to_4(encrypt_info_ptr, current_encryption_rotation);
+        //encrypt_info_ptr += 4;
+
+
+
 
 	if (ptr + encrypt_info_size > end_ptr) {
 		return NULL;
@@ -1334,7 +1367,7 @@ fil_parse_write_crypt_data(
 		     ENCRYPTION_MAGIC_SIZE) == 0));
         ptr += ENCRYPTION_MAGIC_SIZE;
 
-        ptr += 1; //length of iv has been already read
+        ptr += 2; //length of iv has been already read
 
 	ulint space_id = mach_read_from_4(ptr);
 	ptr += 4;
@@ -1382,6 +1415,7 @@ fil_parse_write_crypt_data(
         {
           crypt_data->set_tablespace_key(NULL);
           crypt_data->set_tablespace_iv(NULL); // No tablespace_key => no iv
+          ptr += ENCRYPTION_KEY_LEN;
         }
         else 
         {
@@ -2196,6 +2230,12 @@ fil_crypt_space_needs_rotation(
 {
       fil_space_t* space = state->space;
 
+      DBUG_EXECUTE_IF(
+        "rotate_only_first_100_pages_from_t1",
+        if (strcmp(space->name, "test/t1") == 0 &&  number_of_t1_pages_rotated >= 100)
+          return false;
+      );
+
       //if (space->id == 23)
       //{
         //space->id = 23;
@@ -2281,6 +2321,7 @@ fil_crypt_space_needs_rotation(
                       crypt_data->encryption,
                       crypt_data->min_key_version,
                       key_state->key_version, key_state->rotate_key_age);
+
 
 
               if (need_key_rotation && crypt_data->rotate_state.active_threads > 0 &&
@@ -2571,7 +2612,7 @@ fil_crypt_find_space_to_rotate(
 
               // if space is marked as encrytped this means some of the pages are encrypted and space should be skipped
               if (!state->space->is_encrypted && fil_crypt_space_needs_rotation(state, key_state, recheck)) {
-                              ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+                              ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_INVALID);
                               /* init state->min_key_version_found before
                               * starting on a space */
                               state->min_key_version_found = key_state->key_version;
@@ -2620,9 +2661,9 @@ fil_crypt_start_rotate_space(
               * if space extends, it will be encrypted with newer version */
               /* FIXME: max_offset could be removed and instead
               space->size consulted.*/
-              if (strcmp(state->space->name, "test/t6") == 0)
+              if (strcmp(state->space->name, "test/t1") == 0)
               {
-                ib::error() << "Starting rotating t6" << '\n';
+                ib::error() << "Starting rotating t1" << '\n';
               }
 
               crypt_data->rotate_state.max_offset = state->space->size;
@@ -2923,12 +2964,13 @@ fil_crypt_rotate_page(
                          ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
                          : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
                 
-              if (strcmp(space->name, "test/t6") == 0)
+              if (strcmp(space->name, "test/t1") == 0)
               {
                 ib::error() << "Trying to write to " << space->name << '\n';
                 ib::error() << "Encryption: " << crypt_data->encryption << '\n';
                 ib::error() << "kv: " << kv << '\n';
                 ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
+                ib::error() << "for offset = " << offset << '\n';
               }
 
 
@@ -2958,7 +3000,7 @@ fil_crypt_rotate_page(
                       mtr.set_named_space(space);
                       modified = true;
 
-                      if (strcmp(space->name, "test/t6") == 0)
+                      if (strcmp(space->name, "test/t1") == 0)
                         ib::error() << "Write to  " << space->name << '\n';
                       /* force rotation by dummy updating page */
                       mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
@@ -3099,6 +3141,20 @@ fil_crypt_rotate_pages(
                   buf_dblwr_page_inside(state->offset)) {
                       continue;
               }
+
+              DBUG_EXECUTE_IF(
+                "rotate_only_first_100_pages_from_t1",
+                if (strcmp(state->space->name, "test/t1") == 0)
+                {
+                  if(number_of_t1_pages_rotated >= 100)
+                  {
+                    state->offset = end;
+                    return;
+                  }
+                  else
+                    ++number_of_t1_pages_rotated;
+                }
+              );
 
               fil_crypt_rotate_page(key_state, state);
       }
@@ -3701,6 +3757,7 @@ fil_crypt_complete_rotate_space(
               */
               bool should_flush = last && done;
 
+
               if (should_flush) {
                       /* we're the last active thread */
                       ut_ad(crypt_data->rotate_state.flushing == false);
@@ -3713,6 +3770,15 @@ fil_crypt_complete_rotate_space(
               //TODO:Robert: jest już ustawione
 
               }
+
+              /* In case we simulate only 100 pages being rotated - we stop ourselves from writting to page0. Pages should be
+               * flushed in mtr test with FLUSH FOR EXPORT - this will make sure that buffers will get flushed *
+               * In MTR we can check if we reached this point by checking flushing field - it should be 1 if we are here */
+               DBUG_EXECUTE_IF(
+                "rotate_only_first_100_pages_from_t1",
+                if (strcmp(state->space->name, "test/t1") == 0 && number_of_t1_pages_rotated >= 100)
+                  should_flush = false;
+              );
 
               /* inform scrubbing */
               crypt_data->rotate_state.scrubbing.is_active = false;
@@ -3784,7 +3850,13 @@ DECLARE_THREAD(fil_crypt_thread)(
                                            * by os_thread_create */
 {
       UT_NOT_USED(arg);
+      
+      my_thread_init();
 
+      /* TODO: Add this later */
+//#ifdef UNIV_PFS_THREAD
+	//pfs_register_thread(page_cleaner_thread_key);
+//#endif 
       mutex_enter(&fil_crypt_threads_mutex);
       uint thread_no = srv_n_fil_crypt_threads_started;
       srv_n_fil_crypt_threads_started++;
@@ -3922,6 +3994,8 @@ DECLARE_THREAD(fil_crypt_thread)(
 
       /* We count the number of threads in os_thread_exit(). A created
       thread should always use that to exit and not use return() to exit. */
+
+      my_thread_end();
 
       os_thread_exit();
 
@@ -4135,6 +4209,7 @@ fil_space_crypt_get_status(
 
               if (crypt_data->rotate_state.active_threads > 0 ||
                   crypt_data->rotate_state.flushing) {
+
                       status->rotating = true;
                       status->flushing =
                               crypt_data->rotate_state.flushing;
