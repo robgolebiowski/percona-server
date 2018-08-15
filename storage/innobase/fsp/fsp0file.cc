@@ -404,6 +404,7 @@ Datafile::validate_to_dd(
 	ulint		flags,
 	bool		for_import)
 {
+        ib::error() << "Validating to dd space_id = " << space_id << '\n';
 	//dberr_t err;
         ValidateOutput output;
 
@@ -566,13 +567,6 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 	const char*	error_txt = NULL;
         ValidateOutput  output;
 
-        if (m_space_id == 24)
-        {
-          int x = 1;
-          x=2;
-          (void)x;
-        }
-
 	m_is_valid = true;
 
 	if (m_first_page == NULL
@@ -589,6 +583,17 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 				m_first_page + FIL_PAGE_FILE_FLUSH_LSN);
 		}
 	}
+
+        ib::error() << "Validating first page of space_id = " << m_space_id << '\n';
+
+        if (m_space_id == 24)
+        {
+          int x = 1;
+          x=2;
+          (void)x;
+        }
+
+
 
 	/* Check if the whole page is blank. */
 	if (error_txt == NULL

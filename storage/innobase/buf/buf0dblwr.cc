@@ -505,6 +505,13 @@ buf_dblwr_init_or_load_pages(
 		return(err);
 	}
 
+	err = buf_parallel_dblwr_make_path();
+	if (err != DB_SUCCESS) {
+
+		ut_free(unaligned_read_buf);
+		return(err);
+	}
+
 	doublewrite = read_buf + TRX_SYS_DOUBLEWRITE;
 
 	if (mach_read_from_4(doublewrite + TRX_SYS_DOUBLEWRITE_MAGIC)
@@ -625,12 +632,12 @@ buf_dblwr_init_or_load_pages(
 		page += univ_page_size.physical();
 	}
 
-	err = buf_parallel_dblwr_make_path();
-	if (err != DB_SUCCESS) {
+	//err = buf_parallel_dblwr_make_path();
+	//if (err != DB_SUCCESS) {
 
-		ut_free(unaligned_read_buf);
-		return(err);
-	}
+		//ut_free(unaligned_read_buf);
+		//return(err);
+	//}
 
 	ut_ad(parallel_dblwr_buf.file.is_closed());
 	bool success;

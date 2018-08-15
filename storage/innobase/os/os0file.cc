@@ -1280,7 +1280,12 @@ AIOHandler::post_io_processing(Slot* slot)
 			      || err == DB_CORRUPTION
 			      || err == DB_IO_DECOMPRESS_FAIL
                               || err == DB_IO_DECRYPT_FAIL);
-		} else {
+		} else if (!slot->type.is_log() && slot->type.is_read()) {
+                  ut_ad(is_encrypted_page(slot) == false);
+                  // we did not go to io_complete - so mark read page as unencrypted here
+                  mach_write_to_4(slot->buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+                  err = DB_SUCCESS;
+                } else {
 
 			err = DB_SUCCESS;
 		}
@@ -1763,6 +1768,14 @@ os_file_io_complete(
 	ut_a(offset > 0);
 	ut_ad(type.validate());
 
+        ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+        ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
+
+        if (space_id == 23 && page_no==260)
+        {
+          ib::error() << "In os_file_io_comple for test/t1, page = 260" << '\n';
+        }
+
 	if (!type.is_compression_enabled()) {
 
 		return(DB_SUCCESS);
@@ -1773,9 +1786,23 @@ os_file_io_complete(
 
 		ut_ad(!type.is_log());
 
+
                 //TODO:Tutaj zapisać czy jest encrypted
                 bool was_page_encrypted= encryption.is_encrypted_page(buf);
                 //bool was_page_compressed_and_encrypted= encryption.is_encrypted_and_compressed(buf);
+
+                if (space_id == 23 && page_no==260)
+                {
+                  if (was_page_encrypted)
+                  {
+                    ib::error() << "test/t1 page = 260 was_page_encrypted = " << was_page_encrypted
+                                << " srv_encrypt_tables = " << srv_encrypt_tables;
+                  }
+                  else
+                    ib::error() << "test/t1 page = 260 was not encrypted" ;
+                }
+
+
 
                 // Before we try to decrypt, first we need to validate if checksum is valid
                 // for ROTATED_KEYS encrypted tables
@@ -1895,6 +1922,8 @@ os_file_io_complete(
                         }
                         else
                         {
+                          if (!was_page_encrypted)
+                             mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
                           return ret;
                         }
                 //TODO:Tutaj przypisanie wersji klucza i original page type na encrypted - to powinno sprawdzic jezeli strona jest zaszyfrowana i corrupted
@@ -5875,9 +5904,24 @@ os_file_io(
 		block = NULL;
 	}
 
+
+        ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+        ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
+
 	/* We do encryption after compression, since if we do encryption
 	before compression, the encrypted data will cause compression fail
 	or low compression rate. */
+        if (type.is_write()) {
+        
+          //TODO:Tutaj zapisać czy jest encrypted
+          //bool was_page_compressed_and_encrypted= encryption.is_encrypted_and_compressed(buf);
+
+          if (space_id == 23 && page_no==260)
+          {
+            ib::error() << "write for test/t1 page = 260"  << '\n';
+          } 
+        
+        }
         
         if (type.is_encrypted() && type.is_write()) {
                
@@ -5906,6 +5950,17 @@ os_file_io(
                 }
         }
 
+        if (type.is_encrypted() == false && type.is_write() && !type.is_compressed() && offset > 0 &&
+            type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS) // need to figure out something for compressed
+        {
+          mach_write_to_4(reinterpret_cast<byte*>(buf) +  FIL_PAGE_ENCRYPTION_KEY_VERSION, 0);
+          if (space_id == 23 && page_no==260)
+          {
+            ib::error() << "wrote for test/t1 page = 260"  << '\n';
+          }
+
+        }
+
 	SyncFileIO	sync_file_io(file, buf, n, offset);
 
 	for (ulint i = 0; i < NUM_RETRIES_ON_PARTIAL_IO; ++i) {
@@ -5923,6 +5978,19 @@ os_file_io(
 
 			if (offset > 0
 			    && (type.is_compressed() || type.is_read())) {
+
+                        ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                        ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
+
+
+                        //TODO:Tutaj zapisać czy jest encrypted
+                        //bool was_page_compressed_and_encrypted= encryption.is_encrypted_and_compressed(buf);
+                        if (space_id == 23 && page_no==260)
+                        {
+                          ib::error() << "read for test/t1 page = 260"  << '\n';
+                        }
+
+
 
                                 //if (was_read_page_encrypted)
                                   //*was_read_page_encrypted = Encryption::is_encrypted_page(reinterpret_cast<byte*>(buf));

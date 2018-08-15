@@ -535,6 +535,8 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 		(page + offset + bytes_read);
         bytes_read += 4;
 
+        ut_ad(key_id != (uint)(~0));
+
         if (key_id != 0)
           ib::error() << "Read crypt_data: key_id: " << key_id << " type: " << ((type == CRYPT_SCHEME_UNENCRYPTED) ? "schema unencrypted"
                                                                                                                    : "schema encrypted");
@@ -850,6 +852,7 @@ fil_space_crypt_t::write_page0(
         encrypt_info_ptr += 1;
         mach_write_to_4(encrypt_info_ptr, a_min_key_version);
         encrypt_info_ptr += 4;
+        ut_ad(key_id != (uint)(~0));
         mach_write_to_4(encrypt_info_ptr, key_id);
         encrypt_info_ptr += 4;
         mach_write_to_1(encrypt_info_ptr, encryption);
@@ -1428,6 +1431,13 @@ fil_parse_write_crypt_data(
 
 	/* update fil_space memory cache with crypt_data */
 	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
+
+                ib::error() << "parsed log for table " << space->name
+                            << " with min_key_version = " << min_key_version
+                            << " current min_key_version in crypt_data is " << crypt_data->min_key_version << '\n';
+
+
+
 		crypt_data = fil_space_set_crypt_data(space, crypt_data);
                 //TODO: Robert: Added by me
                 //space->flags |= FSP_FLAGS_MASK_ROTATED_KEYS;
@@ -2303,6 +2313,8 @@ fil_crypt_space_needs_rotation(
               if (crypt_data->key_id != key_state->key_id) {
                       key_state->key_id= crypt_data->key_id;
                       fil_crypt_get_key_state(key_state, crypt_data);
+                      //ib::error() << "key_state.key_version = " << key_state->key_version
+                                  //<< " for table " << space->name;
               }
               //if (strcmp(state->space->name, "test/t1") == 0)
               //{
@@ -2617,10 +2629,11 @@ fil_crypt_find_space_to_rotate(
                               * starting on a space */
                               state->min_key_version_found = key_state->key_version;
 
-                              if (strcmp(state->space->name, "test/t1") == 0)
-                              {
-                                ib::error() << "test/t1 min_key_version_found = " << state->min_key_version_found << '\n';
-                              }
+                              //if (strcmp(state->space->name, "test/t1") == 0)
+                              //{
+                                //ib::error() << "starting with min_key_version_found = " << state->min_key_version_found 
+                                            //<< " for table " << state->space->name << '\n';
+                              //}
                               return true;
                       }
 
@@ -2967,6 +2980,7 @@ fil_crypt_rotate_page(
               if (strcmp(space->name, "test/t1") == 0)
               {
                 ib::error() << "Trying to write to " << space->name << '\n';
+                ib::error() << "Space id = " << space->id << '\n';
                 ib::error() << "Encryption: " << crypt_data->encryption << '\n';
                 ib::error() << "kv: " << kv << '\n';
                 ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
@@ -3194,7 +3208,7 @@ fts_set_encrypted_flag_for_table(
       //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
       //DICT_TF2_ENCRYPTION
       //flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
-      flags ^= DICT_TF2_ENCRYPTION;
+      flags |= DICT_TF2_ENCRYPTION;
 
       mach_write_to_4(static_cast<byte*>(user_arg), flags);
       //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
@@ -3203,15 +3217,47 @@ fts_set_encrypted_flag_for_table(
       return(FALSE);
 }
 
+static
+ibool
+fts_unset_encrypted_flag_for_table(
+      void*		row,		// in: sel_node_t* 
+      void*		user_arg)	// in: bool set/unset flag
+{
+      sel_node_t*	node = static_cast<sel_node_t*>(row);
+      dfield_t*	dfield = que_node_get_val(node->select_list);
 
+      ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+      ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+      // There should be at most one matching record. So the value
+      // must be the default value.
+      ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+            == ULINT32_UNDEFINED);
+      //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
+              //== ULINT32_UNDEFINED);
+
+      ulint		flags = mach_read_from_4(
+                      static_cast<byte*>(dfield_get_data(dfield)));
+
+      //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
+      //DICT_TF2_ENCRYPTION
+      //flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+      flags &= ~DICT_TF2_ENCRYPTION;
+
+      mach_write_to_4(static_cast<byte*>(user_arg), flags);
+      //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
+
+
+      return(FALSE);
+}
 
 static
 dberr_t
-fts_update_table_encrypted_flag_sql(
+fts_update_encrypted_flag_for_table_sql(
 /*=======================*/
       trx_t*		trx,		/*!< in/out: transaction that
                                       covers the update */
-      table_id_t	table_id)	/*!< in: Table for which we want
+      table_id_t	table_id,
+      bool              set)	/*!< in: Table for which we want
                                       to set the root table->flags2 */
 {
       pars_info_t*		info;
@@ -3247,7 +3293,8 @@ fts_update_table_encrypted_flag_sql(
       pars_info_bind_int4_literal(info, "flags2", &flags2);
 
       pars_info_bind_function(
-              info, "my_func", fts_set_encrypted_flag_for_table, &flags2);
+              info, "my_func", set ? fts_set_encrypted_flag_for_table
+                                   : fts_unset_encrypted_flag_for_table, &flags2);
 
       if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
               trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
@@ -3293,6 +3340,32 @@ fts_update_table_encrypted_flag_sql(
 
 static
 ibool
+fts_unset_encrypted_flag_for_tablespace(
+      void*		row,		// in: sel_node_t* 
+      void*		user_arg)	// in: bool set/unset flag
+{
+      sel_node_t*	node = static_cast<sel_node_t*>(row);
+      dfield_t*	dfield = que_node_get_val(node->select_list);
+
+      ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+      ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+      // There should be at most one matching record. So the value
+      // must be the default value.
+      ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+            == ULINT32_UNDEFINED);
+
+      ulint  flags = mach_read_from_4(
+        static_cast<byte*>(dfield_get_data(dfield)));
+
+      flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+
+      mach_write_to_4(static_cast<byte*>(user_arg), flags);
+
+      return(FALSE);
+}
+
+static
+ibool
 fts_set_encrypted_flag_for_tablespace(
       void*		row,		// in: sel_node_t* 
       void*		user_arg)	// in: bool set/unset flag
@@ -3306,18 +3379,13 @@ fts_set_encrypted_flag_for_tablespace(
       // must be the default value.
       ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
             == ULINT32_UNDEFINED);
-      //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
-              //== ULINT32_UNDEFINED);
 
-      ulint		flags = mach_read_from_4(
-                      static_cast<byte*>(dfield_get_data(dfield)));
+      ulint  flags = mach_read_from_4(
+        static_cast<byte*>(dfield_get_data(dfield)));
 
-      //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
-      flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
+      flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
 
       mach_write_to_4(static_cast<byte*>(user_arg), flags);
-      //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
-
 
       return(FALSE);
 }
@@ -3328,10 +3396,11 @@ dberr_t
       //trx_t*		trx,		// in/out: transaction that
                                       //// covers the update 
       //dict_table_t* table)
-fts_update_encrypted_flag_sql(
+fts_update_encrypted_flag_for_tablespace_sql(
       trx_t*		trx,		// in/out: transaction that
                                       // covers the update 
-      fil_space_t *space)
+      fil_space_t *space,
+      bool set)
 {
       pars_info_t*		info;
       ib_uint32_t		flags;
@@ -3439,7 +3508,8 @@ fts_update_encrypted_flag_sql(
       pars_info_bind_int4_literal(info, "flags", &flags);
 
       pars_info_bind_function(
-              info, "my_func", fts_set_encrypted_flag_for_tablespace, &flags);
+              info, "my_func", set ? fts_set_encrypted_flag_for_tablespace
+                                   : fts_unset_encrypted_flag_for_tablespace, &flags);
 
       if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
               trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
@@ -3459,7 +3529,8 @@ fts_update_encrypted_flag_sql(
 
 static
 dberr_t
-fil_toggle_encrypted_flag(fil_space_t *space)
+fil_update_encrypted_flag(fil_space_t *space,
+                          bool set)
 {
   trx_t* trx_set_encrypted = trx_allocate_for_background();
   trx_set_encrypted->op_info = "setting encrypted flag";
@@ -3493,11 +3564,13 @@ fil_toggle_encrypted_flag(fil_space_t *space)
   //dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
                                                 //table);
 
-  dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
-                                                space);
+  dberr_t error = fts_update_encrypted_flag_for_tablespace_sql(trx_set_encrypted,
+                                                space,
+                                                set);
   if (error == DB_SUCCESS)
-    error = fts_update_table_encrypted_flag_sql(trx_set_encrypted,
-                                                table->id);
+    error = fts_update_encrypted_flag_for_table_sql(trx_set_encrypted,
+                                                table->id,
+                                                set);
 
         //table_id_t	table_id)	[>!< in: Table for which we want
 
@@ -3510,17 +3583,21 @@ fil_toggle_encrypted_flag(fil_space_t *space)
   {
       fts_sql_commit(trx_set_encrypted);
 
-
-      if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
-      {
-        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
-        //ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
-      }
-      else
-      {
+      if (set)
         DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+      else
+        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+
+      //if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
+      //{
+        //DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+        //ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
+      //}
+      //else
+      //{
+        //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
         //ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
-      }
+      //}
 
       //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
                 //flags |= FSP_FLAGS_MASK_ENCRYPTION;
@@ -3600,15 +3677,14 @@ fil_crypt_flush_space(
               //crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
       //}
 
-      ib::error() << "Updating encryption flag for table : " << space->name;
 
-      if (strcmp(space->name, "test/t1") == 0)
-      {
-        ib::error() << "Updating encryption flag for mysql/plugin" << '\n';
+      //if (strcmp(space->name, "test/t1") == 0)
+      //{
+        ib::error() << "Updating encryption flag for table : " << space->name;
         ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
         ib::error() << "crypt_data->type = " << current_type << '\n';
         ib::error() << "min_key_version_found = " << crypt_data->rotate_state.min_key_version_found << '\n';
-      }
+      //}
 
       if (crypt_data->encryption_rotation == Encryption::ROTATED_KEY_TO_MASTER_KEY)
       {
@@ -3620,18 +3696,30 @@ fil_crypt_flush_space(
 
       if (space->id != 0) // TODO: Robert  - when this can be true?
       {
-        if ( (current_type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
-             (current_type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
-        {
-          if (DB_SUCCESS != fil_toggle_encrypted_flag(space))
-          {
-            ut_ad(0);
-            return; //TODO:Robert przemysl to jeszcze czy to jest bezpieczne tu robic return
-          }
+        //if ( (current_type == CRYPT_SCHEME_UNENCRYPTED && FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
+             //(current_type == CRYPT_SCHEME_1 && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))
+        //{
+        
+       if (DB_SUCCESS != fil_update_encrypted_flag(space, current_type == CRYPT_SCHEME_UNENCRYPTED ? false : true))
+       {
+         ut_ad(0);
+         return; //TODO:Robert przemysl to jeszcze czy to jest bezpieczne tu robic return
+       }
 
-          mutex_enter(&fil_system->mutex);
-          space->flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
-          mutex_exit(&fil_system->mutex); // TODO:Robert - I am not sure if I need this mutex
+       DBUG_EXECUTE_IF(
+         "crash_on_t1_flush_after_dd_update",
+         if (strcmp(state->space->name, "test/t1") == 0)
+           DBUG_ABORT();
+       );
+
+
+       mutex_enter(&fil_system->mutex);
+       if (current_type == CRYPT_SCHEME_UNENCRYPTED)
+         space->flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+       else
+         space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+
+       mutex_exit(&fil_system->mutex); // TODO:Robert - I am not sure if I need this mutex
           //we need to flip the encryption bit
           //while (DB_SUCCESS != fil_toggle_encrypted_flag(space)) //TODO: Robert: Zmień to na if a nie while
           //{
@@ -3643,11 +3731,11 @@ fil_crypt_flush_space(
               //os_thread_sleep(1000);
               // waiting for DD to be available
           //}
-        }
-        else
-          ut_ad((crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY && current_type == CRYPT_SCHEME_1 &&
-                FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
-                (crypt_data->min_key_version + srv_fil_crypt_rotate_key_age == crypt_data->rotate_state.min_key_version_found && FSP_FLAGS_GET_ENCRYPTION(space->flags)));
+        //}
+        //else
+          //ut_ad((crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY && current_type == CRYPT_SCHEME_1 &&
+                //FSP_FLAGS_GET_ENCRYPTION(space->flags)) ||
+                //(crypt_data->min_key_version + srv_fil_crypt_rotate_key_age == crypt_data->rotate_state.min_key_version_found && FSP_FLAGS_GET_ENCRYPTION(space->flags)));
         //TODO:Would not it be better if srv_fil_crypt_rotate_key_age == 1 meant - rotate key_version every single key rotation?
       }
 
@@ -3778,6 +3866,12 @@ fil_crypt_complete_rotate_space(
                 "rotate_only_first_100_pages_from_t1",
                 if (strcmp(state->space->name, "test/t1") == 0 && number_of_t1_pages_rotated >= 100)
                   should_flush = false;
+              );
+
+              DBUG_EXECUTE_IF(
+                "crash_on_t1_flush_after_dd_update",
+                if (strcmp(state->space->name, "test/t1") == 0 && number_of_t1_pages_rotated >= 100)
+                  should_flush = true;
               );
 
               /* inform scrubbing */

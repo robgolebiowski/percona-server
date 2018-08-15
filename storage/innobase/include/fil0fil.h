@@ -976,9 +976,7 @@ void
 fil_io_set_encryption(
 	IORequest&		req_type,
 	const page_id_t&	page_id,
-	fil_space_t*		space,
-        buf_page_t*	bpage = NULL);
-
+	fil_space_t*		space);
 
 /** Wrapper with reference-counting for a fil_space_t. */
 class FilSpace

@@ -800,10 +800,29 @@ retry:
 
 		/* Validate the flags but do not compare the data directory
 		flag, in case this tablespace was relocated. */
-		const unsigned relevant_space_flags
+		unsigned relevant_space_flags
 			= space->flags & ~FSP_FLAGS_MASK_DATA_DIR;
-		const unsigned relevant_flags
+		unsigned relevant_flags
 			= flags & ~FSP_FLAGS_MASK_DATA_DIR;
+
+                if (space->crypt_data != NULL &&
+                    (
+                      (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) && space->crypt_data->min_key_version == 0) ||
+                      (!FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) && space->crypt_data->min_key_version != 0)
+                    ) && FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) != FSP_FLAGS_GET_ENCRYPTION(relevant_flags) 
+                   )
+                {
+                  ib::warn() << "Table encryption flag is " <<  (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) ? "ON" : "OFF")
+                             << " in the data dictionarym but the encryption flag in file " << node->name << " is " 
+                             << (FSP_FLAGS_GET_ENCRYPTION(relevant_flags) ? "ON" : "OFF")
+                             << " This indicates that the rotation of the table was interupted before space's flags were updated."
+                             << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
+                             << " could finish up the rotation.";
+                  // exclude rotation flag from validation
+                  relevant_space_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+                  relevant_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+                }
+
 		if (UNIV_UNLIKELY(relevant_space_flags != relevant_flags)) {
 
 			ib::fatal()
@@ -4858,6 +4877,8 @@ fil_ibd_load(
 	space = fil_space_get_by_id(space_id);
 	mutex_exit(&fil_system->mutex);
 
+        ib::error() << "Robert: fil_ibd_load for space_id = " << space_id << '\n';
+
 	if (space != NULL) {
 		/* Compare the filename we are trying to open with the
 		filename from the first node of the tablespace we opened
@@ -5910,8 +5931,8 @@ void
 fil_io_set_encryption(
 	IORequest&		req_type,
 	const page_id_t&	page_id,
-	fil_space_t*		space,
-        buf_page_t*	bpage)
+	fil_space_t*		space)
+        //buf_page_t*	bpage)
 {
 	/* Don't encrypt the log, page 0 of all tablespaces, all pages
 	from the system tablespace. */
@@ -6376,8 +6397,8 @@ _fil_io(
         //ut_ad(message != NULL);
         //if (space->crypt_data != NULL)
           //space->encryption_type= Encryption::ROTATED_KEYS;
-        if (message != NULL) //TODO: Just for now, later I will need to get a key here for such a message
-          fil_io_set_encryption(req_type, page_id, space, static_cast<buf_page_t*>(message));
+        //if (message != NULL) //TODO: Just for now, later I will need to get a key here for such a message
+          fil_io_set_encryption(req_type, page_id, space);
 
 	req_type.block_size(node->block_size);
 
