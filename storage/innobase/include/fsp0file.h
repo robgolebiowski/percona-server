@@ -242,6 +242,7 @@ public:
            ValidateOutput()
              : error(DB_ERROR)
              , encryption_type(DO_NOT_KNOW)
+             , rotated_keys_min_key_version(0)
            {}
 
            enum EncryptionType
@@ -253,6 +254,7 @@ public:
            };
            dberr_t error;
            EncryptionType encryption_type;
+           uint rotated_keys_min_key_version; 
         };
 
 	/** Validates the datafile and checks that it conforms with

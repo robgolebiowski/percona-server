@@ -1,13 +1,14 @@
 --source include/have_innodb.inc
 --source include/have_debug.inc
 --source include/have_debug_sync.inc
-#-- source include/have_example_key_management_plugin.inc
 --source include/not_valgrind.inc
 --source include/not_embedded.inc
 
 # This test is to check if tables get rotated correctly in case of server crash
 # 1) Rotate 100 pages in t1
-# 2) Kill the server
+# 2) Shut down the sever - this will make sure the t1's pages are flushed to disk
+#    However it will still simulated the server crash, as only 100 pages will get rotated
+#    and the updated to page0 of t1 will not be done
 # 3) Restart the server
 # 4) Make sure t1 rotation completes
 
@@ -69,10 +70,12 @@ SET GLOBAL innodb_encrypt_tables=ON;
 --let $wait_condition=SELECT name = 'test/t1' FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND ROTATING_OR_FLUSHING = 1
 --source include/wait_condition.inc
 
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
+--echo # Disable rotation threads
+SET GLOBAL innodb_encryption_threads = 0;
+--echo # Disable rotation of only first 100 pages
+SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 
---echo # Make sure buffers for t1 are flushed
-FLUSH TABLES t1 FOR EXPORT;
+--source include/shutdown_mysqld.inc
 
 --echo # Make sure that t1 still contains foobar - as it is only encrypted in half
 
@@ -81,14 +84,9 @@ FLUSH TABLES t1 FOR EXPORT;
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---echo # Disable rotation threads
-SET GLOBAL innodb_encryption_threads = 0;
---echo # Disable rotation of only first 100 pages
-SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
-
 --echo # t1 is only half rotatted, now we will check if the encryption can be completed after the restart
 --let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
---source include/kill_and_restart_mysqld.inc
+--source include/start_mysqld.inc
 
 --let $wait_timeout= 600
 # All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
@@ -111,11 +109,6 @@ SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
 
 SET GLOBAL innodb_encrypt_tables=OFF;
 
-#--sleep 10
-
-#SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
-
 --let $wait_timeout= 600
 # All tables should get unencrypted, apart from t1. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains
 # artificial innodb_system and t1 will only have half of the pages unencrypted => thus min_key_version will still be 1
@@ -128,20 +121,22 @@ SET GLOBAL innodb_encrypt_tables=OFF;
 --let $wait_condition=SELECT name = 'test/t1' FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND ROTATING_OR_FLUSHING = 1
 --source include/wait_condition.inc
 
+--echo # Disable rotation threads
+SET GLOBAL innodb_encryption_threads = 0;
+--echo # Disable rotation of only first 100 pages
+SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
+
+--source include/shutdown_mysqld.inc
+
 --echo # Make sure that t1 contains foobar - as it is only decrypted in half
 --let SEARCH_PATTERN=foobar
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---echo # Disable rotation threads
-SET GLOBAL innodb_encryption_threads = 0;
---echo # Disable rotation of only first 100 pages
-SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
-
 --echo # t1 is only half rotatted, now we will check if the decryption can be completed after the restart
 --let $restart_parameters=restart:--innodb-encrypt-tables=OFF --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
---source include/kill_and_restart_mysqld.inc
+--source include/start_mysqld.inc
 
 --let $wait_timeout= 600
 # All tables should get decrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
@@ -161,11 +156,6 @@ SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
 
 SET GLOBAL innodb_encrypt_tables=ON;
 
-#--sleep 10
-
-#SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
-
 --let $wait_timeout= 600
 # All tables should get unencrypted, apart from t1. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains
 # artificial innodb_system and t1 will only have half of the pages encrypted => thus min_key_version will still be 0
@@ -178,6 +168,13 @@ SET GLOBAL innodb_encrypt_tables=ON;
 --let $wait_condition=SELECT name = 'test/t1' FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND ROTATING_OR_FLUSHING = 1
 --source include/wait_condition.inc
 
+--echo # Disable rotation threads
+SET GLOBAL innodb_encryption_threads = 0;
+--echo # Disable rotation of only first 100 pages
+SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
+
+--source include/shutdown_mysqld.inc
+
 --echo # Make sure that t1 contains foobar - as it is only encrypted in half
 
 --let SEARCH_PATTERN=foobar
@@ -185,14 +182,9 @@ SET GLOBAL innodb_encrypt_tables=ON;
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---echo # Disable rotation threads
-SET GLOBAL innodb_encryption_threads = 0;
---echo # Disable rotation of only first 100 pages
-SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
-
 --echo # t1 is only half rotatted, now we will check if the decryption can be completed after the restart
 --let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
---source include/kill_and_restart_mysqld.inc
+--source include/start_mysqld.inc
 
 --let $wait_timeout= 600
 # All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
@@ -215,11 +207,79 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 --echo # after DD update and before page 0 update.
 
 
-#SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
 SET GLOBAL debug="+d,crash_on_t1_flush_after_dd_update";
 
 --source include/expect_crash.inc
 SET GLOBAL innodb_encrypt_tables=OFF;
+--source include/wait_until_disconnected.inc
+
+# The server crashed after but t1's pages have been flushed to disk by encryption thread
+--echo # Make sure that t1 has been decrypted
+--let SEARCH_PATTERN=foobar
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$t1_IBD
+--source include/search_pattern_in_file.inc
+
+
+--echo # First restart the server after crash so any redo logs for t1 were proceed. If there are any logs available
+--echo # t1 will be opened without validating idb file to DD.
+--let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0
+--source include/start_mysqld.inc
+
+SET GLOBAL debug="-d,crash_on_t1_flush_after_dd_update";
+
+--echo # Now restart the server and select from t1. Validation of t1's flags should proceed.
+--echo # It should be discovered that there is mismatch of flags in t1. However it shoud be possible to use
+--echo # the table. There should be a warning message in the error log file.
+
+--let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
+
+--let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=$error_log
+--source include/restart_mysqld.inc
+
+SELECT COUNT(1) FROM t1;
+
+--source include/shutdown_mysqld.inc
+
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$error_log
+--let SEARCH_PATTERN=Table encryption flag is OFF in the data dictionary but the encryption flag in file \.\/test\/t1\.ibd is ON\. This indicates that the rotation of the table was interrupted before space\'s flags were updated\. Please have encryption_thread variable \(innodb-encryption-threads\) set to value > 0\. So the encryption could finish up the rotation\.
+--source include/search_pattern_in_file.inc
+
+--remove_file $error_log
+
+--echo # Restart and finish up the rotation
+--let $restart_parameters=restart:--innodb-encrypt-tables=OFF --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--source include/start_mysqld.inc
+
+--let $wait_timeout= 600
+# All tables should get unencrypted
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+--source include/wait_condition.inc
+
+# Restart and make sure that warning is no longer available in error log
+--let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=$error_log
+--source include/restart_mysqld.inc
+
+SELECT COUNT(1) FROM t1;
+
+--source include/shutdown_mysqld.inc
+
+--let ABORT_ON=FOUND
+--let SEARCH_FILE=$error_log
+--let SEARCH_PATTERN=Table encryption flag is OFF in the data dictionary but the encryption flag in file \.\/test\/t1\.ibd is ON\. This indicates that the rotation of the table was interrupted before space\'s flags were updated\. Please have encryption_thread variable \(innodb-encryption-threads\) set to value > 0\. So the encryption could finish up the rotation\.
+--source include/search_pattern_in_file.inc
+
+--echo # Now we need to test the rotation unencrypted=>encrypted, when we get a crash after all pages
+--echo # got rotated and DD was updated but before updating page 0
+
+--let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0
+--source include/start_mysqld.inc
+
+SET GLOBAL debug="+d,crash_on_t1_flush_after_dd_update";
+
+--source include/expect_crash.inc
+SET GLOBAL innodb_encryption_threads=4;
 --source include/wait_until_disconnected.inc
 
 --echo # First restart the server after crash so any redo logs for t1 were proceed. If there are any logs available
@@ -227,526 +287,44 @@ SET GLOBAL innodb_encrypt_tables=OFF;
 --let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0
 --source include/start_mysqld.inc
 
---echo # Make sure that part of t1 has been decrypted
+SET GLOBAL debug="-d,crash_on_t1_flush_after_dd_update";
+
+--source include/shutdown_mysqld.inc
+
+--echo # Make sure that t1 has been encrypted
 --let SEARCH_PATTERN=foobar
---let ABORT_ON=NOT_FOUND
+--let ABORT_ON=FOUND
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---echo # Now restart the server and select from t1. Validation of t1's flags  should proceed.
+--echo # Now start the server and select from t1. Validation of t1's flags should proceed.
 --echo # It should be discovered that there is mismatch of flags in t1. However it shoud be possible to use
---echo # the table
---let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0
---source include/restart_mysqld.inc
+--echo # the table. There should be a warning message in the error log file.
 
+--remove_file $error_log
+
+--let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=$error_log --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring --early-plugin-load="keyring_file=$KEYRING_PLUGIN"
+--source include/start_mysqld.inc
 
 SELECT COUNT(1) FROM t1;
 
-# TODO : Add checking log that the warning occured and that rotation can be completed
-# Also I need to do something about flushing those buffers - maybe just shut down the server cleanly? Or add code for flushing
-# in separate function or try to do something with FLUSH FOR EXPORT with UNLOCK TABLES.
+--source include/shutdown_mysqld.inc
 
---die
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$error_log
+--let SEARCH_PATTERN=Table encryption flag is ON in the data dictionary but the encryption flag in file \.\/test\/t1\.ibd is OFF\. This indicates that the rotation of the table was interrupted before space\'s flags were updated\. Please have encryption_thread variable \(innodb-encryption-threads\) set to value > 0\. So the encryption could finish up the rotation\.
+--source include/search_pattern_in_file.inc
 
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_backup_tablespaces("test", "t1");
-EOF
---list_files $MYSQLD_DATADIR/test
-UNLOCK TABLES;
+--remove_file $error_log
 
-ALTER TABLE t1 DISCARD TABLESPACE;
-
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_discard_tablespaces("test", "t1");
-ib_restore_tablespaces("test", "t1");
-EOF
-
---echo # Disable rotation of only first 100 pages 
-SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
-
---let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
+--echo # Restart and finish up the rotation
+--let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--source include/start_mysqld.inc
 
 --let $wait_timeout= 600
-# All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
-# and t1 has been discarded.
---let $wait_condition=SELECT COUNT(*) = $tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+# All tables should get encrypted
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
-select * from INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
---let $assert_text= Make sure t1 is not visilbe in innodb_tablespaces_encryption
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE name=\\'test/t1\\']" = 0
---source include/assert.inc
-
---die
-
-
-#--let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --innodb-encrypt-tables=OFF
-
-
-
-
-#--sleep 40
-#SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
-
---let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
-
---echo # Wait max 10 min for key encryption threads to encrypt all spaces
---let $wait_timeout= 600
-# All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
---let $wait_condition=SELECT COUNT(*) = $tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
---source include/wait_condition.inc
-
-
-
---let $assert_text= Make sure t7 is not encrypted
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL and name=\\'test/t7\\']" = 1
---source include/assert.inc
-
---echo # tablespaces should be now encrypted
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=foobar
---let SEARCH_FILE=$t1_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=temp
---let SEARCH_FILE=$t2_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barfoo
---let SEARCH_FILE=$t3_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=secret
---let SEARCH_FILE=$t4_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=fbar
---let SEARCH_FILE=$t5_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barf
---let SEARCH_FILE=$t6_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=barb
---let SEARCH_FILE=$t7_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=baba
---let SEARCH_FILE=$t8_IBD
---source include/search_pattern_in_file.inc
-
-
---list_files $MYSQLD_DATADIR/test
-FLUSH TABLES t1, t2, t3, t4, t5, t6, t7, t8 FOR EXPORT;
-
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_backup_tablespaces("test", "t1","t2","t3", "t4", "t5", "t6", "t7", "t8");
-EOF
---list_files $MYSQLD_DATADIR/test
-UNLOCK TABLES;
-
-ALTER TABLE t1 DISCARD TABLESPACE;
-ALTER TABLE t2 DISCARD TABLESPACE;
-ALTER TABLE t3 DISCARD TABLESPACE;
-ALTER TABLE t4 DISCARD TABLESPACE;
-ALTER TABLE t5 DISCARD TABLESPACE;
-ALTER TABLE t6 DISCARD TABLESPACE;
-ALTER TABLE t7 DISCARD TABLESPACE;
-ALTER TABLE t8 DISCARD TABLESPACE;
-
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_discard_tablespaces("test", "t1","t2","t3","t4","t5","t6","t7","t8");
-ib_restore_tablespaces("test", "t1","t2","t3","t4","t5","t6","t7","t8");
-EOF
-
-ALTER TABLE t1 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t1;
-ALTER TABLE t2 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t2;
-ALTER TABLE t3 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t3;
-ALTER TABLE t4 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t4;
-ALTER TABLE t5 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t5;
-ALTER TABLE t6 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t6;
-ALTER TABLE t7 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t7;
-ALTER TABLE t8 IMPORT TABLESPACE;
-SELECT COUNT(1) FROM t8;
-
---echo # tablespaces should remain encrypted after import, apart from t7
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=foobar
---let SEARCH_FILE=$t1_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=temp
---let SEARCH_FILE=$t2_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barfoo
---let SEARCH_FILE=$t3_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=secret
---let SEARCH_FILE=$t4_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=fbar
---let SEARCH_FILE=$t5_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barf
---let SEARCH_FILE=$t6_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=barb
---let SEARCH_FILE=$t7_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=baba
---let SEARCH_FILE=$t8_IBD
---source include/search_pattern_in_file.inc
-
-
-ALTER TABLE t1 ENGINE InnoDB;
-SHOW CREATE TABLE t1;
-ALTER TABLE t2 ENGINE InnoDB;
-SHOW CREATE TABLE t2;
-ALTER TABLE t3 ENGINE InnoDB;
-SHOW CREATE TABLE t3;
-ALTER TABLE t4 ENGINE InnoDB;
-SHOW CREATE TABLE t4;
-ALTER TABLE t5 ENGINE InnoDB;
-SHOW CREATE TABLE t5;
-ALTER TABLE t6 ENGINE InnoDB;
-SHOW CREATE TABLE t6;
-ALTER TABLE t7 ENGINE InnoDB;
-SHOW CREATE TABLE t7;
-ALTER TABLE t8 ENGINE InnoDB;
-SHOW CREATE TABLE t8;
-
---echo # Restarting server
--- source include/restart_mysqld.inc
---echo # Done restarting server
-
---echo # Verify that tables are still usable
-SELECT COUNT(1) FROM t1;
-SELECT COUNT(1) FROM t2;
-SELECT COUNT(1) FROM t3;
-SELECT COUNT(1) FROM t4;
-SELECT COUNT(1) FROM t5;
-SELECT COUNT(1) FROM t6;
-SELECT COUNT(1) FROM t7;
-SELECT COUNT(1) FROM t8;
-
---echo # Tablespaces should be encrypted after restart
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=foobar
---let SEARCH_FILE=$t1_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=temp
---let SEARCH_FILE=$t2_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barfoo
---let SEARCH_FILE=$t3_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=secret
---let SEARCH_FILE=$t4_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=fbar
---let SEARCH_FILE=$t5_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barf
---let SEARCH_FILE=$t6_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=barb
---let SEARCH_FILE=$t7_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=baba
---let SEARCH_FILE=$t8_IBD
---source include/search_pattern_in_file.inc
-
-
---let $assert_text= Make sure all tables, apart from t2, are encrypted
---let $assert_cond= "[SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL]" = 1
---source include/assert.inc
-
---list_files $MYSQLD_DATADIR/test
-FLUSH TABLES t1, t2, t3, t4, t5, t6, t7, t8 FOR EXPORT;
-
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_backup_tablespaces("test", "t1","t2","t3", "t4", "t5", "t6", "t7", "t8");
-EOF
---list_files $MYSQLD_DATADIR/test
-UNLOCK TABLES;
-
-ALTER TABLE t1 DISCARD TABLESPACE;
-ALTER TABLE t2 DISCARD TABLESPACE;
-ALTER TABLE t3 DISCARD TABLESPACE;
-ALTER TABLE t4 DISCARD TABLESPACE;
-ALTER TABLE t5 DISCARD TABLESPACE;
-ALTER TABLE t6 DISCARD TABLESPACE;
-ALTER TABLE t7 DISCARD TABLESPACE;
-ALTER TABLE t8 DISCARD TABLESPACE;
-
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_discard_tablespaces("test", "t1","t2","t3","t4","t5","t6","t7","t8");
-ib_restore_tablespaces("test", "t1","t2","t3","t4","t5","t6","t7","t8");
-EOF
-
---echo # Disable rotation threads
-SET GLOBAL innodb_encryption_threads = 0;
-SET GLOBAL innodb_encrypt_tables = off;
-
-ALTER TABLE t1 IMPORT TABLESPACE;
---let $assert_text= Make sure t1 has encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t1\\']" = 1
---source include/assert.inc
-SELECT COUNT(1) FROM t1;
-ALTER TABLE t2 IMPORT TABLESPACE;
---let $assert_text= Make sure t2 has encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t2\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t2\\']" = 1
---source include/assert.inc
-SELECT COUNT(1) FROM t2;
-ALTER TABLE t3 IMPORT TABLESPACE;
---let $assert_text= Make sure t3 has encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t3\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t3 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t3\\']" = 1
-SELECT COUNT(1) FROM t3;
-ALTER TABLE t4 IMPORT TABLESPACE;
---let $assert_text= Make sure t4 has encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t4\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t4 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t4\\']" = 1
-SELECT COUNT(1) FROM t4;
-ALTER TABLE t5 IMPORT TABLESPACE;
---let $assert_text= Make sure t5 has encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t5\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t5 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t5\\']" = 1
-SELECT COUNT(1) FROM t5;
-ALTER TABLE t6 IMPORT TABLESPACE;
---let $assert_text= Make sure t6 has encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t6\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t6 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t6\\']" = 1
-ALTER TABLE t7 IMPORT TABLESPACE;
---let $assert_text= Make sure t7 does not have encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t7\\']" = 0
---source include/assert.inc
---let $assert_text= Make sure t7 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = NULL (i.e. unencrypted)
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t7\\']" = 1
-SELECT COUNT(1) FROM t7;
-ALTER TABLE t8 IMPORT TABLESPACE;
---let $assert_text= Make sure t8 has encrypted flag set after importing
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t8\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t8 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t8\\']" = 1
-SELECT COUNT(1) FROM t8;
-
---echo # tablespaces should be encrypted, apart from t7
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=foobar
---let SEARCH_FILE=$t1_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=temp
---let SEARCH_FILE=$t2_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barfoo
---let SEARCH_FILE=$t3_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=secret
---let SEARCH_FILE=$t4_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=fbar
---let SEARCH_FILE=$t5_IBD
---source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=barf
---let SEARCH_FILE=$t6_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=barb
---let SEARCH_FILE=$t7_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=baba
---let SEARCH_FILE=$t8_IBD
---source include/search_pattern_in_file.inc
-
-SET GLOBAL innodb_encryption_threads = 4;
-
---echo # Wait max 10 min for key encryption threads to decrypt all spaces, apart from t1, t3 and t5
---let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NOT NULL
---source include/wait_condition.inc
-
---let $assert_text= Make sure t1 has encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t1\\']" = 1
---source include/assert.inc
-SELECT COUNT(1) FROM t1;
---let $assert_text= Make sure t2 does not have encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t2\\']" = 0
---source include/assert.inc
---let $assert_text= Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t2\\']" = 1
---source include/assert.inc
-SELECT COUNT(1) FROM t2;
---let $assert_text= Make sure t3 has encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t3\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t3 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t3\\']" = 1
-SELECT COUNT(1) FROM t3;
---let $assert_text= Make sure t4 does not have encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t4\\']" = 0
---source include/assert.inc
---let $assert_text= Make sure t4 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t4\\']" = 1
-SELECT COUNT(1) FROM t4;
---let $assert_text= Make sure t5 has encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t5\\']" = 8192
---source include/assert.inc
---let $assert_text= Make sure t5 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME=\\'test/t5\\']" = 1
-SELECT COUNT(1) FROM t5;
---let $assert_text= Make sure t6 does not have encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t6\\']" = 0
---source include/assert.inc
---let $assert_text= Make sure t6 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t6\\']" = 1
-SELECT COUNT(1) FROM t6;
---let $assert_text= Make sure t7 does not have encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t7\\']" = 0
---source include/assert.inc
---let $assert_text= Make sure t7 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = NULL (i.e. unencrypted)
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t7\\']" = 1
-SELECT COUNT(1) FROM t7;
---let $assert_text= Make sure t8 does not have encrypted flag set
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t8\\']" = 0
---source include/assert.inc
---let $assert_text= Make sure t8 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION IS NULL
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME=\\'test/t8\\']" = 1
-SELECT COUNT(1) FROM t8;
-
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
-
---echo # tablespaces should not be encrypted, apart from t1,t3 and t5
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=foobar
---let SEARCH_FILE=$t1_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=temp
---let SEARCH_FILE=$t2_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=barfoo
---let SEARCH_FILE=$t3_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=secret
---let SEARCH_FILE=$t4_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=FOUND
---let SEARCH_PATTERN=fbar
---let SEARCH_FILE=$t5_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=barb
-# t6 is not encrypted, but unreadable as it is compressed
---let SEARCH_FILE=$t7_IBD
---source include/search_pattern_in_file.inc
---let ABORT_ON=NOT_FOUND
---let SEARCH_PATTERN=baba
---let SEARCH_FILE=$t8_IBD
---source include/search_pattern_in_file.inc
-
---echo # Now let's backup keyring file, change encryption key id of encrypt-able tables (all but t7) 
---echo # export and dicard them. Next restart the server with backuped keyring file and make sure that
---echo # server starts, but tables cannot be imported gracefully
-
-SET GLOBAL innodb_encrypt_tables = on;
-
---echo # Wait max 10 min for key encryption threads to encrypt all spaces
---let $wait_timeout= 600
-# All tables should get encrypted. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
-# table and t7 is unencrypted
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
---source include/wait_condition.inc
-
---copy_file $MYSQLTEST_VARDIR/tmp/mysecret_keyring $MYSQLTEST_VARDIR/tmp/mysecret_keyring_backup
-
-ALTER TABLE t1 encryption_key_id=5;
-ALTER TABLE t2 encryption_key_id=5;
-ALTER TABLE t3 encryption_key_id=5;
-ALTER TABLE t4 encryption_key_id=5;
-ALTER TABLE t5 encryption_key_id=5;
-ALTER TABLE t6 encryption_key_id=5;
-ALTER TABLE t8 encryption_key_id=5;
-
---list_files $MYSQLD_DATADIR/test
-FLUSH TABLES t1, t2, t3, t4, t5, t6, t8 FOR EXPORT;
-
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_backup_tablespaces("test", "t1","t2","t3", "t4", "t5", "t6", "t8");
-EOF
---list_files $MYSQLD_DATADIR/test
-UNLOCK TABLES;
-
-ALTER TABLE t1 DISCARD TABLESPACE;
-ALTER TABLE t2 DISCARD TABLESPACE;
-ALTER TABLE t3 DISCARD TABLESPACE;
-ALTER TABLE t4 DISCARD TABLESPACE;
-ALTER TABLE t5 DISCARD TABLESPACE;
-ALTER TABLE t6 DISCARD TABLESPACE;
-ALTER TABLE t8 DISCARD TABLESPACE;
-
-perl;
-do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
-ib_discard_tablespaces("test", "t1","t2","t3","t4","t5","t6","t8");
-ib_restore_tablespaces("test", "t1","t2","t3","t4","t5","t6","t8");
-EOF
-
---let $restart_parameters=restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring_backup
---source include/restart_mysqld.inc
-
---error ER_GET_ERRMSG
-ALTER TABLE t1 IMPORT TABLESPACE;
---error ER_GET_ERRMSG
-ALTER TABLE t2 IMPORT TABLESPACE;
---error ER_GET_ERRMSG
-ALTER TABLE t3 IMPORT TABLESPACE;
---error ER_GET_ERRMSG
-ALTER TABLE t4 IMPORT TABLESPACE;
---error ER_GET_ERRMSG
-ALTER TABLE t5 IMPORT TABLESPACE;
---error ER_GET_ERRMSG
-ALTER TABLE t6 IMPORT TABLESPACE;
---error ER_GET_ERRMSG
-ALTER TABLE t8 IMPORT TABLESPACE;
-
---let $restart_parameters=restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring
---source include/restart_mysqld.inc
-
+DROP TABLE t1;
 DROP PROCEDURE innodb_insert_proc;
-DROP TABLE t1, t2, t3, t4, t5, t6, t7, t8;

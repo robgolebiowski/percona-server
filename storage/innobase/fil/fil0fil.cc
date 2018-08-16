@@ -805,6 +805,8 @@ retry:
 		unsigned relevant_flags
 			= flags & ~FSP_FLAGS_MASK_DATA_DIR;
 
+                // in case or RK it can so happen that there will be a crash after all pages of tablespace is rotated
+                // and DD is updated, but page0 of the tablespace has not been yet update. We handle this here.
                 if (space->crypt_data != NULL &&
                     (
                       (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) && space->crypt_data->min_key_version == 0) ||
@@ -813,12 +815,12 @@ retry:
                    )
                 {
                   ib::warn() << "Table encryption flag is " <<  (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) ? "ON" : "OFF")
-                             << " in the data dictionarym but the encryption flag in file " << node->name << " is " 
+                             << " in the data dictionary but the encryption flag in file " << node->name << " is " 
                              << (FSP_FLAGS_GET_ENCRYPTION(relevant_flags) ? "ON" : "OFF")
-                             << " This indicates that the rotation of the table was interupted before space's flags were updated."
+                             << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
                              << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
                              << " could finish up the rotation.";
-                  // exclude rotation flag from validation
+                  // exclude encryption flag from validation
                   relevant_space_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
                   relevant_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
                 }

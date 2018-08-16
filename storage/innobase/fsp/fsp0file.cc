@@ -421,6 +421,28 @@ Datafile::validate_to_dd(
 		return(output);
 	}
 
+        // in case or RK it can so happen that there will be a crash after all pages of tablespace is rotated
+        // and DD is updated, but page0 of the tablespace has not been yet update. We handle this here.
+
+        if (output.encryption_type == ValidateOutput::ROTATED_KEYS &&
+              (
+                (FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_min_key_version == 0) ||
+                (!FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_min_key_version != 0)
+              ) && FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags) 
+           )
+        {
+             ib::warn() << "In file '" << m_filepath << "' (tablespace id = " << m_space_id
+                        << ") encryption flag is " << (FSP_FLAGS_GET_ENCRYPTION(m_flags) ? "ON" : "OFF")
+                        << ". However the encryption flag in the data dictionary is " 
+                        << (FSP_FLAGS_GET_ENCRYPTION(flags) ? "ON" : "OFF")
+                        << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
+                        << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
+                        << " could finish up the rotation.";
+              // exclude encryption flag from validation
+              m_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+              flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+        }
+
 	/* Make sure the datafile we found matched the space ID.
 	If the datafile is a file-per-table tablespace then also match
 	the row format and zip page size. */
@@ -690,10 +712,15 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
         //TODO:Robert: Based on this is_rotated_keys is set - but what about situation if we do not
         //get here and ValidateOutput::DO_NOT_KNOW is set - will then an error be emited first
         //and is_rotated_key will not be checked at all ?
-        output.encryption_type = FSP_FLAGS_GET_ENCRYPTION(m_flags) ? (crypt_data == NULL ? ValidateOutput::MASTER_KEY
-                                                                                         : ValidateOutput::ROTATED_KEYS)
-                                                                   : ValidateOutput::NONE;
-
+        if(crypt_data)
+        {
+          output.encryption_type = ValidateOutput::ROTATED_KEYS;
+          output.rotated_keys_min_key_version = crypt_data->min_key_version;
+        }
+        else if (FSP_FLAGS_GET_ENCRYPTION(m_flags))
+            output.encryption_type = ValidateOutput::MASTER_KEY;
+        else
+          output.encryption_type = ValidateOutput::NONE;
 
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
