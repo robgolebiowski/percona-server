@@ -173,8 +173,6 @@ dict_mem_table_create(
 
         table->file_unreadable = false;
 
-        table->rk_encryption_key_is_missing = false;
-        
 #endif /* !UNIV_HOTBACKUP */
 
 	if (DICT_TF_HAS_SHARED_SPACE(table->flags)) {

@@ -1,0 +1,4 @@
+# Testing table with row_format=compressed
+--let $t1_table_type=row_format=compressed
+--let $is_t1_compressed=true
+--source innodb_encryption_aborted_rotation.inc

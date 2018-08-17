@@ -74,9 +74,9 @@ extern os_event_t fil_crypt_threads_event;
  *  CRYPT(PAGE) = xxx(KEY=L, IV=C, PAGE)
  */
 
-#define CRYPT_SCHEME_1 1
+//#define CRYPT_SCHEME_1 1
 #define CRYPT_SCHEME_1_IV_LEN 16
-#define CRYPT_SCHEME_UNENCRYPTED 0
+//#define CRYPT_SCHEME_UNENCRYPTED 0
 
 
 //TODO:Robert:Those are mine

@@ -859,9 +859,7 @@ ut_strerr(
 		return("Table is encrypted but decrypt failed.");
 	case DB_PAGE_CORRUPTED:
 		return("Page read from tablespace is corrupted.");
-        case DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND:
-                return("Key for decrypting ROTATED_KEYS table was not found");
-
+        
 	/* do not add default: in order to produce a warning if new code
 	is added to the enum but not added here */
 	}

@@ -6752,7 +6752,12 @@ ha_innobase::open(
 	/* For encrypted table, check if the encryption info in data
 	file can't be retrieved properly, mark it as corrupted. */
 	if (ib_table != NULL
-	    && dict_table_is_encrypted(ib_table)
+	    && (dict_table_is_encrypted(ib_table) ||
+                  ( 
+                    ib_table->rotated_keys_info.page0_has_crypt_data &&
+                    ib_table->rotated_keys_info.is_encryption_in_progress()
+                  )
+               )
 	    && ib_table->file_unreadable
 	    && !dict_table_is_discarded(ib_table))
         {
@@ -6783,7 +6788,8 @@ ha_innobase::open(
                               
           {
                 int ret_err= HA_ERR_TABLE_CORRUPT;
-                if (ib_table->is_rotated_keys_encryption_key_missing() || ib_table->is_rotated_keys())
+                if (ib_table->rotated_keys_info.rk_encryption_key_is_missing ||
+                    ib_table->rotated_keys_info.page0_has_crypt_data)
                 {
                   /* Proper error message has been already printed by Datafile::validate_first_page,
                    * thus we do not print anything here */

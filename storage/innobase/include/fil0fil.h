@@ -45,6 +45,8 @@ Created 10/25/1995 Heikki Tuuri
 #include <list>
 #include <vector>
 
+#include "fil0rkinfo.h"
+
 //#include "fil0crypt.h" //TODO:Robert This should be removed, when fil_space_crypt_t will be moved to appropriate place
 /** Structure containing encryption specification */
 struct fil_space_crypt_t;
@@ -1261,7 +1263,7 @@ fil_ibd_open(
 	ulint		flags,
 	const char*	tablename,
 	const char*	path_in,
-        bool&           is_rotated_keys)
+        Rotated_keys_info &rotated_keys_info)
 	MY_ATTRIBUTE((warn_unused_result));
 
 enum fil_load_status {

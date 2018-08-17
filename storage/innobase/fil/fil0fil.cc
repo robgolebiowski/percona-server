@@ -4148,7 +4148,7 @@ fil_ibd_open(
 	ulint		flags,
 	const char*	space_name,
 	const char*	path_in,
-        bool&           is_rotated_keys)
+        Rotated_keys_info &rotated_keys_info)
 {
         ib::error() << "Robert: fil_ibd_open space " << space_name;
 
@@ -4167,7 +4167,6 @@ fil_ibd_open(
 	ulint		tablespaces_found = 0;
 	ulint		valid_tablespaces_found = 0;
 	bool		for_import = (purpose == FIL_TYPE_IMPORT);
-        bool was_rotated_keys_encryption_key_not_found = false;
         Datafile::ValidateOutput validate_output;
 
 	ut_ad(!fix_dict || rw_lock_own(dict_operation_lock, RW_LOCK_X));
@@ -4301,26 +4300,28 @@ fil_ibd_open(
 
 	/* Read and validate the first page of these three tablespace
 	locations, if found. */
-	valid_tablespaces_found +=
-		(validate_output = df_remote.validate_to_dd(id, flags, for_import)).error
-			== DB_SUCCESS ? 1 : 0;
+     
+        validate_output = df_remote.validate_to_dd(id, flags, for_import);
+        if (validate_output.error == DB_SUCCESS)
+        {
+          valid_tablespaces_found += 1;
+          rotated_keys_info = validate_output.rotated_keys_info;
+        }
 
-        is_rotated_keys = validate_output.encryption_type == Datafile::ValidateOutput::ROTATED_KEYS;
+        validate_output = df_default.validate_to_dd(id, flags, for_import);
+        if (validate_output.error == DB_SUCCESS)
+        {
+          valid_tablespaces_found += 1;
+          rotated_keys_info = validate_output.rotated_keys_info;
+        }
 
-	valid_tablespaces_found +=
-		(validate_output = df_default.validate_to_dd(id, flags, for_import)).error
-			== DB_SUCCESS ? 1 : 0;
+        validate_output = df_dict.validate_to_dd(id, flags, for_import);
+        if (validate_output.error == DB_SUCCESS)
+        {
+          valid_tablespaces_found += 1;
+          rotated_keys_info = validate_output.rotated_keys_info;
+        }
         
-        is_rotated_keys = is_rotated_keys ? true
-                                          : validate_output.encryption_type == Datafile::ValidateOutput::ROTATED_KEYS;
-
-	valid_tablespaces_found +=
-		(validate_output = df_dict.validate_to_dd(id, flags, for_import)).error
-			== DB_SUCCESS ? 1 : 0;
-
-        is_rotated_keys = is_rotated_keys ? true
-                                          : validate_output.encryption_type == Datafile::ValidateOutput::ROTATED_KEYS;
-
 	/* Make sense of these three possible locations.
 	First, bail out if no tablespace files were found. */
 	if (valid_tablespaces_found == 0) {
@@ -4332,9 +4333,6 @@ fil_ibd_open(
 			ib::error() << "Could not find a valid tablespace file for `"
 				<< space_name << "`. " << TROUBLESHOOT_DATADICT_MSG;
 		}
-                else
-                  return was_rotated_keys_encryption_key_not_found ? DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND 
-                                                                   : DB_CORRUPTION;
 
 		return(DB_CORRUPTION);
 	}

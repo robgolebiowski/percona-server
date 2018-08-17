@@ -2006,6 +2006,11 @@ fil_crypt_start_encrypting_space(
 
               /* 3 - write crypt data to page 0 */
               byte* frame = buf_block_get_frame(block);
+              if (strcmp(space->name, "test/t7") == 0)
+              {
+                ib::error() << "Assigning encryption to t7.2.";
+              }
+
               crypt_data->type = CRYPT_SCHEME_1;
               //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
               crypt_data->write_page0(space, frame, &mtr, crypt_data->min_key_version, crypt_data->type, crypt_data->encryption_rotation);
@@ -2690,6 +2695,11 @@ fil_crypt_start_rotate_space(
                       crypt_data->is_encrypted() &&
                       key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
                       /* this is rotation unencrypted => encrypted */
+                      
+                      if (strcmp(state->space->name, "test/t7") == 0)
+                      {
+                        ib::error() << "Assigning encryption to t7.1.";
+                      }
                       crypt_data->type = CRYPT_SCHEME_1;
               }
       }

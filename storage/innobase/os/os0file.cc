@@ -6108,6 +6108,14 @@ os_file_write_page(
 {
 	dberr_t		err;
 	ut_ad(type.validate());
+
+        if (n == 0)
+        {
+           ib::error() << "Catched assert dblwr buffer for file "
+                       << name << " failed at offset = " << offset
+                       << " buf = " << buf; 
+        }
+
 	ut_ad(n > 0);
 
 	ssize_t n_bytes = os_file_pwrite(type, file, buf, n, offset, &err);

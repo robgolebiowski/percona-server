@@ -426,8 +426,8 @@ Datafile::validate_to_dd(
 
         if (output.encryption_type == ValidateOutput::ROTATED_KEYS &&
               (
-                (FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_min_key_version == 0) ||
-                (!FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_min_key_version != 0)
+                (FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_info.rotated_keys_min_key_version == 0) ||
+                (!FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_info.rotated_keys_min_key_version != 0)
               ) && FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags) 
            )
         {
@@ -715,7 +715,9 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
         if(crypt_data)
         {
           output.encryption_type = ValidateOutput::ROTATED_KEYS;
-          output.rotated_keys_min_key_version = crypt_data->min_key_version;
+          output.rotated_keys_info.page0_has_crypt_data = true;
+          output.rotated_keys_info.rotated_keys_min_key_version = crypt_data->min_key_version;
+          output.rotated_keys_info.type = crypt_data->type;
         }
         else if (FSP_FLAGS_GET_ENCRYPTION(m_flags))
             output.encryption_type = ValidateOutput::MASTER_KEY;
@@ -795,7 +797,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
                    m_is_valid = false;
                    free_first_page();
                    fil_space_destroy_crypt_data(&crypt_data);
-                   output.error = DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND;
+                   output.rotated_keys_info.rk_encryption_key_is_missing = true;
                    return output;
                    //return (DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND);
                 }
