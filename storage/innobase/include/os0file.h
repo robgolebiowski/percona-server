@@ -408,8 +408,7 @@ struct Encryption {
         enum Encryption_rotation
         {
            NO_ROTATION,
-           MASTER_KEY_TO_ROTATED_KEY,
-           ROTATED_KEY_TO_MASTER_KEY
+           MASTER_KEY_TO_ROTATED_KEY
         };
 
 
@@ -453,6 +452,7 @@ struct Encryption {
 		m_klen(other.m_klen),
 		m_iv(other.m_iv),
                 m_tablespace_iv(other.m_tablespace_iv),
+                m_tablespace_key(other.m_tablespace_key),
                 m_key_version(other.m_key_version),
 		m_key_id(other.m_key_id),
                 m_encryption_rotation(other.m_encryption_rotation)
@@ -605,6 +605,8 @@ struct Encryption {
         // encrypted with MK or RK => thus we do not know which tablespace_iv we are
         // going to use RK or MK
         byte*                   m_tablespace_iv;
+
+        byte*                   m_tablespace_key;
 
         uint                    m_key_version;
 
@@ -930,7 +932,8 @@ public:
 			    byte* iv,
                             uint key_version,
                             uint key_id,
-                            byte *tablespace_iv)
+                            byte *tablespace_iv,
+                            byte *tablespace_key)
 	{
                 //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
 		m_encryption.m_key = key;
@@ -939,6 +942,7 @@ public:
                 m_encryption.m_key_version = key_version;
                 m_encryption.m_key_id = key_id;
                 m_encryption.m_tablespace_iv = tablespace_iv;
+                m_encryption.m_tablespace_key = tablespace_key;
 	}
 
         void encryption_rotation(Encryption::Encryption_rotation encryption_rotation)
@@ -971,6 +975,7 @@ public:
                 m_encryption.m_encryption_rotation = Encryption::NO_ROTATION;
                 m_encryption.m_tablespace_iv = NULL;
                 m_encryption.m_key_id = 0;
+                m_encryption.m_tablespace_key = NULL;
 	}
 
         //bool was_page_encrypted_when_read() const

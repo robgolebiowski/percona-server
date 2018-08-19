@@ -5955,6 +5955,7 @@ fil_io_set_encryption(
                 ulint key_len = 32; //32*8=256
                 byte* iv = NULL;
                 byte *tablespace_iv = NULL;
+                byte *tablespace_key = NULL;
                 uint key_version = 0;
                 uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 
@@ -6025,6 +6026,9 @@ fil_io_set_encryption(
                   if (req_type.is_read())
                   {
                     tablespace_iv = space->crypt_data->tablespace_iv;
+                    tablespace_key = space->crypt_data->tablespace_key;
+                    ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_ROTATED_KEY ||
+                          space->crypt_data->tablespace_key != NULL);
                     key = space->crypt_data->tablespace_key;
                   }
                   //else
@@ -6046,7 +6050,8 @@ fil_io_set_encryption(
                                         iv,
                                         key_version,
                                         key_id,
-                                        tablespace_iv);
+                                        tablespace_iv,
+                                        tablespace_key);
 					//space->encryption_iv);
 
                                         
@@ -7076,7 +7081,8 @@ fil_iterate(
 						    encrypted_with_rotated_keys ? iter.crypt_data->iv : iter.encryption_iv,
                                                     0, //TODO:Robert - maybe I should not set key version to 0 here, but to something like invalid key?
                                                     iter.encryption_key_id,
-                                                    iter.crypt_data->tablespace_iv);
+                                                    iter.crypt_data->tablespace_iv,
+                                                    iter.crypt_data->tablespace_key);
 
 			//read_request.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space_flags) ? Encryption::ROTATED_KEYS
                                                                                                   //: Encryption::AES);
@@ -7140,6 +7146,7 @@ fil_iterate(
 						     iter.encryption_iv,
                                                      iter.encryption_key_version,
                                                      iter.encryption_key_id,
+                                                     NULL,
                                                      NULL);
 			write_request.encryption_algorithm(iter.crypt_data ? Encryption::ROTATED_KEYS
                                                                            : Encryption::AES);
@@ -7167,6 +7174,7 @@ fil_iterate(
 						     iter.encryption_iv,
                                                      iter.encryption_key_version,
                                                      iter.crypt_data->key_id,
+                                                     NULL,
                                                      NULL);
 
                         write_request.encryption_algorithm(Encryption::ROTATED_KEYS);

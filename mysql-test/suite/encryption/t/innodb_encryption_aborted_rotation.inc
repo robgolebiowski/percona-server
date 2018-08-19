@@ -44,8 +44,16 @@ set autocommit=1;
 --let $assert_cond= "[SELECT @@GLOBAL.innodb_encrypt_tables]" = 0
 --source include/assert.inc
 
---let $assert_text= Make sure t1 is unencrypted
---let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 0
+if ($is_mk_encrypted)
+{
+  --let $assert_text= Make sure t1 is encrypted
+  --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 8192
+}
+if (!$is_mk_encrypted)
+{
+  --let $assert_text= Make sure t1 is unencrypted
+  --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 0
+}
 --source include/assert.inc
 
 --echo # We want only first 100 pages to be rotated
@@ -75,10 +83,14 @@ SET GLOBAL innodb_encryption_threads = 0;
 --echo # Disable rotation of only first 100 pages
 SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 
+--let $grep_log=`SELECT !$is_t1_compressed && !$is_mk_encrypted`
+
 --source include/shutdown_mysqld.inc
 
 --echo # Make sure that t1 still contains foobar - as it is only encrypted in half
-if ($is_t1_compressed != true)
+--echo # unless originaly table was compressed or MK encrypted - then it does not
+--echo # make sense to check the table as table will not contain plaintext
+if ($grep_log)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=NOT_FOUND
@@ -91,15 +103,15 @@ if ($is_t1_compressed != true)
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
-# All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
-# innodb_system
+--echo # All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
+--echo # innodb_system
 --let $wait_condition=SELECT COUNT(*) = $tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 
 --echo # Make sure t1 is encrypted
-if ($is_t1_compressed != true)
+if (!$is_t1_compressed)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=FOUND
@@ -133,7 +145,7 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 --source include/shutdown_mysqld.inc
 
 --echo # Make sure that t1 contains foobar - as it is only decrypted in half
-if ($is_t1_compressed != true)
+if (!$is_t1_compressed)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=NOT_FOUND
@@ -152,7 +164,7 @@ if ($is_t1_compressed != true)
 --source include/wait_condition.inc
 
 --echo # Make sure that t1 contains foobar - as it is decrypted
-if ($is_t1_compressed != true)
+if (!$is_t1_compressed)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=NOT_FOUND
@@ -187,7 +199,7 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 
 --echo # Make sure that t1 contains foobar - as it is only encrypted in half
 
-if ($is_t1_compressed != true)
+if (!$is_t1_compressed)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=NOT_FOUND
@@ -206,7 +218,7 @@ if ($is_t1_compressed != true)
 --source include/wait_condition.inc
 
 --echo # Make sure that t1 does not contain foobar - as it is encrypted
-if ($is_t1_compressed != true)
+if (!$is_t1_compressed)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=FOUND
@@ -231,7 +243,7 @@ SET GLOBAL innodb_encrypt_tables=OFF;
 
 # The server crashed after but t1's pages have been flushed to disk by encryption thread
 --echo # Make sure that t1 has been decrypted
-if ($is_t1_compressed != true)
+if (!$is_t1_compressed)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=NOT_FOUND
@@ -310,7 +322,7 @@ SET GLOBAL debug="-d,crash_on_t1_flush_after_dd_update";
 --source include/shutdown_mysqld.inc
 
 --echo # Make sure that t1 has been encrypted
-if ($is_t1_compressed != true)
+if (!$is_t1_compressed)
 {
   --let SEARCH_PATTERN=foobar
   --let ABORT_ON=FOUND

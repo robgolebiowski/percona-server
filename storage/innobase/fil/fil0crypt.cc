@@ -572,9 +572,11 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
         }
         else 
         {
+          ut_ad(tablespace_key != NULL);
           crypt_data->set_tablespace_key(tablespace_key); // Since there is tablespace_key present - we also need to read
                                                           // tablespace_iv
           uchar tablespace_iv[ENCRYPTION_KEY_LEN];
+          ut_ad(tablespace_iv != NULL);
           memcpy(tablespace_iv, page + offset + bytes_read, ENCRYPTION_KEY_LEN);
           bytes_read += ENCRYPTION_KEY_LEN;
           crypt_data->set_tablespace_iv(tablespace_iv);
@@ -1975,6 +1977,7 @@ fil_crypt_start_encrypting_space(
       if (space->encryption_type == Encryption::AES) // We are re-encrypting space from MK encryption to RK encryption
       {
         crypt_data->encryption_rotation = Encryption::MASTER_KEY_TO_ROTATED_KEY;
+        ut_ad(space->encryption_key != NULL && space->encryption_iv != NULL);
         crypt_data->set_tablespace_key(space->encryption_key);
         crypt_data->set_tablespace_iv(space->encryption_iv); //space key and encryption are always initalized for MK encrypted tables
       }
@@ -2750,10 +2753,13 @@ fil_crypt_find_page_to_rotate(
       bool found = crypt_data->rotate_state.max_offset >=
               crypt_data->rotate_state.next_offset;
 
-      if (strcmp(state->space->name, "test/t6") == 0)
+      if (strcmp(state->space->name, "test/t1") == 0)
       {
-        if (found)
+        if (found){
           ib::error() << "Page is to be rotated for space=" << state->space->name << '\n';
+          ib::error() << "crypt_data->rotate_state.max_offset= " << crypt_data->rotate_state.max_offset << '\n';
+          ib::error() << "crypt_data->rotate_state.next_offset= " << crypt_data->rotate_state.next_offset << '\n';
+        }
         else {
           ib::error() << "Page is NOT to be rotated for space= " << state->space->name << '\n';
           ib::error() << "crypt_data->rotate_state.max_offset= " << crypt_data->rotate_state.max_offset << '\n';
@@ -2968,6 +2974,11 @@ fil_crypt_rotate_page(
 
       //ut_d(const bool was_free = fseg_page_is_free(space, offset)); //TODO:Robert: For the time being removed
 
+      if (strcmp(space->name, "test/t1") == 0)
+      {
+        ib::error() << "Before trying to write to test/t1 "
+                    << "for offset = " << offset << '\n';
+      }
       mtr_t mtr;
       mtr.start();
       if (buf_block_t* block = fil_crypt_get_page_throttle(state,
@@ -2983,6 +2994,11 @@ fil_crypt_rotate_page(
               //uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
 
 
+              // We always assume that page needs to be encrypted with RK when rotating from MK encryption
+              // This might not be the case if the rotation was aborted (due to server crash) and some of the pages
+              // might be already encrypted with RK. We re-encrypt them anyways. We could be calculating post - encryption checksum
+              // here and decide based on them if the page is RK encrypted or MK encrypted, but this should be very rare case
+              // and some extra-re-encryption will do no harm - and we safe on calculating checksums in normal execution
               uint kv= space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY
                          ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
                          : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
@@ -3151,6 +3167,14 @@ fil_crypt_rotate_pages(
 
       ut_ad(state->space->n_pending_ops > 0);
 
+      if (strcmp(state->space->name, "test/t1") == 0)
+      {
+        ib::error() << "In fil_crypt_rotate_pages for test/t1" << '\n'
+                    << "state->offset = " << state->offset << '\n'
+                    << "state->space->is_encrypted = " << state->space->is_encrypted << '\n'
+                    << "end = " << end << '\n';
+      }
+
       for (; state->offset < end && !state->space->is_encrypted; state->offset++) {
 
               /* we can't rotate pages in dblwr buffer as
@@ -3170,6 +3194,7 @@ fil_crypt_rotate_pages(
                 "rotate_only_first_100_pages_from_t1",
                 if (strcmp(state->space->name, "test/t1") == 0)
                 {
+                  ib::error() << "rotate_only_first_100_pages_from_t1 is active" << '\n';
                   if(number_of_t1_pages_rotated >= 100)
                   {
                     state->offset = end;
@@ -3696,12 +3721,6 @@ fil_crypt_flush_space(
         ib::error() << "min_key_version_found = " << crypt_data->rotate_state.min_key_version_found << '\n';
       //}
 
-      if (crypt_data->encryption_rotation == Encryption::ROTATED_KEY_TO_MASTER_KEY)
-      {
-        mutex_enter(&fil_system->mutex);
-        space->encryption_type = Encryption::AES;
-        mutex_exit(&fil_system->mutex); // TODO:Robert - I am not sure if I need this mutex
-      }
 
 
       if (space->id != 0) // TODO: Robert  - when this can be true?
@@ -3844,7 +3863,7 @@ fil_crypt_complete_rotate_space(
               bool done = crypt_data->rotate_state.next_offset >=
                       crypt_data->rotate_state.max_offset;
 
-              if (strcmp(state->space->name, "test/t2") == 0)
+              if (strcmp(state->space->name, "test/t1") == 0)
               {
                  ib::error() << "crypt_data->rotate_state.active_threads =" << crypt_data->rotate_state.active_threads << '\n';
               }
@@ -3860,6 +3879,10 @@ fil_crypt_complete_rotate_space(
                       /* we're the last active thread */
                       ut_ad(crypt_data->rotate_state.flushing == false);
                       crypt_data->rotate_state.flushing = true;
+                      crypt_data->set_tablespace_iv(NULL);
+                      crypt_data->set_tablespace_key(NULL);
+                      crypt_data->encryption_rotation = Encryption::NO_ROTATION;
+
                       //ut_ad(crypt_data->min_key_version != crypt_data->rotate_state.min_key_version_found);
                       //crypt_data->min_key_version = //This is done latter - after flush
                               //crypt_data->rotate_state.min_key_version_found;
@@ -3888,11 +3911,6 @@ fil_crypt_complete_rotate_space(
               crypt_data->rotate_state.scrubbing.is_active = false;
 
 
-              crypt_data->set_tablespace_iv(NULL);
-              crypt_data->set_tablespace_key(NULL);
-
-
-
               mutex_exit(&crypt_data->mutex); 
               /* all threads must call btr_scrub_complete_space wo/ mutex held */
               //if (state->scrub_data.scrubbing) {
@@ -3916,7 +3934,6 @@ fil_crypt_complete_rotate_space(
                       crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
                       crypt_data->type = current_type;
                       crypt_data->rotate_state.flushing = false;
-                      crypt_data->encryption_rotation = Encryption::NO_ROTATION;
 
 
 
@@ -4433,7 +4450,11 @@ fil_space_verify_crypt_checksum(
 {
         //TODO: Consider changing FIL_PAGE_FILE_FLUSH_LSN to FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION
         //TODO: As in 
-	uint key_version = 0;
+        //
+        //
+        //KEY VERSION should not be checked here - we are just verifying if the post-encrypt checksum is ok.
+        //
+	//uint key_version = 0;
         //mach_read_from_4(page+ FIL_PAGE_ENCRYPTION_KEY_VERSION);
 
         // For compressed pages first is post encryption checksum,
@@ -4443,20 +4464,20 @@ fil_space_verify_crypt_checksum(
 
         if (is_new_schema_compressed)
         {
-          key_version = mach_read_from_4(page + FIL_PAGE_DATA + 4);
+          //key_version = mach_read_from_4(page + FIL_PAGE_DATA + 4);
           page_size = static_cast<uint16_t>(mach_read_from_2(page + FIL_PAGE_COMPRESS_SIZE_V1));
         }
-        else
-        {
-          key_version = mach_read_from_4(page + FIL_PAGE_ENCRYPTION_KEY_VERSION);
-        }
+        //else
+        //{
+          //key_version = mach_read_from_4(page + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+        //}
 
 
 	/* If page is not encrypted, return false */
-	if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-                ut_ad(0);
-		//return false;
-	}
+	//if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+                //ut_ad(0);
+		////return false;
+	//}
 
 	/* Read stored post encryption checksum. */
 	uint32_t checksum = 0;

@@ -1849,14 +1849,17 @@ os_file_io_complete(
                     }
                   }
 
-                  if (encryption.m_encryption_rotation != Encryption::NO_ROTATION) // There is re-encryption going on
+                  if (encryption.m_encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY) // There is re-encryption going on
                   {
                     if (is_crypt_checksum_correct) // assume page is RK encrypted
                       encryption.m_type = Encryption::ROTATED_KEYS; 
                     else
                     {
                       encryption.m_type = Encryption::AES; // assume page is MK encrypted
+                      ut_ad(encryption.m_tablespace_iv != NULL);
                       encryption.m_iv = encryption.m_tablespace_iv; // iv comes from tablespace header for MK encryption
+                      ut_ad(encryption.m_tablespace_key != NULL);
+                      encryption.m_key = encryption.m_tablespace_key;
                     }
                   }
                 }
@@ -10457,7 +10460,7 @@ Encryption::decrypt(
             ut_ad(page_type == FIL_PAGE_ENCRYPTED);
           }
 
-          ut_ad(m_key == NULL); // TODO:Robert: For rottated keys encryption we will just now fetch the key
+          //ut_ad(m_key == NULL); // TODO:Robert: For rottated keys encryption we will just now fetch the key
           //if (m_key == NULL)
             //memset(m_key, 0, ENCRYPTION_KEY_LEN);
           //m_key = NULL;
@@ -10474,6 +10477,8 @@ Encryption::decrypt(
             //return (DB_IO_DECRYPT_FAIL);
         }
         
+        ut_ad(m_key != NULL);
+
         //else
 	  //data_len = src_len - FIL_PAGE_DATA;
           //

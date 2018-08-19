@@ -50,7 +50,7 @@ insert t6 values (repeat('nosecret', 12));
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 
---let $assert_text= Successful rotation of percona_innodb-0 to version 1
+--let $assert_text= Successful rotation of percona_innodb-0 to version 2
 --let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_innodb-0\\"\\) = 1]" = 1
 --source include/assert.inc
 
@@ -95,7 +95,7 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --source include/wait_condition.inc
 
 --echo # Setting innodb_encryption_rotate_key_age to 1. Now each key rotation should result
---echo # in re-encryption of the space
+--echo # in re-encryption of the table
 SET GLOBAL innodb_encryption_rotate_key_age = 1;
 
 --let $assert_text= Successful rotation of percona_innodb-0 to version 4
@@ -208,9 +208,9 @@ SET GLOBAL innodb_encrypt_tables = off;
 
 --let $tables_count= `select count(*) from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
 --let $wait_timeout= 600
-# We should have $tables_count - 2 tables encrypted unencrypted (-1 because of additional innodb_system table)
-# and one table t1 encrypted with version 3 of key 0 => thus $tables_count - 2
---let $wait_condition=SELECT COUNT(*) = $tables_count - 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
+# We should have $tables_count tables unencrypted (+ 1 because of additional innodb_system table)
+# and one table t1 encrypted with version 4 of key 0 (-1) => thus $tables_count
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
 # Table t1 should stay encrypted with version 4 of key 0
