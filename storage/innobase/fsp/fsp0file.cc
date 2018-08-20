@@ -715,7 +715,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
         if(crypt_data)
         {
           output.encryption_type = ValidateOutput::ROTATED_KEYS;
-          output.rotated_keys_info.page0_has_crypt_data = true;
+          output.rotated_keys_info.page0_has_crypt_data = true; // TODO: Muszę się zdecydować, albo has_crypt_data, albo ROTATED_KEYS
           output.rotated_keys_info.rotated_keys_min_key_version = crypt_data->min_key_version;
           output.rotated_keys_info.type = crypt_data->type;
         }
@@ -798,6 +798,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
                    free_first_page();
                    fil_space_destroy_crypt_data(&crypt_data);
                    output.rotated_keys_info.rk_encryption_key_is_missing = true;
+                   output.error = DB_CORRUPTION;
                    return output;
                    //return (DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND);
                 }

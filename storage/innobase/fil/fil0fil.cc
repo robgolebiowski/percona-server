@@ -4300,28 +4300,30 @@ fil_ibd_open(
 
 	/* Read and validate the first page of these three tablespace
 	locations, if found. */
-     
-        validate_output = df_remote.validate_to_dd(id, flags, for_import);
-        if (validate_output.error == DB_SUCCESS)
-        {
-          valid_tablespaces_found += 1;
-          rotated_keys_info = validate_output.rotated_keys_info;
-        }
 
-        validate_output = df_default.validate_to_dd(id, flags, for_import);
-        if (validate_output.error == DB_SUCCESS)
-        {
-          valid_tablespaces_found += 1;
-          rotated_keys_info = validate_output.rotated_keys_info;
-        }
+        valid_tablespaces_found +=
+                (validate_output = df_remote.validate_to_dd(id, flags, for_import)).error
+                        == DB_SUCCESS ? 1 : 0;
 
-        validate_output = df_dict.validate_to_dd(id, flags, for_import);
-        if (validate_output.error == DB_SUCCESS)
-        {
-          valid_tablespaces_found += 1;
+        if (validate_output.rotated_keys_info.page0_has_crypt_data)
           rotated_keys_info = validate_output.rotated_keys_info;
-        }
-        
+       
+        valid_tablespaces_found +=
+               (validate_output = df_default.validate_to_dd(id, flags, for_import)).error
+                       == DB_SUCCESS ? 1 : 0;
+
+        if (validate_output.error == DB_SUCCESS ||
+            (valid_tablespaces_found == 0 && validate_output.rotated_keys_info.page0_has_crypt_data))
+          rotated_keys_info = validate_output.rotated_keys_info;
+
+        valid_tablespaces_found +=
+               (validate_output = df_dict.validate_to_dd(id, flags, for_import)).error
+                       == DB_SUCCESS ? 1 : 0;
+
+        if (validate_output.error == DB_SUCCESS ||
+            (valid_tablespaces_found == 0 && validate_output.rotated_keys_info.page0_has_crypt_data))
+          rotated_keys_info = validate_output.rotated_keys_info;
+
 	/* Make sense of these three possible locations.
 	First, bail out if no tablespace files were found. */
 	if (valid_tablespaces_found == 0) {

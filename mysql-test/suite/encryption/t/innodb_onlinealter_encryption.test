@@ -3,16 +3,13 @@
 # test uses restart
 -- source include/not_embedded.inc
 
-#CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB encrypted=yes;
 CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB encryption='ROTATED_KEYS';
-
 CREATE TABLE t2 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB;
 CREATE TABLE t3 (id INT, a VARCHAR(255)) ENGINE=InnoDB encryption='ROTATED_KEYS';
 CREATE TABLE t4 (id INT, a VARCHAR(255)) engine=InnoDB;
 CREATE TABLE t5 (id INT NOT NULL PRIMARY KEY, a TEXT(500), b VARCHAR(255), FULLTEXT(b)) ENGINE=InnoDB encryption='ROTATED_KEYS';
 CREATE TABLE t6 (id INT, a TEXT(500), b VARCHAR(255), FULLTEXT(b)) ENGINE=InnoDB;
 CREATE TABLE t7 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB row_format=compressed encryption='ROTATED_KEYS';
-#CREATE TABLE t7 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB encryption='ROTATED_KEYS';
 
 delimiter //;
 create procedure innodb_insert_proc (repeat_count int)
@@ -38,9 +35,10 @@ call innodb_insert_proc(1500);
 commit;
 set autocommit=1;
 
---echo # Wait max 10 min for key encryption threads to encrypt all spaces
+--let $tables_count= `select count(*) from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
+--echo # Wait max 10 min for key encryption threads to encrypt all test/t_ tables (all should have MIN_KEY_VERSION 1 assigned)
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+--let $wait_condition=SELECT SUM(MIN_KEY_VERSION) = 7 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME LIKE 'test/t_'
 --source include/wait_condition.inc
 --let $MYSQLD_DATADIR=`select @@datadir`
 
