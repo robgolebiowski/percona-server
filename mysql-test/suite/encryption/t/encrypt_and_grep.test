@@ -21,6 +21,7 @@ SHOW PLUGINS;
 --let t2_IBD = $MYSQLD_DATADIR/test/t2.ibd
 --let t3_IBD = $MYSQLD_DATADIR/test/t3.ibd
 --let t4_IBD = $MYSQLD_DATADIR/test/t4.ibd
+--let ts_encrypted_IBD = $MYSQLD_DATADIR/ts_encrypted.ibd
 --let SEARCH_RANGE = 10000000
 
 --disable_warnings
@@ -33,17 +34,23 @@ create table t2 (a varchar(255)) engine=innodb;
 show warnings;
 create table t3 (a varchar(255)) engine=innodb encryption='N';
 create table t4 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS' encryption_key_id=5;
+
+CREATE TABLESPACE ts_encrypted ADD DATAFILE 'ts_encrypted.ibd' ENCRYPTION="Y" ENGINE="InnoDB";
+CREATE TABLE t5 (a varchar(255)) TABLESPACE ts_encrypted ENCRYPTION="Y" ENGINE="InnoDB";
+
 #create table t5 (a varchar(255)) engine=innodb encryption='Y';
 
 insert t1 values (repeat('foobarsecret', 12));
 insert t2 values (repeat('tempsecret', 12));
 insert t3 values (repeat('dummysecret', 12));
 insert t4 values (repeat('verysecret', 12));
+insert t5 values (repeat('moresecret', 12));
 
 select * from t1;
 select * from t2;
 select * from t3;
 select * from t4;
+select * from t5;
 
 #--sleep 3
 
@@ -51,19 +58,10 @@ select * from t4;
 #SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 #SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
 
-#--let $encrypted_tables_count= `select count(*) - 1 from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
-# In INNODB_TABLESPACE_ENCRYPTION P_S add one tabel which is not present in INNODB_SYS_TABLESPACE, i.e. innodb_system
---echo # encrypted_tables_count is equal to the number of tables inside INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES, even though
---echo # one tablespace remains unencrypted. This is because INNODB_TABLESPACES_ENCRYPTION contains arifical tablespace innodb_system
---echo # which does not exist in INNODB_SYS_TABLESPACES
 --let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --echo $encrypted_tables_counts
 --let $wait_timeout= 600
-#--let $wait_timeout= 60
-#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND ROTATING_OR_FLUSHING = 0
---let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
-#--let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND ROTATING_OR_FLUSHING = 0
 --let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
@@ -72,7 +70,7 @@ SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225
 --let $assert_text= All encrypted tables should have encrypted flag set, apart from t3
 #--let $assert_cond= "[SELECT COUNT(*) = $encrypted_tables_count - 1] FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225" = 1
 # encryted_tables_count - 1 here, as INNODB_SYS_TABLESPACES does not include innodb_system
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225]" = $encrypted_tables_count - 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count - 1
 --source include/assert.inc
 
 #SELECT COUNT(*) FROM SYS_TABLES WHERE
@@ -121,16 +119,17 @@ SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 --echo # ibdata1 expecting NOT FOUND
 -- let SEARCH_FILE=$ib1_IBD
 -- source include/search_pattern_in_file.inc
+--echo # ts_encrypted expecting NOT FOUND
+--let ABORT_ON=FOUND
+--let SEARCH_FILE=$ts_encrypted_IBD
+--let SEARCH_PATTERN=moresecret
+--source include/search_pattern_in_file.inc
+
 
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
-#--let $restart_parameters=restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 -- source include/start_mysqld.inc
 
 --echo # Now turn off encryption and wait for threads to decrypt everything
-
-#SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
-
---echo # HERE ROBERT
 
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
@@ -148,13 +147,6 @@ SET GLOBAL innodb_encrypt_tables = off;
 #SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 #SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
---echo # Wait max 10 min for key encryption threads to decrypt all spaces (but t1 and t4 for which encryption was overriden to yes)
-#--let $wait_timeout= 600
-#--let $tables_count= `select count(*) - 1 from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
-#echo $tables_count;
-#select * from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema';
-
-
 #echo ======alll-from-information_schema====
 #select * from information_schema.tables where engine = 'InnoDB'; 
 --echo # Only two tables should stayed encrypted - the ones with explicite encryption
@@ -170,10 +162,11 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 --let $assert_text= Only two tables should stayed encrypted - the ones with explicite encryption t1 and t4
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225]" = 2
+
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = 2
 --source include/assert.inc
 
-
+#--die
 #
 #--sleep 70
 
@@ -213,6 +206,11 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 --echo # ibdata1 expecting NOT FOUND
 --let SEARCH_FILE=$ib1_IBD
 --source include/search_pattern_in_file.inc
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$ts_encrypted_IBD
+--let SEARCH_PATTERN=moresecret
+--source include/search_pattern_in_file.inc
+
 
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 
@@ -224,16 +222,11 @@ SET GLOBAL innodb_encrypt_tables = on;
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
-#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND ROTATING_OR_FLUSHING = 0;
 --let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
-#--let $wait_timeout= 600
-#--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG <> 8225
-#--source include/wait_condition.inc
-
 --let $assert_text= Only one table should stay unencrypted i.e. t3
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG <> 8225]" = 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE ((FLAG & 8192) = 0)]" = 1
 --source include/assert.inc
 
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
@@ -267,17 +260,25 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 --let SEARCH_PATTERN=foobarsecret
 --let ABORT_ON=FOUND
 --echo # ibdata1 expecting NOT FOUND
--- let SEARCH_FILE=$ib1_IBD
--- source include/search_pattern_in_file.inc
+--let SEARCH_FILE=$ib1_IBD
+--source include/search_pattern_in_file.inc
+--let ABORT_ON=FOUND
+--let SEARCH_FILE=$ts_encrypted_IBD
+--let SEARCH_PATTERN=moresecret
+--source include/search_pattern_in_file.inc
 
--- source include/start_mysqld.inc
+--source include/start_mysqld.inc
 
 alter table t1 encryption='n';
 alter table t4 encryption='n';
 
+#--sleep 15
+#SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
+#SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
+#SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
+
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces (apart from t1,t3 and t4)
 --let $wait_timeout= 600
-#--let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND ROTATING_OR_FLUSHING = 0
 --let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
@@ -288,7 +289,7 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 --let $assert_text= All spaces apart from t1, t3 and t4 should got encrypted
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG <> 8225]" = 3
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE ((FLAG & 8192) = 0)]" = 3
 --source include/assert.inc
 
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
@@ -322,13 +323,15 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 --let SEARCH_PATTERN=foobarsecret
 --let ABORT_ON=FOUND
 --echo # ibdata1 expecting NOT FOUND
---let ABORT_ON_NOT_FOUND=0
---let ABORT_ON_FOUND=1
--- let SEARCH_FILE=$ib1_IBD
--- source include/search_pattern_in_file.inc
+--let ABORT_ON=FOUND
+--let SEARCH_FILE=$ib1_IBD
+--source include/search_pattern_in_file.inc
+--let ABORT_ON=FOUND
+--let SEARCH_FILE=$ts_encrypted_IBD
+--let SEARCH_PATTERN=moresecret
+--source include/search_pattern_in_file.inc
 
--- source include/start_mysqld.inc
+--source include/start_mysqld.inc
 
-
-drop table t1, t2, t3, t4;
-
+drop table t1, t2, t3, t4, t5;
+drop tablespace ts_encrypted;

@@ -335,6 +335,12 @@ struct Compression {
 	Type		m_type;
 };
 
+static const uint ENCRYPTION_KEY_VERSION_INVALID = (~(uint)0);
+
+static const uint FIL_DEFAULT_ENCRYPTION_KEY = 0;
+
+static const uint ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED = 0;
+
 /** Encryption key length */
 static const ulint ENCRYPTION_KEY_LEN = 32;
 
@@ -519,6 +525,8 @@ struct Encryption {
         static bool tablespace_key_exists(uint key_id);
 
         static bool is_encrypted_and_compressed(const byte *page);
+
+        static uint encryption_get_latest_version(uint key_id);
 
        //TODO:Robert: Te dwa są potrzebne.
         static void get_latest_tablespace_key(uint key_id,

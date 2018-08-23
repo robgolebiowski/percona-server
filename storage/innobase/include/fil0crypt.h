@@ -53,10 +53,10 @@ static const ulint ENCRYPTION_KEY_LEN = 32; //TODO:Robert kind of workaround
 #endif // UNIV_INNOCHECKSUM
 
 /* This key will be used if nothing else is given */
-#define FIL_DEFAULT_ENCRYPTION_KEY 0
-#define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
+//#define FIL_DEFAULT_ENCRYPTION_KEY 0
+//#define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
 //#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
-#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  0
+//#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  0
 
 extern os_event_t fil_crypt_threads_event;
 
@@ -108,6 +108,7 @@ struct st_encryption_scheme_key {
   unsigned char key[ENCRYPTION_KEY_LEN];
 };
 
+// Merge it with fil_crypt_data
 struct st_encryption_scheme {
   unsigned char iv[16];
   struct st_encryption_scheme_key key[3]; //TODO : Why do I need this ?
@@ -150,8 +151,6 @@ struct fil_space_rotate_state_t
 };
 
 
-bool encryption_key_id_exists(const char *key_id);
-
 #ifndef UNIV_INNOCHECKSUM
 
 
@@ -167,52 +166,7 @@ struct fil_space_crypt_t : st_encryption_scheme
 		uint new_key_id,
 		fil_encryption_t new_encryption,
                 bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
-                Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION)
-		: st_encryption_scheme(),
-		min_key_version(new_min_key_version),
-		page0_offset(0),
-		encryption(new_encryption),
-		//found_key_version(ENCRYPTION_KEY_VERSION_INVALID),
-                key_found(false),
-                //key_found(0),
-		rotate_state(),
-                encryption_rotation(encryption_rotation),
-                tablespace_key(NULL)
-	{
-		key_id = new_key_id;
-		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
-                  type = 0; //TODO:Robert: This is temporary to get rid of unused variable problem
-                mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
-		//locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
-		type = new_type;
-
-		if (new_encryption == FIL_ENCRYPTION_OFF ||
-			(!srv_encrypt_tables &&
-			 new_encryption == FIL_ENCRYPTION_DEFAULT)) {
-			type = CRYPT_SCHEME_UNENCRYPTED;
-                        min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-                        key_found = true;
-                        //ut_ad(0);
-		} else {
-			type = CRYPT_SCHEME_1;
-                        //if (create_key)
-                        //{
-                                key_found = true; // cheat key_get_latest_version that the key exists - if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
-         			min_key_version= key_get_latest_version(); //This means table was created with ROTATED_KEYS = thus we know that this table is encrypted
-                                                                          //min_key_version should be set to key_version, when create_key is false it means it was not created
-                                key_found = min_key_version != ENCRYPTION_KEY_VERSION_INVALID;
-                                                                          //with ROTATED_KEYS
-                                //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-                        //}
-                        //else
-                                //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; //it will be filled in later by a caller - which read crypto - if it going to be read from page0
-                                //min_key_version = key_get_latest_version();
-                        //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-                        //ut_ad(min_key_version == 0);
-		}
-
-		//found_key_version = min_key_version; // TODO:This does not make much sense now - always true
-	}
+                Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION);
 
 	/** Destructor */
 	~fil_space_crypt_t()
@@ -327,114 +281,6 @@ struct fil_space_crypt_t : st_encryption_scheme
         //to be able to store this IV.
         uchar *tablespace_iv;
 };
-
-
-
-//struct fil_space_crypt_t : st_encryption_scheme
-//{
- //public:
-	//[>* Constructor. Does not initialize the members!
-	//The object is expected to be placed in a buffer that
-	//has been zero-initialized. */
-
-			////fil_space_crypt_t(
-				//////type,
-				////min_key_version,
-				////key);
-				//////encrypt_mode);
-
-
-	//fil_space_crypt_t(
-		//uint new_min_key_version,
-		//const uchar *key,
-                //fil_encryption_t new_encryption)
-		//: st_encryption_scheme(),
-		//min_key_version(new_min_key_version),
-		//page0_offset(0),
-		//encryption(new_encryption),
-		//key_found(0),
-		//rotate_state()
-	//{
-		////key_id = new_key_id;
-		//my_random_bytes(iv, sizeof(iv));
-		//mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
-		//locker = crypt_data_scheme_locker;
-		////type = new_type;
-                //mempy(this->key, key, ENCRYPTION_SCHEME_BLOCK_LENGTH);
-
-		//if (new_encryption == FIL_ENCRYPTION_OFF ||
-			//(!srv_encrypt_tables &&
-			 //new_encryption == FIL_ENCRYPTION_DEFAULT)) {
-			//type = CRYPT_SCHEME_UNENCRYPTED;
-		//} else {
-			//type = CRYPT_SCHEME_1;
-			//min_key_version = key_get_latest_version();
-		//}
-
-		//key_found = min_key_version;
-	//}
-
-	//[>* Destructor <]
-	//~fil_space_crypt_t()
-	//{
-		//mutex_free(&mutex);
-	//}
-
-	//[>* Get latest key version from encryption plugin
-	//@retval key_version or
-	//@retval ENCRYPTION_KEY_VERSION_INVALID if used key_id
-	//is not found from encryption plugin. */
-	//uint key_get_latest_version(void);
-
-	//[>* Returns true if key was found from encryption plugin
-	//and false if not. */
-	//bool is_key_found() const {
-		//return key_found != ENCRYPTION_KEY_VERSION_INVALID;
-	//}
-
-	//[>* Returns true if tablespace should be encrypted <]
-	//bool should_encrypt() const {
-		//return ((encryption == FIL_ENCRYPTION_ON) ||
-			//(srv_encrypt_tables &&
-				//encryption == FIL_ENCRYPTION_DEFAULT));
-	//}
-
-	//[>* Return true if tablespace is encrypted. <]
-	//bool is_encrypted() const {
-		//return (encryption != FIL_ENCRYPTION_OFF);
-	//}
-
-	//[>* Return true if default tablespace encryption is used, <]
-	//bool is_default_encryption() const {
-		//return (encryption == FIL_ENCRYPTION_DEFAULT);
-	//}
-
-	//[>* Return true if tablespace is not encrypted. <]
-	//bool not_encrypted() const {
-		//return (encryption == FIL_ENCRYPTION_OFF);
-	//}
-
-	//[>* Write crypt data to a page (0)
-	//@param[in]	space	tablespace
-	//@param[in,out]	page0	first page of the tablespace
-	//@param[in,out]	mtr	mini-transaction */
-	//void write_page0(const fil_space_t* space, byte* page0, mtr_t* mtr);
-
-	//uint min_key_version; // min key version for this space
-	//ulint page0_offset;   // byte offset on page 0 for crypt data
-        //fil_encryption_t encryption; // Encryption setup
-
-	//ib_mutex_t mutex;   // mutex protecting following variables
-
-	//[>* Return code from encryption_key_get_latest_version.
-        //If ENCRYPTION_KEY_VERSION_INVALID encryption plugin
-	//could not find the key and there is no need to call
-	//get_latest_key_version again as keys are read only
-	//at startup. */
-	//uint key_found;
-
-	//fil_space_rotate_state_t rotate_state;
-//};
 
 /** Status info about encryption */
 struct fil_space_crypt_status_t {

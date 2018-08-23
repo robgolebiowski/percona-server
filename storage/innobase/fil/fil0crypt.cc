@@ -41,7 +41,7 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 //#include "fil0pagecompress.h"
 #include "ha_prototypes.h" // IB_LOG_
 #include <my_crypt.h>
-#include "system_key.h"
+//#include "system_key.h"
 #include "buf0flu.h"
 #include "buf0buf.h"
 
@@ -54,6 +54,8 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "fts0priv.h"
 #include "lock0lock.h"
 #include "my_dbug.h"
+
+#include "os0file.h"
 
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
@@ -122,10 +124,6 @@ uint fil_get_encrypt_info_size(const uint iv_len)
 static fil_crypt_stat_t crypt_stat;
 static ib_mutex_t crypt_stat_mutex;
 
-/** Is background scrubbing enabled, defined on btr0scrub.cc */
-//extern my_bool srv_background_scrub_data_uncompressed;
-//extern my_bool srv_background_scrub_data_compressed;
-
 /***********************************************************************
 Check if a key needs rotation given a key_state
 @param[in]	encrypt_mode		Encryption mode
@@ -164,143 +162,60 @@ fil_space_crypt_cleanup() // TODO:Robert kiedy to jest wołane?!
         mutex_free(&crypt_stat_mutex);
 }
 
-bool encryption_key_id_exists(const char *key_id)
-{
-#ifndef UNIV_INNOCHECKSUM
-        int ret;
-	char*	key_type = NULL;
-        byte* key = NULL; 
-        size_t key_len;
-	//size_t	key_len;
-	/* We call key ring API to get master key here. */
-	ret = my_key_fetch(key_id, &key_type, NULL,
-			   reinterpret_cast<void**>(&key), &key_len);
+fil_space_crypt_t::fil_space_crypt_t(
+		uint new_type,
+		uint new_min_key_version,
+		uint new_key_id,
+		fil_encryption_t new_encryption,
+                bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
+                Encryption::Encryption_rotation encryption_rotation)
+		: st_encryption_scheme(),
+		min_key_version(new_min_key_version),
+		page0_offset(0),
+		encryption(new_encryption),
+		//found_key_version(ENCRYPTION_KEY_VERSION_INVALID),
+                key_found(false),
+                //key_found(0),
+		rotate_state(),
+                encryption_rotation(encryption_rotation),
+                tablespace_key(NULL)
+	{
+		key_id = new_key_id;
+		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
+                  type = 0; //TODO:Robert: This is temporary to get rid of unused variable problem
+                mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
+		//locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
+		type = new_type;
 
-	if (key_type) {
-		my_free(key_type);
+		if (new_encryption == FIL_ENCRYPTION_OFF ||
+			(!srv_encrypt_tables &&
+			 new_encryption == FIL_ENCRYPTION_DEFAULT)) {
+			type = CRYPT_SCHEME_UNENCRYPTED;
+                        min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                        key_found = true;
+                        //ut_ad(0);
+		} else {
+			type = CRYPT_SCHEME_1;
+                        //if (create_key)
+                        //{
+                                //key_found = true; // cheat key_get_latest_version that the key exists - if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
+                                min_key_version = Encryption::encryption_get_latest_version(key_id);
+                                 //min_key_version= key_get_latest_version(); //This means table was created with ROTATED_KEYS = thus we know that this table is encrypted
+                                                                          //min_key_version should be set to key_version, when create_key is false it means it was not created
+                                key_found = min_key_version != ENCRYPTION_KEY_VERSION_INVALID;
+                                                                          //with ROTATED_KEYS
+                                //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                        //}
+                        //else
+                                //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED; //it will be filled in later by a caller - which read crypto - if it going to be read from page0
+                                //min_key_version = key_get_latest_version();
+                        //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+                        //ut_ad(min_key_version == 0);
+		}
+
+		//found_key_version = min_key_version; // TODO:This does not make much sense now - always true
 	}
 
-	if (ret) {
-          // in case of error most likely keyring plugin is not loaded
-          if (key) {
-            my_free(key);
-          }
-          return false;
-	}
-
-        if (key == NULL)
-          return false;
-        my_free(key);
-        ut_ad(key_len > 0);
-        return true;
-#endif
-}
-
-//void get_key_name(char *key_name, uint key_id)
-//{
-  //memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
-
-  //// The form of the key is percona_innodb-<number>, where <number> == key_id
-  //ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-	      //key_id);
-//}
-
-//bool encryption_create_key(uint key_id, uchar **system_key)
-//{
-  //char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
-  //char *system_key_type = NULL;
-  //size_t system_key_len = 0;
-
-  //ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-	      //key_id);
-
-  //return 
-   //(my_key_generate(key_name, "AES", NULL, ENCRYPTION_KEY_LEN) ||
-    //my_key_fetch(key_name, &system_key_type, NULL,
-                 //reinterpret_cast<void**>(system_key), &system_key_len) ||
-    //system_key == NULL);
-//}
-
-uint encryption_get_latest_version(uint key_id)
-{
-  size_t key_len;
-  char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
-
-  uchar *key;
-  uint key_version;
-
-  memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
-
-  // The form of the key is percona_innodb-<number>, where <number> == key_id
-  ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-	      key_id);
-
-  char *system_key_type = NULL;
-  size_t system_key_len = 0;
-  uchar *system_key = NULL;
-
-  if (my_key_fetch(key_name, &system_key_type, NULL,
-                   reinterpret_cast<void**>(&system_key), &system_key_len) ||
-      system_key == NULL)
-         return ENCRYPTION_KEY_VERSION_INVALID;
-
-  my_free(system_key_type);
-
-  if (parse_system_key(system_key, system_key_len, &key_version, &key, &key_len) == reinterpret_cast<uchar*>(NullS))
-  {
-    my_free(system_key);
-    return ENCRYPTION_KEY_VERSION_INVALID;
-  }
-  my_free(system_key);
-  my_free(key);
-
-  return key_version;
-}
-
-
-//uint encryption_get_latest_version(uint key_id)
-//{
-  //size_t key_len;
-  //char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
-
-  //uchar *key;
-  //uint key_version;
-
-  //memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
-
-  //// The form of the key is percona_innodb-<number>, where <number> == key_id
-  //ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-	      //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-	      //key_id);
-
-  //char *system_key_type = NULL;
-  //size_t system_key_len = 0;
-  //uchar *system_key = NULL;
-
-  //if (my_key_fetch(key_name, &system_key_type, NULL,
-                   //reinterpret_cast<void**>(&system_key), &system_key_len) ||
-      //(system_key == NULL &&
-       //(my_key_generate(key_name, "AES", NULL, ENCRYPTION_KEY_LEN) ||
-        //my_key_fetch(key_name, &system_key_type, NULL,
-                     //reinterpret_cast<void**>(&system_key), &system_key_len) ||
-        //system_key == NULL)))
-         //return ENCRYPTION_KEY_VERSION_INVALID;
-
-  //my_free(system_key_type);
-
-  //if (parse_system_key(system_key, system_key_len, &key_version, &key, &key_len) == reinterpret_cast<uchar*>(NullS))
-  //{
-    //my_free(system_key);
-    //return ENCRYPTION_KEY_VERSION_INVALID;
-  //}
-  //my_free(system_key);
-  //my_free(key);
-
-  //return key_version;
-//}
 /**
 Get latest key version from encryption plugin.
 @return key version or ENCRYPTION_KEY_VERSION_INVALID */
@@ -310,7 +225,7 @@ fil_space_crypt_t::key_get_latest_version(void)
         uint key_version = ENCRYPTION_KEY_VERSION_INVALID;
 
 	if (is_key_found()) { //TODO:Robert:This blocks new version from being found - if it once read - it stays the same
-		key_version = encryption_get_latest_version(key_id);
+		key_version = Encryption::encryption_get_latest_version(key_id);
 		srv_stats.n_key_requests.inc();
 		//found_key_version = key_version;
 	}
@@ -466,30 +381,6 @@ fsp_header_get_encryption_offset(
 fil_space_crypt_t*
 fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 {
-        //memcpy(encrypt_info_ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
-        //encrypt_info_ptr += ENCRYPTION_MAGIC_SIZE;
-        //mach_write_to_1(encrypt_info_ptr, iv_len);
-        //encrypt_info_ptr += 1;
-
-	//mach_write_to_4(encrypt_info_ptr, space->id); //TODO:Robert - I do not think this is needed - it is suppliec in log0recv.cc and can be passed to fil_parse_write_crypt_data
-	//encrypt_info_ptr += 4;
-	//mach_write_to_2(encrypt_info_ptr, offset);
-        //encrypt_info_ptr += 2;
-
-	//mach_write_to_4(encrypt_info_ptr, space->flags);
-	//encrypt_info_ptr += 4;
-
-        //mach_write_to_1(encrypt_info_ptr, type);
-        //encrypt_info_ptr += 1;
-        //mach_write_to_4(encrypt_info_ptr, min_key_version);
-        //encrypt_info_ptr += 4;
-        //mach_write_to_4(encrypt_info_ptr, key_id);
-        //encrypt_info_ptr += 4;
-        //mach_write_to_1(encrypt_info_ptr, encryption);
-        //encrypt_info_ptr += 1;
-
-        //memcpy(encrypt_info_ptr, iv, iv_len);
-
         ulint bytes_read = 0;
 
 	const ulint offset = fsp_header_get_encryption_offset(page_size);
@@ -585,161 +476,6 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	return crypt_data;
 }
 
-
-//fil_space_crypt_t*
-//fil_space_read_crypt_data(
-	//ulint		space,
-	//const byte*	page,
-	//ulint		offset)
-//{
-	//if (memcmp(page + offset, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) != 0) {
-		//[> Crypt data is not stored. <]
-		//return NULL;
-	//}
-
-	//ulint type = mach_read_from_1(page + offset + ENCRYPTION_MAGIC_SIZE + 0);
-
-	//if (! (type == CRYPT_SCHEME_UNENCRYPTED ||
-	       //type == CRYPT_SCHEME_1)) {
-
-		//ib_logf(IB_LOG_LEVEL_ERROR,
-			//"Found non sensible crypt scheme: " ULINTPF " for space " ULINTPF
-			//" offset: " ULINTPF " bytes: "
-			//"[ %.2x %.2x %.2x %.2x %.2x %.2x ].",
-			//type, space, offset,
-			//page[offset + 0 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 1 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 2 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 3 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 4 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 5 + ENCRYPTION_MAGIC_SIZE]);
-		//ut_error;
-	//}
-
-	//fil_space_crypt_t* crypt_data;
-	//ulint iv_length = mach_read_from_1(page + offset + ENCRYPTION_MAGIC_SIZE + 1);
-
-	//if (! (iv_length == sizeof(crypt_data->iv))) {
-		//ib_logf(IB_LOG_LEVEL_ERROR,
-			//"Found non sensible iv length: %lu for space %lu "
-			//" offset: %lu type: %lu bytes: "
-			//"[ %.2x %.2x %.2x %.2x %.2x %.2x ].",
-			//iv_length, space, offset, type,
-			//page[offset + 0 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 1 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 2 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 3 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 4 + ENCRYPTION_MAGIC_SIZE],
-			//page[offset + 5 + ENCRYPTION_MAGIC_SIZE]);
-		//ut_error;
-	//}
-
-	//uint min_key_version = mach_read_from_4
-		//(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length);
-
-	//uint key_id = mach_read_from_4
-		//(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length + 4);
-
-	//fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(
-		//page + offset + ENCRYPTION_MAGIC_SIZE + 2 + iv_length + 8);
-
-	//crypt_data = fil_space_create_crypt_data(encryption, key_id);
-	//[> We need to overwrite these as above function will initialize
-	//members */
-	//crypt_data->type = type;
-	//crypt_data->min_key_version = min_key_version;
-	//crypt_data->page0_offset = offset;
-	//memcpy(crypt_data->iv, page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv_length);
-
-	//return crypt_data;
-//}
-
-
-/** Initialize encryption parameters from a tablespace header page.
-@param[in]	page_size	page size of the tablespace
-@param[in]	page		first page of the tablespace
-@return crypt data from page 0
-@retval	NULL	if not present or not valid */
-//fil_space_crypt_t*
-////fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
-////bool fil_space_read_crypt_data(const page_size_t& page_size, const byte* page, ulint space_id)
-//fil_space_read_crypt_data(const page_size_t& page_size, const byte* page, ulint space_id)
-//{
-        //ulint fsp_flags = fsp_header_get_flags(page); //TODO: Should this be checked here Chyba powinno było być sprawdzone wcześniej?
-
-        //byte* key;
-        //byte iv[ENCRYPTION_SCHEME_BLOCK_LENGTH];
-        //ulint key_version;
-        //fil_encryption_t encryption;
-        //uint8_t type;
-
-        //if (!fsp_header_get_encryption_key(flags, key, iv, page, &type, &key_version, &encryption))
-          //return false;
-
-	//crypt_data = fil_space_create_crypt_data(encryption, key_id);
-	//[> We need to overwrite these as above function will initialize
-	//members */
-
-        ////TODO:Robert, tutaj jest jeszcze trochę do poprawienia ...
-	//crypt_data->type = type;
-	//crypt_data->min_key_version = min_key_version;
-	//crypt_data->page0_offset = offset;
-	////memcpy(crypt_data->iv, page + offset + MAGIC_SZ + 2, iv_length);
-
-
-        ////return fsp_header_get_encryption_key(flags, key, iv, page, &type, &key_version, &encryption) &&
-               ////fil_set_encryption(space_id, ROTATED_KEYS, key, iv) == DB_SUCCESS;
-               
-
-
-	////const ulint offset = FSP_HEADER_OFFSET
-		////+ fsp_header_get_encryption_offset(page_size);
-
-	////if (memcmp(page + offset, CRYPT_MAGIC, MAGIC_SZ) != 0) {
-		////[> Crypt data is not stored. <]
-		////return NULL;
-	////}
-
-	////uint8_t type = mach_read_from_1(page + offset + MAGIC_SZ + 0);
-	////uint8_t iv_length = mach_read_from_1(page + offset + MAGIC_SZ + 1);
-	////fil_space_crypt_t* crypt_data;
-
-	////if (!(type == CRYPT_SCHEME_UNENCRYPTED ||
-	      ////type == CRYPT_SCHEME_1)
-	    ////|| iv_length != sizeof crypt_data->iv) {
-		////ib::error() << "Found non sensible crypt scheme: "
-			    ////<< type << "," << iv_length << " for space: "
-			    ////<< page_get_space_id(page) << " offset: "
-			    ////<< offset << " bytes: ["
-			    ////<< page[offset + 2 + MAGIC_SZ]
-			    ////<< page[offset + 3 + MAGIC_SZ]
-			    ////<< page[offset + 4 + MAGIC_SZ]
-			    ////<< page[offset + 5 + MAGIC_SZ]
-			    ////<< "].";
-		////return NULL;
-	////}
-
-        ////TODO:Why is it min_key_version
-	////uint min_key_version = mach_read_from_4 //TODO:why is it called  min_key_version
-		////(page + offset + MAGIC_SZ + 2 + iv_length);
-
-	////uint key_id = mach_read_from_4
-		////(page + offset + MAGIC_SZ + 2 + iv_length + 4);
-
-	////fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(
-		////page + offset + MAGIC_SZ + 2 + iv_length + 8);
-
-	////crypt_data = fil_space_create_crypt_data(encryption, key);
-	//[> We need to overwrite these as above function will initialize
-	//members */
-	////crypt_data->type = type; //TODO: I do not have type
-	////crypt_data->min_key_version = min_key_version;
-	////crypt_data->page0_offset = offset;
-	////memcpy(crypt_data->iv, iv, ENCRYPTION_SCHEME_BLOCK_LENGTH);
-
-	////return crypt_data;
-//}
-
 /******************************************************************
 Free a crypt data object
 @param[in,out] crypt_data	crypt data to be freed */
@@ -769,15 +505,6 @@ fil_space_destroy_crypt_data(
 }
 
 
-
-//#ifndef UNIV_HOTBACKUP
-/** Get the offset of encrytion information in page 0.
-@param[in]	page_size	page size.
-@return	offset on success, otherwise 0. */
-
-
-
-
 /******************************************************************
 Write crypt data to a page (0)
 @param[in]	space	tablespace
@@ -793,16 +520,6 @@ fil_space_crypt_t::write_page0(
         uint a_type,
         Encryption::Encryption_rotation current_encryption_rotation)
 {
-
-        //byte encrypt_info[ENCRYPTION_INFO_SIZE_V2];
-		//4 + // size of space_id
-		//2 + // size of offset
-		//1 + // size of type
-		//1 + // size of iv-len
-		//4 +  // size of min_key_version
-		//4 +  // size of key_id
-		//1; // fil_encryption_t
-
 
         if (space->id == 23)
         {
@@ -890,304 +607,9 @@ fil_space_crypt_t::write_page0(
 
         delete[] encrypt_info;
 
-
-	/*
-	redo log this as bytewise updates to page 0
-	followed by an MLOG_FILE_WRITE_CRYPT_DATA
-	(that will during recovery update fil_space_t)
-	*/
-        //mlog_write_ulint(page + FSP_HEADER_OFFSET + FSP_SPACE_FLAGS, space->flags, MLOG_4BYTES, mtr); // done
-
-	//mlog_write_string(page + offset, (const uchar*)ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr); //done
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr); //done
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 1, len, MLOG_1BYTE, mtr); //done
-	//mlog_write_string(page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv, len,  //done
-			  //mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len, min_key_version, //done
-			 //MLOG_4BYTES, mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 4, key_id, //done
-			 //MLOG_4BYTES, mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 8, encryption, //done
-		//MLOG_1BYTE, mtr);
-
-        //if (space->flags & DICT_TF2_ENCRYPTION)
-
-	//byte* log_ptr = mlog_open(mtr, 11 + 17 + len);
-
-	//if (log_ptr != NULL) {
-		//log_ptr = mlog_write_initial_log_record_fast(
-			//page,
-			//MLOG_FILE_WRITE_CRYPT_DATA,
-			//log_ptr, mtr);
-		//mach_write_to_4(log_ptr, space->id);
-		//log_ptr += 4;
-		//mach_write_to_2(log_ptr, offset);
-		//log_ptr += 2;
-		//mach_write_to_1(log_ptr, type);
-		//log_ptr += 1;
-		//mach_write_to_1(log_ptr, len); {
-		//version = Encryption::ENCRYPTION_VERSION_1;
-	//} 
-
-		//log_ptr += 1;
-		//mach_write_to_4(log_ptr, min_key_version);
-		//log_ptr += 4;
-		//mach_write_to_4(log_ptr, key_id);
-		//log_ptr += 4;
-		//mach_write_to_1(log_ptr, encryption);
-		//log_ptr += 1;
-		//mlog_close(mtr, log_ptr);
-
-		//mlog_catenate_string(mtr, iv, len);
-	//}
-
-        //int x =1;
-        //if (strcmp(space->name, "t2"))
-        //{
-          //x=x;
-        //}
-
         ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << a_min_key_version;
 
 }
-
-//void
-//fil_space_crypt_t::write_page0(
-	//byte* 			page,
-	//mtr_t*		emtr)
-//{
-	//ut_ad(this == space->crypt_data);
-	//const uint len = sizeof(iv);
-	//const ulint offset = FSP_HEADER_OFFSET
-		//+ fsp_header_get_encryption_offset(page_size_t(space->flags));
-	//page0_offset = offset;
-
-	//[>
-	//redo log this as bytewise updates to page 0
-	//followed by an MLOG_FILE_WRITE_CRYPT_DATA
-	//(that will during recovery update fil_space_t)
-	//*/
-	//mlog_write_string(page + offset, CRYPT_MAGIC, MAGIC_SZ, mtr);
-	//mlog_write_ulint(page + offset + MAGIC_SZ + 0, type, MLOG_1BYTE, mtr);
-	//mlog_write_ulint(page + offset + MAGIC_SZ + 1, len, MLOG_1BYTE, mtr);
-	//mlog_write_string(page + offset + MAGIC_SZ + 2, iv, len,
-			  //mtr);
-	//mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len, min_key_version,
-			 //MLOG_4BYTES, mtr);
-	//mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len + 4, key_id,
-			 //MLOG_4BYTES, mtr);
-	//mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len + 8, encryption,
-		//MLOG_1BYTE, mtr);
-
-	//byte* log_ptr = mlog_open(mtr, 11 + 17 + len);
-
-	//if (log_ptr != NULL) {
-		//log_ptr = mlog_write_initial_log_record_fast(
-			//page,
-			//MLOG_FILE_WRITE_CRYPT_DATA,
-			//log_ptr, mtr);
-		//mach_write_to_4(log_ptr, space->id);
-		//log_ptr += 4;
-		//mach_write_to_2(log_ptr, offset);
-		//log_ptr += 2;
-		//mach_write_to_1(log_ptr, type);
-		//log_ptr += 1;
-		//mach_write_to_1(log_ptr, len);
-		//log_ptr += 1;
-		//mach_write_to_4(log_ptr, min_key_version);
-		//log_ptr += 4;
-		//mach_write_to_4(log_ptr, key_id);
-		//log_ptr += 4;
-		//mach_write_to_1(log_ptr, encryption);
-		//log_ptr += 1;
-		//mlog_close(mtr, log_ptr);
-
-		//mlog_catenate_string(mtr, iv, len);
-	//}
-//}
-
-//void
-//fil_space_crypt_t::write_page0(
-	//byte* 			page,
-	//mtr_t*			mtr)
-//{
-	//ulint space_id = mach_read_from_4(
-		//page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-	//const uint len = sizeof(iv);
-	//ulint zip_size = fsp_header_get_zip_size(page);
-	//const ulint offset = fsp_header_get_crypt_offset(zip_size);
-	//page0_offset = offset;
-
-	//[>
-	//redo log this as bytewise updates to page 0
-	//followed by an MLOG_FILE_WRITE_CRYPT_DATA
-	//(that will during recovery update fil_space_t)
-	//*/
-	//mlog_write_string(page + offset, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 0, type, MLOG_1BYTE, mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 1, len, MLOG_1BYTE, mtr);
-	//mlog_write_string(page + offset + ENCRYPTION_MAGIC_SIZE + 2, iv, len,
-			  //mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len, min_key_version,
-			 //MLOG_4BYTES, mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 4, key_id,
-			 //MLOG_4BYTES, mtr);
-	//mlog_write_ulint(page + offset + ENCRYPTION_MAGIC_SIZE + 2 + len + 8, encryption,
-		//MLOG_1BYTE, mtr);
-
-	//byte* log_ptr = mlog_open(mtr, 11 + 17 + len);
-
-	//if (log_ptr != NULL) {
-		//log_ptr = mlog_write_initial_log_record_fast(
-			//page,
-			//MLOG_FILE_WRITE_CRYPT_DATA,
-			//log_ptr, mtr);
-		//mach_write_to_4(log_ptr, space_id);
-		//log_ptr += 4;
-		//mach_write_to_2(log_ptr, offset);
-		//log_ptr += 2;
-		//mach_write_to_1(log_ptr, type);
-		//log_ptr += 1;
-		//mach_write_to_1(log_ptr, len);
-		//log_ptr += 1;
-		//mach_write_to_4(log_ptr, min_key_version);
-		//log_ptr += 4;
-		//mach_write_to_4(log_ptr, key_id);
-		//log_ptr += 4;
-		//mach_write_to_1(log_ptr, encryption);
-		//log_ptr += 1;
-		//mlog_close(mtr, log_ptr);
-
-		//mlog_catenate_string(mtr, iv, len);
-	//}
-//}
-
-
-
-// void
-// fil_space_crypt_t::write_page0(
-// 	const fil_space_t*	space,
-// 	byte* 			page,
-// 	mtr_t*			mtr)
-// {
-// 	ut_ad(this == space->crypt_data);
-//         const uint len = sizeof(iv);
-// 	const ulint offset = FSP_HEADER_OFFSET
-// 		+ fsp_header_get_encryption_offset(page_size_t(space->flags));
-// 	page0_offset = offset;
-
-//         //TODO:Start of paste
-
-// 	memset(encrypt_info, 0, ENCRYPTION_INFO_SIZE_V2);
-// 	//memset(key_info, 0, ENCRYPTION_KEY_LEN * 2);
-
-// 	/* Use the new master key to encrypt the tablespace
-// 	key. */
-// 	ut_ad(encrypt_info != NULL);
-// 	ptr = encrypt_info;
-
-// 	/* Write magic header. */
-// 	//if (version == Encryption::ENCRYPTION_VERSION_1) {
-// 		//memcpy(ptr, ENCRYPTION_KEY_MAGIC_V1, ENCRYPTION_MAGIC_SIZE);
-// 	//} else {
-// 		//memcpy(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE);
-// 	//}
-
-// 	memcpy(ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
-// 	ptr += ENCRYPTION_MAGIC_SIZE;
-
-// 	/* Write master key id. */
-// 	ptr += sizeof(ulint);//TODO:skip writting master_key_id, mach_write_to_4(ptr, master_key_id);
-
-//         memcpy(ptr, space->crypt_data->encryption, 1);
-//         ptr+= 1;
-//         memcpy(ptr, space->crypt_data->type, 1);
-// 	//ptr += sizeof(ulint); // skip master_key_id, we do not use it
-//         ptr += 2;
-
-
-// 	/* Write server uuid. */
-//         memcpy(ptr, Encryption::uuid, ENCRYPTION_SERVER_UUID_LEN);
-//         ptr += ENCRYPTION_SERVER_UUID_LEN;
-
-// 	/* Write tablespace key to temp space. */
-// 	memcpy(key_info, &space->id, 4);
-//         memcpy(key_info + 4, &space->encryption_key_version, 4);
-
-// 	/* Write tablespace iv to temp space. */
-// 	memcpy(key_info + ENCRYPTION_KEY_LEN, // last 8 bytes of key are unused
-// 	       space->encryption_iv,
-// 	       ENCRYPTION_KEY_LEN);
-
-// //#ifdef	UNIV_ENCRYPT_DEBUG
-// 	//fprintf(stderr, "Set %lu:%lu ",space->id,
-// 		//Encryption::master_key_id);
-// 	//for (data = (const byte*) master_key, i = 0;
-// 	     //i < ENCRYPTION_KEY_LEN; i++)
-// 		//fprintf(stderr, "%02lx", (ulong)*data++);
-// 	//fprintf(stderr, " ");
-// 	//for (data = (const byte*) space->encryption_key,
-// 	     //i = 0; i < ENCRYPTION_KEY_LEN; i++)
-// 		//fprintf(stderr, "%02lx", (ulong)*data++);
-// 	//fprintf(stderr, " ");
-// 	//for (data = (const byte*) space->encryption_iv,
-// 	     //i = 0; i < ENCRYPTION_KEY_LEN; i++)
-// 		//fprintf(stderr, "%02lx", (ulong)*data++);
-// 	//fprintf(stderr, "\n");
-// //#endif
-
-//        ptr += ENCRYPTION_KEY_LEN * 2;
-//           /* Write checksum bytes. */
-//        crc = ut_crc32(key_info, ENCRYPTION_KEY_LEN * 2);
-//        mach_write_to_4(ptr, crc);
-// //TODO:End of paste
-
-
-// 	/*
-// 	redo log this as bytewise updates to page 0
-// 	followed by an MLOG_FILE_WRITE_CRYPT_DATA
-// 	(that will during recovery update fil_space_t)
-// 	*/
-// 	//mlog_write_string(page + offset, CRYPT_MAGIC, MAGIC_SZ, mtr);
-// 	//memcpy(ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
-// 	mlog_write_string(page + offset, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE, mtr);
-// 	mlog_write_ulint(page + offset + MAGIC_SZ + 0, type, MLOG_1BYTE, mtr);
-// 	mlog_write_ulint(page + offset + MAGIC_SZ + 1, len, MLOG_1BYTE, mtr);
-// 	mlog_write_string(page + offset + MAGIC_SZ + 2, iv, len,
-// 			  mtr);
-// 	mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len, min_key_version,
-// 			 MLOG_4BYTES, mtr);
-// 	mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len + 4, key_id,
-// 			 MLOG_4BYTES, mtr);
-// 	mlog_write_ulint(page + offset + MAGIC_SZ + 2 + len + 8, encryption,
-// 		MLOG_1BYTE, mtr);
-
-// 	byte* log_ptr = mlog_open(mtr, 11 + 17 + len);
-
-// 	if (log_ptr != NULL) {
-// 		log_ptr = mlog_write_initial_log_record_fast(
-// 			page,
-// 			MLOG_FILE_WRITE_CRYPT_DATA,
-// 			log_ptr, mtr);
-// 		mach_write_to_4(log_ptr, space->id);
-// 		log_ptr += 4;
-// 		mach_write_to_2(log_ptr, offset);
-// 		log_ptr += 2;
-// 		mach_write_to_1(log_ptr, type);
-// 		log_ptr += 1;
-// 		mach_write_to_1(log_ptr, len);
-// 		log_ptr += 1;
-// 		mach_write_to_4(log_ptr, min_key_version);
-// 		log_ptr += 4;
-// 		mach_write_to_4(log_ptr, key_id);
-// 		log_ptr += 4;
-// 		mach_write_to_1(log_ptr, encryption);
-// 		log_ptr += 1;
-// 		mlog_close(mtr, log_ptr);
-
-// 		mlog_catenate_string(mtr, iv, len);
-// 	}
-// }
 
 /******************************************************************
 Set crypt data for a tablespace
@@ -1265,103 +687,6 @@ fil_parse_write_crypt_data(
           recv_sys->set_corrupt_log();
           return NULL;
         }
-        //byte *encrypt_info = new byte[encrypt_info_size];
-
-		////mach_write_to_4(log_ptr, space->id);
-		////log_ptr += 4;
-		////mach_write_to_2(log_ptr, offset);
-		////log_ptr += 2;
-
-
-        //memcpy(encrypt_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
-        //encrypt_info += ENCRYPTION_MAGIC_SIZE;
-        //mach_write_to_1(encrypt_info, iv_len);
-        //encrypt_info += 1;
-        //memcpy(encrypt_info, iv, iv_len);
-        //encrypt_info += iv_len;
-
-	//mach_write_to_4(encrypt_info, space->id);
-	//encrypt_info += 4;
-	//mach_write_to_2(encrypt_info, offset);
-        //encrypt_info += 2;
-
-	//mach_write_to_4(encrypt_info, space->flags);
-	//encrypt_info += 4;
-        //mach_write_to_1(encrypt_info, type);
-        //encrypt_info += 1;
-        //mach_write_to_4(encrypt_info, min_key_version);
-        //encrypt_info += 4;
-        //mach_write_to_4(encrypt_info, key_id);
-        //encrypt_info += 4;
-        //mach_write_to_1(encrypt_info, encryption);
-
-	//mlog_write_string(page + offset,
-			  //encrypt_info,
-			  //encrypt_info_size,
-			  //mtr);
-
-        //delete[] encrypt_info;
-
-
-        //byte *encrypt_info = new byte[encrypt_info_size];
-
-        //memcpy(encrypt_info, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
-        //encrypt_info += ENCRYPTION_MAGIC_SIZE;
-        //mach_write_to_1(encrypt_info, iv_len);
-        //encrypt_info += 1;
-        //memcpy(encrypt_info, iv, iv_len);
-        //encrypt_info += iv_len;
-	//mach_write_to_4(encrypt_info, space->flags);
-	//encrypt_info += 4;
-        //mach_write_to_1(encrypt_info, type);
-        //encrypt_info += 1;
-        //mach_write_to_4(encrypt_info, min_key_version);
-        //encrypt_info += 4;
-        //mach_write_to_4(encrypt_info, key_id);
-        //encrypt_info += 4;
-        //mach_write_to_1(encrypt_info, encryption);
-
-
-	/* check that redo log entry is complete */
-	//uint entry_size =
-		//4 + // size of space_id
-		//2 + // size of offset
-		//1 + // size of type
-		//1 + // size of iv-len
-		//4 +  // size of min_key_version
-		//4 +  // size of key_id
-		//1; // fil_encryption_t
-
-        //memcpy(encrypt_info_ptr, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE);
-        //encrypt_info_ptr += ENCRYPTION_MAGIC_SIZE;
-        //mach_write_to_2(encrypt_info_ptr, iv_len);
-        //encrypt_info_ptr += 2;
-
-	//mach_write_to_4(encrypt_info_ptr, space->id); //TODO:Robert - I do not think this is needed - it is suppliec in log0recv.cc and can be passed to fil_parse_write_crypt_data
-	//encrypt_info_ptr += 4;
-	//mach_write_to_2(encrypt_info_ptr, offset);
-        //encrypt_info_ptr += 2;
-
-	////mach_write_to_4(encrypt_info_ptr, space->flags);
-	////encrypt_info_ptr += 4;
-
-        //mach_write_to_1(encrypt_info_ptr, a_type);
-        //encrypt_info_ptr += 1;
-        //mach_write_to_4(encrypt_info_ptr, a_min_key_version);
-        //encrypt_info_ptr += 4;
-        //mach_write_to_4(encrypt_info_ptr, key_id);
-        //encrypt_info_ptr += 4;
-        //mach_write_to_1(encrypt_info_ptr, encryption);
-        //encrypt_info_ptr += 1;
-
-        //memcpy(encrypt_info_ptr, iv, iv_len);
-        //encrypt_info_ptr += iv_len;
-
-        //mach_write_to_4(encrypt_info_ptr, current_encryption_rotation);
-        //encrypt_info_ptr += 4;
-
-
-
 
 	if (ptr + encrypt_info_size > end_ptr) {
 		return NULL;
@@ -1464,336 +789,6 @@ fil_parse_write_crypt_data(
 	return ptr;
 }
 
-/** Encrypt a buffer.
-@param[in,out]		crypt_data	Crypt data
-@param[in]		space		space_id
-@param[in]		offset		Page offset
-@param[in]		lsn		Log sequence number
-@param[in]		src_frame	Page to encrypt
-@param[in]		page_size	Page size
-@param[in,out]		dst_frame	Output buffer
-@return encrypted buffer or NULL */
-
-//byte*
-//fil_encrypt_buf(
-	//fil_space_crypt_t*	crypt_data,
-	//ulint			space,
-	//ulint			offset,
-	//lsn_t			lsn,
-	//const byte*		src_frame,
-	//const page_size_t&	page_size,
-	//byte*			dst_frame)
-//{
-	//uint size = uint(page_size.physical());
-	//uint key_version = fil_crypt_get_latest_key_version(crypt_data);
-
-	//ut_a(key_version != ENCRYPTION_KEY_VERSION_INVALID);
-
-	//ulint orig_page_type = mach_read_from_2(src_frame+FIL_PAGE_TYPE);
-	//ibool page_compressed = (orig_page_type == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED);
-	//uint header_len = FIL_PAGE_DATA;
-
-	//if (page_compressed) {
-		//header_len += (FIL_PAGE_COMPRESSED_SIZE + FIL_PAGE_COMPRESSION_METHOD_SIZE);
-	//}
-
-	//[> FIL page header is not encrypted <]
-	//memcpy(dst_frame, src_frame, header_len);
-
-	//[> Store key version <]
-	//mach_write_to_4(dst_frame + FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION, key_version);
-
-	//[> Calculate the start offset in a page <]
-	//uint unencrypted_bytes = header_len + FIL_PAGE_DATA_END;
-	//uint srclen = size - unencrypted_bytes;
-	//const byte* src = src_frame + header_len;
-	//byte* dst = dst_frame + header_len;
-	//uint32 dstlen = 0;
-
-	//if (page_compressed) {
-		//srclen = mach_read_from_2(src_frame + FIL_PAGE_DATA);
-	//}
-
-	//int rc = encryption_scheme_encrypt(src, srclen, dst, &dstlen,
-					   //crypt_data, key_version,
-					   //space, offset, lsn);
-	//ut_a(rc == MY_AES_OK);
-	//ut_a(dstlen == srclen);
-
-	//[> For compressed tables we do not store the FIL header because
-	//the whole page is not stored to the disk. In compressed tables only
-	//the FIL header + compressed (and now encrypted) payload alligned
-	//to sector boundary is written. */
-	//if (!page_compressed) {
-		//[> FIL page trailer is also not encrypted <]
-		//memcpy(dst_frame + page_size.physical() - FIL_PAGE_DATA_END,
-			//src_frame + page_size.physical() - FIL_PAGE_DATA_END,
-			//FIL_PAGE_DATA_END);
-	//} else {
-		//[> Clean up rest of buffer <]
-		//memset(dst_frame+header_len+srclen, 0,
-		       //page_size.physical() - (header_len + srclen));
-	//}
-
-	//[> handle post encryption checksum <]
-	//ib_uint32_t checksum = 0;
-
-	//checksum = fil_crypt_calculate_checksum(page_size, dst_frame);
-
-	//// store the post-encryption checksum after the key-version
-	//mach_write_to_4(dst_frame + FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION + 4, checksum);
-
-	//ut_ad(fil_space_verify_crypt_checksum(dst_frame, page_size,
-					      //space, offset));
-
-	//srv_stats.pages_encrypted.inc();
-
-	//return dst_frame;
-//}
-
-/******************************************************************
-Encrypt a page
-
-@param[in]		space		Tablespace
-@param[in]		offset		Page offset
-@param[in]		lsn		Log sequence number
-@param[in]		src_frame	Page to encrypt
-@param[in,out]		dst_frame	Output buffer
-@return encrypted buffer or NULL */
-
-//byte*
-//fil_space_encrypt(
-	//const fil_space_t*	space,
-	//ulint			offset,
-	//lsn_t			lsn,
-	//byte*			src_frame,
-	//byte*			dst_frame)
-//{
-	//switch (mach_read_from_2(src_frame+FIL_PAGE_TYPE)) {
-	//case FIL_PAGE_TYPE_FSP_HDR:
-	//case FIL_PAGE_TYPE_XDES:
-	//case FIL_PAGE_RTREE:
-		//[> File space header, extent descriptor or spatial index
-		//are not encrypted. */
-		//return src_frame;
-	//}
-
-	//if (!space->crypt_data || !space->crypt_data->is_encrypted()) {
-		//return (src_frame);
-	//}
-
-	//fil_space_crypt_t* crypt_data = space->crypt_data;
-	//const page_size_t	page_size(space->flags);
-	//ut_ad(space->n_pending_ios > 0);
-	//byte* tmp = fil_encrypt_buf(crypt_data, space->id, offset, lsn,
-				    //src_frame, page_size, dst_frame);
-
-//#ifdef UNIV_DEBUG
-	//if (tmp) {
-		//[> Verify that encrypted buffer is not corrupted <]
-		//byte* tmp_mem = (byte *)malloc(UNIV_PAGE_SIZE);
-		//dberr_t err = DB_SUCCESS;
-		//byte* src = src_frame;
-		//bool page_compressed_encrypted = (mach_read_from_2(tmp+FIL_PAGE_TYPE) == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED);
-		//byte* comp_mem = NULL;
-		//byte* uncomp_mem = NULL;
-
-		//if (page_compressed_encrypted) {
-			//comp_mem = (byte *)malloc(UNIV_PAGE_SIZE);
-			//uncomp_mem = (byte *)malloc(UNIV_PAGE_SIZE);
-			//memcpy(comp_mem, src_frame, UNIV_PAGE_SIZE);
-			//fil_decompress_page(uncomp_mem, comp_mem,
-					    //srv_page_size, NULL);
-			//src = uncomp_mem;
-		//}
-
-		//bool corrupted1 = buf_page_is_corrupted(true, src, page_size, space);
-		//bool ok = fil_space_decrypt(crypt_data, tmp_mem, page_size, tmp, &err);
-
-		//[> Need to decompress the page if it was also compressed <]
-		//if (page_compressed_encrypted) {
-			//memcpy(comp_mem, tmp_mem, UNIV_PAGE_SIZE);
-			//fil_decompress_page(tmp_mem, comp_mem,
-					    //srv_page_size, NULL);
-		//}
-
-		//bool corrupted = buf_page_is_corrupted(true, tmp_mem, page_size, space);
-		//memcpy(tmp_mem+FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION, src+FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION, 8);
-		//bool different = memcmp(src, tmp_mem, page_size.physical());
-
-		//if (!ok || corrupted || corrupted1 || err != DB_SUCCESS || different) {
-			//fprintf(stderr, "ok %d corrupted %d corrupted1 %d err %d different %d\n",
-				//ok , corrupted, corrupted1, err, different);
-			//fprintf(stderr, "src_frame\n");
-			//buf_page_print(src_frame, page_size);
-			//fprintf(stderr, "encrypted_frame\n");
-			//buf_page_print(tmp, page_size);
-			//fprintf(stderr, "decrypted_frame\n");
-			//buf_page_print(tmp_mem, page_size);
-			//ut_ad(0);
-		//}
-
-		//free(tmp_mem);
-
-		//if (comp_mem) {
-			//free(comp_mem);
-		//}
-
-		//if (uncomp_mem) {
-			//free(uncomp_mem);
-		//}
-	//}
-//#endif [> UNIV_DEBUG <]
-
-	//return tmp;
-//}
-
-/** Decrypt a page.
-@param[in]	crypt_data		crypt_data
-@param[in]	tmp_frame		Temporary buffer
-@param[in]	page_size		Page size
-@param[in,out]	src_frame		Page to decrypt
-@param[out]	err			DB_SUCCESS or DB_DECRYPTION_FAILED
-@return true if page decrypted, false if not.*/
-
-//bool
-//fil_space_decrypt(
-	//fil_space_crypt_t*	crypt_data,
-	//byte*			tmp_frame,
-	//const page_size_t&	page_size,
-	//byte*			src_frame,
-	//dberr_t*		err)
-//{
-	//ulint page_type = mach_read_from_2(src_frame+FIL_PAGE_TYPE);
-	//uint key_version = mach_read_from_4(src_frame + FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION);
-	//bool page_compressed = (page_type == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED);
-	//uint offset = mach_read_from_4(src_frame + FIL_PAGE_OFFSET);
-	//uint space = mach_read_from_4(src_frame + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-	//ib_uint64_t lsn = mach_read_from_8(src_frame + FIL_PAGE_LSN);
-
-	//*err = DB_SUCCESS;
-
-	//if (key_version == ENCRYPTION_KEY_NOT_ENCRYPTED) {
-		//return false;
-	//}
-
-	//ut_a(crypt_data != NULL && crypt_data->is_encrypted());
-
-	//[> read space & lsn <]
-	//uint header_len = FIL_PAGE_DATA;
-
-	//if (page_compressed) {
-		//header_len += (FIL_PAGE_COMPRESSED_SIZE + FIL_PAGE_COMPRESSION_METHOD_SIZE);
-	//}
-
-	//[> Copy FIL page header, it is not encrypted <]
-	//memcpy(tmp_frame, src_frame, header_len);
-
-	//[> Calculate the offset where decryption starts <]
-	//const byte* src = src_frame + header_len;
-	//byte* dst = tmp_frame + header_len;
-	//uint32 dstlen = 0;
-	//uint srclen = uint(page_size.physical())
-		//- header_len - FIL_PAGE_DATA_END;
-
-	//if (page_compressed) {
-		//srclen = mach_read_from_2(src_frame + FIL_PAGE_DATA);
-	//}
-
-	//int rc = encryption_scheme_decrypt(src, srclen, dst, &dstlen,
-					   //crypt_data, key_version,
-					   //space, offset, lsn);
-
-	//if (! ((rc == MY_AES_OK) && ((ulint) dstlen == srclen))) {
-
-		//if (rc == -1) {
-			//*err = DB_DECRYPTION_FAILED;
-			//return false;
-		//}
-
-		//ib::fatal() << "Unable to decrypt data-block "
-			    //<< " src: " << src << "srclen: "
-			    //<< srclen << " buf: " << dst << "buflen: "
-			    //<< dstlen << " return-code: " << rc
-			    //<< " Can't continue!";
-	//}
-
-	//[> For compressed tables we do not store the FIL header because
-	//the whole page is not stored to the disk. In compressed tables only
-	//the FIL header + compressed (and now encrypted) payload alligned
-	//to sector boundary is written. */
-	//if (!page_compressed) {
-		//[> Copy FIL trailer <]
-		//memcpy(tmp_frame + page_size.physical() - FIL_PAGE_DATA_END,
-		       //src_frame + page_size.physical() - FIL_PAGE_DATA_END,
-		       //FIL_PAGE_DATA_END);
-	//}
-
-	//srv_stats.pages_decrypted.inc();
-
-	//return true; [> page was decrypted <]
-//}
-
-/**
-Decrypt a page.
-@param[in]	space			Tablespace
-@param[in]	tmp_frame		Temporary buffer used for decrypting
-@param[in,out]	src_frame		Page to decrypt
-@param[out]	decrypted		true if page was decrypted
-@return decrypted page, or original not encrypted page if decryption is
-not needed.*/
-
-//byte*
-//fil_space_decrypt(
-	//const fil_space_t* space,
-	//byte*		tmp_frame,
-	//byte*		src_frame,
-	//bool*		decrypted)
-//{
-	//dberr_t err = DB_SUCCESS;
-	//byte* res = NULL;
-	//const page_size_t page_size(space->flags);
-	//*decrypted = false;
-
-	//ut_ad(space->crypt_data != NULL && space->crypt_data->is_encrypted());
-	//ut_ad(space->n_pending_ios > 0);
-
-	//bool encrypted = fil_space_decrypt(space->crypt_data, tmp_frame,
-					   //page_size, src_frame, &err);
-
-	//if (err == DB_SUCCESS) {
-		//if (encrypted) {
-			//*decrypted = true;
-			//[> Copy the decrypted page back to page buffer, not
-			//really any other options. */
-			//memcpy(src_frame, tmp_frame, page_size.physical());
-		//}
-
-		//res = src_frame;
-	//}
-
-	//return res;
-//}
-
-/******************************************************************
-Calculate post encryption checksum
-@param[in]	page_size	page size
-@param[in]	dst_frame	Block where checksum is calculated
-@return page checksum
-not needed. */
-
-//uint32_t
-//fil_crypt_calculate_checksum(
-      //const page_size_t&	page_size,
-      //const byte*		dst_frame)
-//{
-      //[> For encrypted tables we use only crc32 and strict_crc32 <]
-      //return page_size.is_compressed()
-              //? page_zip_calc_checksum(dst_frame, page_size.physical(),
-                                       //SRV_CHECKSUM_ALGORITHM_CRC32)
-              //: buf_calc_page_crc32(dst_frame);
-//}
-
 /***********************************************************************/
 
 /** A copy of global key state */
@@ -1811,7 +806,6 @@ struct key_state_t {
 };
 
 /***********************************************************************
-TODO:Robert na razie zakomentowane
 Copy global key state
 @param[in,out]	new_state	key state
 @param[in]	crypt_data	crypt data */
@@ -2065,127 +1059,6 @@ fil_crypt_start_encrypting_space(
 
       return recheck;
 }
-
-/***********************************************************************
-Start encrypting a space
-@param[in,out]		space		Tablespace
-@return true if a recheck is needed */
-//static
-//bool
-//fil_crypt_start_encrypting_space(
-      //fil_space_t*	space)
-//{
-      //bool recheck = false;
-
-      //mutex_enter(&fil_crypt_threads_mutex);
-
-      //fil_space_crypt_t *crypt_data = space->crypt_data;
-
-      //[> If space is not encrypted and encryption is not enabled, then
-      //do not continue encrypting the space. */
-      //if (!crypt_data && !srv_encrypt_tables) {
-              //mutex_exit(&fil_crypt_threads_mutex);
-              //return false;
-      //}
-
-      //if (crypt_data != NULL || fil_crypt_start_converting) {
-              //[> someone beat us to it <]
-              //if (fil_crypt_start_converting) {
-                      //recheck = true;
-              //}
-
-              //mutex_exit(&fil_crypt_threads_mutex);
-              //return recheck;
-      //}
-
-      /* NOTE: we need to write and flush page 0 before publishing
-      * the crypt data. This so that after restart there is no
-      * risk of finding encrypted pages without having
-      * crypt data in page 0 */
-
-      //[> 1 - create crypt data <]
-      //crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
-
-      //if (crypt_data == NULL) {
-              //mutex_exit(&fil_crypt_threads_mutex);
-              //return false;
-      //}
-
-      //crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
-      //crypt_data->min_key_version = 0; // all pages are unencrypted
-      //crypt_data->rotate_state.start_time = time(0);
-      //crypt_data->rotate_state.starting = true;
-      //crypt_data->rotate_state.active_threads = 1;
-
-      //mutex_enter(&crypt_data->mutex);
-      //crypt_data = fil_space_set_crypt_data(space, crypt_data);
-      //mutex_exit(&crypt_data->mutex);
-
-      //fil_crypt_start_converting = true;
-      //mutex_exit(&fil_crypt_threads_mutex);
-
-      //do
-      //{
-              //mtr_t mtr;
-              //mtr_start(&mtr);
-
-              //[> 2 - get page 0 <]
-              //ulint zip_size = fsp_flags_get_zip_size(space->flags);
-              //buf_block_t* block = buf_page_get_gen(space->id, zip_size, 0,
-                                                    //RW_X_LATCH,
-                                                    //NULL,
-                                                    //BUF_GET,
-                                                    //__FILE__, __LINE__,
-                                                    //&mtr);
-
-
-              //[> 3 - write crypt data to page 0 <]
-              //byte* frame = buf_block_get_frame(block);
-              //crypt_data->type = CRYPT_SCHEME_1;
-              //crypt_data->write_page0(frame, &mtr);
-              //mtr_commit(&mtr);
-
-              //[> record lsn of update <]
-              //lsn_t end_lsn = mtr.end_lsn;
-
-              //[> 4 - sync tablespace before publishing crypt data <]
-
-              //bool success = false;
-              //ulint sum_pages = 0;
-
-              //do {
-                      //ulint n_pages = 0;
-                      //success = buf_flush_list(ULINT_MAX, end_lsn, &n_pages);
-                      //buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
-                      //sum_pages += n_pages;
-              //} while (!success);
-
-              //[> 5 - publish crypt data <]
-              //mutex_enter(&fil_crypt_threads_mutex);
-              //mutex_enter(&crypt_data->mutex);
-              //crypt_data->type = CRYPT_SCHEME_1;
-              //ut_a(crypt_data->rotate_state.active_threads == 1);
-              //crypt_data->rotate_state.active_threads = 0;
-              //crypt_data->rotate_state.starting = false;
-
-              //fil_crypt_start_converting = false;
-              //mutex_exit(&crypt_data->mutex);
-              //mutex_exit(&fil_crypt_threads_mutex);
-
-              //return recheck;
-      //} while (0);
-
-      //mutex_enter(&crypt_data->mutex);
-      //ut_a(crypt_data->rotate_state.active_threads == 1);
-      //crypt_data->rotate_state.active_threads = 0;
-      //mutex_exit(&crypt_data->mutex);
-
-      //mutex_enter(&fil_crypt_threads_mutex);
-      //fil_crypt_start_converting = false;
-      //mutex_exit(&fil_crypt_threads_mutex);
-
-      //return recheck;
-//}
 
 /** State of a rotation thread */
 struct rotate_thread_t {
@@ -2877,69 +1750,6 @@ fil_crypt_get_page_throttle_func(
       return block;
 }
 
-
-/***********************************************************************
-Get block and allocation status
-
-note: innodb locks fil_space_latch and then block when allocating page
-but locks block and then fil_space_latch when freeing page.
-
-@param[in,out]		state		Rotation state
-@param[in]		offset		Page offset
-@param[in,out]		mtr		Minitransaction
-@param[out]		allocation_status Allocation status
-@param[out]		sleeptime_ms	Sleep time
-@return block or NULL
-*/
-//static
-//buf_block_t*
-//btr_scrub_get_block_and_allocation_status(
-      //rotate_thread_t*	state,
-      //ulint 			offset,
-      //mtr_t*			mtr,
-      //btr_scrub_page_allocation_status_t *allocation_status,
-      //ulint*			sleeptime_ms)
-//{
-      //mtr_t local_mtr;
-      //buf_block_t *block = NULL;
-      //fil_space_t* space = state->space;
-
-      //ut_ad(space->n_pending_ops > 0);
-
-      //mtr_start(&local_mtr);
-
-      //*allocation_status = fseg_page_is_free(space, offset) ?
-              //BTR_SCRUB_PAGE_FREE :
-              //BTR_SCRUB_PAGE_ALLOCATED;
-
-      //if (*allocation_status == BTR_SCRUB_PAGE_FREE) {
-              //[> this is easy case, we lock fil_space_latch first and
-              //then block */
-              //block = fil_crypt_get_page_throttle(state,
-                                                  //offset, mtr,
-                                                  //sleeptime_ms);
-              //mtr_commit(&local_mtr);
-      //} else {
-              //[> page is allocated according to xdes <]
-
-              //[> release fil_space_latch *before* fetching block <]
-              //mtr_commit(&local_mtr);
-
-              /* NOTE: when we have locked dict_index_get_lock(),
-              * it's safe to release fil_space_latch and then fetch block
-              * as dict_index_get_lock() is needed to make tree modifications
-              * such as free-ing a page
-              */
-
-              //block = fil_crypt_get_page_throttle(state,
-                                                  //offset, mtr,
-                                                  //sleeptime_ms);
-      //}
-
-      //return block;
-//}
-
-
 /***********************************************************************
 Rotate one page
 @param[in,out]		key_state		Key state
@@ -3064,66 +1874,6 @@ fil_crypt_rotate_page(
               mtr.commit();
               lsn_t end_lsn = mtr.commit_lsn();
 
-              //if (needs_scrubbing == BTR_SCRUB_PAGE) {
-                      //mtr.start();
-                      /*
-                      * refetch page and allocation status
-                      */
-                      //btr_scrub_page_allocation_status_t allocated;
-
-                      //block = btr_scrub_get_block_and_allocation_status(
-                              //state, offset, &mtr,
-                              //&allocated,
-                              //&sleeptime_ms);
-
-                      //if (block) {
-                              //mtr.set_named_space(space);
-
-                              //[> get required table/index and index-locks <]
-                              //needs_scrubbing = btr_scrub_recheck_page(
-                                      //&state->scrub_data, block, allocated, &mtr);
-
-                              //if (needs_scrubbing == BTR_SCRUB_PAGE) {
-                                      /* we need to refetch it once more now that we have
-                                      * index locked */
-                                      //block = btr_scrub_get_block_and_allocation_status(
-                                              //state, offset, &mtr,
-                                              //&allocated,
-                                              //&sleeptime_ms);
-
-                                      //needs_scrubbing = btr_scrub_page(&state->scrub_data,
-                                              //block, allocated,
-                                              //&mtr);
-                              //}
-
-                              /* NOTE: mtr is committed inside btr_scrub_recheck_page()
-                              * and/or btr_scrub_page. This is to make sure that
-                              * locks & pages are latched in corrected order,
-                              * the mtr is in some circumstances restarted.
-                              * (mtr_commit() + mtr_start())
-                              */
-                      //}
-              //}
-
-              //if (needs_scrubbing != BTR_SCRUB_PAGE) {
-                      //[> if page didn't need scrubbing it might be that cleanups
-                      //are needed. do those outside of any mtr to prevent deadlocks.
-
-                      //the information what kinds of cleanups that are needed are
-                      //encoded inside the needs_scrubbing, but this is opaque to
-                      //this function (except the value BTR_SCRUB_PAGE) */
-                      //btr_scrub_skip_page(&state->scrub_data, needs_scrubbing);
-              //}
-
-              //if (needs_scrubbing == BTR_SCRUB_TURNED_OFF) {
-                      /* if we just detected that scrubbing was turned off
-                      * update global state to reflect this */
-                      //ut_ad(crypt_data);
-                      //mutex_enter(&crypt_data->mutex);
-                      //crypt_data->rotate_state.scrubbing.is_active = false;
-                      //mutex_exit(&crypt_data->mutex);
-              //}
-
               if (modified) {
                       /* if we modified page, we take lsn from mtr */
                       ut_a(end_lsn > state->end_lsn);
@@ -3230,23 +1980,13 @@ fts_set_encrypted_flag_for_table(
 
       ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
       ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-      // There should be at most one matching record. So the value
-      // must be the default value.
-      ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-            == ULINT32_UNDEFINED);
-      //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
-              //== ULINT32_UNDEFINED);
 
-      ulint		flags = mach_read_from_4(
+      ulint flags = mach_read_from_4(
                       static_cast<byte*>(dfield_get_data(dfield)));
 
-      //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
-      //DICT_TF2_ENCRYPTION
-      //flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
       flags |= DICT_TF2_ENCRYPTION;
 
       mach_write_to_4(static_cast<byte*>(user_arg), flags);
-      //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
 
 
       return(FALSE);
@@ -3262,37 +2002,23 @@ fts_unset_encrypted_flag_for_table(
       dfield_t*	dfield = que_node_get_val(node->select_list);
 
       ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-      ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-      // There should be at most one matching record. So the value
-      // must be the default value.
-      ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-            == ULINT32_UNDEFINED);
-      //ut_ad((static_cast<Encrypted_flag_data*>(user_arg))->flags
-              //== ULINT32_UNDEFINED);
-
-      ulint		flags = mach_read_from_4(
+      
+      ulint flags = mach_read_from_4(
                       static_cast<byte*>(dfield_get_data(dfield)));
 
-      //flags |=  FSP_FLAGS_MASK_ENCRYPTION;
-      //DICT_TF2_ENCRYPTION
-      //flags ^= (1U << FSP_FLAGS_POS_ENCRYPTION);
       flags &= ~DICT_TF2_ENCRYPTION;
-
       mach_write_to_4(static_cast<byte*>(user_arg), flags);
-      //(static_cast<Encrypted_flag_data*>(user_arg))->flags= flags;
-
 
       return(FALSE);
 }
 
 static
 dberr_t
-fts_update_encrypted_flag_for_table_sql(
-/*=======================*/
-      trx_t*		trx,		/*!< in/out: transaction that
+fts_update_encrypted_tables_flags_in_space_sql(
+      trx_t*		trx,		/* in/out: transaction that
                                       covers the update */
-      table_id_t	table_id,
-      bool              set)	/*!< in: Table for which we want
+      ulint		space_id,
+      bool              set)	/* in: Table for which we want
                                       to set the root table->flags2 */
 {
       pars_info_t*		info;
@@ -3304,7 +2030,7 @@ fts_update_encrypted_flag_for_table_sql(
               "DECLARE CURSOR c IS\n"
               " SELECT MIX_LEN"
               " FROM SYS_TABLES"
-              " WHERE ID = :table_id FOR UPDATE;"
+              " WHERE SPACE = :space_id FOR UPDATE;"
               "\n"
               "BEGIN\n"
               "OPEN c;\n"
@@ -3316,15 +2042,14 @@ fts_update_encrypted_flag_for_table_sql(
               "END LOOP;\n"
               "UPDATE SYS_TABLES"
               " SET MIX_LEN = :flags2"
-              " WHERE ID = :table_id;\n"
+              " WHERE SPACE = :space_id;\n"
               "CLOSE c;\n"
               "END;\n";
 
-      flags2 = ULINT32_UNDEFINED;
 
       info = pars_info_create();
 
-      pars_info_add_ull_literal(info, "table_id", table_id);
+      pars_info_add_ull_literal(info, "space_id", space_id);
       pars_info_bind_int4_literal(info, "flags2", &flags2);
 
       pars_info_bind_function(
@@ -3337,41 +2062,10 @@ fts_update_encrypted_flag_for_table_sql(
 
       dberr_t err = que_eval_sql(info, sql, false, trx);
 
-      ut_a(flags2 != ULINT32_UNDEFINED);
-
-      //TODO: Data dictionary was not updated - do another try later
-      if (flags2 == ULINT32_UNDEFINED)
-          return DB_ERROR;
-      //ut_a(flags2 != ULINT32_UNDEFINED);
-
       return(err);
 }
 
-//static
-//ibool
-//fts_set_encrypted_flag(
-      //void*		row,		// in: sel_node_t* 
-      //void*		user_arg)	// in: bool set/unset flag
-//{
-      //sel_node_t*	node = static_cast<sel_node_t*>(row);
-      //dfield_t*	dfield = que_node_get_val(node->select_list);
 
-      //ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-      //ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-      //// There should be at most one matching record. So the value
-      //// must be the default value.
-      //ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-            //== ULINT32_UNDEFINED);
-
-      //ulint		flags2 = mach_read_from_4(
-                      //static_cast<byte*>(dfield_get_data(dfield)));
-
-      //flags2 |=  DICT_TF2_ENCRYPTION;
-
-      //mach_write_to_4(static_cast<byte*>(user_arg), flags2);
-
-      //return(FALSE);
-//}
 
 static
 ibool
@@ -3426,43 +2120,37 @@ fts_set_encrypted_flag_for_tablespace(
 }
 
 static
+ibool
+read_table_id(
+/*============*/
+	void*		row,		/*!< in: sel_node_t* */
+	void*		user_arg)	/*!< in: pointer to ib_vector_t */
+{
+      ib_vector_t*	tables_ids = static_cast<ib_vector_t*>(user_arg);
+
+      sel_node_t*	node = static_cast<sel_node_t*>(row);
+      dfield_t*	dfield = que_node_get_val(node->select_list);
+
+      ut_ad(dfield_get_len(dfield) == 8);
+
+      table_id_t *table_id = static_cast<table_id_t*>(ib_vector_push(tables_ids, NULL));
+
+      *table_id = mach_read_from_8(static_cast<byte*>(dfield_get_data(dfield)));
+
+      return(TRUE); // TODO: I am not sure if it matters if the function returnes TRUE or FALSE ?
+                    // doing what fsp0fsp is doing for this function.
+}
+
+static
 dberr_t
-//fts_update_encrypted_flag_sql(
-      //trx_t*		trx,		// in/out: transaction that
-                                      //// covers the update 
-      //dict_table_t* table)
 fts_update_encrypted_flag_for_tablespace_sql(
       trx_t*		trx,		// in/out: transaction that
                                       // covers the update 
-      fil_space_t *space,
+      ulint		space_id,
       bool set)
 {
       pars_info_t*		info;
       ib_uint32_t		flags;
-      //Encrypted_flag_data encrypted_flag_data;
-
-      //static const char	sql[] =
-              //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-              //"DECLARE FUNCTION my_func;\n"
-              //"DECLARE CURSOR c IS\n"
-              //" SELECT MIX_LEN"
-              //" FROM SYS_TABLESPACES"
-              //" WHERE SPACE=:table_id FOR UPDATE;"
-              //"\n"
-              //"BEGIN\n"
-              //"OPEN c;\n"
-              //"WHILE 1 = 1 LOOP\n"
-              //"  FETCH c INTO my_func();\n"
-              //"  IF c % NOTFOUND THEN\n"
-              //"    EXIT;\n"
-              //"  END IF;\n"
-              //"END LOOP;\n"
-              //"UPDATE SYS_TABLESPACES"
-              //" SET MIX_LEN=:flags2"
-              //" WHERE SPACE=:table_id;\n"
-              //"CLOSE c;\n"
-              //"END;\n";
-
       
       static const char	sql[] =
               "PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
@@ -3486,67 +2174,20 @@ fts_update_encrypted_flag_for_tablespace_sql(
               "CLOSE c;\n"
               "END;\n";
 
-      //static const char	sql[] =
-              //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-              //"DECLARE FUNCTION my_func;\n"
-              //"DECLARE CURSOR c IS\n"
-              //" SELECT MIX_LEN"
-              //" FROM SYS_TABLES"
-              //" WHERE ID=:table_id FOR UPDATE;"
-              //"\n"
-              //"BEGIN\n"
-              //"OPEN c;\n"
-              //"WHILE 1 = 1 LOOP\n"
-              //"  FETCH c INTO my_func();\n"
-              //"  IF c % NOTFOUND THEN\n"
-              //"    EXIT;\n"
-              //"  END IF;\n"
-              //"END LOOP;\n"
-              //"UPDATE SYS_TABLES"
-              //" SET MIX_LEN=:flags2"
-              //" WHERE ID=:table_id;\n"
-              //"CLOSE c;\n"
-              //"END;\n";
-
-      //static const char	sql[] =
-              //"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-              //"DECLARE FUNCTION my_func;\n"
-              //"DECLARE CURSOR c IS\n"
-              //" SELECT MIX_LEN"
-              //" FROM SYS_TABLES"
-              //" WHERE SPACE=:table_id FOR UPDATE;"
-              //"\n"
-              //"BEGIN\n"
-              //"OPEN c;\n"
-              //"WHILE 1 = 1 LOOP\n"
-              //"  FETCH c INTO my_func();\n"
-              //"  IF c % NOTFOUND THEN\n"
-              //"    EXIT;\n"
-              //"  END IF;\n"
-              //"END LOOP;\n"
-              //"UPDATE SYS_TABLES"
-              //" SET MIX_LEN=:flags2"
-              //" WHERE SPACE=:table_id;\n"
-              //"CLOSE c;\n"
-              //"END;\n";
-
-
-
       flags = ULINT32_UNDEFINED;
 
       info = pars_info_create();
 
-      //pars_info_add_ull_literal(info, "table_id", table->id);
-      pars_info_add_int4_literal(info, "space_id", space->id);
-      //pars_info_add_ull_literal(info, "table_id", space->id);
-      //pars_info_bind_int4_literal(info, "flags2", &flags2);
+      pars_info_add_int4_literal(info, "space_id", space_id);
       pars_info_bind_int4_literal(info, "flags", &flags);
 
       pars_info_bind_function(
               info, "my_func", set ? fts_set_encrypted_flag_for_tablespace
                                    : fts_unset_encrypted_flag_for_tablespace, &flags);
 
-      if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
+      if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) { // TODO:Robert - is this needed - I think not, they are not using it in
+                                                             // fts_drop_orphaned tables for getting a list of tables
+                                                             // możę trx_set_dict_operation(trx, TRX_DICT_OP_TABLE); ?
               trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
       }
 
@@ -3557,17 +2198,98 @@ fts_update_encrypted_flag_for_tablespace_sql(
       //TODO: Data dictionary was not updated - do another try later
       if (flags == ULINT32_UNDEFINED)
           return DB_ERROR;
-      //ut_a(flags2 != ULINT32_UNDEFINED);
 
       return(err);
 }
 
 static
 dberr_t
+get_tables_ids_in_space_sql(
+      trx_t*		trx,		// in/out: transaction that
+      fil_space_t *space,
+      ib_vector_t* tables_ids
+)
+{
+      pars_info_t *info = pars_info_create();
+
+      static const char	sql[] =
+                "PROCEDURE GET_TABLES_IDS() IS\n"
+		"DECLARE FUNCTION my_func;\n"
+		"DECLARE CURSOR c IS"
+		" SELECT ID"
+		" FROM SYS_TABLES"
+                " WHERE SPACE=:space_id;\n"
+		"BEGIN\n"
+		"\n"
+		"OPEN c;\n"
+		"WHILE 1 = 1 LOOP\n"
+		"  FETCH c INTO my_func();\n"
+		"  IF c % NOTFOUND THEN\n"
+		"    EXIT;\n"
+		"  END IF;\n"
+		"END LOOP;\n"
+		"CLOSE c;\n"
+                "END;\n";
+
+      pars_info_bind_function(info, "my_func", read_table_id, tables_ids);
+      pars_info_add_int4_literal(info, "space_id", space->id);
+
+      dberr_t err = que_eval_sql(info, sql, false, trx);
+
+      return(err);
+}
+
+struct TransactionAndHeapGuard
+{
+  TransactionAndHeapGuard(trx_t *trx)
+    : trx(trx), heap(NULL), do_rollback(true)
+  {}
+
+  void set_transaction(trx_t *trx)
+  {
+    this->trx = trx; 
+  }
+
+  void set_heap(mem_heap_t *heap)
+  {
+    this->heap = heap;
+  }
+
+  void commit()
+  {
+    ut_ad(trx != NULL);
+    fts_sql_commit(trx);
+    do_rollback = false;
+  }
+
+  ~TransactionAndHeapGuard()
+  {
+    if (trx && do_rollback) 
+      fts_sql_rollback(trx);
+
+    row_mysql_unlock_data_dictionary(trx);
+    trx_free_for_background(trx);
+  }
+
+private:
+  trx_t *trx;
+  mem_heap_t *heap;
+  bool do_rollback;
+};
+
+
+static
+dberr_t
 fil_update_encrypted_flag(fil_space_t *space,
                           bool set)
 {
+
+  // We are only modifying DD so the lock on DD is enough, we do not need
+  // lock on space
+
   trx_t* trx_set_encrypted = trx_allocate_for_background();
+  TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
+
   trx_set_encrypted->op_info = "setting encrypted flag";
 
   while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
@@ -3575,79 +2297,63 @@ fil_update_encrypted_flag(fil_space_t *space,
     //os_thread_sleep(6000);
     os_thread_sleep(6);
     if (space->stop_new_ops) // space is about to be dropped
-     return DB_SUCCESS;      // do not try to lock the DD
+      return DB_SUCCESS;      // do not try to lock the DD
   }
 
   trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
   mutex_enter(&dict_sys->mutex);
 
-  //rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
+  if (space->stop_new_ops) // space is about to be dropped
+   return DB_SUCCESS;
 
-  //row_mysql_lock_data_dictionary(trx_set_encrypted);
+  mem_heap_t* heap = mem_heap_create(1024); // TODO:consider moving expensive operation out of dict_sys->mutex
+  transaction_and_heap_guard.set_heap(heap);
+  
+  ib_alloc_t* heap_alloc = ib_heap_allocator_create(heap);
 
-  dict_table_t* table = dict_table_open_on_name(space->name, TRUE, FALSE,
-                                                DICT_ERR_IGNORE_NONE);
-  if (table == NULL) // table went away - has been dropped
-  {
-    //ut_ad(false);
+  /* We store the table ids of all the FTS indexes that were found. */
+  ib_vector_t* tables_ids = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
 
-    row_mysql_unlock_data_dictionary(trx_set_encrypted);
-    trx_free_for_background(trx_set_encrypted);
-    return DB_SUCCESS;
-  }
-
-  //dberr_t error = fts_update_encrypted_flag_sql(trx_set_encrypted,
-                                                //table);
-
-  dberr_t error = fts_update_encrypted_flag_for_tablespace_sql(trx_set_encrypted,
-                                                space,
-                                                set);
-  if (error == DB_SUCCESS)
-    error = fts_update_encrypted_flag_for_table_sql(trx_set_encrypted,
-                                                table->id,
-                                                set);
-
-        //table_id_t	table_id)	[>!< in: Table for which we want
+  dberr_t error = get_tables_ids_in_space_sql(trx_set_encrypted, space, tables_ids);
 
   if (error != DB_SUCCESS)
-  {
-      ut_ad(0);
-      fts_sql_rollback(trx_set_encrypted);
-  }
-  else
-  {
-      fts_sql_commit(trx_set_encrypted);
+    return error;
 
-      if (set)
+  // First update tablespace's encryption flag
+  error = fts_update_encrypted_flag_for_tablespace_sql(trx_set_encrypted,
+                                                       space->id,
+                                                       set);
+  if (error != DB_SUCCESS)
+    return error;
+
+  // Update encryption flags of all tables in the tablespace
+  error = fts_update_encrypted_tables_flags_in_space_sql(trx_set_encrypted,
+                                                         space->id,
+                                                         set);
+  if (error != DB_SUCCESS)
+    return error;
+
+  transaction_and_heap_guard.commit();
+
+  while (!ib_vector_is_empty(tables_ids))
+  {
+    table_id_t *table_id = static_cast<table_id_t*>(
+                      ib_vector_pop(tables_ids));
+
+    dict_table_t *table = dict_table_open_on_id(*table_id, TRUE,
+                                  DICT_TABLE_OP_NORMAL);
+
+    ut_ad(table != NULL);
+
+    if (set)
         DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-      else
+    else
         DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
 
-      //if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION))
-      //{
-        //DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
-        //ut_ad(!FSP_FLAGS_GET_ENCRYPTION(space->flags));
-      //}
-      //else
-      //{
-        //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-        //ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
-      //}
-
-      //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
-                //flags |= FSP_FLAGS_MASK_ENCRYPTION;
-      //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-      //ib::error() << "Successfuly updated for table = " << table->name
-                     //<< " table_id= " << table->id << " space_id = " << space->id;
+    dict_table_close(table, TRUE, FALSE);
   }
 
-  dict_table_close(table, TRUE, FALSE);
-
-  row_mysql_unlock_data_dictionary(trx_set_encrypted);
-
-  trx_free_for_background(trx_set_encrypted);
-
-  return error;
+  return DB_SUCCESS;
 }
 
 /***********************************************************************

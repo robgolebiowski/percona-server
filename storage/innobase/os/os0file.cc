@@ -40,11 +40,11 @@ Created 10/21/1995 Heikki Tuuri
 #include "os0file.h"
 
 #include "fil0crypt.h"
+#include "system_key.h"
 
 #ifdef UNIV_NONINL
 #include "os0file.ic"
 #endif
-
 
 #include "fil0crypt.h"
 
@@ -67,7 +67,6 @@ Created 10/21/1995 Heikki Tuuri
 
 #include <vector>
 #include <functional>
-
 
 #include "fil0crypt.h"
 
@@ -92,7 +91,6 @@ bool	innodb_calling_exit;
 #include <my_aes.h>
 #include <my_rnd.h>
 #include <mysqld.h>
-#include "system_key.h"
 #include "fil0crypt.h"
 #include <mysql/service_mysql_keyring.h>
 #include "buf0buf.h"
@@ -9409,30 +9407,9 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 	int	ret;
 
-        //ulint master_key_id = space_id == 0 ? this->master_key_id : space_id;
-
-	/* If uuid does not match with current server uuid,
-	set uuid as current server uuid. */
-	if (strcmp(uuid, server_uuid) != 0) {
-		memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
-	}
-	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
-
-        //if (uuid[0] == '\0')
-          //memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
-
-        //ut_ad(uuid[0] != '\0');
-
-	/* Generate new tablespace key */
-        // key name should not contain version, as this is first version, it will get assigned version 0
-	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    //"%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    //uuid, space_id);
-
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
 		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 		    key_id);
-
 
 	/* We call key ring API to generate tablespace key here. */
 	ret = my_key_generate(key_name, "AES",
@@ -9457,15 +9434,11 @@ Encryption::create_tablespace_key(byte** tablespace_key,
                 my_free(key_type);
                 return;
 	} 
-	if (key_type) {
-		my_free(key_type);
-	}
+	my_free(key_type);
 
         uint tablespace_key_version = 0;
         size_t tablespace_key_data_length = 0;
-
-        //TODO : Robert, może można to rozwiązać trochę lepiej, bez tych my_free(system_tablespace_key)?
-        //Pobieranie z wersją może byłoby lepsze
+       
         if (parse_system_key(system_tablespace_key, key_len, &tablespace_key_version,
                              tablespace_key, &tablespace_key_data_length) == NULL)
         {
@@ -9556,39 +9529,22 @@ Encryption::get_tablespace_key(uint key_id,
 {
         bool result = true;
 #ifndef UNIV_INNOCHECKSUM
-	//size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
-	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    //"%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    //key_id);
-  //std::ostringstream percona_binlog_with_ver_ss;
-  //percona_binlog_with_ver_ss << PERCONA_BINLOG_KEY_NAME << ':' << kv;
-
         ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
                     "%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
                      key_id, tablespace_key_version);
-
-        //get_system_key(key_name, tablespace_key, &key_version_fetched, key_len);
-
-        //get_keyring_key(key_name, tablespace_key, key_len);
-        // TODO:For debug we always expect key_version to be fetched correctly
-        //ut_ad(tablespace_key_version == key_version_fetched);
-
 
         Encryption::get_keyring_key(key_name, tablespace_key, key_len);
 
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
 				" the keyring plugin is loaded. 2";
-                //ut_ad(0);
                 result = false;
 	}
    
-        //else 
-
 #ifdef UNIV_ENCRYPT_DEBUG
 	if (*tablespace_key) {
 		fprintf(stderr, "Fetched tablespace key:%s ", key_name);
@@ -9600,7 +9556,6 @@ Encryption::get_tablespace_key(uint key_id,
         return result;
 }
                             
-
 void Encryption::get_latest_system_key(const char *system_key_name,
                                 byte **key,
                                 uint *key_version,
@@ -9616,9 +9571,6 @@ void Encryption::get_latest_system_key(const char *system_key_name,
     return;
   }
 
-//extern uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
-                               //uchar **key_data, size_t *key_data_length);
-
   parse_system_key(system_key, system_key_len, key_version, (uchar**)key, key_length);
 #endif
 }
@@ -9633,27 +9585,13 @@ Encryption::get_latest_tablespace_key(uint key_id,
 	size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-        if (uuid[0] == '\0')
-          memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
-        //ut_ad(uuid[0] != '\0'); // TODO:Robert: Make sure Encryption::uuid was already initialized
-
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
 		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
 		    key_id);
-	//ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    //"%s-%s-%lu", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    //uuid, space_id); // TODO:Robert make sure uuid is set till we get here
 
         get_latest_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
-
-        /* //TODO : For now, I am commenting this out maybe I will change this to error
-         * TODO: If I decided to move creating innodb tablespace key creationg to fil_set_encryption
-	if (*tablespace_key == NULL) {
-		ib::error() << "Encryption can't find master key, please check"
-				" the keyring plugin is loaded.";
-	}*/
 
 #ifdef UNIV_ENCRYPT_DEBUG
 	if (*tablespace_key) {
@@ -9702,33 +9640,28 @@ Encryption::get_latest_tablespace_key_or_create_new_one(uint key_id,
      get_latest_tablespace_key(key_id, tablespace_key_version, tablespace_key);
      if (*tablespace_key == NULL)
      {
-       fprintf(stderr, "Robert:get_latest_tablespace_key returned null, generating new tablespace_key for space: %u\n", key_id);
-
        Encryption::create_tablespace_key(tablespace_key, key_id);
-       *tablespace_key_version = 0;
-     }
-     else
-     {
-
-#ifdef UNIV_ENCRYPT_DEBUG
-       fprintf(stderr, "Robert:get_latest_tablespace_key returned key, using it:");
-       ut_print_buf(stderr, *tablespace_key, ENCRYPTION_KEY_LEN);
-       fprintf(stderr, "\n");
-       return;
-#endif
-     }
-     if (*tablespace_key == NULL)
-         fprintf(stderr, "Robert:failed to generate tablespace_key\n");
-     else
-     {
-#ifdef UNIV_ENCRYPT_DEBUG
-         fprintf(stderr, "Robert:succesfuly generated new tablespace_key: ");
-         ut_print_buf(stderr, *tablespace_key, ENCRYPTION_KEY_LEN);
-         fprintf(stderr, "\n");
-#endif
+       *tablespace_key_version = 1;
      }
 }
 
+
+uint Encryption::encryption_get_latest_version(uint key_id)
+{
+#ifndef UNIV_INNOCHECKSUM
+  uint tablespace_key_version;
+  byte *tablespace_key; 
+
+  get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
+  
+  if(tablespace_key == NULL)
+    return ENCRYPTION_KEY_VERSION_INVALID;
+
+  my_free(tablespace_key);
+  return tablespace_key_version;
+#endif
+  return ENCRYPTION_KEY_VERSION_INVALID;
+}
 
 /** Get master key by key id.
 @param[in]	master_key_id	master key id

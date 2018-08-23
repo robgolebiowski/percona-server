@@ -12087,24 +12087,37 @@ create_table_info_t::create_option_encryption_is_valid() const
 		}
 	}
 
-        //bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
+        bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
 
 	/* Currently we do not support encryption for
 	spatial indexes thus do not allow creating table with forced
 	encryption */
 
-        //if (table_is_rotated_keys)
-        //{
-          //for(ulint i = 0; i < m_form->s->keys; i++) {
-                  //const KEY* key = m_form->key_info + i;
-                  //if (key->flags & HA_SPATIAL) {
-			//my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                                       //"InnoDB: ENCRYPTED='ROTATED_KEYS' not supported for table because "
-                                       //"it contains spatial index.", MYF(0));
-                          //return(false);
-                  //}
-          //}
-        //}
+        if (table_is_rotated_keys)
+        {
+          if (!m_allow_file_per_table) {
+                  my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                        "InnoDB: ROTATED_KEYS requires innodb_file_per_table.", MYF(0));
+                  return (false);
+          }
+
+          if (m_create_info->tablespace != NULL)
+          {
+             my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                             "InnoDB: table encrypted with ROTATED_KEYS cannot be part of shared tablespace.", MYF(0));
+                  return (false);
+          }
+
+          for(ulint i = 0; i < m_form->s->keys; i++) {
+                  const KEY* key = m_form->key_info + i;
+                  if (key->flags & HA_SPATIAL) {
+                        my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                                       "InnoDB: ENCRYPTED='ROTATED_KEYS' not supported for table because "
+                                       "it contains spatial index.", MYF(0));
+                          return(false);
+                  }
+          }
+        }
 
         // TODO:Robert table is not encrypted when temporary table // should differentiate between Oracle encryption and ROTATED_KEYS
 	bool table_is_encrypted =
@@ -12621,6 +12634,15 @@ create_table_info_t::innobase_table_flags()
 			my_error(ER_INVALID_ENCRYPTION_OPTION, MYF(0));
 			DBUG_RETURN(false);
 		}
+
+                if (m_use_shared_space && !m_use_file_per_table)
+                {
+		        /* Can't encrypt shared tablespace with RK */
+                        if (Encryption::is_rotated_keys(encryption)) {
+                            my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
+			    DBUG_RETURN(false);
+                        }
+                }
 
 		if (m_create_info->options & HA_LEX_CREATE_TMP_TABLE) {
 			if (!Encryption::is_none(encryption)) {
@@ -14078,7 +14100,8 @@ validate_create_tablespace_info(
 
 		err = Encryption::validate(alter_info->encrypt_type.str);
 
-		if (err == DB_UNSUPPORTED) {
+		if (err == DB_UNSUPPORTED ||
+                    Encryption::is_rotated_keys(alter_info->encrypt_type.str)) {
 			my_error(ER_INVALID_ENCRYPTION_OPTION, MYF(0));
 			return(HA_WRONG_CREATE_OPTION);
 		}
