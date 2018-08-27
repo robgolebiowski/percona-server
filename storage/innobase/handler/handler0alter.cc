@@ -380,10 +380,24 @@ static MY_ATTRIBUTE((warn_unused_result))
 bool
 innobase_need_rebuild(
 /*==================*/
-	const Alter_inplace_info*	ha_alter_info)
+	const Alter_inplace_info*	ha_alter_info,
+	const TABLE*			old_table)
+
 {
 	Alter_inplace_info::HA_ALTER_FLAGS alter_inplace_flags =
 		ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE);
+
+        if ((
+              Encryption::is_no(ha_alter_info->create_info->encrypt_type.str) &&
+              (Encryption::is_rotated_keys(old_table->s->encrypt_type.str) || Encryption::is_empty(old_table->s->encrypt_type.str))
+            ) ||
+            (
+              Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
+              !Encryption::is_rotated_keys(old_table->s->encrypt_type.str)
+            ) ||
+            ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
+            )
+          return true;
 
 	if (alter_inplace_flags
 	    == Alter_inplace_info::CHANGE_CREATE_OPTION
@@ -391,7 +405,8 @@ innobase_need_rebuild(
 		 & (HA_CREATE_USED_ROW_FORMAT
 		    | HA_CREATE_USED_KEY_BLOCK_SIZE
 		    | HA_CREATE_USED_TABLESPACE
-                    | HA_CREATE_ENCRYPTION_KEY_ID))) {
+                    | HA_CREATE_ENCRYPTION_KEY_ID)))
+        {
 		/* Any other CHANGE_CREATE_OPTION than changing
 		ROW_FORMAT, KEY_BLOCK_SIZE or TABLESPACE can be done
 		without rebuilding the table. */
@@ -562,10 +577,13 @@ ha_innobase::check_if_supported_inplace_alter(
 	char*	old_encryption = this->table->s->encrypt_type.str;
 	char*	new_encryption = altered_table->s->encrypt_type.str;
 
-	if ((Encryption::is_none(old_encryption) != Encryption::is_none(new_encryption)) ||
-            (Encryption::is_master_key_encryption(old_encryption) && Encryption::is_rotated_keys(new_encryption)) ||
-            (Encryption::is_rotated_keys(old_encryption) && Encryption::is_master_key_encryption(new_encryption))
-           ) {
+        if (Encryption::is_master_key_encryption(old_encryption) ||
+            Encryption::is_master_key_encryption(new_encryption))
+	//if ((Encryption::is_none(old_encryption) != Encryption::is_none(new_encryption)) ||
+            //(Encryption::is_master_key_encryption(old_encryption) && Encryption::is_rotated_keys(new_encryption)) ||
+            //(Encryption::is_rotated_keys(old_encryption) && Encryption::is_master_key_encryption(new_encryption))
+           //)
+        {
 		ha_alter_info->unsupported_reason =
 			innobase_get_err_msg(
 				ER_UNSUPPORTED_ALTER_ENCRYPTION_INPLACE);
@@ -852,7 +870,7 @@ ha_innobase::check_if_supported_inplace_alter(
 		operation is possible. */
 	} else if (((ha_alter_info->handler_flags
 		     & Alter_inplace_info::ADD_PK_INDEX)
-		    || innobase_need_rebuild(ha_alter_info))
+		    || innobase_need_rebuild(ha_alter_info, altered_table))
 		   && (innobase_fulltext_exist(altered_table)
 		       || innobase_spatial_exist(altered_table))) {
 		/* Refuse to rebuild the table online, if
@@ -2349,9 +2367,10 @@ innobase_create_key_defs(
 	bool&				add_fts_doc_id,
 			/*!< in: whether we need to add new DOC ID
 			column for FTS index */
-	bool&				add_fts_doc_idx)
-			/*!< in: whether we need to add new DOC ID
-			index for FTS index */
+	bool&				add_fts_doc_idx,
+
+        const TABLE*			table)
+                        /*!<in: old_table MySQL table as it is before the ALTER operation */
 {
 	index_def_t*		indexdef;
 	index_def_t*		indexdefs;
@@ -2386,7 +2405,7 @@ innobase_create_key_defs(
 	}
 
 	const bool rebuild = new_primary || add_fts_doc_id
-		|| innobase_need_rebuild(ha_alter_info);
+		|| innobase_need_rebuild(ha_alter_info, table);
 
 	/* Reserve one more space if new_primary is true, and we might
 	need to add the FTS_DOC_ID_INDEX */
@@ -4296,7 +4315,7 @@ prepare_inplace_alter_table_dict(
 		ctx->heap, ha_alter_info, altered_table, ctx->num_to_add_index,
 		num_fts_index,
 		row_table_got_default_clust_index(ctx->new_table),
-		fts_doc_id_col, add_fts_doc_id, add_fts_doc_id_idx);
+		fts_doc_id_col, add_fts_doc_id, add_fts_doc_id_idx, old_table);
 
 	new_clustered = DICT_CLUSTERED & index_defs[0].ind_type;
 
@@ -4309,7 +4328,7 @@ prepare_inplace_alter_table_dict(
 		/* This is not an online operation (LOCK=NONE). */
 	} else if (ctx->add_autoinc == ULINT_UNDEFINED
 		   && num_fts_index == 0
-		   && (!innobase_need_rebuild(ha_alter_info)
+		   && (!innobase_need_rebuild(ha_alter_info, old_table)
 		       || !innobase_fulltext_exist(altered_table))) {
 		/* InnoDB can perform an online operation (LOCK=NONE). */
 	} else {
@@ -4326,7 +4345,7 @@ prepare_inplace_alter_table_dict(
 	is just copied from old table and stored in indexdefs[0] */
 	DBUG_ASSERT(!add_fts_doc_id || new_clustered);
 	DBUG_ASSERT(!!new_clustered ==
-		    (innobase_need_rebuild(ha_alter_info)
+		    (innobase_need_rebuild(ha_alter_info, old_table)
 		     || add_fts_doc_id));
 
 	/* Allocate memory for dictionary index definitions */
@@ -4617,16 +4636,16 @@ prepare_inplace_alter_table_dict(
 			//fil_space_release(space);
 		//}
 
+                key_id= ha_alter_info->create_info->encryption_key_id;
 
                 if (Encryption::is_no(encrypt))
                   mode= FIL_ENCRYPTION_OFF;
                 else if (Encryption::is_rotated_keys(encrypt) || 
-                        (srv_encrypt_tables && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)))
+                        (srv_encrypt_tables && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
+                         && !Encryption::is_master_key_encryption(encrypt)))
                 {
                   mode= Encryption::is_rotated_keys(encrypt) ? FIL_ENCRYPTION_ON
                                                              : FIL_ENCRYPTION_DEFAULT;
-                  key_id= ha_alter_info->create_info->encryption_key_id;
-
                   uint tablespace_key_version;
                   byte *tablespace_key; 
 
@@ -4770,7 +4789,7 @@ new_clustered_failed:
 			add_cols, ctx->heap, prebuilt);
 		ctx->add_cols = add_cols;
 	} else {
-		DBUG_ASSERT(!innobase_need_rebuild(ha_alter_info));
+		DBUG_ASSERT(!innobase_need_rebuild(ha_alter_info, old_table));
 		DBUG_ASSERT(old_table->s->primary_key
 			    == altered_table->s->primary_key);
 
@@ -6075,7 +6094,7 @@ err_exit:
 	if (!(ha_alter_info->handler_flags & INNOBASE_ALTER_DATA)
 	    || ((ha_alter_info->handler_flags & ~INNOBASE_INPLACE_IGNORE)
 		== Alter_inplace_info::CHANGE_CREATE_OPTION
-		&& !innobase_need_rebuild(ha_alter_info))) {
+		&& !innobase_need_rebuild(ha_alter_info, table))) {
 
 		if (heap) {
 			ha_alter_info->handler_ctx
@@ -6360,7 +6379,7 @@ ok_exit:
 
 	if ((ha_alter_info->handler_flags & ~INNOBASE_INPLACE_IGNORE)
 	    == Alter_inplace_info::CHANGE_CREATE_OPTION
-	    && !innobase_need_rebuild(ha_alter_info)) {
+	    && !innobase_need_rebuild(ha_alter_info, table)) {
 		goto ok_exit;
 	}
 

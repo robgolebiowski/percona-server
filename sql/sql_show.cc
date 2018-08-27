@@ -1924,6 +1924,15 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
     {
       packet->append(STRING_WITH_LEN(" ENCRYPTION="));
       append_unescaped(packet, share->encrypt_type.str, share->encrypt_type.length);
+
+      if (strncmp(share->encrypt_type.str, "ROTATED_KEYS",
+              strlen("ROTATED_KEYS")) == 0)
+      {
+        char *end;
+        packet->append(STRING_WITH_LEN(" ENCRYPTION_KEY_ID=")); 
+        end= longlong10_to_str(table->s->encryption_key_id, buff, 10);
+        packet->append(buff, (uint) (end - buff));
+      }
     }
     table->file->append_create_info(packet);
     if (share->comment.length)

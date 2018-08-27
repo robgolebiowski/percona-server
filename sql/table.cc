@@ -2205,6 +2205,15 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
       }
       next_chunk+= 2 + share->encrypt_type.length;
     }
+
+    if (next_chunk + 4 <= buff_end &&
+        share->encrypt_type.length > 0 &&
+        strncmp(share->encrypt_type.str, "ROTATED_KEYS",
+              strlen("ROTATED_KEYS")) == 0)
+    {
+          share->encryption_key_id= uint4korr(next_chunk);
+    }
+    next_chunk += 4;
   }
   share->key_block_size= uint2korr(head+62);
 

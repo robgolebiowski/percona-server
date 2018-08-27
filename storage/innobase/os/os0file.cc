@@ -10147,18 +10147,18 @@ Encryption::encrypt(
             page_size = type.get_zip_page_physical_size();
           }
 
-        if (space_id == 24 && page_no == 4)
-        {
-	    fprintf(stderr, "Robert: Checksum for 24:4:%d", m_checksum);
-        }
+        //if (space_id == 24 && page_no == 4)
+        //{
+	    //fprintf(stderr, "Robert: Checksum for 24:4:%d", m_checksum);
+        //}
 
 
           m_checksum = fil_crypt_calculate_checksum(page_size, dst, type.is_page_zip_compressed());
 
-        if (space_id == 24 && page_no == 4)
-        {
-	    fprintf(stderr, "Robert: Checksum for 24:4:%d", m_checksum);
-        }
+        //if (space_id == 24 && page_no == 4)
+        //{
+	    //fprintf(stderr, "Robert: Checksum for 24:4:%d", m_checksum);
+        //}
 
 #endif
 

@@ -502,6 +502,9 @@ struct Encryption {
 	static bool is_no(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
+        static bool is_empty(const char* algorithm)
+		MY_ATTRIBUTE((warn_unused_result));
+
         static bool is_rotated_keys(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
 //TODO:Robert, to nie jest obecnie używane!

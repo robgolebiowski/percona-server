@@ -2187,7 +2187,7 @@ fts_update_encrypted_flag_for_tablespace_sql(
 
       if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) { // TODO:Robert - is this needed - I think not, they are not using it in
                                                              // fts_drop_orphaned tables for getting a list of tables
-                                                             // możę trx_set_dict_operation(trx, TRX_DICT_OP_TABLE); ?
+                                                             // może trx_set_dict_operation(trx, TRX_DICT_OP_TABLE); ?
               trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
       }
 

@@ -2732,20 +2732,22 @@ Compression::validate(const char* algorithm)
 	return(check(algorithm, &compression));
 }
 
+bool
+Encryption::is_empty(const char* algorithm)
+{
+	/* NULL is the same as empty */
+        return (algorithm == NULL
+                || innobase_strcasecmp(algorithm, "") == 0);
+}
+
 /** Check if the string is "" or "n".
 @param[in]      algorithm       Encryption algorithm to check
 @return true if no algorithm requested */
 bool
 Encryption::is_none(const char* algorithm)
 {
-	/* NULL is the same as NONE */
-	if (algorithm == NULL
-	    || Encryption::is_no(algorithm)
-	    || innobase_strcasecmp(algorithm, "") == 0) {
-		return(true);
-	}
-
-	return(false);
+        return Encryption::is_empty(algorithm)
+               || Encryption::is_no(algorithm);
 }
 
 bool
@@ -12117,6 +12119,33 @@ create_table_info_t::create_option_encryption_is_valid() const
                           return(false);
                   }
           }
+
+
+
+          //TODO:Robert:This still needs porting
+          //if (encrypt == FIL_ENCRYPTION_OFF && srv_encrypt_tables == 2) {
+                  //push_warning(
+                          //m_thd, Sql_condition::WARN_LEVEL_WARN,
+                          //HA_WRONG_CREATE_OPTION,
+                          //"InnoDB: ENCRYPTED=OFF cannot be used when innodb_encrypt_tables=FORCE");
+                  //return "ENCRYPTED";
+          //}
+        }
+
+
+        if (!table_is_rotated_keys)
+        {
+          /* Ignore nondefault key_id if encryption is set off */
+	  if (m_create_info->encryption_key_id  != THDVAR(m_thd, default_encryption_key_id))
+          {
+		push_warning_printf(
+			m_thd, Sql_condition::SL_WARNING,
+			HA_WRONG_CREATE_OPTION,
+			"InnoDB: Ignored ENCRYPTION_KEY_ID %u when ROTATED_KEYS encryption is disabled",
+			(uint)m_create_info->encryption_key_id
+		);
+		m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+	  }
         }
 
         // TODO:Robert table is not encrypted when temporary table // should differentiate between Oracle encryption and ROTATED_KEYS

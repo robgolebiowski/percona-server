@@ -515,6 +515,7 @@ given at all. */
 /** COMPRESSION="zlib|lz4|none" used during table create. */
 #define HA_CREATE_USED_COMPRESS         (1L << 26)
 
+//TODO: Hm not much space is left for the flags, should I move it ?
 #define HA_CREATE_ENCRYPTION_KEY_ID     (1L << 31)
 
 /*
@@ -605,6 +606,7 @@ class st_alter_tablespace : public Sql_alloc
   enum tablespace_access_mode ts_access_mode;
   bool encrypt;
   LEX_STRING encrypt_type;
+  uint32_t encryption_key_id;
   bool is_tablespace_command()
   {
     return ts_cmd_type == CREATE_TABLESPACE      ||
@@ -637,6 +639,7 @@ class st_alter_tablespace : public Sql_alloc
     ts_access_mode= TS_NOT_DEFINED;
     encrypt= false;
     encrypt_type = LEX_STRING();
+    encryption_key_id = 0; // Change to default?
   }
 };
 
