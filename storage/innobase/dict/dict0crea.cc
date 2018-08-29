@@ -426,7 +426,7 @@ dict_build_tablespace(
 		tablespace->flags(),
 		FIL_IBD_FILE_INITIAL_SIZE,
                 node ? node->mode : FIL_ENCRYPTION_DEFAULT,
-                node ? node->encryption_key_id : FIL_DEFAULT_ENCRYPTION_KEY);
+                node ? node->create_info_encryption_key_id : CreateInfoEncryptionKeyId());
 	if (err != DB_SUCCESS) {
 		return(err);
 	}
@@ -549,7 +549,7 @@ dict_build_tablespace_for_table(
 			space, table->name.m_name, filepath, fsp_flags,
 			FIL_IBD_FILE_INITIAL_SIZE,
                         node ? node->mode : FIL_ENCRYPTION_DEFAULT,
-                        node ? node->encryption_key_id : 0);
+                        node ? node->create_info_encryption_key_id : CreateInfoEncryptionKeyId());
 
 		ut_free(filepath);
 
@@ -1376,7 +1376,7 @@ tab_create_graph_create(
 				structure */
 	mem_heap_t*	heap,    /*!< in: heap where created */
         fil_encryption_t mode,	/*!< in: encryption mode */
-	const uint32_t encryption_key_id)	/*!< in: encryption key_id */
+        const CreateInfoEncryptionKeyId &create_info_encryption_key_id) /*!< in: encryption key_id */
 {
 	tab_node_t*	node;
 
@@ -1390,7 +1390,7 @@ tab_create_graph_create(
 	node->state = TABLE_BUILD_TABLE_DEF;
 	node->heap = mem_heap_create(256);
         node->mode= mode;
-        node->encryption_key_id= encryption_key_id;
+        node->create_info_encryption_key_id= create_info_encryption_key_id;
 
 	node->tab_def = ins_node_create(INS_DIRECT, dict_sys->sys_tables,
 					heap);

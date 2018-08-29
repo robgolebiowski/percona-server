@@ -2263,6 +2263,9 @@ truncate_t::fixup_tables_in_non_system_tablespace()
 				fil_create_directory_for_tablename(
 					(*it)->m_tablename);
 
+                                CreateInfoEncryptionKeyId create_info_encryption_key_id(false,
+                                                                                        (*it)->m_encryption_key_id);
+
 				err = fil_ibd_create(
 					(*it)->m_space_id,
 					(*it)->m_tablename,
@@ -2270,7 +2273,7 @@ truncate_t::fixup_tables_in_non_system_tablespace()
 					(*it)->m_tablespace_flags,
 					FIL_IBD_FILE_INITIAL_SIZE,
                                         (*it)->m_encryption,
-                                        (*it)->m_encryption_key_id
+                                        create_info_encryption_key_id
                                         );
 				if (err != DB_SUCCESS) {
 					/* If checkpoint is not yet done

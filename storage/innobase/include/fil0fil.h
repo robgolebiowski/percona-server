@@ -46,6 +46,7 @@ Created 10/25/1995 Heikki Tuuri
 #include <vector>
 
 #include "fil0rkinfo.h"
+#include "create_info_encryption_key.h"
 
 //#include "fil0crypt.h" //TODO:Robert This should be removed, when fil_space_crypt_t will be moved to appropriate place
 /** Structure containing encryption specification */
@@ -1223,7 +1224,7 @@ fil_ibd_create(
 	ulint		flags,
 	ulint		size,
         fil_encryption_t mode,
-        const uint32_t encryption_key_id)
+        const CreateInfoEncryptionKeyId &create_info_encryption_key_id)
 	MY_ATTRIBUTE((warn_unused_result));
 /********************************************************************//**
 Tries to open a single-table tablespace and optionally checks the space id is

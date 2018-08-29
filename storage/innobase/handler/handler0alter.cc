@@ -60,6 +60,8 @@ Smart ALTER TABLE
 
 #include "fil0crypt.h"
 
+#include "create_info_encryption_key.h"
+
 /** Operations for creating secondary indexes (no rebuild needed) */
 static const Alter_inplace_info::HA_ALTER_FLAGS INNOBASE_ONLINE_CREATE
 	= Alter_inplace_info::ADD_INDEX
@@ -395,7 +397,8 @@ innobase_need_rebuild(
               Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
               !Encryption::is_rotated_keys(old_table->s->encrypt_type.str)
             ) ||
-            ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
+            ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id //TODO:Should not I also check if table was encrypted ?
+                                                                                             //if not then maybe I do not need to rebuild ?
             )
           return true;
 
@@ -404,8 +407,7 @@ innobase_need_rebuild(
 	    && !(ha_alter_info->create_info->used_fields
 		 & (HA_CREATE_USED_ROW_FORMAT
 		    | HA_CREATE_USED_KEY_BLOCK_SIZE
-		    | HA_CREATE_USED_TABLESPACE
-                    | HA_CREATE_ENCRYPTION_KEY_ID)))
+		    | HA_CREATE_USED_TABLESPACE)))
         {
 		/* Any other CHANGE_CREATE_OPTION than changing
 		ROW_FORMAT, KEY_BLOCK_SIZE or TABLESPACE can be done
@@ -4241,6 +4243,7 @@ prepare_inplace_alter_table_dict(
 	dict_add_v_col_t*	add_v = NULL;
 	ha_innobase_inplace_ctx*ctx;
 	zip_dict_id_container_t	zip_dict_ids;
+        CreateInfoEncryptionKeyId create_info_encryption_key_id;
 
 	DBUG_ENTER("prepare_inplace_alter_table_dict");
 
@@ -4637,12 +4640,14 @@ prepare_inplace_alter_table_dict(
 		//}
 
                 key_id= ha_alter_info->create_info->encryption_key_id;
+                                ut_ad(key_id == 0 || ha_alter_info->create_info->was_encryption_key_id_set);
 
                 if (Encryption::is_no(encrypt))
                   mode= FIL_ENCRYPTION_OFF;
                 else if (Encryption::is_rotated_keys(encrypt) || 
                         (srv_encrypt_tables && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
-                         && !Encryption::is_master_key_encryption(encrypt)))
+                         && !Encryption::is_master_key_encryption(encrypt)) ||
+                        ha_alter_info->create_info->was_encryption_key_id_set)
                 {
                   mode= Encryption::is_rotated_keys(encrypt) ? FIL_ENCRYPTION_ON
                                                              : FIL_ENCRYPTION_DEFAULT;
@@ -4704,9 +4709,14 @@ prepare_inplace_alter_table_dict(
 			}
 		}
 
+
+                create_info_encryption_key_id.was_encryption_key_id_set =
+                  ha_alter_info->create_info->was_encryption_key_id_set;
+                create_info_encryption_key_id.encryption_key_id = key_id;
+
                 //TODO:Robert - to musisz zmienic na pobieranie poprawnych informacji z alter table
 		error = row_create_table_for_mysql(
-			ctx->new_table, compression, ctx->trx, false, mode, key_id);
+			ctx->new_table, compression, ctx->trx, false, mode, create_info_encryption_key_id);
 
 		punch_hole_warning =
 			(error == DB_IO_NO_PUNCH_HOLE_FS)

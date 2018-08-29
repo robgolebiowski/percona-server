@@ -11334,7 +11334,8 @@ err_col:
                 fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
                 uint32_t encryption_key_id;
 
-                if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
+                //if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
+                if (m_create_info->was_encryption_key_id_set)
                    encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
                                                                         // TODO: To będzie też sprawdzane w check_table z crypt_data
                                                                        // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
@@ -11461,10 +11462,16 @@ err_col:
 			//err = row_create_table_for_mysql(
 				//table, algorithm, m_trx, false,
                                 //FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+                                //
+                                //
+                        CreateInfoEncryptionKeyId create_info_encryption_key_id(m_create_info->was_encryption_key_id_set,
+                            m_create_info->encryption_key_id);
+
+
                         err = row_create_table_for_mysql(
 				table, algorithm, m_trx, false,
 				rotated_keys_encryption_option,
-				encryption_key_id);
+				create_info_encryption_key_id);
 		}
 
 		if (err == DB_IO_NO_PUNCH_HOLE_FS) {
@@ -12132,19 +12139,22 @@ create_table_info_t::create_option_encryption_is_valid() const
           //}
         }
 
-
-        if (!table_is_rotated_keys)
+        if (Encryption::is_master_key_encryption(m_create_info->encrypt_type.str) ||
+            Encryption::is_no(m_create_info->encrypt_type.str))
         {
-          /* Ignore nondefault key_id if encryption is set off */
-	  if (m_create_info->encryption_key_id  != THDVAR(m_thd, default_encryption_key_id))
+          if (m_create_info->was_encryption_key_id_set)
+	  //if (m_create_info->encryption_key_id  != THDVAR(m_thd, default_encryption_key_id))
           {
 		push_warning_printf(
 			m_thd, Sql_condition::SL_WARNING,
 			HA_WRONG_CREATE_OPTION,
-			"InnoDB: Ignored ENCRYPTION_KEY_ID %u when ROTATED_KEYS encryption is disabled",
+                        Encryption::is_no(m_create_info->encrypt_type.str)  
+			        ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled."
+                                : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when Master Key encryption is enabled.",
 			(uint)m_create_info->encryption_key_id
 		);
-		m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+                m_create_info->was_encryption_key_id_set = false;
+                m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 	  }
         }
 

@@ -515,9 +515,6 @@ given at all. */
 /** COMPRESSION="zlib|lz4|none" used during table create. */
 #define HA_CREATE_USED_COMPRESS         (1L << 26)
 
-//TODO: Hm not much space is left for the flags, should I move it ?
-#define HA_CREATE_ENCRYPTION_KEY_ID     (1L << 31)
-
 /*
   This is master database for most of system tables. However there
   can be other databases which can hold system tables. Respective
@@ -607,6 +604,7 @@ class st_alter_tablespace : public Sql_alloc
   bool encrypt;
   LEX_STRING encrypt_type;
   uint32_t encryption_key_id;
+  bool was_encryption_key_id_set;
   bool is_tablespace_command()
   {
     return ts_cmd_type == CREATE_TABLESPACE      ||
@@ -640,6 +638,7 @@ class st_alter_tablespace : public Sql_alloc
     encrypt= false;
     encrypt_type = LEX_STRING();
     encryption_key_id = 0; // Change to default?
+    was_encryption_key_id_set= false;
   }
 };
 
@@ -1225,6 +1224,7 @@ typedef struct st_ha_create_information
 
   LEX_STRING encrypt_type;
   uint32_t encryption_key_id;
+  bool was_encryption_key_id_set;
 
   const char *data_file_name, *index_file_name;
   const char *alias;

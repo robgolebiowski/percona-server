@@ -38,6 +38,8 @@ Created 9/17/2000 Heikki Tuuri
 #include "trx0types.h"
 #include "sess0sess.h"
 
+#include "create_info_encryption_key.h"
+
 // Forward declaration
 struct SysIndexCallback;
 
@@ -471,7 +473,7 @@ row_create_table_for_mysql(
 	trx_t*		trx,	/*!< in/out: transaction */
 	bool		commit, /*!< in: if true, commit the transaction */
         fil_encryption_t mode,	/*!< in: encryption mode */
-	const uint32_t encryption_key_id); /*!< in: encryption key_id */
+        const CreateInfoEncryptionKeyId &create_info_encryption_key_id); /*!< in: encryption key_id */
 /*********************************************************************//**
 Does an index creation operation for MySQL. TODO: currently failure
 to create an index results in dropping the whole table! This is no problem

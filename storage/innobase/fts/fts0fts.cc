@@ -1876,7 +1876,7 @@ fts_create_one_common_table(
                                            //FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
                                           
         error = row_create_table_for_mysql(new_table, NULL, trx, false,
-                                           FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+                                           FIL_ENCRYPTION_DEFAULT, CreateInfoEncryptionKeyId());
 
 	if (error == DB_SUCCESS) {
 
@@ -2091,7 +2091,7 @@ fts_create_one_index_table(
 		FTS_INDEX_ILIST_LEN);
 
 	error = row_create_table_for_mysql(new_table, NULL, trx, false,
-                                           FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+                                           FIL_ENCRYPTION_DEFAULT, CreateInfoEncryptionKeyId());
 
 	if (error == DB_SUCCESS) {
 		dict_index_t*	index = dict_mem_index_create(

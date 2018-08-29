@@ -8196,7 +8196,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   if (!(used_fields & HA_CREATE_USED_CONNECTION))
     create_info->connect_string= table->s->connect_string;
 
-  if (!(used_fields & HA_CREATE_ENCRYPTION_KEY_ID))
+  if (!create_info->was_encryption_key_id_set)
     create_info->encryption_key_id= table->s->encryption_key_id;
 
   restore_record(table, s->default_values);     // Empty record for DEFAULT

@@ -3536,8 +3536,8 @@ row_create_table_for_mysql(
 	trx_t*		trx,	/*!< in/out: transaction */
 	bool		commit, /*!< in: if true, commit the transaction */
         fil_encryption_t mode,	/*!< in: encryption mode */
-	const uint32_t encryption_key_id)/*!< in: encryption key_id */
-{
+        const CreateInfoEncryptionKeyId &create_info_encryption_key_id) { /*!< in: encryption key_id */
+
 	tab_node_t*	node;
 	mem_heap_t*	heap;
 	que_thr_t*	thr;
@@ -3589,7 +3589,7 @@ err_exit:
 		ut_ad(strstr(table->name.m_name, "/FTS_") != NULL);
 	}
 
-        node = tab_create_graph_create(table, heap, mode, encryption_key_id);
+        node = tab_create_graph_create(table, heap, mode, create_info_encryption_key_id);
 
 	thr = pars_complete_graph_for_exec(node, trx, heap, NULL);
 

@@ -3805,7 +3805,7 @@ fil_ibd_create(
 	ulint		flags,
 	ulint		size,
         fil_encryption_t mode,
-        const uint32_t encryption_key_id)
+        const CreateInfoEncryptionKeyId &create_info_encryption_key_id)
 {
 	pfs_os_file_t	file;
 	dberr_t		err;
@@ -4043,8 +4043,9 @@ fil_ibd_create(
         // TODO:Robert: FIL_ENCRYPTION_ON jest tylko ustawione dla rotated_keys
 	if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF
             //|| (srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(flags))) {
-            || (srv_encrypt_tables)) {
-		crypt_data = fil_space_create_crypt_data(mode, encryption_key_id);
+            || (srv_encrypt_tables || create_info_encryption_key_id.was_encryption_key_id_set)) {
+		crypt_data = fil_space_create_crypt_data(mode,
+                                                         create_info_encryption_key_id.encryption_key_id);
 	}
 
         //TODO: Robert czy destruktor space powinien niszczyc crypt_data ?
