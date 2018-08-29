@@ -1924,16 +1924,23 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
     {
       packet->append(STRING_WITH_LEN(" ENCRYPTION="));
       append_unescaped(packet, share->encrypt_type.str, share->encrypt_type.length);
-
-      if (strncmp(share->encrypt_type.str, "ROTATED_KEYS",
-              strlen("ROTATED_KEYS")) == 0)
-      {
-        char *end;
-        packet->append(STRING_WITH_LEN(" ENCRYPTION_KEY_ID=")); 
-        end= longlong10_to_str(table->s->encryption_key_id, buff, 10);
-        packet->append(buff, (uint) (end - buff));
-      }
     }
+
+      // encryption key id is ignored for Master Key encrypted tables or explicty unencrypted table
+
+  if ((share->encrypt_type.length == 0 && share->was_encryption_key_id_set) ||
+      (share->encrypt_type.length != 0 &&
+       my_strcasecmp(system_charset_info, share->encrypt_type.str, "ROTATED_KEYS") == 0))
+    {
+      DBUG_ASSERT(share->encrypt_type.length == 0 || my_strcasecmp(system_charset_info, share->encrypt_type.str, "ROTATED_KEYS") != 0
+                  || share->encrypt_type.length == strlen("ROTATED_KEYS"));
+
+      char *end;
+      packet->append(STRING_WITH_LEN(" ENCRYPTION_KEY_ID=")); 
+      end= longlong10_to_str(table->s->encryption_key_id, buff, 10);
+      packet->append(buff, static_cast<uint>(end - buff));
+    }
+
     table->file->append_create_info(packet);
     if (share->comment.length)
     {
@@ -5618,7 +5625,15 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
       InnoDB uses only the first 1 bytes and the only supported values
       are (Y | N). */
       ptr= my_stpcpy(ptr, " ENCRYPTION=\"");
-      ptr= strxnmov(ptr, 3, share->encrypt_type.str, NullS);
+      if (strncmp(share->encrypt_type.str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) == 0)
+      {
+        DBUG_ASSERT(share->encrypt_type.length == 12); //TODO:I am adding here 2 as it is done for N/Y
+        ptr= strxnmov(ptr, 14, share->encrypt_type.str, NullS);
+      }
+      else
+        ptr= strxnmov(ptr, 3, share->encrypt_type.str, NullS);
+
+
       ptr= my_stpcpy(ptr, "\"");
     }
 

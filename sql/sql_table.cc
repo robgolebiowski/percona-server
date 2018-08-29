@@ -4845,6 +4845,9 @@ mysql_prepare_create_table(THD *thd, const char *error_schema_name,
 	       encrypt_type->str, "ENCRYPTION", TABLE_COMMENT_MAXLEN);
       DBUG_RETURN(TRUE);
     }
+
+    DBUG_ASSERT(encrypt_type->length == 0 || strncmp(encrypt_type->str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) != 0 ||
+                encrypt_type->length == 12);
   }
 
   DBUG_RETURN(FALSE);

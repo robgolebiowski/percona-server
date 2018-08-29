@@ -272,11 +272,11 @@ bool mysql_create_frm(THD *thd, const char *file_name,
 
   create_info->extra_size+= 2 + create_info->encrypt_type.length;
 
-  if (create_info->encrypt_type.length > 0 &&
-      strncmp(create_info->encrypt_type.str, "ROTATED_KEYS",
-              strlen("ROTATED_KEYS")) == 0)
+  if ((create_info->encrypt_type.length == 0 && create_info->was_encryption_key_id_set) ||
+      (create_info->encrypt_type.length != 0 &&
+       my_strcasecmp(system_charset_info, create_info->encrypt_type.str, "ROTATED_KEYS") == 0))
   {
-    create_info->extra_size += sizeof(uint); //reserve space for encryption key id
+    create_info->extra_size += strlen("ENCRYPTION_KEY_ID") + 4;
   }
 
 
@@ -466,18 +466,19 @@ bool mysql_create_frm(THD *thd, const char *file_name,
         mysql_file_write(file, (uchar*) create_info->encrypt_type.str,
                          create_info->encrypt_type.length, MYF(MY_NABP)))
       goto err;
+  }
 
-
-    if (create_info->encrypt_type.length > 0 &&
-        strncmp(create_info->encrypt_type.str, "ROTATED_KEYS",
-                strlen("ROTATED_KEYS")) == 0)
-    {
+  if ((create_info->encrypt_type.length == 0 && create_info->was_encryption_key_id_set) ||
+      (create_info->encrypt_type.length != 0 &&
+       my_strcasecmp(system_charset_info, create_info->encrypt_type.str, "ROTATED_KEYS") == 0))
+  {
       uchar encryption_key_id_buff[4];
-
       int4store(encryption_key_id_buff, create_info->encryption_key_id);
-      if (mysql_file_write(file, encryption_key_id_buff, 4, MYF(MY_NABP)))
+
+      if (mysql_file_write(file, (uchar*) "ENCRYPTION_KEY_ID",
+                           strlen("ENCRYPTION_KEY_ID"), MYF(MY_NABP)) ||
+          mysql_file_write(file, encryption_key_id_buff, 4, MYF(MY_NABP)))
         goto err;
-    }
   }
 
   mysql_file_seek(file, filepos, MY_SEEK_SET, MYF(0));

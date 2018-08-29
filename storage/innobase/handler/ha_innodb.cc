@@ -12164,17 +12164,6 @@ create_table_info_t::create_option_encryption_is_valid() const
 //                (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str) &&
 //                 !(m_create_info->options & HA_LEX_CREATE_TMP_TABLE));
 
-       if (Encryption::is_no(m_create_info->encrypt_type.str) &&
-	//if (encrypt == FIL_ENCRYPTION_OFF &&
-		m_create_info->encryption_key_id != THDVAR(m_thd, default_encryption_key_id)) {
-		push_warning_printf(
-			m_thd, Sql_condition::SL_WARNING,
-			HA_WRONG_CREATE_OPTION,
-			"InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled",
-			m_create_info->encryption_key_id
-		);
-		m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-	}
 
         //TODO:There is more to move from rotated_tablespaces
         if (Encryption::is_no(m_create_info->encrypt_type.str) && srv_encrypt_tables == 2) {

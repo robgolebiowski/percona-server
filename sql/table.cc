@@ -2195,7 +2195,18 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
       next_chunk+= 2 + share->compress.length;
     }
 
-    if (next_chunk + 2 <= buff_end)
+    // I need to refactor this
+    // next can be either encryption type OR encryption_key_id OR (encryption type == ROTATED_KEYS followed by encryption_key_id)
+    if (next_chunk + strlen("ENCRYPTION_KEY_ID") + 4 // + 4 for encryption_key_id value, ENCRYPTION_KEY_ID is used here as a marker
+        <= buff_end && 
+        strncmp(reinterpret_cast<char*>(next_chunk), "ENCRYPTION_KEY_ID",
+                strlen("ENCRYPTION_KEY_ID")) == 0)
+    {
+          share->encryption_key_id= uint4korr(next_chunk + strlen("ENCRYPTION_KEY_ID"));
+          share->was_encryption_key_id_set= true;
+          next_chunk += 4 + strlen("ENCRYPTION_KEY_ID");
+    }
+    else if (next_chunk + 2 <= buff_end)
     {
       share->encrypt_type.length = uint2korr(next_chunk);
       if (! (share->encrypt_type.str= strmake_root(&share->mem_root,
@@ -2205,15 +2216,18 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
       }
       next_chunk+= 2 + share->encrypt_type.length;
     }
-
-    if (next_chunk + 4 <= buff_end &&
-        share->encrypt_type.length > 0 &&
-        strncmp(share->encrypt_type.str, "ROTATED_KEYS",
-              strlen("ROTATED_KEYS")) == 0)
+    if (next_chunk + strlen("ENCRYPTION_KEY_ID") + 4 // + 4 for encryption_key_id value, ENCRYPTION_KEY_ID is used here as a marker
+        <= buff_end && 
+        strncmp(reinterpret_cast<char*>(next_chunk), "ENCRYPTION_KEY_ID",
+                strlen("ENCRYPTION_KEY_ID")) == 0)
     {
-          share->encryption_key_id= uint4korr(next_chunk);
+          share->encryption_key_id= uint4korr(next_chunk + strlen("ENCRYPTION_KEY_ID"));
+          share->was_encryption_key_id_set= true;
+          next_chunk += 4 + strlen("ENCRYPTION_KEY_ID");
     }
-    next_chunk += 4;
+
+    DBUG_ASSERT(share->encrypt_type.length == 0 || strncmp(share->encrypt_type.str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) != 0 ||
+                share->encrypt_type.length == strlen("ROTATED_KEYS"));
   }
   share->key_block_size= uint2korr(head+62);
 
@@ -2744,6 +2758,9 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
   bitmap_set_all(&share->all_set);
 
   delete handler_file;
+
+  DBUG_ASSERT(share->encrypt_type.length == 0 || strncmp(share->encrypt_type.str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) != 0 ||
+              share->encrypt_type.length == strlen("ROTATED_KEYS"));
 #ifndef DBUG_OFF
   if (use_hash)
     (void) my_hash_check(&share->name_hash);
