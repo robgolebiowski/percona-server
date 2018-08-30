@@ -4666,9 +4666,8 @@ prepare_inplace_alter_table_dict(
                   else
                     my_free(tablespace_key);
 
-                  //TODO:Robert - nie jestem pewny czy tu zawsze dodawać flagę
-		  DICT_TF2_FLAG_SET(ctx->new_table,
-		                    DICT_TF2_ENCRYPTION);
+                  if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables))
+         	    DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_ENCRYPTION);
 
                 }
 		else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE) // TODO:Robert: USE_FILE_PER_TABLE needs to be checked for ROTATED_KEYS too

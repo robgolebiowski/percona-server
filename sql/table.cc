@@ -2195,18 +2195,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
       next_chunk+= 2 + share->compress.length;
     }
 
-    // I need to refactor this
-    // next can be either encryption type OR encryption_key_id OR (encryption type == ROTATED_KEYS followed by encryption_key_id)
-    if (next_chunk + strlen("ENCRYPTION_KEY_ID") + 4 // + 4 for encryption_key_id value, ENCRYPTION_KEY_ID is used here as a marker
-        <= buff_end && 
-        strncmp(reinterpret_cast<char*>(next_chunk), "ENCRYPTION_KEY_ID",
-                strlen("ENCRYPTION_KEY_ID")) == 0)
-    {
-          share->encryption_key_id= uint4korr(next_chunk + strlen("ENCRYPTION_KEY_ID"));
-          share->was_encryption_key_id_set= true;
-          next_chunk += 4 + strlen("ENCRYPTION_KEY_ID");
-    }
-    else if (next_chunk + 2 <= buff_end)
+    if (next_chunk + 2 <= buff_end)
     {
       share->encrypt_type.length = uint2korr(next_chunk);
       if (! (share->encrypt_type.str= strmake_root(&share->mem_root,
@@ -2216,6 +2205,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
       }
       next_chunk+= 2 + share->encrypt_type.length;
     }
+
     if (next_chunk + strlen("ENCRYPTION_KEY_ID") + 4 // + 4 for encryption_key_id value, ENCRYPTION_KEY_ID is used here as a marker
         <= buff_end && 
         strncmp(reinterpret_cast<char*>(next_chunk), "ENCRYPTION_KEY_ID",

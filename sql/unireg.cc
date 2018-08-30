@@ -468,9 +468,7 @@ bool mysql_create_frm(THD *thd, const char *file_name,
       goto err;
   }
 
-  if ((create_info->encrypt_type.length == 0 && create_info->was_encryption_key_id_set) ||
-      (create_info->encrypt_type.length != 0 &&
-       my_strcasecmp(system_charset_info, create_info->encrypt_type.str, "ROTATED_KEYS") == 0))
+  if (create_info->was_encryption_key_id_set)
   {
       uchar encryption_key_id_buff[4];
       int4store(encryption_key_id_buff, create_info->encryption_key_id);

@@ -1926,9 +1926,7 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
       append_unescaped(packet, share->encrypt_type.str, share->encrypt_type.length);
     }
 
-      // encryption key id is ignored for Master Key encrypted tables or explicty unencrypted table
-
-  if ((share->encrypt_type.length == 0 && share->was_encryption_key_id_set) ||
+  if (share->was_encryption_key_id_set ||
       (share->encrypt_type.length != 0 &&
        my_strcasecmp(system_charset_info, share->encrypt_type.str, "ROTATED_KEYS") == 0))
     {
@@ -5636,6 +5634,17 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
 
       ptr= my_stpcpy(ptr, "\"");
     }
+
+    //TODO: This is not available in MariaDB => thus it seems encryption_key_id does not get replicated
+    //TODO: Should this be on in MariaDB?
+    //if ((share->encrypt_type.length == 0 && share->was_encryption_key_id_set) ||
+        //(share->encrypt_type.length != 0 &&
+         //my_strcasecmp(system_charset_info, share->encrypt_type.str, "ROTATED_KEYS") == 0))
+    //{
+      //ptr= my_stpcpy(ptr, " ENCRYPTION_KEY_ID=");
+      //ptr= longlong10_to_str(share->encryption_key_id, ptr, 10);
+    //}
+ 
 
     if (is_partitioned)
     {

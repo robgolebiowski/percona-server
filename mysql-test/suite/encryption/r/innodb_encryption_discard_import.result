@@ -1,0 +1,541 @@
+CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB encryption='ROTATED_KEYS';
+CREATE TABLE t2 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB ENCRYPTION='Y';
+CREATE TABLE t3 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB COMPRESSION="zlib" encryption='ROTATED_KEYS';
+CREATE TABLE t4 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB COMPRESSION="zlib";
+CREATE TABLE t5 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB row_format=compressed encryption='ROTATED_KEYS';
+CREATE TABLE t6 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB row_format=compressed;
+CREATE TABLE t7 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB ENCRYPTION='N';
+CREATE TABLE t8 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB;
+create procedure innodb_insert_proc (repeat_count int)
+begin
+declare current_num int;
+set current_num = 0;
+while current_num < repeat_count do
+insert into t1 values (current_num,repeat('foobar',42));
+insert into t2 values (current_num,repeat('temp', 42));
+insert into t3 values (current_num,repeat('barfoo',42));
+insert into t4 values (current_num,repeat('secret',42));
+insert into t5 values (current_num,repeat('fbar',42));
+insert into t6 values (current_num,repeat('barf',42));
+insert into t7 values (current_num,repeat('barb',42));
+insert into t8 values (current_num,repeat('baba',42));
+set current_num = current_num + 1;
+end while;
+end//
+commit;
+set autocommit=0;
+call innodb_insert_proc(10000);
+commit;
+set autocommit=1;
+# Wait max 10 min for key encryption threads to encrypt all spaces
+include/assert.inc [Make sure t7 is not encrypted]
+# tablespaces should be now encrypted
+t1.frm
+t1.ibd
+t2.frm
+t2.ibd
+t3.frm
+t3.ibd
+t4.frm
+t4.ibd
+t5.frm
+t5.ibd
+t6.frm
+t6.ibd
+t7.frm
+t7.ibd
+t8.frm
+t8.ibd
+FLUSH TABLES t1, t2, t3, t4, t5, t6, t7, t8 FOR EXPORT;
+backup: t1
+backup: t2
+backup: t3
+backup: t4
+backup: t5
+backup: t6
+backup: t7
+backup: t8
+t1.cfg
+t1.frm
+t1.ibd
+t2.cfg
+t2.frm
+t2.ibd
+t3.cfg
+t3.frm
+t3.ibd
+t4.cfg
+t4.frm
+t4.ibd
+t5.cfg
+t5.frm
+t5.ibd
+t6.cfg
+t6.frm
+t6.ibd
+t7.cfg
+t7.frm
+t7.ibd
+t8.cfg
+t8.frm
+t8.ibd
+UNLOCK TABLES;
+ALTER TABLE t1 DISCARD TABLESPACE;
+ALTER TABLE t2 DISCARD TABLESPACE;
+ALTER TABLE t3 DISCARD TABLESPACE;
+ALTER TABLE t4 DISCARD TABLESPACE;
+ALTER TABLE t5 DISCARD TABLESPACE;
+ALTER TABLE t6 DISCARD TABLESPACE;
+ALTER TABLE t7 DISCARD TABLESPACE;
+ALTER TABLE t8 DISCARD TABLESPACE;
+restore: t1 .ibd and .cfg files
+restore: t2 .ibd and .cfg files
+restore: t3 .ibd and .cfg files
+restore: t4 .ibd and .cfg files
+restore: t5 .ibd and .cfg files
+restore: t6 .ibd and .cfg files
+restore: t7 .ibd and .cfg files
+restore: t8 .ibd and .cfg files
+ALTER TABLE t1 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t1;
+COUNT(1)
+10000
+ALTER TABLE t2 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t2;
+COUNT(1)
+10000
+ALTER TABLE t3 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t3;
+COUNT(1)
+10000
+ALTER TABLE t4 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t4;
+COUNT(1)
+10000
+ALTER TABLE t5 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t5;
+COUNT(1)
+10000
+ALTER TABLE t6 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t6;
+COUNT(1)
+10000
+ALTER TABLE t7 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t7;
+COUNT(1)
+10000
+ALTER TABLE t8 IMPORT TABLESPACE;
+SELECT COUNT(1) FROM t8;
+COUNT(1)
+10000
+# tablespaces should remain encrypted after import, apart from t7
+ALTER TABLE t1 ENGINE InnoDB;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+ALTER TABLE t2 ENGINE InnoDB;
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='Y'
+ALTER TABLE t3 ENGINE InnoDB;
+SHOW CREATE TABLE t3;
+Table	Create Table
+t3	CREATE TABLE `t3` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COMPRESSION='zlib' ENCRYPTION='ROTATED_KEYS'
+ALTER TABLE t4 ENGINE InnoDB;
+SHOW CREATE TABLE t4;
+Table	Create Table
+t4	CREATE TABLE `t4` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COMPRESSION='zlib'
+ALTER TABLE t5 ENGINE InnoDB;
+SHOW CREATE TABLE t5;
+Table	Create Table
+t5	CREATE TABLE `t5` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED ENCRYPTION='ROTATED_KEYS'
+ALTER TABLE t6 ENGINE InnoDB;
+SHOW CREATE TABLE t6;
+Table	Create Table
+t6	CREATE TABLE `t6` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED
+ALTER TABLE t7 ENGINE InnoDB;
+SHOW CREATE TABLE t7;
+Table	Create Table
+t7	CREATE TABLE `t7` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='N'
+ALTER TABLE t8 ENGINE InnoDB;
+SHOW CREATE TABLE t8;
+Table	Create Table
+t8	CREATE TABLE `t8` (
+  `id` int(11) NOT NULL,
+  `a` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# Restarting server
+# restart
+# Done restarting server
+# Verify that tables are still usable
+SELECT COUNT(1) FROM t1;
+COUNT(1)
+10000
+SELECT COUNT(1) FROM t2;
+COUNT(1)
+10000
+SELECT COUNT(1) FROM t3;
+COUNT(1)
+10000
+SELECT COUNT(1) FROM t4;
+COUNT(1)
+10000
+SELECT COUNT(1) FROM t5;
+COUNT(1)
+10000
+SELECT COUNT(1) FROM t6;
+COUNT(1)
+10000
+SELECT COUNT(1) FROM t7;
+COUNT(1)
+10000
+SELECT COUNT(1) FROM t8;
+COUNT(1)
+10000
+# Tablespaces should be encrypted after restart
+include/assert.inc [Make sure all tables, apart from t2, are encrypted]
+t1.cfg
+t1.frm
+t1.ibd
+t2.cfg
+t2.frm
+t2.ibd
+t3.cfg
+t3.frm
+t3.ibd
+t4.cfg
+t4.frm
+t4.ibd
+t5.cfg
+t5.frm
+t5.ibd
+t6.cfg
+t6.frm
+t6.ibd
+t7.cfg
+t7.frm
+t7.ibd
+t8.cfg
+t8.frm
+t8.ibd
+FLUSH TABLES t1, t2, t3, t4, t5, t6, t7, t8 FOR EXPORT;
+backup: t1
+backup: t2
+backup: t3
+backup: t4
+backup: t5
+backup: t6
+backup: t7
+backup: t8
+t1.cfg
+t1.frm
+t1.ibd
+t2.cfg
+t2.frm
+t2.ibd
+t3.cfg
+t3.frm
+t3.ibd
+t4.cfg
+t4.frm
+t4.ibd
+t5.cfg
+t5.frm
+t5.ibd
+t6.cfg
+t6.frm
+t6.ibd
+t7.cfg
+t7.frm
+t7.ibd
+t8.cfg
+t8.frm
+t8.ibd
+UNLOCK TABLES;
+ALTER TABLE t1 DISCARD TABLESPACE;
+ALTER TABLE t2 DISCARD TABLESPACE;
+ALTER TABLE t3 DISCARD TABLESPACE;
+ALTER TABLE t4 DISCARD TABLESPACE;
+ALTER TABLE t5 DISCARD TABLESPACE;
+ALTER TABLE t6 DISCARD TABLESPACE;
+ALTER TABLE t7 DISCARD TABLESPACE;
+ALTER TABLE t8 DISCARD TABLESPACE;
+restore: t1 .ibd and .cfg files
+restore: t2 .ibd and .cfg files
+restore: t3 .ibd and .cfg files
+restore: t4 .ibd and .cfg files
+restore: t5 .ibd and .cfg files
+restore: t6 .ibd and .cfg files
+restore: t7 .ibd and .cfg files
+restore: t8 .ibd and .cfg files
+# Disable rotation threads
+SET GLOBAL innodb_encryption_threads = 0;
+SET GLOBAL innodb_encrypt_tables = off;
+ALTER TABLE t1 IMPORT TABLESPACE;
+include/assert.inc [Make sure t1 has encrypted flag set after importing]
+include/assert.inc [Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1]
+SELECT COUNT(1) FROM t1;
+COUNT(1)
+10000
+ALTER TABLE t2 IMPORT TABLESPACE;
+include/assert.inc [Make sure t2 has encrypted flag set after importing]
+include/assert.inc [Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1]
+SELECT COUNT(1) FROM t2;
+COUNT(1)
+10000
+ALTER TABLE t3 IMPORT TABLESPACE;
+include/assert.inc [Make sure t3 has encrypted flag set after importing]
+SELECT COUNT(1) FROM t3;
+COUNT(1)
+10000
+ALTER TABLE t4 IMPORT TABLESPACE;
+include/assert.inc [Make sure t4 has encrypted flag set after importing]
+SELECT COUNT(1) FROM t4;
+COUNT(1)
+10000
+ALTER TABLE t5 IMPORT TABLESPACE;
+include/assert.inc [Make sure t5 has encrypted flag set after importing]
+SELECT COUNT(1) FROM t5;
+COUNT(1)
+10000
+ALTER TABLE t6 IMPORT TABLESPACE;
+include/assert.inc [Make sure t6 has encrypted flag set after importing]
+ALTER TABLE t7 IMPORT TABLESPACE;
+include/assert.inc [Make sure t7 does not have encrypted flag set after importing]
+SELECT COUNT(1) FROM t7;
+COUNT(1)
+10000
+ALTER TABLE t8 IMPORT TABLESPACE;
+include/assert.inc [Make sure t8 has encrypted flag set after importing]
+SELECT COUNT(1) FROM t8;
+COUNT(1)
+10000
+# tablespaces should be encrypted, apart from t7
+SET GLOBAL innodb_encryption_threads = 4;
+# Wait max 10 min for key encryption threads to decrypt all spaces, apart from t1, t3 and t5
+include/assert.inc [Make sure t1 has encrypted flag set]
+include/assert.inc [Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1]
+SELECT COUNT(1) FROM t1;
+COUNT(1)
+10000
+include/assert.inc [Make sure t2 does not have encrypted flag set]
+include/assert.inc [Make sure t2 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0]
+SELECT COUNT(1) FROM t2;
+COUNT(1)
+10000
+include/assert.inc [Make sure t3 has encrypted flag set]
+SELECT COUNT(1) FROM t3;
+COUNT(1)
+10000
+include/assert.inc [Make sure t4 does not have encrypted flag set]
+SELECT COUNT(1) FROM t4;
+COUNT(1)
+10000
+include/assert.inc [Make sure t5 has encrypted flag set]
+SELECT COUNT(1) FROM t5;
+COUNT(1)
+10000
+include/assert.inc [Make sure t6 does not have encrypted flag set]
+SELECT COUNT(1) FROM t6;
+COUNT(1)
+10000
+include/assert.inc [Make sure t7 does not have encrypted flag set]
+SELECT COUNT(1) FROM t7;
+COUNT(1)
+10000
+include/assert.inc [Make sure t8 does not have encrypted flag set]
+SELECT COUNT(1) FROM t8;
+COUNT(1)
+10000
+SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
+SPACE	NAME	ENCRYPTION_SCHEME	KEYSERVER_REQUESTS	MIN_KEY_VERSION	CURRENT_KEY_VERSION	KEY_ROTATION_PAGE_NUMBER	KEY_ROTATION_MAX_PAGE_NUMBER	CURRENT_KEY_ID	ROTATING_OR_FLUSHING
+2	mysql/plugin	0	0	0	0	NULL	NULL	0	0
+3	mysql/servers	0	0	0	0	NULL	NULL	0	0
+4	mysql/help_topic	0	0	0	0	NULL	NULL	0	0
+5	mysql/help_category	0	0	0	0	NULL	NULL	0	0
+6	mysql/help_relation	0	0	0	0	NULL	NULL	0	0
+7	mysql/help_keyword	0	0	0	0	NULL	NULL	0	0
+8	mysql/time_zone_name	0	0	0	0	NULL	NULL	0	0
+9	mysql/time_zone	0	0	0	0	NULL	NULL	0	0
+10	mysql/time_zone_transition	0	0	0	0	NULL	NULL	0	0
+11	mysql/time_zone_transition_type	0	0	0	0	NULL	NULL	0	0
+12	mysql/time_zone_leap_second	0	0	0	0	NULL	NULL	0	0
+13	mysql/innodb_table_stats	0	0	0	0	NULL	NULL	0	0
+14	mysql/innodb_index_stats	0	0	0	0	NULL	NULL	0	0
+15	mysql/slave_relay_log_info	0	0	0	0	NULL	NULL	0	0
+16	mysql/slave_master_info	0	0	0	0	NULL	NULL	0	0
+17	mysql/slave_worker_info	0	0	0	0	NULL	NULL	0	0
+18	mysql/gtid_executed	0	0	0	0	NULL	NULL	0	0
+19	mysql/server_cost	0	0	0	0	NULL	NULL	0	0
+20	mysql/engine_cost	0	0	0	0	NULL	NULL	0	0
+21	sys/sys_config	0	0	0	0	NULL	NULL	0	0
+31	test/t1	1	0	1	1	NULL	NULL	0	0
+32	test/t2	0	0	0	0	NULL	NULL	0	0
+33	test/t3	1	0	1	1	NULL	NULL	0	0
+34	test/t4	0	0	0	0	NULL	NULL	0	0
+35	test/t5	1	0	1	1	NULL	NULL	0	0
+36	test/t6	0	0	0	0	NULL	NULL	0	0
+37	test/t7	0	0	0	0	NULL	NULL	0	0
+38	test/t8	0	0	0	0	NULL	NULL	0	0
+0	innodb_system	0	0	0	0	NULL	NULL	0	0
+SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
+SPACE	NAME	FLAG	FILE_FORMAT	ROW_FORMAT	PAGE_SIZE	ZIP_PAGE_SIZE	SPACE_TYPE	FS_BLOCK_SIZE	FILE_SIZE	ALLOCATED_SIZE
+2	mysql/plugin	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+3	mysql/servers	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+4	mysql/help_topic	33	Barracuda	Dynamic	16384	0	Single	4096	114688	114688
+5	mysql/help_category	33	Barracuda	Dynamic	16384	0	Single	4096	114688	114688
+6	mysql/help_relation	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+7	mysql/help_keyword	33	Barracuda	Dynamic	16384	0	Single	4096	114688	114688
+8	mysql/time_zone_name	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+9	mysql/time_zone	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+10	mysql/time_zone_transition	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+11	mysql/time_zone_transition_type	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+12	mysql/time_zone_leap_second	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+13	mysql/innodb_table_stats	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+14	mysql/innodb_index_stats	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+15	mysql/slave_relay_log_info	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+16	mysql/slave_master_info	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+17	mysql/slave_worker_info	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+18	mysql/gtid_executed	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+19	mysql/server_cost	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+20	mysql/engine_cost	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+21	sys/sys_config	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+31	test/t1	8225	Barracuda	Dynamic	16384	0	Single	4096	9437184	9437184
+32	test/t2	33	Barracuda	Dynamic	16384	0	Single	4096	8388608	8388608
+33	test/t3	8225	Barracuda	Dynamic	16384	0	Single	4096	9437184	9437184
+34	test/t4	33	Barracuda	Dynamic	16384	0	Single	4096	9437184	9437184
+35	test/t5	8233	Barracuda	Compressed	16384	8192	Single	4096	4194304	4194304
+36	test/t6	41	Barracuda	Compressed	16384	8192	Single	4096	4194304	4194304
+37	test/t7	33	Barracuda	Dynamic	16384	0	Single	4096	8388608	8388608
+38	test/t8	33	Barracuda	Dynamic	16384	0	Single	4096	8388608	8388608
+# tablespaces should not be encrypted, apart from t1,t3 and t5
+# Now let's backup keyring file, change encryption key id of encrypt-able tables (all but t7) 
+# export and dicard them. Next restart the server with backuped keyring file and make sure that
+# server starts, but tables cannot be imported gracefully
+SET GLOBAL innodb_encrypt_tables = on;
+# Wait max 10 min for key encryption threads to encrypt all spaces
+ALTER TABLE t1 encryption_key_id=5;
+ALTER TABLE t2 encryption_key_id=5;
+ALTER TABLE t3 encryption_key_id=5;
+ALTER TABLE t4 encryption_key_id=5;
+ALTER TABLE t5 encryption_key_id=5;
+ALTER TABLE t6 encryption_key_id=5;
+ALTER TABLE t8 encryption_key_id=5;
+t1.cfg
+t1.frm
+t1.ibd
+t2.cfg
+t2.frm
+t2.ibd
+t3.cfg
+t3.frm
+t3.ibd
+t4.cfg
+t4.frm
+t4.ibd
+t5.cfg
+t5.frm
+t5.ibd
+t6.cfg
+t6.frm
+t6.ibd
+t7.cfg
+t7.frm
+t7.ibd
+t8.cfg
+t8.frm
+t8.ibd
+FLUSH TABLES t1, t2, t3, t4, t5, t6, t8 FOR EXPORT;
+backup: t1
+backup: t2
+backup: t3
+backup: t4
+backup: t5
+backup: t6
+backup: t8
+t1.cfg
+t1.frm
+t1.ibd
+t2.cfg
+t2.frm
+t2.ibd
+t3.cfg
+t3.frm
+t3.ibd
+t4.cfg
+t4.frm
+t4.ibd
+t5.cfg
+t5.frm
+t5.ibd
+t6.cfg
+t6.frm
+t6.ibd
+t7.cfg
+t7.frm
+t7.ibd
+t8.cfg
+t8.frm
+t8.ibd
+UNLOCK TABLES;
+ALTER TABLE t1 DISCARD TABLESPACE;
+ALTER TABLE t2 DISCARD TABLESPACE;
+ALTER TABLE t3 DISCARD TABLESPACE;
+ALTER TABLE t4 DISCARD TABLESPACE;
+ALTER TABLE t5 DISCARD TABLESPACE;
+ALTER TABLE t6 DISCARD TABLESPACE;
+ALTER TABLE t8 DISCARD TABLESPACE;
+restore: t1 .ibd and .cfg files
+restore: t2 .ibd and .cfg files
+restore: t3 .ibd and .cfg files
+restore: t4 .ibd and .cfg files
+restore: t5 .ibd and .cfg files
+restore: t6 .ibd and .cfg files
+restore: t8 .ibd and .cfg files
+# restart:--loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring_backup
+ALTER TABLE t1 IMPORT TABLESPACE;
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ALTER TABLE t2 IMPORT TABLESPACE;
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ALTER TABLE t3 IMPORT TABLESPACE;
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ALTER TABLE t4 IMPORT TABLESPACE;
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ALTER TABLE t5 IMPORT TABLESPACE;
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ALTER TABLE t6 IMPORT TABLESPACE;
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ALTER TABLE t8 IMPORT TABLESPACE;
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+# restart:--loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring
+DROP PROCEDURE innodb_insert_proc;
+DROP TABLE t1, t2, t3, t4, t5, t6, t7, t8;

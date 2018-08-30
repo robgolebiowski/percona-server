@@ -8200,7 +8200,10 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
     create_info->connect_string= table->s->connect_string;
 
   if (!create_info->was_encryption_key_id_set)
+  {
     create_info->encryption_key_id= table->s->encryption_key_id;
+    create_info->was_encryption_key_id_set= table->s->was_encryption_key_id_set;
+  }
 
   restore_record(table, s->default_values);     // Empty record for DEFAULT
   Create_field *def;
