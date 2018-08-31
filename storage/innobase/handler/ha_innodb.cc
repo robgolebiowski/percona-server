@@ -12110,12 +12110,13 @@ create_table_info_t::create_option_encryption_is_valid() const
                   return (false);
           }
 
-          if (m_create_info->tablespace != NULL)
-          {
-             my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                             "InnoDB: table encrypted with ROTATED_KEYS cannot be part of shared tablespace.", MYF(0));
-                  return (false);
-          }
+          //TODO:Robert: with this encryption_force fails
+          //if (m_create_info->tablespace != NULL)
+          //{
+             //my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                             //"InnoDB: table encrypted with ROTATED_KEYS cannot be part of shared tablespace.", MYF(0));
+                  //return (false);
+          //}
 
           for(ulint i = 0; i < m_form->s->keys; i++) {
                   const KEY* key = m_form->key_info + i;

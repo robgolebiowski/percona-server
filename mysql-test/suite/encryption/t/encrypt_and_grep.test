@@ -29,36 +29,7 @@ SET GLOBAL innodb_file_per_table = ON;
 SET GLOBAL innodb_file_format = `Barracuda`;
 --enable_warnings
 
-create table t0 (a varchar(255)) engine=innodb;
-
-create table t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS' encryption_key_id =5;
-show create table t1;
-
-#alter table t1 encryption='ROTATED_KEYS' encryption_key_id=6;
-alter table t1 encryption_key_id=6;
-show create table t1;
-
-#should not make sense
-#alter table t1 encryption='n' encryption_key_id=3;
-
-#should not make sense
-alter table t1 encryption_key_id=3;
-
-alter table t1 encryption_key_id=7, ALGORITHM=INPLACE;
-show create table t1;
-alter table t1 encryption='ROTATED_KEYS' encryption_key_id=8, ALGORITHM=INPLACE;
-show create table t1;
-
-alter table t1 encryption='Y' encryption_key_id=10;
-
-
---source include/shutdown_mysqld.inc
---source include/start_mysqld.inc
-show create table t1;
-
-#alter table t1 encryption='n';
---die
-
+create table t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
 create table t2 (a varchar(255)) engine=innodb;
 show warnings;
 create table t3 (a varchar(255)) engine=innodb encryption='N';
@@ -71,11 +42,6 @@ CREATE TABLE t5 (a varchar(255)) TABLESPACE ts_encrypted ENCRYPTION="Y" ENGINE="
 CREATE TABLESPACE ts_rk_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='ROTATED_KEYS' ENGINE="InnoDB";
 
 create table t6 (a varchar(255)) engine=innodb;
-
-
-
-
-
 #create table t5 (a varchar(255)) engine=innodb encryption='Y';
 
 insert t1 values (repeat('foobarsecret', 12));
@@ -99,9 +65,6 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --let SEARCH_FILE=$t4_IBD
 --source include/search_pattern_in_file.inc
 
---sorted_result
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
 ALTER TABLE t4 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
 --echo # ibdata1 expecting NOT_FOUND
 --let ABORT_ON=FOUND
@@ -109,27 +72,13 @@ ALTER TABLE t4 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
 --let SEARCH_FILE=$t4_IBD
 --source include/search_pattern_in_file.inc
 
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
-
-
-
 --echo # It should be possible to mark table as not encrypted with INPLACE algorithm, given table is
 --echo # is currently not encrypted
 ALTER TABLE t6 ENCRYPTION='N', ALGORITHM=INPLACE;
 
---sleep 10
-SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
-SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
-
---die
+ALTER TABLE t6 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
 
 
-#--sleep 3
-
-#--sleep 30
-#SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
-#SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
 
 --let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
@@ -222,10 +171,10 @@ SET GLOBAL innodb_encrypt_tables = off;
 
 #echo ======alll-from-information_schema====
 #select * from information_schema.tables where engine = 'InnoDB'; 
---echo # Only two tables should stayed encrypted - the ones with explicite encryption
+--echo # Only three tables should stayed encrypted - the ones with explicite encryption
 #--let $wait_condition=SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND ROTATING_OR_FLUSHING = 0
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--let $wait_condition=SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
@@ -236,7 +185,7 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 --let $assert_text= Only two tables should stayed encrypted - the ones with explicite encryption t1 and t4
 
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = 2
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = 3
 --source include/assert.inc
 
 #--die
@@ -406,5 +355,5 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 --source include/start_mysqld.inc
 
-drop table t1, t2, t3, t4, t5;
+drop table t1, t2, t3, t4, t5, t6;
 drop tablespace ts_encrypted;
