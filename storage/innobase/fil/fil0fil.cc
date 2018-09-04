@@ -1461,6 +1461,8 @@ fil_space_create(
 
         space->is_encrypted = false;
 
+        space->exclude_from_rotation = false;
+
 	UT_LIST_ADD_LAST(fil_system->space_list, space);
 
 	if (id < SRV_LOG_SPACE_FIRST_ID && id > fil_system->max_assigned_id) {
@@ -4151,7 +4153,7 @@ fil_ibd_open(
 	const char*	path_in,
         Rotated_keys_info &rotated_keys_info)
 {
-        ib::error() << "Robert: fil_ibd_open space " << space_name;
+        ib::error() << "Robert: fil_ibd_open space " << space_name << "space flags = " << flags;
 
 	dberr_t		err = DB_SUCCESS;
 	bool		dict_filepath_same_as_default = false;

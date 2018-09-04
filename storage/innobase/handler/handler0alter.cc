@@ -4640,7 +4640,7 @@ prepare_inplace_alter_table_dict(
 		//}
 
                 key_id= ha_alter_info->create_info->encryption_key_id;
-                                ut_ad(key_id == 0 || ha_alter_info->create_info->was_encryption_key_id_set);
+                ut_ad(key_id == 0 || ha_alter_info->create_info->was_encryption_key_id_set);
 
                 if (Encryption::is_no(encrypt))
                   mode= FIL_ENCRYPTION_OFF;

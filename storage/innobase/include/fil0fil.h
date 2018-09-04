@@ -226,6 +226,8 @@ struct fil_space_t {
 
 	bool		is_encrypted;
 
+        bool            exclude_from_rotation;
+
 	UT_LIST_NODE_T(fil_space_t) space_list;
 				/*!< list of all spaces */
 	UT_LIST_NODE_T(fil_space_t) rotation_list;

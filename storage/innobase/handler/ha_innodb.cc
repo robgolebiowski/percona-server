@@ -549,10 +549,69 @@ static PSI_file_info	all_innodb_files[] = {
 # endif /* UNIV_PFS_IO */
 #endif /* HAVE_PSI_INTERFACE */
 
+static int
+default_encryption_key_id_validate(
+/*=================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to system
+						variable */
+	void*				save,	/*!< out: immediate result
+						for update function */
+	struct st_mysql_value*		value)	/*!< in: incoming string */
+{
+	long long	intbuf;
+
+	DBUG_ENTER("default_encryption_key_id_validate");
+
+	if (value->val_int(value, &intbuf)) {
+		/* The value is NULL. That is invalid. */
+		DBUG_RETURN(1);
+	}
+
+        if (intbuf < 0 || intbuf >= UINT_MAX)
+        {
+           push_warning_printf(thd, Sql_condition::SL_WARNING,
+                               HA_ERR_UNSUPPORTED,
+                               "InnoDB: value out of scope");
+           DBUG_RETURN(1);
+        }
+
+        if(!Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(static_cast<uint>(intbuf))) {
+                push_warning_printf(thd, Sql_condition::SL_WARNING,
+                                    HA_ERR_UNSUPPORTED,
+                                    "InnoDB: cannot enable encryption, "
+                                    "keyring plugin is not available");
+           DBUG_RETURN(1);
+        }
+
+	*reinterpret_cast<ulong*>(save) = static_cast<ulong>(intbuf);
+
+        DBUG_RETURN(0);
+}
+
+static
+void default_encryption_key_id_update(
+        THD*                            thd,    // in: thread handle <]
+        struct st_mysql_sys_var*        var,    // in: pointer to
+                                                // system variable */
+        void*                           var_ptr,//  where the
+                                                // formal string goes */
+        const void*                     save)   // in: immediate result
+                                                // from check function */
+{
+  *static_cast<ulong*>(var_ptr) = *static_cast<const ulong*>(save);
+}
+
 static MYSQL_THDVAR_UINT(default_encryption_key_id, PLUGIN_VAR_RQCMDARG,
-			 "Default encryption key id used for table encryption.",
-			 NULL, NULL,
-			 FIL_DEFAULT_ENCRYPTION_KEY, 0, UINT_MAX32, 0);
+                         "Default encryption key id used for table encryption.",
+                         default_encryption_key_id_validate, default_encryption_key_id_update,
+                         FIL_DEFAULT_ENCRYPTION_KEY, 0, UINT_MAX32, 0);
+
+uint get_global_default_encryption_key_id_value()
+{
+     return THDVAR(NULL, default_encryption_key_id);
+}
+
 
 /** Set up InnoDB API callback function array */
 ib_cb_t innodb_api_cb[] = {
@@ -11332,15 +11391,14 @@ err_col:
 		const char*	encrypt = m_create_info->encrypt_type.str;
 
                 fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
-                uint32_t encryption_key_id;
+                //uint32_t encryption_key_id;
 
-                //if (m_create_info->used_fields & HA_CREATE_ENCRYPTION_KEY_ID)
-                if (m_create_info->was_encryption_key_id_set)
-                   encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
-                                                                        // TODO: To będzie też sprawdzane w check_table z crypt_data
-                                                                       // TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
-                else
-                  encryption_key_id= THDVAR(m_thd, default_encryption_key_id);
+                //if (m_create_info->was_encryption_key_id_set)
+                   //encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
+                                                                        //// TODO: To będzie też sprawdzane w check_table z crypt_data
+                                                                       //// TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
+                //else
+                  //encryption_key_id= THDVAR(m_thd, default_encryption_key_id); //It's done earlier in validate
 
 
 
@@ -11363,7 +11421,7 @@ err_col:
                       byte *tablespace_key; 
 
                       //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
-                      Encryption::get_latest_tablespace_key_or_create_new_one(encryption_key_id, &tablespace_key_version, &tablespace_key);
+                      Encryption::get_latest_tablespace_key_or_create_new_one(m_create_info->encryption_key_id, &tablespace_key_version, &tablespace_key);
                       if (tablespace_key == NULL)
                       {
                          my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, //TODO: Inny błąd?
@@ -12096,11 +12154,14 @@ create_table_info_t::create_option_encryption_is_valid() const
 		}
 	}
 
-        bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
-
 	/* Currently we do not support encryption for
 	spatial indexes thus do not allow creating table with forced
 	encryption */
+
+        if (!m_create_info->was_encryption_key_id_set)
+            m_create_info->encryption_key_id= THDVAR(m_thd, default_encryption_key_id);
+ 
+        bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
 
         if (table_is_rotated_keys)
         {

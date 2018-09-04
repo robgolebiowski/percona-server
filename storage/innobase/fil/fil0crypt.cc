@@ -96,6 +96,7 @@ uint srv_n_fil_crypt_iops = 100;	 // 10ms per iop
 static uint srv_alloc_time = 3;		    // allocate iops for 3s at a time
 static uint n_fil_crypt_iops_allocated = 0;
 
+uint get_global_default_encryption_key_id_value();
 
 /** Variables for scrubbing */
 //extern uint srv_background_scrub_data_interval;
@@ -607,7 +608,8 @@ fil_space_crypt_t::write_page0(
 
         delete[] encrypt_info;
 
-        ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << a_min_key_version;
+        ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << a_min_key_version
+                    << " space_flags = " << space->flags;
 
 }
 
@@ -955,7 +957,7 @@ fil_crypt_start_encrypting_space(
       //TODO:Robert: Should it not be default encryption key variable - so when the default key gets changed it would be used here?
       //For now when innodb_encrypt_tables is turned on it is checked if DEFAULT_ENCRYPTION_KEY exist and if not it is created
       //thus there is no need to create it here
-      crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY, false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+      crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
 
       if (crypt_data == NULL) {
               mutex_exit(&fil_crypt_threads_mutex);
@@ -1003,9 +1005,9 @@ fil_crypt_start_encrypting_space(
 
               /* 3 - write crypt data to page 0 */
               byte* frame = buf_block_get_frame(block);
-              if (strcmp(space->name, "test/t7") == 0)
+              if (strcmp(space->name, "test/t2") == 0)
               {
-                ib::error() << "Assigning encryption to t7.2.";
+                ib::error() << "Assigning encryption to t2.";
               }
 
               crypt_data->type = CRYPT_SCHEME_1;
@@ -1135,6 +1137,7 @@ fil_crypt_space_needs_rotation(
 
       /* Make sure that tablespace is normal tablespace */
       if (space->purpose != FIL_TYPE_TABLESPACE) {
+                  ib::error() << "Break reason 7";
               return false;
       }
 
@@ -1153,6 +1156,7 @@ fil_crypt_space_needs_rotation(
               //space->encryption_type = Encryption::ROTATED_KEYS;
 
               if (crypt_data == NULL) {
+                  //ib::error() << "Break reason 6";
                       return false;
               }
 
@@ -1162,6 +1166,7 @@ fil_crypt_space_needs_rotation(
       /* If used key_id is not found from encryption plugin we can't
       continue to rotate the tablespace */
       if (!crypt_data->is_key_found()) {
+                  //ib::error() << "Break reason 5";
               return false;
       }
 
@@ -1220,6 +1225,7 @@ fil_crypt_space_needs_rotation(
               if (need_key_rotation && crypt_data->rotate_state.active_threads > 0 &&
                   crypt_data->rotate_state.next_offset > crypt_data->rotate_state.max_offset)
               {
+                    //ib::error() << "Leaving rotation for space " << space->name;
                     break; // the space is already being processed and there are no more pages to rotate
               }
 
@@ -1497,20 +1503,16 @@ fil_crypt_find_space_to_rotate(
       while (!state->should_shutdown() && state->space) {
               fil_crypt_read_crypt_data(state->space);
 
-              //if (strcmp(state->space->name, "test/t1") == 0)
-              //{
-                //ib::error() << "Checking if test/t1 needs rotation" << '\n';
-              //}
 
 
               // if space is marked as encrytped this means some of the pages are encrypted and space should be skipped
-              if (!state->space->is_encrypted && fil_crypt_space_needs_rotation(state, key_state, recheck)) {
+              if (!state->space->is_encrypted && !state->space->exclude_from_rotation && fil_crypt_space_needs_rotation(state, key_state, recheck)) {
                               ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_INVALID);
                               /* init state->min_key_version_found before
                               * starting on a space */
                               state->min_key_version_found = key_state->key_version;
 
-                              //if (strcmp(state->space->name, "test/t1") == 0)
+                              //if (strcmp(state->space->name, "test/t3") == 0 || strcmp(state->space->name, "ts_1") == 0)
                               //{
                                 //ib::error() << "starting with min_key_version_found = " << state->min_key_version_found 
                                             //<< " for table " << state->space->name << '\n';
@@ -1555,9 +1557,9 @@ fil_crypt_start_rotate_space(
               * if space extends, it will be encrypted with newer version */
               /* FIXME: max_offset could be removed and instead
               space->size consulted.*/
-              if (strcmp(state->space->name, "test/t1") == 0)
+              if (strcmp(state->space->name, "test/t2") == 0)
               {
-                ib::error() << "Starting rotating t1" << '\n';
+                ib::error() << "Starting rotating t2" << '\n';
               }
 
               crypt_data->rotate_state.max_offset = state->space->size;
@@ -1980,13 +1982,17 @@ fts_set_encrypted_flag_for_table(
 
       ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
       ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+      /* There should be at most one matching record. So the value
+       must be the default value. */
+      ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+	      == ULINT32_UNDEFINED);
 
-      ulint flags = mach_read_from_4(
+      ulint flags2 = mach_read_from_4(
                       static_cast<byte*>(dfield_get_data(dfield)));
 
-      flags |= DICT_TF2_ENCRYPTION;
+      flags2 |= DICT_TF2_ENCRYPTION;
 
-      mach_write_to_4(static_cast<byte*>(user_arg), flags);
+      mach_write_to_4(static_cast<byte*>(user_arg), flags2);
 
 
       return(FALSE);
@@ -2014,10 +2020,10 @@ fts_unset_encrypted_flag_for_table(
 
 static
 dberr_t
-fts_update_encrypted_tables_flags_in_space_sql(
+fts_update_encrypted_tables_flag(
       trx_t*		trx,		/* in/out: transaction that
                                       covers the update */
-      ulint		space_id,
+      table_id_t        *table_id, 
       bool              set)	/* in: Table for which we want
                                       to set the root table->flags2 */
 {
@@ -2030,7 +2036,7 @@ fts_update_encrypted_tables_flags_in_space_sql(
               "DECLARE CURSOR c IS\n"
               " SELECT MIX_LEN"
               " FROM SYS_TABLES"
-              " WHERE SPACE = :space_id FOR UPDATE;"
+              " WHERE ID = :table_id FOR UPDATE;"
               "\n"
               "BEGIN\n"
               "OPEN c;\n"
@@ -2042,14 +2048,15 @@ fts_update_encrypted_tables_flags_in_space_sql(
               "END LOOP;\n"
               "UPDATE SYS_TABLES"
               " SET MIX_LEN = :flags2"
-              " WHERE SPACE = :space_id;\n"
+              " WHERE ID = :table_id;\n"
               "CLOSE c;\n"
               "END;\n";
 
+      flags2 = ULINT32_UNDEFINED;
 
       info = pars_info_create();
 
-      pars_info_add_ull_literal(info, "space_id", space_id);
+      pars_info_add_ull_literal(info, "table_id", *table_id);
       pars_info_bind_int4_literal(info, "flags2", &flags2);
 
       pars_info_bind_function(
@@ -2061,6 +2068,8 @@ fts_update_encrypted_tables_flags_in_space_sql(
       }
 
       dberr_t err = que_eval_sql(info, sql, false, trx);
+
+      ut_a(flags2 != ULINT32_UNDEFINED);
 
       return(err);
 }
@@ -2267,6 +2276,8 @@ struct TransactionAndHeapGuard
     if (trx && do_rollback) 
       fts_sql_rollback(trx);
 
+    //TODO = Why no free for heap ?
+
     row_mysql_unlock_data_dictionary(trx);
     trx_free_for_background(trx);
   }
@@ -2277,6 +2288,31 @@ private:
   bool do_rollback;
 };
 
+static
+void
+fil_revert_encryption_flag_updates(ib_vector_t* tables_ids_to_revert_if_error, bool set)
+{
+  while (!ib_vector_is_empty(tables_ids_to_revert_if_error))
+  {
+    table_id_t *table_id = static_cast<table_id_t*>(
+                      ib_vector_pop(tables_ids_to_revert_if_error));
+
+    dict_table_t *table = dict_table_open_on_id(*table_id, TRUE,
+                                  DICT_TABLE_OP_NORMAL);
+
+    ut_ad(table != NULL);
+
+    if (set)
+    {
+        ib::error() << "While reverting - Setting encryption for table " << table->name.m_name; 
+        DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+    }
+    else
+        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+
+    dict_table_close(table, TRUE, FALSE);
+  }
+}
 
 static
 dberr_t
@@ -2326,19 +2362,34 @@ fil_update_encrypted_flag(fil_space_t *space,
   if (error != DB_SUCCESS)
     return error;
 
-  // Update encryption flags of all tables in the tablespace
-  error = fts_update_encrypted_tables_flags_in_space_sql(trx_set_encrypted,
-                                                         space->id,
-                                                         set);
-  if (error != DB_SUCCESS)
-    return error;
-
-  transaction_and_heap_guard.commit();
+  ib_vector_t* tables_ids_to_revert_if_error = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
 
   while (!ib_vector_is_empty(tables_ids))
   {
     table_id_t *table_id = static_cast<table_id_t*>(
                       ib_vector_pop(tables_ids));
+
+     // Update table's encryption flag
+     error = fts_update_encrypted_tables_flag(trx_set_encrypted,
+                                              table_id,
+                                              set);
+
+     DBUG_EXECUTE_IF(
+        "fail_encryption_flag_update_on_t3",
+         dict_table_t *table = dict_table_open_on_id(*table_id, TRUE,
+                                  DICT_TABLE_OP_NORMAL);
+
+         if (strcmp(table->name.m_name, "test/t3") == 0)
+           error = DB_ERROR; 
+         dict_table_close(table, TRUE, FALSE);
+      );
+
+     
+     if (error != DB_SUCCESS)
+     {
+       fil_revert_encryption_flag_updates(tables_ids_to_revert_if_error, !set);
+       return error;
+     }
 
     dict_table_t *table = dict_table_open_on_id(*table_id, TRUE,
                                   DICT_TABLE_OP_NORMAL);
@@ -2346,12 +2397,21 @@ fil_update_encrypted_flag(fil_space_t *space,
     ut_ad(table != NULL);
 
     if (set)
+    {
+        ib::error() << "Setting encryption for table " << table->name.m_name; 
         DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+    }
     else
         DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
 
+
+    ib_vector_push(tables_ids_to_revert_if_error, table_id);
+
     dict_table_close(table, TRUE, FALSE);
   }
+
+
+  transaction_and_heap_guard.commit();
 
   return DB_SUCCESS;
 }
@@ -2361,7 +2421,7 @@ Flush rotated pages and then update page 0
 
 @param[in,out]		state	rotation state */
 static
-void
+dberr_t
 fil_crypt_flush_space(
       rotate_thread_t*	state)
 {
@@ -2437,8 +2497,9 @@ fil_crypt_flush_space(
         
        if (DB_SUCCESS != fil_update_encrypted_flag(space, current_type == CRYPT_SCHEME_UNENCRYPTED ? false : true))
        {
-         ut_ad(0);
-         return; //TODO:Robert przemysl to jeszcze czy to jest bezpieczne tu robic return
+         ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0));
+
+         return DB_ERROR;
        }
 
        DBUG_EXECUTE_IF(
@@ -2493,26 +2554,7 @@ fil_crypt_flush_space(
 
       mtr.commit();
 
-      //mutex_enter(&crypt_data->mutex);
-      //crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
-      //crypt_data->type = current_type;
-      //crypt_data->rotate_state.flushing = false;
-      //mutex_exit(&crypt_data->mutex);
-
-
-     
-      //(void)fil_update_encrypted_flag;
-      //while (DB_SUCCESS != fil_update_encrypted_flag(space))
-      //{
-        ////ib::error() << "Could not set ENCRYPTED flag for table " << space->name
-                    ////<< " Not updating page0 for this table. Will retry updating the flag"
-                    ////<< " and page 0 when rotation thread will pick this table for re-encryption. "
-                    ////<< " Please note that although table " << space->name  << "does not have encryption flag set "
-                    ////<< " and page 0 updated. All its pages have been encrypted";
-         //os_thread_sleep(1000);
-         //// TODO: waiting for DD to be available
-      //}
-
+      return DB_SUCCESS;
 
 }
 
@@ -2632,16 +2674,25 @@ fil_crypt_complete_rotate_space(
               //}
 
               if (should_flush) {
-                      fil_crypt_flush_space(state);
-
-                      uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
-                                                                                                                 : crypt_data->type;
-                      mutex_enter(&crypt_data->mutex);
-                      crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
-                      crypt_data->type = current_type;
-                      crypt_data->rotate_state.flushing = false;
-
-
+                      if (fil_crypt_flush_space(state) == DB_SUCCESS)
+                      {
+                        uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
+                                                                                                                   : crypt_data->type;
+                        mutex_enter(&crypt_data->mutex);
+                        crypt_data->min_key_version = crypt_data->rotate_state.min_key_version_found;
+                        crypt_data->type = current_type;
+                        crypt_data->rotate_state.flushing = false;
+                      }
+                      else
+                      {
+                        mutex_enter(&crypt_data->mutex);
+                        crypt_data->rotate_state.flushing = false;
+                        ib::error() << "Encryption thread failed to flush encryption information for tablespace " << state->space->name
+                                    << ". This should not happen and could indicate problem with OS or filesystem. Excluding "
+                                    << state->space->name << " from encryption rotation. "
+                                    << "You can try decrypting/encrypting with alter statement for this table or restarting the server.";
+                        state->space->exclude_from_rotation = true; //TODO:Robert:This will stop encryption threads from picking up this tablespace for rotation
+                      }
 
                       // TODO: Need to add what happens for crypt_data->encryption_rotation == ROTATED_KEY_TO_MASTER_KEY
                       //crypt_data->rotate_state.flushing = false;
