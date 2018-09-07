@@ -1894,6 +1894,7 @@ os_file_io_complete(
                               if (was_page_encrypted) 
                               {
                                 mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
+                                ut_ad(encryption.m_key_version != 0);
                                 mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
                                 //mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, encryption.m_checksum);
                                 //if (type.is_zip_compressed())
@@ -2422,6 +2423,7 @@ os_file_encrypt_page(
 	encrypted_page = static_cast<byte*>(
 		ut_align(block->m_ptr, os_io_ptr_align));
 
+        //zwraca encrypted block
 	buf_ptr = encryption.encrypt(type,
 				     reinterpret_cast<byte*>(buf), *n,
 				     encrypted_page, &encrypted_len);
@@ -5950,14 +5952,15 @@ os_file_io(
                   }
                 }
         }
-
         if (type.is_encrypted() == false && type.is_write() && !type.is_compressed() && offset > 0 &&
-            type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS) // need to figure out something for compressed
+            type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS) // need to figure out something for compressed,
+                                                                            // TODO:ten warunek nie ma sensu - najpierw spradzam czy type jest NONE w is_encrypted
+                                                                            // a poźniej czy jest różny od ROTATED_KEYS ... 
         {
           mach_write_to_4(reinterpret_cast<byte*>(buf) +  FIL_PAGE_ENCRYPTION_KEY_VERSION, 0);
-          if (space_id == 23 && page_no==260)
+          if (space_id == 2 && page_no==3)
           {
-            ib::error() << "wrote for test/t1 page = 260"  << '\n';
+            ib::error() << "Overwritten key_version with 0"  << '\n';
           }
 
         }
@@ -9645,6 +9648,10 @@ Encryption::get_latest_tablespace_key_or_create_new_one(uint key_id,
      }
 }
 
+bool Encryption::is_keyring_alive()
+{
+  return Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(0); //DEFAULT ENCRYPTION KEY
+}
 
 uint Encryption::encryption_get_latest_version(uint key_id)
 {
@@ -9881,7 +9888,6 @@ Encryption::encrypt(
 	//ulint space_id =
 		//mach_read_from_4(src + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
-	ulint page_no = mach_read_from_4(src + FIL_PAGE_OFFSET);
 	fprintf(stderr, "Encrypting page:%lu.%lu len:%lu\n",
 		space_id, page_no, src_len);
         fprintf(stderr, "with key:");
@@ -10161,6 +10167,10 @@ Encryption::encrypt(
         //}
 
 #endif
+          ut_ad(m_key_version != 0); // Since we are encrypting key_version cannot be 0 (i.e. page unencrypted)
+
+          //We also need to mark page key version as encrypted in a buffer
+	  mach_write_to_4(src + FIL_PAGE_ENCRYPTION_KEY_VERSION, m_key_version);
 
           if (page_type == FIL_PAGE_COMPRESSED)
           {

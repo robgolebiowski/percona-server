@@ -2398,6 +2398,16 @@ static bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
              " PLUGIN group_replication.");
     goto err;
   }
+
+  if (plugin->ref_count && plugin->plugin->type == MYSQL_KEYRING_PLUGIN)
+  {
+    mysql_mutex_unlock(&LOCK_plugin);
+    
+    my_error(ER_PLUGIN_CANNOT_BE_UNINSTALLED, MYF(0), name->str,
+             "Plugin is busy, it cannot be uninstalled. ");
+   //TODO: Add more information why it is busy (srv_treads > 0 or binlog_encryption is ON ?
+    goto err;
+  }
 #endif
 
   plugin->state= PLUGIN_IS_DELETED;

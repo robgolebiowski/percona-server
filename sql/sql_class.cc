@@ -5133,3 +5133,38 @@ bool THD::is_current_stmt_binlog_row_enabled_with_write_set_extraction() const
           is_current_stmt_binlog_format_row() &&
           !is_current_stmt_binlog_disabled());
 }
+
+// esentialy I am using this vector as a stack, but I did not want to import stack.h just for
+// this usage
+typedef std::vector<plugin_ref> LockedKeyringsPlugins;
+static LockedKeyringsPlugins locked_keyring_plugins; //This needs mutex
+
+static my_bool lock_keyring(THD *thd, plugin_ref plugin, void *arg)
+{
+  uint *number_of_keyrings_locked= reinterpret_cast<uint*>(arg);
+  plugin= plugin_lock(thd, &plugin);
+  if (plugin)
+  {
+    *number_of_keyrings_locked += 1;
+    locked_keyring_plugins.push_back(plugin);
+  }
+  return FALSE;
+}
+
+int lock_keyrings(THD *thd)
+{
+  uint number_of_keyrings_locked= 0;
+  plugin_foreach(thd, lock_keyring, MYSQL_KEYRING_PLUGIN, &number_of_keyrings_locked);
+  return number_of_keyrings_locked;
+}
+
+int unlock_keyrings(THD *thd)
+{
+  for(LockedKeyringsPlugins::reverse_iterator riter = locked_keyring_plugins.rbegin();
+      riter != locked_keyring_plugins.rend(); ++riter)
+  {
+    plugin_unlock(thd, *riter);
+    locked_keyring_plugins.pop_back();
+  }
+  return 0;
+}

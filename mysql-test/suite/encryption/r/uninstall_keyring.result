@@ -1,0 +1,114 @@
+select * from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
+SPACE	NAME	FLAG	FILE_FORMAT	ROW_FORMAT	PAGE_SIZE	ZIP_PAGE_SIZE	SPACE_TYPE	FS_BLOCK_SIZE	FILE_SIZE	ALLOCATED_SIZE
+2	mysql/plugin	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+3	mysql/servers	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+4	mysql/help_topic	33	Barracuda	Dynamic	16384	0	Single	4096	114688	114688
+5	mysql/help_category	33	Barracuda	Dynamic	16384	0	Single	4096	114688	114688
+6	mysql/help_relation	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+7	mysql/help_keyword	33	Barracuda	Dynamic	16384	0	Single	4096	114688	114688
+8	mysql/time_zone_name	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+9	mysql/time_zone	8225	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+10	mysql/time_zone_transition	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+11	mysql/time_zone_transition_type	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+12	mysql/time_zone_leap_second	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+13	mysql/innodb_table_stats	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+14	mysql/innodb_index_stats	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+15	mysql/slave_relay_log_info	8225	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+16	mysql/slave_master_info	8225	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+17	mysql/slave_worker_info	8225	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+18	mysql/gtid_executed	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+19	mysql/server_cost	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+20	mysql/engine_cost	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+21	sys/sys_config	33	Barracuda	Dynamic	16384	0	Single	4096	98304	98304
+select * from INFORMATION_SCHEMA.INNODB_SYS_TABLES;
+TABLE_ID	NAME	FLAG	N_COLS	SPACE	FILE_FORMAT	ROW_FORMAT	ZIP_PAGE_SIZE	SPACE_TYPE
+14	SYS_DATAFILES	0	5	0	Antelope	Redundant	0	System
+11	SYS_FOREIGN	0	7	0	Antelope	Redundant	0	System
+12	SYS_FOREIGN_COLS	0	7	0	Antelope	Redundant	0	System
+13	SYS_TABLESPACES	0	6	0	Antelope	Redundant	0	System
+15	SYS_VIRTUAL	0	6	0	Antelope	Redundant	0	System
+16	SYS_ZIP_DICT	0	6	0	Antelope	Redundant	0	System
+17	SYS_ZIP_DICT_COLS	0	6	0	Antelope	Redundant	0	System
+36	mysql/engine_cost	33	9	20	Barracuda	Dynamic	0	Single
+34	mysql/gtid_executed	33	6	18	Barracuda	Dynamic	0	Single
+21	mysql/help_category	33	7	5	Barracuda	Dynamic	0	Single
+23	mysql/help_keyword	33	5	7	Barracuda	Dynamic	0	Single
+22	mysql/help_relation	33	5	6	Barracuda	Dynamic	0	Single
+20	mysql/help_topic	33	9	4	Barracuda	Dynamic	0	Single
+30	mysql/innodb_index_stats	33	11	14	Barracuda	Dynamic	0	Single
+29	mysql/innodb_table_stats	33	9	13	Barracuda	Dynamic	0	Single
+18	mysql/plugin	33	5	2	Barracuda	Dynamic	0	Single
+35	mysql/server_cost	33	7	19	Barracuda	Dynamic	0	Single
+19	mysql/servers	33	12	3	Barracuda	Dynamic	0	Single
+32	mysql/slave_master_info	33	28	16	Barracuda	Dynamic	0	Single
+31	mysql/slave_relay_log_info	33	12	15	Barracuda	Dynamic	0	Single
+33	mysql/slave_worker_info	33	16	17	Barracuda	Dynamic	0	Single
+25	mysql/time_zone	33	5	9	Barracuda	Dynamic	0	Single
+28	mysql/time_zone_leap_second	33	5	12	Barracuda	Dynamic	0	Single
+24	mysql/time_zone_name	33	5	8	Barracuda	Dynamic	0	Single
+26	mysql/time_zone_transition	33	6	10	Barracuda	Dynamic	0	Single
+27	mysql/time_zone_transition_type	33	8	11	Barracuda	Dynamic	0	Single
+37	sys/sys_config	33	7	21	Barracuda	Dynamic	0	Single
+# Wait max 10 min for key encryption threads to encrypt all spaces
+# Encryption threads turned on, try uninstalling keyring
+UNINSTALL PLUGIN keyring_file;
+ERROR HY000: Plugin 'keyring_file' cannot be uninstalled now. Plugin is busy, it cannot be uninstalled. 
+# Turn off encryption threads, uninstall keyring
+SET GLOBAL innodb_encryption_threads=0;
+UNINSTALL PLUGIN keyring_file;
+# Turn on encryption back - should not be possible as there is keyring plugin installed
+SET GLOBAL innodb_encryption_threads=1;
+ERROR HY000: InnoDB: cannot enable encryption threads, keyring plugin is not available
+# Install keyring plugin and turn encryption threads back on
+INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
+SET GLOBAL innodb_encryption_threads=4;
+#It should not be possible to start server with encryption threads > 0 and no keyring installed
+# It should not be possible to start server with encryption threads > 0 and keyring not properly
+# intialized
+CREATE table t_mk (a varchar(255)) engine=innodb;
+# Turn off encryption threads, uninstall keyring. Check CREATE, ALTER etc.
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL innodb_encrypt_tables=OFF;
+UNINSTALL PLUGIN keyring_file;
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+ERROR HY000: Seems that keyring is down. It is not possible to create encrypted tables  without keyring. Please install a keyring and try again.
+CREATE TABLE t2 (a varchar(255)) engine=innodb;
+ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
+ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
+ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
+# Decrypt all tables. The restart without keyring plugin functional should work as there should not be
+# any system tables left encrypted with ROTATED_KEYS
+INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
+SET GLOBAL innodb_encryption_threads=4;
+SET GLOBAL innodb_encrypt_tables=OFF;
+# Wait max 10 min for key encryption threads to decrypt all spaces
+# Restart with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with ROTATED_KEYS.
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=../../../../../../../mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=OFF --innodb-encryption-threads=0 --log-error=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/my_restart.err --innodb-encrypt-tables=OFF
+SET GLOBAL innodb_encryption_threads=1;
+ERROR HY000: InnoDB: keyring plugin is installed but it seems it was not properly initialized. Cannot enable encryption threads.
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+ERROR HY000: Seems that keyring is down. It is not possible to create encrypted tables  without keyring. Please install a keyring and try again.
+ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
+ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
+ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
+# Set valid keyring file path and try above operations
+SET @@global.keyring_file_data= 'MYSQL_TMP_DIR/mysecret_keyring';
+SET GLOBAL innodb_encryption_threads=1;
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+INSERT t2 VALUES (repeat('foobarsecret', 12));
+SET GLOBAL innodb_encryption_threads=0;
+UNINSTALL PLUGIN keyring_file;
+ALTER TABLE t2 ENCRYPTION='N';
+ERROR HY000: Cannot find key to decrypt table to ALTER. Please make sure that keyring is installed  and key used to encrypt table is available.
+INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
+Warnings:
+Warning	29	File '../../../../../../../mysecret_keyring' not found (Errcode: 13 - Permission denied)
+SET @@global.keyring_file_data= 'MYSQL_TMP_DIR/mysecret_keyring';
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=../../../../../../../mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=OFF --innodb-encryption-threads=0 --log-error=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/my_restart.err
+ALTER TABLE t2 ENCRYPTION='N';
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+DROP TABLE t1,t2,t_mk;

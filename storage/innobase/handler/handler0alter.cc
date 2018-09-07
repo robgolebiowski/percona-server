@@ -4642,6 +4642,43 @@ prepare_inplace_alter_table_dict(
                 key_id= ha_alter_info->create_info->encryption_key_id;
                 ut_ad(key_id == 0 || ha_alter_info->create_info->was_encryption_key_id_set);
 
+                // re-encrypting, check that key used to encrypt table is present
+                if (DICT_TF2_FLAG_SET(ctx->old_table, DICT_TF2_ENCRYPTION))
+                {
+                   if (Encryption::is_master_key_encryption(old_table->s->encrypt_type.str))
+                   {
+                     // re-encrypting from master key encryption
+                     /* Check if keyring is ready. */
+                      byte*			master_key = NULL;
+                      ulint			master_key_id;
+                      Encryption::Version	version;
+
+         	      Encryption::get_master_key(&master_key_id,
+		                                 &master_key,
+						 &version);
+
+                      if (master_key == NULL) {
+                              dict_mem_table_free(ctx->new_table);
+                              my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+                                       MYF(0));
+                              goto new_clustered_failed;
+                      } else {
+                              my_free(master_key);
+                      }
+                   }
+                   else if (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt))
+                   {
+                      // it is ROTATED_KEYS encryption - check if old's table encryption key is available 
+                      if (Encryption::tablespace_key_exists(old_table->s->encryption_key_id) == false)
+                      {
+                          my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                                          "Cannot find key to decrypt table to ALTER. Please make sure that keyring is installed "
+                                          " and key used to encrypt table is available.", MYF(0));
+                          goto new_clustered_failed;
+                      }
+                   }
+                }
+
                 if (Encryption::is_no(encrypt))
                   mode= FIL_ENCRYPTION_OFF;
                 else if (Encryption::is_rotated_keys(encrypt) || 
@@ -4659,8 +4696,9 @@ prepare_inplace_alter_table_dict(
                   if (tablespace_key == NULL)
                   {
                      dict_mem_table_free(ctx->new_table);
-                     my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, //TODO: Inny błąd?
-                              MYF(0));
+                     my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                                     "Seems that keyring is down. It is not possible to encrypt table"
+                                     " without keyring. Please install a keyring and try again.", MYF(0));
 		     goto new_clustered_failed;
                   }
                   else

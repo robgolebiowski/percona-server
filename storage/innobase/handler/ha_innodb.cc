@@ -4070,6 +4070,27 @@ innobase_init(
 		DBUG_RETURN(innobase_init_abort());
 	}
 
+        // We are starting encryption threads, we must lock the keyring plugins
+        if (srv_n_fil_crypt_threads  > 0) {
+          uint number_of_keyring_locked= lock_keyrings(NULL);
+
+          if (number_of_keyring_locked == 0)
+          {
+               sql_print_error("InnoDB: cannot enable encryption threads, "
+                               "keyring plugin is not available");
+
+	       DBUG_RETURN(innobase_init_abort());
+          }
+          if (Encryption::is_keyring_alive() == false)
+          {
+               sql_print_error("InnoDB: keyring plugin is installed but it seems it was not "
+                               "properly initialized. Cannot enable encryption threads.");
+               unlock_keyrings(NULL);
+
+	       DBUG_RETURN(innobase_init_abort());
+          }
+        }
+
 	os_file_set_umask(my_umask);
 
 	/* Setup the memory alloc/free tracing mechanisms before calling
@@ -11412,6 +11433,7 @@ err_col:
                   else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
                           (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)))
                   {
+                      // Check if keyring is up and the key exists in keyring was already done in encryption option validation
                       rotated_keys_encryption_option= Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
                                                                   ? FIL_ENCRYPTION_ON
                                                                   : FIL_ENCRYPTION_DEFAULT;
@@ -11419,19 +11441,17 @@ err_col:
 
                       uint tablespace_key_version;
                       byte *tablespace_key; 
-
                       //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
                       Encryption::get_latest_tablespace_key_or_create_new_one(m_create_info->encryption_key_id, &tablespace_key_version, &tablespace_key);
                       if (tablespace_key == NULL)
                       {
-                         my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, //TODO: Inny błąd?
-                                           MYF(0));
-                         err = DB_UNSUPPORTED;
-                         dict_mem_table_free(table);
+                        my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                                        "Seems that keyring is down. It is not possible to create encrypted tables "
+                                        " without keyring. Please install a keyring and try again.", MYF(0));
+                        err = DB_UNSUPPORTED;
                       }
                       else
                         my_free(tablespace_key);
-
                   }
                   //else if(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)) //TODO: Shouldn't here be also check for encryption_key_id
                                                                                                      ////Thus this and the above should be merged ?
@@ -21236,6 +21256,55 @@ innodb_srv_empty_free_list_algorithm_validate(
 	return(0);
 }
 
+static int
+innodb_encryption_threads_validate(
+/*=================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to system
+						variable */
+	void*				save,	/*!< out: immediate result
+						for update function */
+	struct st_mysql_value*		value)	/*!< in: incoming string */
+{
+	long long	intbuf;
+
+	DBUG_ENTER("innodb_encryption_threads_validate");
+
+	if (value->val_int(value, &intbuf)) {
+		/* The value is NULL. That is invalid. */
+		DBUG_RETURN(1);
+	}
+
+        if (srv_n_fil_crypt_threads == 0 && intbuf > 0) // We are starting encryption threads, we must lock
+                                                        // the keyring plugins
+        {
+          uint number_of_keyrings_locked= lock_keyrings(NULL);
+
+          if (number_of_keyrings_locked == 0)
+          {
+               my_printf_error(ER_WRONG_ARGUMENTS, "InnoDB: cannot enable encryption threads, "
+                               "keyring plugin is not available", MYF(0));
+               DBUG_RETURN(1);
+          }
+          if (Encryption::is_keyring_alive() == false)
+          {
+               my_printf_error(ER_WRONG_ARGUMENTS, "InnoDB: keyring plugin is installed but it seems it was not "
+                               "properly initialized. Cannot enable encryption threads.", MYF(0));
+               unlock_keyrings(NULL);
+               DBUG_RETURN(1);
+          }
+
+        }
+        else if (intbuf == 0 && srv_n_fil_crypt_threads > 0) // We are disabling encryption threads, unlock the keyrings
+        {
+          unlock_keyrings(NULL);  
+        }
+
+	*reinterpret_cast<ulong*>(save) = static_cast<ulong>(intbuf);
+
+        DBUG_RETURN(0);
+}
+
 /******************************************************************
 Update the system variable innodb_encryption_threads */
 static
@@ -22465,7 +22534,7 @@ static MYSQL_SYSVAR_UINT(encryption_threads, srv_n_fil_crypt_threads,
 			 PLUGIN_VAR_RQCMDARG,
 			 "Number of threads performing background key rotation and "
 			 "scrubbing",
-			 NULL,
+                         innodb_encryption_threads_validate,
 			 innodb_encryption_threads_update,
 			 srv_n_fil_crypt_threads, 0, UINT_MAX32, 0);
 

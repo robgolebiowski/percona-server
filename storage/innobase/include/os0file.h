@@ -563,6 +563,8 @@ struct Encryption {
 				   byte** master_key,
 				   Encryption::Version*  version);
 
+        static bool is_keyring_alive();
+
 	/** Encrypt the page data contents. Page type can't be
 	FIL_PAGE_ENCRYPTED, FIL_PAGE_COMPRESSED_AND_ENCRYPTED,
 	FIL_PAGE_ENCRYPTED_RTREE.

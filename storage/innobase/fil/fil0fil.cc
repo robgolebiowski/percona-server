@@ -870,7 +870,8 @@ retry:
 		}
 
                 //For recovery this should be checked by validate_for_recovery ?
-               if (space->crypt_data && Encryption::tablespace_key_exists(space->crypt_data->key_id) == false &&
+               if (space->crypt_data && space->crypt_data->type == CRYPT_SCHEME_1 &&
+                   Encryption::tablespace_key_exists(space->crypt_data->key_id) == false &&
                    !recv_recovery_is_on())
                {
                  //TODO:Robert: Dlaczego w MK jest tylko gdy recv_recovery_is_on to sprawdzane ?
@@ -5945,7 +5946,8 @@ fil_io_set_encryption(
         //
         //bpage->      
 
-	if (!req_type.is_log() && page_id.page_no() > 0
+       /* don't encrypt TRX_SYS_SPACE.TRX_SYS_PAGE_NO as it contains address to dblwr buffer */
+	if (!req_type.is_log() && page_id.page_no() > 0 && TRX_SYS_SPACE != page_id.space() && TRX_SYS_PAGE_NO != page_id.page_no()
 	    && space->encryption_type != Encryption::NONE)
 	{
                 //TODO: Here I also need to get a key for encryption or move it deeper into os0file
