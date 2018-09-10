@@ -74,7 +74,9 @@ SHOW CREATE TABLE t5;
 SET GLOBAL innodb_encryption_threads= 0;
 SET GLOBAL innodb_encrypt_tables = OFF;
 CREATE TABLE t6 (a varchar(255)) ENGINE=innodb;
+SHOW CREATE TABLE t6;
 CREATE TABLE t7 (a varchar(255)) ENCRYPTION="Y" ENGINE=innodb;
+SHOW CREATE TABLE t7;
 
 --let $assert_text= Table t6 and t7 should NOT be included in INNODB_TABLESPACES_ENCRYPTION
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME = \\"test/t6\\" OR NAME = \\"test/t7\\" ]" = 0
@@ -94,6 +96,11 @@ CREATE TABLE t7 (a varchar(255)) ENCRYPTION="Y" ENGINE=innodb;
 --source include/assert.inc
 --let $assert_text= Table t7 should be included in INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERION 1 (encrypted) and CURRENT_KEY_ID = 6
 --let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME = \\"test/t7\\" AND CURRENT_KEY_ID = 6]" = 1
+
+--echo # Both statements should produce warnings
+CREATE TABLE t8 (a varchar(255)) ENCRYPTION="Y" ENCRYPTION_KEY_ID=5 ENGINE=innodb;
+CREATE TABLE t9 (a varchar(255)) ENCRYPTION="N" ENCRYPTION_KEY_ID=5 ENGINE=innodb;
+
 --source include/assert.inc
 
 drop table t1,t2,t3,t4,t5,t6;

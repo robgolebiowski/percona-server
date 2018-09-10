@@ -1065,6 +1065,14 @@ struct handlerton
   */
   bool (*rotate_encryption_master_key)(void);
 
+  struct KeyringEncryptionVariables
+  {
+    bool global_encrypt_tables;
+    uint session_default_encryption_key_id; 
+  };
+
+  KeyringEncryptionVariables (*get_keyring_encryption_variables)(THD *thd);
+
   /**
     Creates a new compression dictionary with the specified data for this SE.
 

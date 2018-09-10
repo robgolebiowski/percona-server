@@ -613,6 +613,16 @@ uint get_global_default_encryption_key_id_value()
 }
 
 
+handlerton::KeyringEncryptionVariables get_keyring_encryption_variables(THD *thd)
+{
+     handlerton::KeyringEncryptionVariables keyring_encryption_variables;
+     keyring_encryption_variables.global_encrypt_tables= srv_encrypt_tables;
+     keyring_encryption_variables.session_default_encryption_key_id = THDVAR(thd, default_encryption_key_id);
+
+     return keyring_encryption_variables;
+}
+
+
 /** Set up InnoDB API callback function array */
 ib_cb_t innodb_api_cb[] = {
 	(ib_cb_t) ib_cursor_open_table,
@@ -4025,6 +4035,9 @@ innobase_init(
 
 	innobase_hton->rotate_encryption_master_key =
 		innobase_encryption_key_rotation;
+
+        innobase_hton->get_keyring_encryption_variables = 
+                get_keyring_encryption_variables;
 
 	innobase_hton->create_zip_dict = innobase_create_zip_dict;
 	innobase_hton->drop_zip_dict = innobase_drop_zip_dict;
@@ -12174,13 +12187,6 @@ create_table_info_t::create_option_encryption_is_valid() const
 		}
 	}
 
-	/* Currently we do not support encryption for
-	spatial indexes thus do not allow creating table with forced
-	encryption */
-
-        if (!m_create_info->was_encryption_key_id_set)
-            m_create_info->encryption_key_id= THDVAR(m_thd, default_encryption_key_id);
- 
         bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
 
         if (table_is_rotated_keys)
@@ -12198,6 +12204,11 @@ create_table_info_t::create_option_encryption_is_valid() const
                              //"InnoDB: table encrypted with ROTATED_KEYS cannot be part of shared tablespace.", MYF(0));
                   //return (false);
           //}
+
+
+          /* Currently we do not support encryption for
+          spatial indexes thus do not allow creating table with forced
+          encryption */
 
           for(ulint i = 0; i < m_form->s->keys; i++) {
                   const KEY* key = m_form->key_info + i;

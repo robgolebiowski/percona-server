@@ -4848,6 +4848,35 @@ mysql_prepare_create_table(THD *thd, const char *error_schema_name,
 
     DBUG_ASSERT(encrypt_type->length == 0 || strncmp(encrypt_type->str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) != 0 ||
                 encrypt_type->length == 12);
+
+
+   // For ROTATED_KEYS table if encryption_key_id has not yet been assigned - assign default_encryption_key_id
+   //if (0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) &&
+   if (false == create_info->was_encryption_key_id_set)
+   {
+      const LEX_STRING storage_engine= { C_STRING_WITH_LEN("innodb") };
+      plugin_ref se_plugin;
+      handlerton *hton;
+
+      if ((se_plugin= ha_resolve_by_name(current_thd, &storage_engine, false)))
+      {
+        hton= plugin_data<handlerton *>(se_plugin);
+      }
+      else
+      {
+        my_error(ER_MASTER_KEY_ROTATION_SE_UNAVAILABLE, MYF(0)); // TODO: Change the error message
+        return true;
+      }
+
+      handlerton::KeyringEncryptionVariables keyring_encryption_variables = hton->get_keyring_encryption_variables(current_thd);
+      if ((0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", strlen("ROTATED_KEYS"))) ||
+          (encrypt_type->length == 0 && keyring_encryption_variables.global_encrypt_tables == true))
+      {
+        create_info->encryption_key_id = keyring_encryption_variables.session_default_encryption_key_id;  
+        create_info->was_encryption_key_id_set = true;
+      }
+   }
+
   }
 
   DBUG_RETURN(FALSE);

@@ -1926,9 +1926,7 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
       append_unescaped(packet, share->encrypt_type.str, share->encrypt_type.length);
     }
 
-  if (share->was_encryption_key_id_set ||
-      (share->encrypt_type.length != 0 &&
-       my_strcasecmp(system_charset_info, share->encrypt_type.str, "ROTATED_KEYS") == 0))
+    if (share->was_encryption_key_id_set)
     {
       DBUG_ASSERT(share->encrypt_type.length == 0 || my_strcasecmp(system_charset_info, share->encrypt_type.str, "ROTATED_KEYS") != 0
                   || share->encrypt_type.length == strlen("ROTATED_KEYS"));
