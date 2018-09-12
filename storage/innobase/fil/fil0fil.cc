@@ -4049,6 +4049,11 @@ fil_ibd_create(
             || (srv_encrypt_tables || create_info_encryption_key_id.was_encryption_key_id_set)) {
 		crypt_data = fil_space_create_crypt_data(mode,
                                                          create_info_encryption_key_id.encryption_key_id);
+            if (crypt_data->should_encrypt())
+            {
+              crypt_data->encrypting_with_key_version = crypt_data->key_get_latest_version();
+              crypt_data->load_needed_keys_into_local_cache();
+            }
 	}
 
         //TODO: Robert czy destruktor space powinien niszczyc crypt_data ?
@@ -5945,9 +5950,12 @@ fil_io_set_encryption(
         //TODO:Robert: I need to remove is_log() from here - to all system tablepsace encryption
         //
         //bpage->      
+        // I need mutex for crypt_data here
+        //
+        // TODO: I nned to get mutex on crypt_data here
 
        /* don't encrypt TRX_SYS_SPACE.TRX_SYS_PAGE_NO as it contains address to dblwr buffer */
-	if (!req_type.is_log() && page_id.page_no() > 0 && TRX_SYS_SPACE != page_id.space() && TRX_SYS_PAGE_NO != page_id.page_no()
+	if (!req_type.is_log() && page_id.page_no() > 0 && (TRX_SYS_SPACE != page_id.space() || TRX_SYS_PAGE_NO != page_id.page_no())
 	    && space->encryption_type != Encryption::NONE)
 	{
                 //TODO: Here I also need to get a key for encryption or move it deeper into os0file
@@ -5988,9 +5996,11 @@ fil_io_set_encryption(
                            //uint *tablespace_key_version,
 			   //byte** tablespace_key);
 
-                    if (space->crypt_data->should_encrypt())
+                    if (space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
                     {
-                      Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &key_version, &key);
+                      key = space->crypt_data->get_key_currently_used_for_encryption();
+                      key_version = space->crypt_data->encrypting_with_key_version;
+                      //Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &key_version, &key);
                       key_len = 32;
                     }
                     else

@@ -83,11 +83,13 @@ show status like 'innodb_pages0_read%';
 #
 # Verify
 #
-#TODO:Robert:Change all those to asserts
+--let $assert_text=Should contain 100 tables
 --echo # should contain 100 tables
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
---echo # should contain 0 tables
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME LIKE \\'innodb_encrypted%\\']" = 100
+--source include/assert.inc
+--let $assert_text=Should contain 0 tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted%\\']" = 0;
+--source include/assert.inc
 
 #
 # This will create 100 tables that are not encrypted
@@ -124,18 +126,15 @@ show status like 'innodb_pages0_read%';
 
 --let $assert_text=Should contain 100 tables
 --echo # should contain 100 tables
---let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted%\\']" = 100
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME LIKE \\'innodb_encrypted%\\']" = 100
 --source include/assert.inc
 #SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
 --let $assert_text=Should contain 100 tables
---let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION IS NULL AND NAME LIKE \\'innodb_encrypted%\\']" = 100;
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted%\\']" = 100;
 --source include/assert.inc
 
 use test;
 show status like 'innodb_pages0_read%';
-
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
 
 SET GLOBAL innodb_encrypt_tables = on;
 SET GLOBAL innodb_encryption_threads=4;
@@ -143,16 +142,27 @@ SET GLOBAL innodb_encryption_threads=4;
 --echo #tables in innodb_encrypted_1 and innodb_encrypted_2 should be encrypted
 
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = 200 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%';
+--let $wait_condition=SELECT COUNT(*) = 200 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME LIKE 'innodb_encrypted%';
 --source include/wait_condition.inc
 
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
-show status like 'innodb_pages0_read%';
+--let $assert_text=Should contain 100 tables
+--echo # should contain 100 tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME LIKE \\'innodb_encrypted_1%\\']" = 100
+--source include/assert.inc
+
+--let $assert_text=Should contain 100 tables
+--echo # should contain 100 tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME LIKE \\'innodb_encrypted_2%\\']" = 100
+--source include/assert.inc
+
+--let $assert_text=Should contain 100 unencrypted tables
+--echo # should contain 100 unencrypted tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted_3%\\']" = 100
+--source include/assert.inc
 
 --echo # Success!
 --echo # Restart mysqld --innodb_encrypt_tables=0 --innodb_encryption_threads=0
--- let $restart_parameters=restart:--innodb_encrypt_tables=0 --innodb_encryption_threads=0
+-- let $restart_parameters=restart:--innodb_encrypt_tables=OFF --innodb_encryption_threads=0
 -- source include/restart_mysqld.inc
 
 --echo # Restart Success!
@@ -217,19 +227,37 @@ show status like 'innodb_pages0_read%';
 --echo #tables in innodb_encrypted_1 and innodb_encrypted_2 should remain encrypted as there is no active
 --echo #encryption thread
 
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
+--let $assert_text=Should contain 200 tables
+--echo # should contain 200 tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME LIKE \\'innodb_encrypted%\\']" = 200
+--source include/assert.inc
+
+--let $assert_text=Should contain 100 unencrypted tables
+--echo # should contain 100 unencrypted tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted_3%\\']" = 100
+--source include/assert.inc
 
 SET GLOBAL innodb_encrypt_tables = off;
 SET GLOBAL innodb_encryption_threads=4;
 
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = 100 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+--let $wait_condition=SELECT COUNT(*) = 100 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1;
 --source include/wait_condition.inc
 
+--let $assert_text=Should contain 100 unencrypted tables
+--echo # should contain 100 unencrypted tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted_1%\\']" = 100
+--source include/assert.inc
 
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'innodb_encrypted%' ORDER BY NAME;
+--let $assert_text=Should contain 100 tables
+--echo # should contain 100 encrypted tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME LIKE \\'innodb_encrypted_2%\\']" = 100
+--source include/assert.inc
+
+--let $assert_text=Should contain 100 unencrypted tables
+--echo # should contain 100 unencrypted tables
+--let $assert_cond="[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE \\'innodb_encrypted_3%\\']" = 100
+--source include/assert.inc
 
 #
 # Cleanup

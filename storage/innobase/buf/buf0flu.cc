@@ -1097,7 +1097,7 @@ buf_flush_write_block_low(
        //if (FSP_FLAGS_GET_ROTATED_KEYS(space->flags))
          
        if (space->crypt_data != NULL && //space->encryption_type == Encryption::ROTATED_KEYS &&
-           space->crypt_data->should_encrypt())
+           space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
            //(space->crypt_data->encryption == FIL_ENCRYPTION_ON ||
             //(space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
        {
@@ -1105,7 +1105,9 @@ buf_flush_write_block_low(
          ut_ad(space->crypt_data != NULL);// && space->crypt_data->iv[0] != '\0');
          //Encryption::get_latest_tablespace_key(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
          //Encryption::get_latest_tablespace_key_or_create_new_one(space->id, &bpage->encryption_key_version, &bpage->encryption_key);
-         Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+         //Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+         bpage->encryption_key= space->crypt_data->get_key_currently_used_for_encryption();
+         bpage->encryption_key_version= space->crypt_data->encrypting_with_key_version;
          //ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
          ut_ad(bpage->encryption_key != NULL);
          //TODO: Tutaj błąd, jeżeli klucz nie istnieje, albo przy ::decrypt zwrócić DB_IO_DECRYPT_FAILED
@@ -1116,7 +1118,8 @@ buf_flush_write_block_low(
        }
        else
        {
-         ut_ad(space->crypt_data == NULL || !srv_encrypt_tables || space->crypt_data->encryption == FIL_ENCRYPTION_OFF);
+         ut_ad(space->crypt_data == NULL || !srv_encrypt_tables || space->crypt_data->encryption == FIL_ENCRYPTION_OFF ||
+               space->crypt_data->encrypting_with_key_version == 0);
          //if (space->crypt_data != NULL)
          //{
            //space->encryption_type = Encryption::ROTATED_KEYS;

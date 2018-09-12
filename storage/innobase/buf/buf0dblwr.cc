@@ -1239,10 +1239,12 @@ buf_dblwr_flush_buffered_writes(
                                                 // Temporarily encrypt all pages in doulbe write buffer with system's tablespace key
                 
                 //TODO:Those keys will need to be fried somewhere
-                if (space() && space()->crypt_data && space()->crypt_data->should_encrypt()) //TODO:Robert Space might be already dropped - one more reason to
+                if (space() && space()->crypt_data && space()->crypt_data->should_encrypt() && space()->crypt_data->encrypting_with_key_version != 0) //TODO:Robert Space might be already dropped - one more reason to
                                                                                              //have encryption earlier
                 {
-                  Encryption::get_latest_tablespace_key(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
+                  bpage->encryption_key = space()->crypt_data->get_key_currently_used_for_encryption();
+                  bpage->encryption_key_version = space()->crypt_data->encrypting_with_key_version;
+                  //Encryption::get_latest_tablespace_key(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
                   ////It seems that it can reach here before variable encrypt_tables is validated - which is weird .. -
                   //if (space()->crypt_data->key_id == 0 && bpage->encryption_key == NULL)
                     //Encryption::get_latest_tablespace_key_or_create_new_one(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);

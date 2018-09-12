@@ -6017,6 +6017,7 @@ create_table_option:
           {
             Lex->create_info.was_encryption_key_id_set= true;
             Lex->create_info.encryption_key_id= $3;
+            Lex->alter_info.was_encryption_key_id_set = true;
           }
         | AUTO_INC opt_equal ulonglong_num
           {

@@ -105,13 +105,20 @@ struct key_struct
 struct st_encryption_scheme_key {
   unsigned int version;
   //unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
-  unsigned char key[ENCRYPTION_KEY_LEN];
+  uchar *key;
 };
 
 // Merge it with fil_crypt_data
 struct st_encryption_scheme {
   unsigned char iv[16];
   struct st_encryption_scheme_key key[3]; //TODO : Why do I need this ?
+
+  uchar* get_key_or_create_one(uint *version, bool create_if_not_exists);
+  uchar* get_key(uint version);
+  uchar* get_key_currently_used_for_encryption();
+
+
+  uint encrypting_with_key_version;
   unsigned int keyserver_requests;
   //unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
   unsigned int key_id;
@@ -187,7 +194,6 @@ struct fil_space_crypt_t : st_encryption_scheme
 	/** Returns true if key was found from encryption plugin
 	and false if not. */
 	bool is_key_found() const {
-		//return true; //TODO:temporary key is always found //key_found != ENCRYPTION_KEY_VERSION_INVALID;
                 //return found_key_version != ENCRYPTION_KEY_VERSION_INVALID;
                 return key_found;
 	}
@@ -254,6 +260,7 @@ struct fil_space_crypt_t : st_encryption_scheme
           }
         }
 
+        bool load_needed_keys_into_local_cache();
 
 	uint min_key_version; // min key version for this space
 	ulint page0_offset;   // byte offset on page 0 for crypt data //TODO:Robert: po co to ?

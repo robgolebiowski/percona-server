@@ -4846,12 +4846,12 @@ mysql_prepare_create_table(THD *thd, const char *error_schema_name,
       DBUG_RETURN(TRUE);
     }
 
-    DBUG_ASSERT(encrypt_type->length == 0 || strncmp(encrypt_type->str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) != 0 ||
+    DBUG_ASSERT(encrypt_type->length == 0 || strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length) != 0 ||
                 encrypt_type->length == 12);
 
 
    // For ROTATED_KEYS table if encryption_key_id has not yet been assigned - assign default_encryption_key_id
-   //if (0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) &&
+   //if (0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length) &&
    if (false == create_info->was_encryption_key_id_set)
    {
       const LEX_STRING storage_engine= { C_STRING_WITH_LEN("innodb") };
@@ -4869,12 +4869,19 @@ mysql_prepare_create_table(THD *thd, const char *error_schema_name,
       }
 
       handlerton::KeyringEncryptionVariables keyring_encryption_variables = hton->get_keyring_encryption_variables(current_thd);
-      if ((0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", strlen("ROTATED_KEYS"))) ||
+      if ((0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length)) ||
           (encrypt_type->length == 0 && keyring_encryption_variables.global_encrypt_tables == true))
       {
         create_info->encryption_key_id = keyring_encryption_variables.session_default_encryption_key_id;  
         create_info->was_encryption_key_id_set = true;
       }
+   }
+   else if (0 != encrypt_type->length && 0 != strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length) &&
+            alter_info->was_encryption_key_id_set == false)
+   {
+       // if it is encrypted table with Master key encryption or marked as not to be encrypted and alter table
+       // does not have ENCRYPTION_KEY_ID - mark encryption key id as not set. 
+       create_info->was_encryption_key_id_set = false;
    }
 
   }

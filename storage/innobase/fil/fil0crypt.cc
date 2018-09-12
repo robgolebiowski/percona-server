@@ -121,6 +121,86 @@ uint fil_get_encrypt_info_size(const uint iv_len)
            + ENCRYPTION_KEY_LEN;// tablespace iv
 }
 
+uchar* st_encryption_scheme::get_key_currently_used_for_encryption()
+{
+  ut_ad(encrypting_with_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+  return get_key(encrypting_with_key_version);
+}
+
+
+bool fil_space_crypt_t::load_needed_keys_into_local_cache()
+{
+  if (encrypting_with_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+  {
+    // used in encryption 
+    uchar *key = get_key(encrypting_with_key_version);
+    if (key == NULL)
+      return false;
+  }
+
+  if (min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+  {
+    // We need this key to decrypt table 
+    uchar *key = get_key(min_key_version);
+    if (key == NULL)
+      return false;
+  }
+  return true;
+}
+
+uchar* st_encryption_scheme::get_key(uint version)
+{
+  return get_key_or_create_one(&version, false);
+}
+
+uchar* st_encryption_scheme::get_key_or_create_one(uint *version, bool create_if_not_exists)
+{
+  ut_ad(*version != 0 || create_if_not_exists);
+
+  if (*version != 0)
+  {
+    for (uint i = 0; i < array_elements(key); ++i)
+    {
+      if(key[i].version == 0) // no more keys
+        break;
+
+      if (key[i].version == *version)
+        return key[i].key;
+    }
+  }
+
+  // key not found
+  uchar *tablespace_key = NULL;
+  uint tablespace_key_version = 0;
+  if (create_if_not_exists)
+    Encryption::get_latest_tablespace_key_or_create_new_one(this->key_id, &tablespace_key_version, &tablespace_key);
+  else
+    Encryption::get_latest_tablespace_key(this->key_id, &tablespace_key_version, &tablespace_key);
+    
+  if (tablespace_key == NULL)
+    return NULL;
+
+  // Rotate keys to make room for a new one
+  if (key[array_elements(key) - 1].key != NULL)
+  {
+    memset_s(key[array_elements(key)-1].key, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
+    my_free(key[array_elements(key)-1].key);
+    key[array_elements(key)-1].key = NULL;
+    key[array_elements(key)-1].version = 0;
+  }
+
+  for (uint i = array_elements(key) - 1; i; i--)
+  {
+    key[i] = key[i - 1];
+  }
+  key[0].key= tablespace_key;
+  key[0].version = tablespace_key_version;
+
+  *version = tablespace_key_version;
+
+  return tablespace_key;
+}
+
 /** Statistics variables */
 static fil_crypt_stat_t crypt_stat;
 static ib_mutex_t crypt_stat_mutex;
@@ -200,10 +280,23 @@ fil_space_crypt_t::fil_space_crypt_t(
                         //if (create_key)
                         //{
                                 //key_found = true; // cheat key_get_latest_version that the key exists - if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
-                                min_key_version = Encryption::encryption_get_latest_version(key_id);
+                                uchar *key = NULL;
+                                uint key_version = 0;
+                                Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &key_version, &key);
+                                if (key == NULL)
+                                {
+                                  key_found = false;
+                                  min_key_version = ENCRYPTION_KEY_VERSION_INVALID;
+                                }
+                                else 
+                                {
+                                  key_found = true;
+                                  min_key_version = key_version;
+                                }
+                                //min_key_version = Encryption::encryption_get_latest_version(key_id);
                                  //min_key_version= key_get_latest_version(); //This means table was created with ROTATED_KEYS = thus we know that this table is encrypted
                                                                           //min_key_version should be set to key_version, when create_key is false it means it was not created
-                                key_found = min_key_version != ENCRYPTION_KEY_VERSION_INVALID;
+                                //key_found = min_key_version != NCRYPTION_KEY_VERSION_INVALID;
                                                                           //with ROTATED_KEYS
                                 //min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
                         //}
@@ -423,6 +516,10 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 		(page + offset + bytes_read);
         bytes_read += 4;
 
+	//uint encrypting_with_key_version = mach_read_from_4
+		//(page + offset + bytes_read);
+        //bytes_read += 4;
+
 	uint key_id = mach_read_from_4
 		(page + offset + bytes_read);
         bytes_read += 4;
@@ -443,6 +540,8 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 	members */
 	crypt_data->type = type;
 	crypt_data->min_key_version = min_key_version;
+        crypt_data->encrypting_with_key_version = min_key_version;
+        //crypt_data->encrypting_with_key_version = encrypting_with_key_version;
 	crypt_data->page0_offset = offset;
 	memcpy(crypt_data->iv, page + offset + bytes_read, iv_length);
 
@@ -959,7 +1058,7 @@ fil_crypt_start_encrypting_space(
       //thus there is no need to create it here
       crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
 
-      if (crypt_data == NULL) {
+      if (crypt_data == NULL || crypt_data->key_found == false) {
               mutex_exit(&fil_crypt_threads_mutex);
               return false;
       }
@@ -978,6 +1077,20 @@ fil_crypt_start_encrypting_space(
         crypt_data->set_tablespace_iv(space->encryption_iv); //space key and encryption are always initalized for MK encrypted tables
       }
 
+      crypt_data->encrypting_with_key_version = crypt_data->key_get_latest_version();
+      ut_ad(crypt_data->encrypting_with_key_version != 0 && crypt_data->encrypting_with_key_version != ENCRYPTION_KEY_VERSION_INVALID);
+
+      if (crypt_data->key_found == false || crypt_data->load_needed_keys_into_local_cache() == false)
+      {
+        // This should not happen, we have locked the keyring before encryption threads could have even started
+        // unless something realy strange have happend like removing keyring file from under running server.
+        ib::error() << "Encryption thread could not retrieve a key from a keyring for tablespace " << space->name
+                    << " . Removing space from encrypting. Please make sure keyring is functional and try restarting the server";
+        space->exclude_from_rotation = true;
+        mutex_exit(&fil_crypt_threads_mutex);
+        fil_space_destroy_crypt_data(&crypt_data);
+        return false;
+      }
       mutex_enter(&crypt_data->mutex);
       crypt_data = fil_space_set_crypt_data(space, crypt_data);
       mutex_exit(&crypt_data->mutex);
@@ -1150,6 +1263,8 @@ fil_crypt_space_needs_rotation(
               * space has no crypt data
               *   start encrypting it...
               */
+              key_state->key_id= get_global_default_encryption_key_id_value();
+
               *recheck = fil_crypt_start_encrypting_space(space);
               crypt_data = space->crypt_data;
               //TODO:Robert: To powinno być pod mutexem, albo z użyciem fil_set_encryption
@@ -1160,7 +1275,7 @@ fil_crypt_space_needs_rotation(
                       return false;
               }
 
-              crypt_data->key_get_latest_version();
+              key_state->key_version = crypt_data->encrypting_with_key_version;
       }
 
       /* If used key_id is not found from encryption plugin we can't
@@ -1539,7 +1654,7 @@ Start rotating a space
 @param[in]	key_state		Key state
 @param[in,out]	state			Rotation state */
 static
-void
+bool
 fil_crypt_start_rotate_space(
       const key_state_t*	key_state,
       rotate_thread_t*	state)
@@ -1551,6 +1666,16 @@ fil_crypt_start_rotate_space(
       ut_ad(key_state->key_id == crypt_data->key_id);
 
       if (crypt_data->rotate_state.active_threads == 0) {
+
+              crypt_data->encrypting_with_key_version = key_state->key_version;
+              if (crypt_data->load_needed_keys_into_local_cache() == false)
+              {
+                ib::error() << "Encryption thread could not retrieve a key from a keyring for tablespace " << state->space->name
+                            << " . Removing space from encrypting. Please make sure keyring is functional and try restarting the server";
+                state->space->exclude_from_rotation = true;
+                mutex_exit(&crypt_data->mutex);
+                return false;
+              }
               /* only first thread needs to init */
               crypt_data->rotate_state.next_offset = 1; // skip page 0
               /* no need to rotate beyond current max
@@ -1597,6 +1722,7 @@ fil_crypt_start_rotate_space(
               crypt_data->rotate_state.min_key_version_found;
 
       mutex_exit(&crypt_data->mutex);
+      return true;
 }
 
 /***********************************************************************
@@ -2330,10 +2456,9 @@ fil_update_encrypted_flag(fil_space_t *space,
   // We are only modifying DD so the lock on DD is enough, we do not need
   // lock on space
 
-  trx_t* trx_set_encrypted = trx_allocate_for_background();
-  TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
-
-  trx_set_encrypted->op_info = "setting encrypted flag";
+  //trx_t* trx_set_encrypted = trx_allocate_for_background();
+  //TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
+  //trx_set_encrypted->op_info = "setting encrypted flag";
 
   while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
   {
@@ -2342,6 +2467,10 @@ fil_update_encrypted_flag(fil_space_t *space,
     if (space->stop_new_ops) // space is about to be dropped
       return DB_SUCCESS;      // do not try to lock the DD
   }
+
+  trx_t* trx_set_encrypted = trx_allocate_for_background();
+  TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
+  trx_set_encrypted->op_info = "setting encrypted flag";
 
   trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
   mutex_enter(&dict_sys->mutex);
@@ -2541,6 +2670,8 @@ fil_crypt_flush_space(
                 //(crypt_data->min_key_version + srv_fil_crypt_rotate_key_age == crypt_data->rotate_state.min_key_version_found && FSP_FLAGS_GET_ENCRYPTION(space->flags)));
         //TODO:Would not it be better if srv_fil_crypt_rotate_key_age == 1 meant - rotate key_version every single key rotation?
       }
+
+      //ut_ad(crypt_data->rotate_state.min_key_version_found == crypt_data->encrypting_with_key_version);
 
       /* update page 0 */
       mtr_t mtr;
@@ -2795,6 +2926,7 @@ DECLARE_THREAD(fil_crypt_thread)(
 
               //ib::error() << "Restarting from first table" << '\n';
 
+
               /* iterate all spaces searching for those needing rotation */
               while (!thr.should_shutdown() &&
                      fil_crypt_find_space_to_rotate(&new_state, &thr, &recheck)) {
@@ -2804,55 +2936,56 @@ DECLARE_THREAD(fil_crypt_thread)(
                         //ib::error() << "Recheck = " << recheck << '\n';
                         //ib::error() << "Getting to rotate " << thr.space->name << '\n';
                       //}
+                      bool rotation_started = fil_crypt_start_rotate_space(&new_state, &thr);
 
                       /* we found a space to rotate */
-                      fil_crypt_start_rotate_space(&new_state, &thr);
+                      if (rotation_started)
+                      {
+                        /* iterate all pages (cooperativly with other threads) */
+                        while (!thr.should_shutdown() &&
+                               fil_crypt_find_page_to_rotate(&new_state, &thr)) {
 
-                      /* iterate all pages (cooperativly with other threads) */
-                      while (!thr.should_shutdown() &&
-                             fil_crypt_find_page_to_rotate(&new_state, &thr)) {
-
-                              //if (strcmp(thr.space->name, "test/t1") == 0)
-                              //{
-                                //ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
-                              //}
+                                //if (strcmp(thr.space->name, "test/t1") == 0)
+                                //{
+                                  //ib::error() << "Found page to rotate for space=" << thr.space->name << '\n';
+                                //}
 
 
-                              if (!thr.space->is_stopping()) {
-                                      /* rotate a (set) of pages */
-                                      fil_crypt_rotate_pages(&new_state, &thr);
-                              }
+                                if (!thr.space->is_stopping()) {
+                                        /* rotate a (set) of pages */
+                                        fil_crypt_rotate_pages(&new_state, &thr);
+                                }
 
-                              if (thr.space->is_encrypted)
-                              {
-                                      /* There were some pages that were corrupted or could not have been
-                                       * decrypted - abort rotating space */
-  
-                                      ib::error() << "Found space with pages that cannot be decrypted - aborting encryption "
-                                                     "rotation for space id = " << thr.space->id << " table name = " << thr.space->name;
+                                if (thr.space->is_encrypted)
+                                {
+                                        /* There were some pages that were corrupted or could not have been
+                                         * decrypted - abort rotating space */
+    
+                                        ib::error() << "Found space with pages that cannot be decrypted - aborting encryption "
+                                                       "rotation for space id = " << thr.space->id << " table name = " << thr.space->name;
 
-                                      fil_space_release(thr.space);
-                                      thr.space = NULL;
-                                      break;
-                              }
+                                        fil_space_release(thr.space);
+                                        thr.space = NULL;
+                                        break;
+                                }
 
-                              /* If space is marked as stopping, release
-                              space and stop rotation. */
-                              if (thr.space->is_stopping()) {
-                                      fil_crypt_complete_rotate_space(
-                                              &new_state, &thr);
-                                      fil_space_release(thr.space);
-                                      thr.space = NULL;
-                                      break;
-                              }
+                                /* If space is marked as stopping, release
+                                space and stop rotation. */
+                                if (thr.space->is_stopping()) {
+                                        fil_crypt_complete_rotate_space(
+                                                &new_state, &thr);
+                                        fil_space_release(thr.space);
+                                        thr.space = NULL;
+                                        break;
+                                }
 
-                              /* realloc iops */
-                              fil_crypt_realloc_iops(&thr);
-                      }
-
-                      /* complete rotation */
-                      if (thr.space) {
-                              fil_crypt_complete_rotate_space(&new_state, &thr);
+                                /* realloc iops */
+                                fil_crypt_realloc_iops(&thr);
+                        }
+                        /* complete rotation */
+                        if (thr.space) {
+                                fil_crypt_complete_rotate_space(&new_state, &thr);
+                        }
                       }
 
                       /* force key state refresh */
