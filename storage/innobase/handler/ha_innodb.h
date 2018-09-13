@@ -67,6 +67,7 @@ typedef struct st_innobase_share {
 /** Prebuilt structures in an InnoDB table handle used within MySQL */
 struct row_prebuilt_t;
 
+
 /** The class defining a handle to an InnoDB table */
 class ha_innobase: public handler
 {

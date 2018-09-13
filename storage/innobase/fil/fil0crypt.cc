@@ -65,7 +65,7 @@ static int number_of_t1_pages_rotated = 0; //TODO:Robert - Can this be moved to 
 static ib_mutex_t fil_crypt_key_mutex;
 
 static bool fil_crypt_threads_inited = false;
-ulong srv_encrypt_tables = 0;
+extern ulong srv_encrypt_tables;
 
 /** No of key rotation threads requested */
 uint srv_n_fil_crypt_threads = 0;
@@ -97,6 +97,12 @@ static uint srv_alloc_time = 3;		    // allocate iops for 3s at a time
 static uint n_fil_crypt_iops_allocated = 0;
 
 uint get_global_default_encryption_key_id_value();
+
+bool is_online_encryption_on()
+{
+  return srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE;
+}
 
 /** Variables for scrubbing */
 //extern uint srv_background_scrub_data_interval;
@@ -269,7 +275,7 @@ fil_space_crypt_t::fil_space_crypt_t(
 		type = new_type;
 
 		if (new_encryption == FIL_ENCRYPTION_OFF ||
-			(!srv_encrypt_tables &&
+			(is_online_encryption_on() == false &&
 			 new_encryption == FIL_ENCRYPTION_DEFAULT)) {
 			type = CRYPT_SCHEME_UNENCRYPTED;
                         min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
@@ -915,12 +921,13 @@ fil_crypt_get_key_state(
       key_state_t*			new_state,
       fil_space_crypt_t*		crypt_data)
 {
-      if (srv_encrypt_tables) {
+      if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+          srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) {
               new_state->key_version = crypt_data->key_get_latest_version();
               new_state->rotate_key_age = srv_fil_crypt_rotate_key_age;
 
               ut_a(new_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-      } else {
+      } else if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED) {
               new_state->key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
               new_state->rotate_key_age = 0;
       }
@@ -1030,7 +1037,7 @@ fil_crypt_start_encrypting_space(
 
       /* If space is not encrypted and encryption is not enabled, then
       do not continue encrypting the space. */
-      if (!crypt_data && !srv_encrypt_tables) {
+      if (!crypt_data && is_online_encryption_on() == false) {
               mutex_exit(&fil_crypt_threads_mutex);
               return false;
       }
@@ -3239,7 +3246,7 @@ fil_space_crypt_get_status(
 
               mutex_exit(&crypt_data->mutex);
 
-              if (srv_encrypt_tables || crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+              if (is_online_encryption_on() || crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
                       status->current_key_version =
                               fil_crypt_get_latest_key_version(crypt_data);
               }

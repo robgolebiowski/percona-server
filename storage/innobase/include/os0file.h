@@ -509,7 +509,7 @@ struct Encryption {
         static bool is_rotated_keys(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
 //TODO:Robert, to nie jest obecnie używane!
-        static Type string_to_encryption_type(const char *algoritm)
+        static Type string_to_encryption_type(const char *algoritm);
 
         /** Generate random encryption value for key and iv.
         @param[in,out]	value	Encryption value */

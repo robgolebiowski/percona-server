@@ -1476,7 +1476,7 @@ fil_space_create(
 	if (purpose == FIL_TYPE_TABLESPACE
 	    && !srv_fil_crypt_rotate_key_age && fil_crypt_threads_event &&
 	    (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
-		    srv_encrypt_tables ))) {
+		    srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ))) {
 		    //srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(space->flags)))) {
 		/* Key rotation is not enabled, need to inform background
 		encryption threads. */
@@ -4047,7 +4047,7 @@ fil_ibd_create(
         // TODO:Robert: FIL_ENCRYPTION_ON jest tylko ustawione dla rotated_keys
 	if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF
             //|| (srv_encrypt_tables && !FSP_FLAGS_GET_ENCRYPTION(flags))) {
-            || (srv_encrypt_tables || create_info_encryption_key_id.was_encryption_key_id_set)) {
+            || (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING || create_info_encryption_key_id.was_encryption_key_id_set)) {
 		crypt_data = fil_space_create_crypt_data(mode,
                                                          create_info_encryption_key_id.encryption_key_id);
             if (crypt_data->should_encrypt())

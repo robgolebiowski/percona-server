@@ -577,8 +577,7 @@ ha_innobase::check_if_supported_inplace_alter(
 
 	/* We don't support change Mater Key encryption attribute with
 	inplace algorithm. */
-	//const bool currently_encrypted =
-		//m_prebuilt->table->flags2 & DICT_TF2_ENCRYPTION;
+	char*	old_encryption = this->table->s->encrypt_type.str;
 	char*	new_encryption = altered_table->s->encrypt_type.str;
 
         if (Encryption::is_master_key_encryption(old_encryption) ||
@@ -4697,7 +4696,9 @@ prepare_inplace_alter_table_dict(
                 if (Encryption::is_no(encrypt))
                   mode= FIL_ENCRYPTION_OFF;
                 else if (Encryption::is_rotated_keys(encrypt) || 
-                        (srv_encrypt_tables && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
+                        ((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+                          srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) 
+                          && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
                          && !Encryption::is_master_key_encryption(encrypt)) ||
                         ha_alter_info->create_info->was_encryption_key_id_set)
                 {
@@ -4719,7 +4720,9 @@ prepare_inplace_alter_table_dict(
                   else
                     my_free(tablespace_key);
 
-                  if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables))
+                  if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
+                                                    (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+                                                     srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)))
          	    DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_ENCRYPTION);
 
                 }

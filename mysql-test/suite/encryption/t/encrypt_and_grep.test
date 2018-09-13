@@ -148,7 +148,7 @@ SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 --source include/search_pattern_in_file.inc
 
 
---let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
 -- source include/start_mysqld.inc
 
 --echo # Now turn off encryption and wait for threads to decrypt everything
@@ -159,7 +159,7 @@ SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTI
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
-SET GLOBAL innodb_encrypt_tables = off;
+SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 
 #--sleep 10
 
@@ -234,12 +234,12 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 --source include/search_pattern_in_file.inc
 
 
---let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 
 -- source include/start_mysqld.inc
 
 --echo # Now turn on encryption and wait for threads to encrypt all spaces
-SET GLOBAL innodb_encrypt_tables = on;
+SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces

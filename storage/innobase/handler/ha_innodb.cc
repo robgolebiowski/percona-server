@@ -201,6 +201,17 @@ static char*	innodb_version_str = (char*) INNODB_VERSION_STR;
 extern uint srv_fil_crypt_rotate_key_age;
 extern uint srv_n_fil_crypt_iops;
 
+//enum srv_encrypt_tables_values {
+  //SRV_ENCRYPT_TABLES_OFF = 0,
+  //SRV_ENCRYPT_TABLES_ON = 1,
+  //SRV_ENCRYPT_TABLES_FORCE = 2,
+  //SRV_ENCRYPT_TABLES_KEYRING_ON = 3,
+  //SRV_ENCRYPT_TABLES_KEYRING_FORCE = 4,
+  //SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING = 5,
+  //SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE = 6,
+  //SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED = 7
+//};
+
 /** Note we cannot use rec_format_enum because we do not allow
 COMPRESSED row format for innodb_default_row_format option. */
 enum default_row_format_enum {
@@ -2836,16 +2847,6 @@ Encryption::is_rotated_keys(const char *algoritm)
                innobase_strcasecmp(algoritm, "rotated_keys") == 0);
 }
 
-/** Check if the NO algorithm was explicitly specified.
-@param[in]      algorithm       Encryption algorithm to check
-@return true if no algorithm explicitly requested */
-bool
-Encryption::none_explicitly_specified(const char* algorithm)
-{
-	return (algorithm != NULL && 
-	        innobase_strcasecmp(algorithm, "n") == 0);
-}
-
 /** Check the encryption option and set it
 @param[in]	option		encryption option
 @param[in/out]	encryption	The encryption algorithm
@@ -4084,9 +4085,9 @@ innobase_init(
 		}
 	}
 
-	if (srv_encrypt_tables
+	if ((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING || srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)
              && !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(FIL_DEFAULT_ENCRYPTION_KEY)) {
-		sql_print_error("InnoDB: cannot enable encryption, "
+		sql_print_error("InnoDB: cannot enable encryption, innodb_encrypt_tables is set to value different than OFF, but "
 				"keyring plugin is not available");
 
 		DBUG_RETURN(innobase_init_abort());
@@ -11503,7 +11504,7 @@ err_col:
                   //else if((Encryption::is_none(m_create_info->encrypt_type.str) && srv_encrypt_tables)
                           //|| Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
                   else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
-                          (srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)))
+                          (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING && !Encryption::is_no(m_create_info->encrypt_type.str)))
                   {
                       // Check if keyring is up and the key exists in keyring was already done in encryption option validation
                       rotated_keys_encryption_option= Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
@@ -12246,12 +12247,15 @@ create_table_info_t::create_option_compression_is_valid()
 	return(true);
 }
 
-enum srv_encrypt_tables_values {
-  SRV_ENCRYPT_TABLES_OFF = 0,
-  SRV_ENCRYPT_TABLES_ON = 1,
-  SRV_ENCRYPT_TABLES_FORCE = 2,
-};
-static const char* srv_encrypt_tables_names[] = { "OFF", "ON", "FORCE", 0 };
+
+//static bool is_srv_encrypt_tables_online_to_keyring()
+//{
+  //return srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+         //srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE;
+//}
+static const char* srv_encrypt_tables_names[] = { "OFF", "ON", "FORCE", "KEYRING_ON", "KEYRING_FORCE", 
+                                                  "ONLINE_TO_KEYRING", "ONLINE_TO_KEYRING_FORCE",
+                                                  "ONLINE_FROM_KEYRING_TO_UNENCRYPTED", 0 };
 
 /** Validate ENCRYPTION option.
 @return true if valid, false if not. */
@@ -12343,18 +12347,26 @@ create_table_info_t::create_option_encryption_is_valid() const
 
 
         //TODO:There is more to move from rotated_tablespaces
-        if (Encryption::is_no(m_create_info->encrypt_type.str) && srv_encrypt_tables == 2) {
-               my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
-			"InnoDB: Only ENCRYPTED tables can be created with "
-			"innodb_encrypt_tables=FORCE.", MYF(0));
-               return (false);
-        }
+        //if (Encryption::is_no(m_create_info->encrypt_type.str) && srv_encrypt_tables == 2) {
+               //my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
+			//"InnoDB: Only ENCRYPTED tables can be created with "
+			//"innodb_encrypt_tables=FORCE.", MYF(0));
+               //return (false);
+        //}
 
 	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE
-	  && Encryption::none_explicitly_specified(m_create_info->encrypt_type.str)) {
+	  && !Encryption::is_master_key_encryption(m_create_info->encrypt_type.str)) {
 		my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
-			"InnoDB: Only ENCRYPTED tables can be created with "
+			"InnoDB: Only Master Key encrypted tables (ENCRYPTION=\'Y\') can be created with "
 			"innodb_encrypt_tables=FORCE.", MYF(0));
+		return(false);
+	}
+
+	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE
+	  && !Encryption::is_rotated_keys(m_create_info->encrypt_type.str)) {
+		my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
+			"InnoDB: Only KEYRING encrypted tables (ENCRYPTION=\'KEYRING\') can be created with "
+			"innodb_encrypt_tables=KEYRING_FORCE.", MYF(0));
 		return(false);
 	}
 
@@ -12670,11 +12682,28 @@ create_table_info_t::create_options_are_invalid()
 }
 
 static const LEX_STRING yes_string = { C_STRING_WITH_LEN("Y") };
+static const LEX_STRING rotated_keys_string = { C_STRING_WITH_LEN("ROTATED_KEYS") };
 void
 ha_innobase::adjust_create_info_for_frm(
 	HA_CREATE_INFO*	create_info)
 {
-	bool	is_intrinsic =
+			if (create_info->encrypt_type.length == 0
+			&& create_info->encrypt_type.str == NULL)
+                {
+                        if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
+                            srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE)
+			{
+				create_info->encrypt_type = yes_string;
+			}
+                        else if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
+                                 srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
+                                 srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)
+                        {
+                                create_info->encrypt_type = rotated_keys_string;
+                        }
+                }
+
+        bool	is_intrinsic =
 		(create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE) != 0;
 
 	/* If table is intrinsic, it will use encryption for table based on
@@ -14491,7 +14520,7 @@ innobase_create_tablespace(
 	bool atomic_blobs = page_size.is_compressed();
 	bool is_encrypted = ((alter_info->encrypt
 		&& (!Encryption::is_none(alter_info->encrypt_type.str) ||
-                    (srv_encrypt_tables && !Encryption::is_no(alter_info->encrypt_type.str)))) 
+                    (srv_encrypt_tables = SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING && !Encryption::is_no(alter_info->encrypt_type.str)))) 
                 || srv_encrypt_tables); // TODO:Robert tu chyba nie powinno być || srv_encrypt_tables
         //bool is_rotated_key = (alter_info->encrypt 
             //&& Encryption::is_rotated_keys(alter_info->encrypt_type.str));
@@ -21970,8 +21999,8 @@ static MYSQL_SYSVAR_ENUM(encrypt_tables, srv_encrypt_tables,
 			 "specified. When it's set to FORCE, only encrypted tables can be created."
 			 "The FORCE setting also disables non inplace alteration of unencrypted,"
 			 " tables without encrypting them in the process.",
-			 NULL,
-			 NULL,
+			 innodb_encrypt_tables_validate,
+			 innodb_encrypt_tables_update,
 			 0,
 			 &srv_encrypt_tables_typelib);
 
@@ -22735,20 +22764,20 @@ static MYSQL_SYSVAR_BOOL(encrypt_online_alter_logs,
   "Encrypt online alter logs.",
   NULL, NULL, FALSE);
 
-static const char* srv_encrypt_tables_names[] = { "OFF", "ON", "FORCE", 0 };
-static TYPELIB srv_encrypt_tables_typelib = {
-	array_elements(srv_encrypt_tables_names)-1, 0, srv_encrypt_tables_names,
-	NULL
-};
+//static const char* srv_encrypt_tables_names[] = { "OFF", "ON", "FORCE", 0 };
+//static TYPELIB srv_encrypt_tables_typelib = {
+	//array_elements(srv_encrypt_tables_names)-1, 0, srv_encrypt_tables_names,
+	//NULL
+//};
 
-static MYSQL_SYSVAR_ENUM(encrypt_tables, srv_encrypt_tables,
-			 PLUGIN_VAR_OPCMDARG,
-			 "Enable encryption for tables. "
-			 "Don't forget to enable --innodb-encrypt-log too",
-			 innodb_encrypt_tables_validate,
-			 innodb_encrypt_tables_update,
-			 0,
-			 &srv_encrypt_tables_typelib);
+//static MYSQL_SYSVAR_ENUM(encrypt_tables, srv_encrypt_tables,
+			 //PLUGIN_VAR_OPCMDARG,
+			 //"Enable encryption for tables. "
+			 //"Don't forget to enable --innodb-encrypt-log too",
+			 //innodb_encrypt_tables_validate,
+			 //innodb_encrypt_tables_update,
+			 //0,
+			 //&srv_encrypt_tables_typelib);
 
 static MYSQL_SYSVAR_UINT(encryption_threads, srv_n_fil_crypt_threads,
 			 PLUGIN_VAR_RQCMDARG,

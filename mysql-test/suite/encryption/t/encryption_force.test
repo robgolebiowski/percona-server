@@ -5,6 +5,8 @@
 
 select @@innodb_encrypt_tables;
 
+set global innodb_encrypt_tables='KEYRING_FORCE';
+
 create table t1 (a int) engine=innodb encryption='ROTATED_KEYS';
 create table t2 (a varchar(255)) engine=innodb;
 --error ER_INVALID_ENCRYPTION_OPTION
@@ -14,9 +16,9 @@ create table t4 (a int) engine=innodb encryption='ROTATED_KEYS' partition by has
 --error ER_INVALID_ENCRYPTION_OPTION
 create table t5 (a int) engine=innodb encryption='N' partition by hash(a) partitions 2;
 
-set global innodb_encrypt_tables='ON';
+set global innodb_encrypt_tables='KEYRING_ON';
 create table t3 (a int) engine=innodb encryption='N';
-set global innodb_encrypt_tables='FORCE';
+set global innodb_encrypt_tables='KEYRING_FORCE';
 
 show create table t1;
 show create table t2;

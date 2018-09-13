@@ -483,7 +483,8 @@ dict_build_tablespace_for_table(
 					    DICT_TF2_FTS_AUX_HEX_NAME););
 
         if (node && (node->mode == FIL_ENCRYPTION_ON ||
-                     (node->mode == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables)))
+                    (node->mode == FIL_ENCRYPTION_DEFAULT &&
+                     srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)))
           DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
 
 	if (needs_file_per_table) {

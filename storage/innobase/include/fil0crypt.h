@@ -201,7 +201,8 @@ struct fil_space_crypt_t : st_encryption_scheme
 	/** Returns true if tablespace should be encrypted */
 	bool should_encrypt() const {
 		return ((encryption == FIL_ENCRYPTION_ON) ||
-			(srv_encrypt_tables &&
+			((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING || 
+                          srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) &&
 				encryption == FIL_ENCRYPTION_DEFAULT));
 	}
 
