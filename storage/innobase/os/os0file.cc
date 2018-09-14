@@ -10666,7 +10666,8 @@ os_dblwr_encrypt_page(
 	write_request.encryption_key(
 		space->encryption_key,
 		space->encryption_klen,
-		space->encryption_iv);
+		space->encryption_iv,
+                0, 0, NULL, NULL);
 	write_request.encryption_algorithm(
 		Encryption::AES);
 
@@ -10721,7 +10722,8 @@ os_dblwr_decrypt_page(
 	decrypt_request.encryption_key(
 			space->encryption_key,
 			space->encryption_klen,
-			space->encryption_iv);
+			space->encryption_iv,
+                        0, 0, NULL, NULL);
 
 	decrypt_request.encryption_algorithm(
 		Encryption::AES);

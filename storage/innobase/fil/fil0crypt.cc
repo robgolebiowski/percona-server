@@ -1256,7 +1256,7 @@ fil_crypt_space_needs_rotation(
 
 
       /* Make sure that tablespace is normal tablespace */
-      if (space->purpose != FIL_TYPE_TABLESPACE) {
+      if (space->purpose != FIL_TYPE_TABLESPACE && space->purpose != FIL_TYPE_TEMPORARY) {
                   ib::error() << "Break reason 7";
               return false;
       }

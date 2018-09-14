@@ -11051,7 +11051,7 @@ create_table_info_t::enable_encryption(dict_table_t* table) {
 	ulint			master_key_id;
 	Encryption::Version	version;
 
-	/* Check if keyring is ready. */
+	/* Check if keyring is ready. */ //TODO:This is wrong there should a fetch OR create master key
 	Encryption::get_master_key(
 		&master_key_id, &master_key, &version);
 
@@ -11534,80 +11534,6 @@ err_col:
                       //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
                   //}
                 }
-		else {
-
-
-			/* Set the encryption flag. */
-			byte*			master_key = NULL;
-			ulint			master_key_id;
-			Encryption::Version	version;
-
-                        //if (Encryption::is_rotated_keys(encrypt))
-                        //{
-                              // TODO: Czy powininem tutaj już wygenerować klucz dla tablicy
-                              // i zapisać w keyringu ?
-                          /* Check if keyring is ready. */
-                          //TODO:Robert, duże kopiuj/wklej. Czy mogę tutaj utworzyć klucz dla tablicy?
-                           //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                           //DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
- 
-//TODO:Robert: Ingoring the chekcing for keyring - seems get_master_key can be null here
-                          //Encryption::get_master_key(&master_key_id,
-                                                     //&master_key,
-                                                     //&version);
-
-                          //if (master_key == NULL) {
-                                  //my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
-                                           //MYF(0));
-                                  //err = DB_UNSUPPORTED;
-                                  //dict_mem_table_free(table);
-                          //} else {
-                                  //my_free(master_key);
-
-                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
-                          //}
-
-
-
-                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                              //DICT_TF2_FLAG_SET(table, DICT_TF2_ROTATED_KEYS);
-                        //}
-                        //else
-                        //{
-                          /* Check if keyring is ready. */
-                          Encryption::get_master_key(&master_key_id,
-                                                     &master_key,
-                                                     &version);
-
-                          if (master_key == NULL) {
-                                  my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, //TODO:Robert:To sprawdzenie jest tez dla rotated keys, ale blad powininen byc inny niz "cannot find master key"
-                                           MYF(0));
-                                  err = DB_UNSUPPORTED;
-                                  dict_mem_table_free(table);
-                          } else {
-                                  my_free(master_key);
-                                  DICT_TF2_FLAG_SET(table,
-                                                    DICT_TF2_ENCRYPTION);
-
-                                  //if ((m_create_info->encrypt_type.length > 0 && 
-                                       //(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
-                                        //(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)))) ||
-                                      //srv_encrypt_tables) // TODO:Robert już później powinienem się tylko opierać na FIL_ENCRYPTION...
-                                  //{
-                                    //rotated_keys_encryption_option= FIL_ENCRYPTION_ON;
-                                    //encryption_key_id= m_create_info->encryption_key_id;
-                                  //}
-                          }
-		}
-
-
-                // Make sure that encryption_key_id is not used with MK encryption
-                //ut_ad(!Encryption::is_none(m_create_info->encrypt_type.str) &&
-                //      !Encryption::is_rotated_keys(m_create_info->encrypt_type.str) &&
-                //      m_create_info->encryption_key_id.length == 0);
-
-
 
 		if (err == DB_SUCCESS) {
 			//err = row_create_table_for_mysql(
@@ -12370,14 +12296,6 @@ create_table_info_t::create_option_encryption_is_valid() const
 		return(false);
 	}
 
-	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE
-	  && Encryption::none_explicitly_specified(m_create_info->encrypt_type.str)) {
-		my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
-			"InnoDB: Only ENCRYPTED tables can be created with "
-			"innodb_encrypt_tables=FORCE.", MYF(0));
-		return(false);
-	}
-
 	if (m_use_shared_space) {
 		space_id = fil_space_get_id_by_name(m_create_info->tablespace);
 
@@ -12687,22 +12605,6 @@ void
 ha_innobase::adjust_create_info_for_frm(
 	HA_CREATE_INFO*	create_info)
 {
-			if (create_info->encrypt_type.length == 0
-			&& create_info->encrypt_type.str == NULL)
-                {
-                        if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
-                            srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE)
-			{
-				create_info->encrypt_type = yes_string;
-			}
-                        else if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
-                                 srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
-                                 srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)
-                        {
-                                create_info->encrypt_type = rotated_keys_string;
-                        }
-                }
-
         bool	is_intrinsic =
 		(create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE) != 0;
 
@@ -12711,12 +12613,22 @@ ha_innobase::adjust_create_info_for_frm(
 	without explicit encryption attribute, table will be forced to be
 	encrypted if innodb_encrypt_tables=ON/FORCE */
 	if (create_info->encrypt_type.length == 0
-	    && create_info->encrypt_type.str == NULL
-	    && ((is_intrinsic && srv_tmp_space.is_encrypted())
-		|| (!is_intrinsic
-		    && srv_encrypt_tables != SRV_ENCRYPT_TABLES_OFF))) {
-		create_info->encrypt_type = yes_string;
-	}
+	    && create_info->encrypt_type.str == NULL)
+        {
+                if ((!is_intrinsic && (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
+                                       srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE))
+                    ||
+                    (is_intrinsic && srv_tmp_space.is_encrypted()))
+		{
+			create_info->encrypt_type = yes_string;
+		}
+                else if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
+                         srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
+                         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)
+                {
+                        create_info->encrypt_type = rotated_keys_string;
+                }
+        }
 }
 
 /*****************************************************************//**

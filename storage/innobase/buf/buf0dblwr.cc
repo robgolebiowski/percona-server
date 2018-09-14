@@ -862,8 +862,11 @@ buf_dblwr_process(void)
 					<< ". Trying to recover it from the"
 					<< " doublewrite buffer.";
 
-				dberr_t	err = os_dblwr_decrypt_page(
-					space, page);
+				dberr_t	err = DB_SUCCESS;
+
+                                if (space->crypt_data == NULL) // if it was crypt_data encrypted it was already decrypted
+                                  err = os_dblwr_decrypt_page(
+					  space, page);
 
 				if (err != DB_SUCCESS || buf_page_is_corrupted(
 					true, page, page_size,
@@ -1305,6 +1308,8 @@ buf_dblwr_flush_buffered_writes(
                 //FilSpace space (bpage->id.space()); // this is a guard
                 FilSpace space (TRX_SYS_SPACE); // this is a guard
                                                 // Temporarily encrypt all pages in doulbe write buffer with system's tablespace key
+
+                bpage->encrypt = false;
                 
                 //TODO:Those keys will need to be fried somewhere
                 if (space() && space()->crypt_data && space()->crypt_data->should_encrypt() && space()->crypt_data->encrypting_with_key_version != 0) //TODO:Robert Space might be already dropped - one more reason to
@@ -1336,7 +1341,8 @@ buf_dblwr_flush_buffered_writes(
 		buffer has sane LSN values. */
 		buf_dblwr_check_page_lsn(dblwr_page);
 
-		if (encrypt_parallel_dblwr
+                // it can be already encrypted by encryption threads
+		if (encrypt_parallel_dblwr && bpage->encrypt == false
 		    && !buf_dblwr_disable_encryption(block)) {
 			buf_dblwr_encrypt_page(block, dblwr_page);
 		}
@@ -1552,7 +1558,7 @@ retry:
 
 	IORequest	write_request(IORequest::WRITE);
 
-	if (buf_dblwr_disable_encryption((buf_block_t*)bpage)) {
+	if (bpage->encrypt == false && buf_dblwr_disable_encryption((buf_block_t*)bpage)) {
 		write_request.disable_encryption();
 	}
 

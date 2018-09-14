@@ -2178,11 +2178,6 @@ fil_space_next(fil_space_t* prev_space)
        if (prev_space != NULL ) { //|| space_should_not_be_rotated(space)) {
 		ut_ad(space->n_pending_ops > 0);
 
-                //if (strcmp(prev_space->name, "test/t2") == 0)
-                //{
-                  //ib::error() << "Prev space is test/t2" << '\n';
-                //}
-
 		/* Move on to the next fil_space_t */
 		space->n_pending_ops--;
 		space = UT_LIST_GET_NEXT(space_list, space);
@@ -2200,19 +2195,7 @@ fil_space_next(fil_space_t* prev_space)
 		}
 
                 if (space != NULL) {
-
-                  //if (strcmp(space->name, "test/t2") == 0)
-                  //{
-                      //ib::error() << "Increasing n_pending_ops for test/t2" << '\n';
-                  //}
-
-                  //if (strcmp(space->name, "test/t2") == 0 && space->n_pending_ops == 1)
-                  //{
-                      //ib::error() << "Increasing n_pending_ops to 2 for test/t2" << '\n';
-                  //}
-           
-
-			space->n_pending_ops++;
+       			space->n_pending_ops++;
 		}
 	}
 
@@ -5972,7 +5955,7 @@ fil_io_set_encryption(
 	/* Don't encrypt pages of system tablespace upto
 	TRX_SYS_PAGE(including). The doublewrite buffer
 	header is on TRX_SYS_PAGE */
-	if (is_shared_system_tablespace(space->id)
+	if (is_shared_system_tablespace(space->id) && space->crypt_data == NULL
 	    && page_id.page_no() <= FSP_TRX_SYS_PAGE_NO) {
 		req_type.clear_encrypted();
 		return;
@@ -6376,6 +6359,16 @@ _fil_io(
 			space->name, byte_offset, len, req_type.is_read());
 	}
 
+        if (page_size.is_compressed())
+        {
+          req_type.mark_page_zip_compressed();
+          req_type.set_zip_page_physical_size(page_size.physical());
+          ut_ad(page_size.physical() > 0);
+        }
+
+	/* Set encryption information. */
+        fil_io_set_encryption(req_type, page_id, space);
+
 	/* Now we have made the changes in the data structures of fil_system */
 	mutex_exit(&fil_system->mutex);
 
@@ -6464,19 +6457,15 @@ _fil_io(
 		req_type.clear_compressed();
 	}
 
-        if (page_size.is_compressed())
-        {
-          req_type.mark_page_zip_compressed();
-          req_type.set_zip_page_physical_size(page_size.physical());
-          ut_ad(page_size.physical() > 0);
-        }
+        //if (page_size.is_compressed())
+        //{
+          //req_type.mark_page_zip_compressed();
+          //req_type.set_zip_page_physical_size(page_size.physical());
+          //ut_ad(page_size.physical() > 0);
+        //}
 
 	/* Set encryption information. */
-        //ut_ad(message != NULL);
-        //if (space->crypt_data != NULL)
-          //space->encryption_type= Encryption::ROTATED_KEYS;
-        //if (message != NULL) //TODO: Just for now, later I will need to get a key here for such a message
-          fil_io_set_encryption(req_type, page_id, space);
+        //fil_io_set_encryption(req_type, page_id, space);
 
 	req_type.block_size(node->block_size);
 
@@ -8216,7 +8205,10 @@ fil_set_encryption(
 
 	ut_ad(algorithm != Encryption::NONE);
 	space->encryption_type = algorithm;
-	space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+        // if it's encrypted with rotated keys encryption threads will update
+        // the mask after space's been encrypted
+        if (space->crypt_data == NULL)
+        	space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
 
 	if (key == NULL) {
 		Encryption::random_value(space->encryption_key);
@@ -8275,6 +8267,8 @@ static const ulint ENCRYPTION_DEFAULT_MASTER_KEY_ID = 0;
 
 /** Rotate the tablespace keys by new master key.
 @return true if the re-encrypt suceeds */
+
+//TODO:Allow this only when encryption threads are disabled
 bool
 fil_encryption_rotate()
 {
@@ -8286,6 +8280,7 @@ fil_encryption_rotate()
 	     space != NULL; ) {
 		/* Skip unencypted tablespaces. */
 		if (srv_is_undo_tablespace(space->id)
+                    || space->crypt_data
 		    || space->purpose == FIL_TYPE_LOG) {
 			space = UT_LIST_GET_NEXT(space_list, space);
 			continue;
@@ -8313,6 +8308,13 @@ fil_encryption_rotate()
 			mtr.set_named_space(space->id);
 
 			space = mtr_x_lock_space(space->id, &mtr);
+
+                        //if (space->crypt_data != NULL) //encryption threads already started to process this thread
+                        //{
+                          //mtr_commit(&mtr);
+                          //continue;
+                        //}
+                        //space->exclude_from_rotation = true;
 
 			memset(encrypt_info, 0, ENCRYPTION_INFO_SIZE_V2);
 
