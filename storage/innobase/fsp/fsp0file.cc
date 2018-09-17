@@ -404,7 +404,7 @@ Datafile::validate_to_dd(
 	ulint		flags,
 	bool		for_import)
 {
-        ib::error() << "Validating to dd space_id = " << space_id << '\n';
+        //ib::error() << "Validating to dd space_id = " << space_id << '\n';
 	//dberr_t err;
         ValidateOutput output;
 
@@ -606,14 +606,14 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 		}
 	}
 
-        ib::error() << "Validating first page of space_id = " << m_space_id << '\n';
+        //ib::error() << "Validating first page of space_id = " << m_space_id << '\n';
 
-        if (m_space_id == 24)
-        {
-          int x = 1;
-          x=2;
-          (void)x;
-        }
+        //if (m_space_id == 24)
+        //{
+          //int x = 1;
+          //x=2;
+          //(void)x;
+        //}
 
 
 
@@ -701,13 +701,13 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
         fil_space_crypt_t* crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page);
 
 
-        if (m_space_id == 24)
-        {
-          if (crypt_data)
-            ib::error() << "Table test/t2 has crypt data in validate first page";
-          else 
-            ib::error() << "Table test/t2 has NOT crypt data in validate first page";
-        }
+        //if (m_space_id == 24)
+        //{
+          //if (crypt_data)
+            //ib::error() << "Table test/t2 has crypt data in validate first page";
+          //else 
+            //ib::error() << "Table test/t2 has NOT crypt data in validate first page";
+        //}
  
         //TODO:Robert: Based on this is_rotated_keys is set - but what about situation if we do not
         //get here and ValidateOutput::DO_NOT_KNOW is set - will then an error be emited first

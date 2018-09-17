@@ -570,10 +570,10 @@ fil_node_create_low(
 
 	space->size += size;
 
-        if (strcmp(space->name, "test/t2") == 0)
-        {
-          ib::error() << "In fil_node_create_log : Setting test/t2 size to" << size << '\n';
-        }
+        //if (strcmp(space->name, "test/t2") == 0)
+        //{
+          //ib::error() << "In fil_node_create_log : Setting test/t2 size to" << size << '\n';
+        //}
 
 	node->space = space;
 
@@ -733,13 +733,13 @@ retry:
 			request,
 			node->handle, page, 0, UNIV_PAGE_SIZE);
 
-                ib::error() << "Robert: Openning tablename "
-                        << node->name << " space_id =  " << space->id;
+                //ib::error() << "Robert: Openning tablename "
+                        //<< node->name << " space_id =  " << space->id;
 
-                if (strcmp(space->name, "test/t2") == 0)
-                {
-                  ib::error() << "Openning test/t2'\n'";
-                }
+                //if (strcmp(space->name, "test/t2") == 0)
+                //{
+                  //ib::error() << "Openning test/t2'\n'";
+                //}
 
 		srv_stats.page0_read.add(1);
 		space_id = fsp_header_get_space_id(page);
@@ -1436,10 +1436,10 @@ fil_space_create(
 
 	space->magic_n = FIL_SPACE_MAGIC_N;
 
-        if (strcmp(space->name, "test/t2") == 0 && crypt_data != NULL)
-        {
-          ib::error() << "Assigning crypt data to test/t2 <<'\n'";
-        }
+        //if (strcmp(space->name, "test/t2") == 0 && crypt_data != NULL)
+        //{
+          //ib::error() << "Assigning crypt data to test/t2 <<'\n'";
+        //}
 
         space->crypt_data = crypt_data;
 
@@ -4143,7 +4143,7 @@ fil_ibd_open(
 	const char*	path_in,
         Rotated_keys_info &rotated_keys_info)
 {
-        ib::error() << "Robert: fil_ibd_open space " << space_name << "space flags = " << flags;
+        //ib::error() << "Robert: fil_ibd_open space " << space_name << "space flags = " << flags;
 
 	dberr_t		err = DB_SUCCESS;
 	bool		dict_filepath_same_as_default = false;
@@ -4169,8 +4169,8 @@ fil_ibd_open(
 	ut_ad(!fix_dict || srv_log_file_size != 0);
 	ut_ad(fil_type_is_data(purpose));
 
-        if (strcmp(space_name, "test/t2") == 0)
-          ib::error() << "fil_ibd_open test/t2";
+        //if (strcmp(space_name, "test/t2") == 0)
+          //ib::error() << "fil_ibd_open test/t2";
 
 
 
@@ -4288,7 +4288,7 @@ fil_ibd_open(
 		goto skip_validate;
 	}
 
-        ib::error() << "Robert: Validating first page of space " << space_name; 
+        //ib::error() << "Robert: Validating first page of space " << space_name; 
 
 
 	/* Read and validate the first page of these three tablespace
@@ -4578,8 +4578,8 @@ skip_validate:
                   }
                   else if (space->crypt_data)
                   {
-                      if (strcmp(space->name, "test/t2") == 0)
-                        ib::error() << "There is crypt_data for test/t2";
+                      //if (strcmp(space->name, "test/t2") == 0)
+                        //ib::error() << "There is crypt_data for test/t2";
 
 
                         err = fil_set_encryption(space->id,
@@ -6014,8 +6014,8 @@ fil_io_set_encryption(
                 uint key_version = 0;
                 uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 
-                if (strcmp(space->name, "test/t6") == 0)
-                  ib::error() << "dummy test for " << space->name << '\n';
+                //if (strcmp(space->name, "test/t6") == 0)
+                  //ib::error() << "dummy test for " << space->name << '\n';
 
                 //ut_ad(space->encryption_type != Encryption::ROTATED_KEYS); //TODO:Robert:Cannot be called for ROTATED_KEYS
 
@@ -6075,8 +6075,8 @@ fil_io_set_encryption(
                   }
                   key_id= space->crypt_data->key_id;
 
-                  if (strcmp(space->name, "test/t6") == 0)
-                    ib::error() << "dummy test for " << space->name << '\n';
+                  //if (strcmp(space->name, "test/t6") == 0)
+                    //ib::error() << "dummy test for " << space->name << '\n';
 
 
 

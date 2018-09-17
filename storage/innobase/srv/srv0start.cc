@@ -206,6 +206,8 @@ mysql_pfs_key_t	srv_log_tracking_thread_key;
 mysql_pfs_key_t	srv_worker_thread_key;
 #endif /* UNIV_PFS_THREAD */
 
+int unlock_keyrings(THD *thd);
+
 #ifdef HAVE_PSI_STAGE_INTERFACE
 /** Array of all InnoDB stage events for monitoring activities via
 performance schema. */
@@ -3030,6 +3032,9 @@ innobase_shutdown_for_mysql(void)
 		dict_stats_thread_deinit();
                /* Shutdown key rotation threads */
                 fil_crypt_threads_cleanup(); // TODO:Robert: in the original there is also 
+                if (srv_n_fil_crypt_threads > 0)
+                  unlock_keyrings(NULL); 
+
 //   srv_start_state_t: Document the flags. Replace SRV_START_STATE_STAT
   //  with SRV_START_STATE_REDO. The srv_bg_undo_sources replaces the
   //  original use of SRV_START_STATE_STAT.

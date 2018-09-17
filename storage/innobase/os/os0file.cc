@@ -9920,7 +9920,7 @@ Encryption::encrypt(
           //}
           
 //#ifdef UNIV_ENCRYPT_DEBUG
-	  fprintf(stderr, "Robert:Rotating tablspace\n");
+	  //fprintf(stderr, "Robert:Rotating tablspace\n");
           //get_latest_tablespace_key_or_create_new_one(ulint space_id,
                                                        //uint *tablespace_key_version,
 							//byte** tablespace_key)

@@ -532,9 +532,9 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 
         ut_ad(key_id != (uint)(~0));
 
-        if (key_id != 0)
-          ib::error() << "Read crypt_data: key_id: " << key_id << " type: " << ((type == CRYPT_SCHEME_UNENCRYPTED) ? "schema unencrypted"
-                                                                                                                   : "schema encrypted");
+        //if (key_id != 0)
+          //ib::error() << "Read crypt_data: key_id: " << key_id << " type: " << ((type == CRYPT_SCHEME_UNENCRYPTED) ? "schema unencrypted"
+                                                                                                                   //: "schema encrypted");
 
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(
 		page + offset + bytes_read);
@@ -713,8 +713,8 @@ fil_space_crypt_t::write_page0(
 
         delete[] encrypt_info;
 
-        ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << a_min_key_version
-                    << " space_flags = " << space->flags;
+        //ib::error() << "Successfuly updated page0 for table = " << space->name << " with min_key_verion " << a_min_key_version
+                    //<< " space_flags = " << space->flags;
 
 }
 
@@ -866,9 +866,9 @@ fil_parse_write_crypt_data(
 	/* update fil_space memory cache with crypt_data */
 	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
 
-                ib::error() << "parsed log for table " << space->name
-                            << " with min_key_version = " << min_key_version
-                            << " current min_key_version in crypt_data is " << crypt_data->min_key_version << '\n';
+                //ib::error() << "parsed log for table " << space->name
+                            //<< " with min_key_version = " << min_key_version
+                            //<< " current min_key_version in crypt_data is " << crypt_data->min_key_version << '\n';
 
 
 
@@ -886,7 +886,7 @@ fil_parse_write_crypt_data(
                     && !crypt_data->is_key_found())
                     //&& Encryption::tablespace_key_exists(crypt_data->key_id) == false) 
                 {
-                      ib::error() << "Key cannot be read for SPACE ID = " << space_id;
+                      ib::error() << "Key cannot be read for SPACE ID = " << space_id; //TODO: To jest zmienione w MariaDB - zmienić!
                       recv_sys->set_corrupt_log();
 		}
 	} else {
@@ -975,8 +975,8 @@ fil_crypt_needs_rotation(
       /* this is rotation encrypted => encrypted,
       * only reencrypt if key is sufficiently old */
       if (rotate_key_age > 0 && (key_version + rotate_key_age <= latest_key_version)) {
-         ib::error() << "Rotating from key_version = " << key_version << " rotate_key_age = " << rotate_key_age
-                     << " latest_key_version = " << latest_key_version;
+         //ib::error() << "Rotating from key_version = " << key_version << " rotate_key_age = " << rotate_key_age
+                     //<< " latest_key_version = " << latest_key_version;
 
               return true;
       }
@@ -1125,10 +1125,10 @@ fil_crypt_start_encrypting_space(
 
               /* 3 - write crypt data to page 0 */
               byte* frame = buf_block_get_frame(block);
-              if (strcmp(space->name, "test/t2") == 0)
-              {
-                ib::error() << "Assigning encryption to t2.";
-              }
+              //if (strcmp(space->name, "test/t2") == 0)
+              //{
+                //ib::error() << "Assigning encryption to t2.";
+              //}
 
               crypt_data->type = CRYPT_SCHEME_1;
               //space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
@@ -1257,7 +1257,7 @@ fil_crypt_space_needs_rotation(
 
       /* Make sure that tablespace is normal tablespace */
       if (space->purpose != FIL_TYPE_TABLESPACE && space->purpose != FIL_TYPE_TEMPORARY) {
-                  ib::error() << "Break reason 7";
+                  //ib::error() << "Break reason 7";
               return false;
       }
 
@@ -1689,10 +1689,10 @@ fil_crypt_start_rotate_space(
               * if space extends, it will be encrypted with newer version */
               /* FIXME: max_offset could be removed and instead
               space->size consulted.*/
-              if (strcmp(state->space->name, "test/t2") == 0)
-              {
-                ib::error() << "Starting rotating t2" << '\n';
-              }
+              //if (strcmp(state->space->name, "test/t2") == 0)
+              //{
+                //ib::error() << "Starting rotating t2" << '\n';
+              //}
 
               crypt_data->rotate_state.max_offset = state->space->size;
               crypt_data->rotate_state.end_lsn = 0;
@@ -1706,10 +1706,10 @@ fil_crypt_start_rotate_space(
                       key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
                       /* this is rotation unencrypted => encrypted */
                       
-                      if (strcmp(state->space->name, "test/t7") == 0)
-                      {
-                        ib::error() << "Assigning encryption to t7.1.";
-                      }
+                      //if (strcmp(state->space->name, "test/t7") == 0)
+                      //{
+                        //ib::error() << "Assigning encryption to t7.1.";
+                      //}
                       crypt_data->type = CRYPT_SCHEME_1;
               }
       }
@@ -1761,6 +1761,7 @@ fil_crypt_find_page_to_rotate(
       bool found = crypt_data->rotate_state.max_offset >=
               crypt_data->rotate_state.next_offset;
 
+      /*
       if (strcmp(state->space->name, "test/t1") == 0)
       {
         if (found){
@@ -1773,7 +1774,7 @@ fil_crypt_find_page_to_rotate(
           ib::error() << "crypt_data->rotate_state.max_offset= " << crypt_data->rotate_state.max_offset << '\n';
           ib::error() << "crypt_data->rotate_state.next_offset= " << crypt_data->rotate_state.next_offset << '\n';
         }
-      }
+      }*/
 
 
       if (found) {
@@ -1919,11 +1920,11 @@ fil_crypt_rotate_page(
 
       //ut_d(const bool was_free = fseg_page_is_free(space, offset)); //TODO:Robert: For the time being removed
 
-      if (strcmp(space->name, "test/t1") == 0)
-      {
-        ib::error() << "Before trying to write to test/t1 "
-                    << "for offset = " << offset << '\n';
-      }
+      //if (strcmp(space->name, "test/t1") == 0)
+      //{
+        //ib::error() << "Before trying to write to test/t1 "
+                    //<< "for offset = " << offset << '\n';
+      //}
       mtr_t mtr;
       mtr.start();
       if (buf_block_t* block = fil_crypt_get_page_throttle(state,
@@ -1948,16 +1949,16 @@ fil_crypt_rotate_page(
                          ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
                          : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
                 
-              if (strcmp(space->name, "test/t1") == 0)
-              {
-                ib::error() << "Trying to write to " << space->name << '\n';
-                ib::error() << "Space id = " << space->id << '\n';
-                ib::error() << "Encryption: " << crypt_data->encryption << '\n';
-                ib::error() << "kv: " << kv << '\n';
-                ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
-                ib::error() << "for offset = " << offset << '\n';
-                ib::error() << "rotation = " << space->crypt_data->encryption_rotation << '\n';
-              }
+              //if (strcmp(space->name, "test/t1") == 0)
+              //{
+                //ib::error() << "Trying to write to " << space->name << '\n';
+                //ib::error() << "Space id = " << space->id << '\n';
+                //ib::error() << "Encryption: " << crypt_data->encryption << '\n';
+                //ib::error() << "kv: " << kv << '\n';
+                //ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
+                //ib::error() << "for offset = " << offset << '\n';
+                //ib::error() << "rotation = " << space->crypt_data->encryption_rotation << '\n';
+              //}
 
 
               if (space->is_stopping()) {
@@ -1986,8 +1987,8 @@ fil_crypt_rotate_page(
                       mtr.set_named_space(space);
                       modified = true;
 
-                      if (strcmp(space->name, "test/t1") == 0)
-                        ib::error() << "Write to  " << space->name << " for offset = " << offset << '\n';
+                      //if (strcmp(space->name, "test/t1") == 0)
+                        //ib::error() << "Write to  " << space->name << " for offset = " << offset << '\n';
                       /* force rotation by dummy updating page */
                       mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
                                        space_id, MLOG_4BYTES, &mtr);
@@ -2059,13 +2060,13 @@ fil_crypt_rotate_pages(
 
       ut_ad(state->space->n_pending_ops > 0);
 
-      if (strcmp(state->space->name, "test/t1") == 0)
-      {
-        ib::error() << "In fil_crypt_rotate_pages for test/t1" << '\n'
-                    << "state->offset = " << state->offset << '\n'
-                    << "state->space->is_encrypted = " << state->space->is_encrypted << '\n'
-                    << "end = " << end << '\n';
-      }
+      //if (strcmp(state->space->name, "test/t1") == 0)
+      //{
+        //ib::error() << "In fil_crypt_rotate_pages for test/t1" << '\n'
+                    //<< "state->offset = " << state->offset << '\n'
+                    //<< "state->space->is_encrypted = " << state->space->is_encrypted << '\n'
+                    //<< "end = " << end << '\n';
+      //}
 
       for (; state->offset < end && !state->space->is_encrypted; state->offset++) {
 
@@ -2086,7 +2087,7 @@ fil_crypt_rotate_pages(
                 "rotate_only_first_100_pages_from_t1",
                 if (strcmp(state->space->name, "test/t1") == 0)
                 {
-                  ib::error() << "rotate_only_first_100_pages_from_t1 is active" << '\n';
+                  //ib::error() << "rotate_only_first_100_pages_from_t1 is active" << '\n';
                   if(number_of_t1_pages_rotated >= 100)
                   {
                     state->offset = end;
@@ -2444,7 +2445,7 @@ fil_revert_encryption_flag_updates(ib_vector_t* tables_ids_to_revert_if_error, b
 
     if (set)
     {
-        ib::error() << "While reverting - Setting encryption for table " << table->name.m_name; 
+        //ib::error() << "While reverting - Setting encryption for table " << table->name.m_name; 
         DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
     }
     else
@@ -2541,7 +2542,7 @@ fil_update_encrypted_flag(fil_space_t *space,
 
     if (set)
     {
-        ib::error() << "Setting encryption for table " << table->name.m_name; 
+        //ib::error() << "Setting encryption for table " << table->name.m_name; 
         DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
     }
     else
@@ -2624,10 +2625,10 @@ fil_crypt_flush_space(
 
       //if (strcmp(space->name, "test/t1") == 0)
       //{
-        ib::error() << "Updating encryption flag for table : " << space->name;
-        ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
-        ib::error() << "crypt_data->type = " << current_type << '\n';
-        ib::error() << "min_key_version_found = " << crypt_data->rotate_state.min_key_version_found << '\n';
+        //ib::error() << "Updating encryption flag for table : " << space->name;
+        //ib::error() << "space flags encrypted = " << FSP_FLAGS_GET_ENCRYPTION(space->flags) << '\n';
+        //ib::error() << "crypt_data->type = " << current_type << '\n';
+        //ib::error() << "min_key_version_found = " << crypt_data->rotate_state.min_key_version_found << '\n';
       //}
 
 
@@ -2715,10 +2716,10 @@ fil_crypt_complete_rotate_space(
 {
       fil_space_crypt_t *crypt_data = state->space->crypt_data;
 
-      if (strcmp(state->space->name, "test/t1") == 0)
-      {
-        ib::error() << "fil_crypt_complete_rotate_space test/t1" << '\n';
-      }
+      //if (strcmp(state->space->name, "test/t1") == 0)
+      //{
+        //ib::error() << "fil_crypt_complete_rotate_space test/t1" << '\n';
+      //}
 
       ut_ad(crypt_data);
       ut_ad(state->space->n_pending_ops > 0);
@@ -2756,10 +2757,10 @@ fil_crypt_complete_rotate_space(
               bool done = crypt_data->rotate_state.next_offset >=
                       crypt_data->rotate_state.max_offset;
 
-              if (strcmp(state->space->name, "test/t1") == 0)
-              {
-                 ib::error() << "crypt_data->rotate_state.active_threads =" << crypt_data->rotate_state.active_threads << '\n';
-              }
+              //if (strcmp(state->space->name, "test/t1") == 0)
+              //{
+                 //ib::error() << "crypt_data->rotate_state.active_threads =" << crypt_data->rotate_state.active_threads << '\n';
+              //}
 
               /**
               * we should flush space if we're last thread AND
@@ -2968,8 +2969,8 @@ DECLARE_THREAD(fil_crypt_thread)(
                                         /* There were some pages that were corrupted or could not have been
                                          * decrypted - abort rotating space */
     
-                                        ib::error() << "Found space with pages that cannot be decrypted - aborting encryption "
-                                                       "rotation for space id = " << thr.space->id << " table name = " << thr.space->name;
+                                        //ib::error() << "Found space with pages that cannot be decrypted - aborting encryption "
+                                                       //"rotation for space id = " << thr.space->id << " table name = " << thr.space->name;
 
                                         fil_space_release(thr.space);
                                         thr.space = NULL;

@@ -2419,12 +2419,12 @@ dict_stats_save(
 
 	table = dict_stats_snapshot_create(table_orig);
 
-        ib::error() << "Saving stats for table "
-			<< table->name;
-        if (table_orig->is_readable())
-          ib::error() << ':' << "is readable" << '\n';
-        else
-          ib::error() << ':' << "is not readable" << '\n';
+        //ib::error() << "Saving stats for table "
+			//<< table->name;
+        //if (table_orig->is_readable())
+          //ib::error() << ':' << "is readable" << '\n';
+        //else
+          //ib::error() << ':' << "is not readable" << '\n';
 
 
 

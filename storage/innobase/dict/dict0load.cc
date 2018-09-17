@@ -1549,12 +1549,12 @@ dict_check_sys_tables(
 					 &table_id, &space_id,
 					 &n_cols, &flags, &flags2);
 
-                if (strcmp(table_name.m_name, "test/t2") == 0)
-                {
-                  ib::error() << "Flags for test/t2 :'\n'";
-                  ib::error() << "flags = " << flags << '\n';
-                  ib::error() << "flags2 = " << flags2 << '\n';
-                }
+                //if (strcmp(table_name.m_name, "test/t2") == 0)
+                //{
+                  //ib::error() << "Flags for test/t2 :'\n'";
+                  //ib::error() << "flags = " << flags << '\n';
+                  //ib::error() << "flags2 = " << flags2 << '\n';
+                //}
 
 		if (flags == ULINT_UNDEFINED
 		    || is_system_tablespace(space_id)) {

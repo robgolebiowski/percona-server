@@ -1046,7 +1046,7 @@ static void plugin_deinitialize(st_plugin_int *plugin, bool ref_check)
   mysql_mutex_assert_not_owner(&LOCK_plugin);
 
 
-  sql_print_error("0. Deinitializing plugin: '%s'", plugin->name.str);
+  //sql_print_error("0. Deinitializing plugin: '%s'", plugin->name.str);
 
   if (plugin->plugin->status_vars)
   {
@@ -1060,13 +1060,12 @@ static void plugin_deinitialize(st_plugin_int *plugin, bool ref_check)
       sql_print_error("Plugin '%s' of type %s failed deinitialization",
                       plugin->name.str, plugin_type_names[plugin->plugin->type].str);
     }
-    sql_print_error("1. Deinitializing plugin: '%s'", plugin->name.str);
+    //sql_print_error("1. Deinitializing plugin: '%s'", plugin->name.str);
   }
   else if (plugin->plugin->deinit)
   {
     DBUG_PRINT("info", ("Deinitializing plugin: '%s'", plugin->name.str));
-    //TODO:Robert - remove
-    sql_print_error("2. Deinitializing plugin: '%s'", plugin->name.str);
+    //sql_print_error("2. Deinitializing plugin: '%s'", plugin->name.str);
     if (plugin->plugin->deinit(plugin))
     {
       DBUG_PRINT("warning", ("Plugin '%s' deinit function returned error.",
