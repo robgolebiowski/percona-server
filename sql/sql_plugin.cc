@@ -1846,14 +1846,19 @@ static void plugin_load(MEM_ROOT *tmp_root, int *argc, char **argv)
     */
     mysql_mutex_lock(&LOCK_plugin);
     mysql_rwlock_wrlock(&LOCK_system_variables_hash);
+    //bool was_error = false;
     if (plugin_add(tmp_root, &name, &dl, argc, argv, REPORT_TO_LOG, false))
+    //{
       sql_print_warning("Couldn't load plugin named '%s' with soname '%s'.",
                         str_name.c_ptr(), str_dl.c_ptr());
+      //was_error = true;
+    //}
     else
       mysql_mutex_unlock(&LOCK_plugin);
     mysql_rwlock_unlock(&LOCK_system_variables_hash);
     free_root(tmp_root, MYF(MY_MARK_BLOCKS_FREE));
-    mysql_mutex_unlock(&LOCK_plugin);
+    //if (was_error == true)
+      //mysql_mutex_unlock(&LOCK_plugin);
   }
   if (error > 0)
     sql_print_error(ER(ER_GET_ERRNO), my_errno);

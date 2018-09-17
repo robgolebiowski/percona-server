@@ -11038,7 +11038,7 @@ and set the encryption flag in table flags
 @param[in,out]	table	table object
 @return on success DB_SUCCESS else DB_UNSPPORTED on failure */
 dberr_t
-create_table_info_t::enable_encryption(dict_table_t* table) {
+create_table_info_t::enable_master_key_encryption(dict_table_t* table) {
 
 	const char*	encrypt = m_create_info->encrypt_type.str;
 
@@ -11067,6 +11067,37 @@ create_table_info_t::enable_encryption(dict_table_t* table) {
 	return(err);
 }
 
+dberr_t
+create_table_info_t::enable_keyring_encryption(dict_table_t *table, fil_encryption_t &rotated_keys_encryption_option) {
+
+  if (Encryption::is_no(m_create_info->encrypt_type.str))
+        rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
+  else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
+          (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING))
+  {
+      // Check if keyring is up and the key exists in keyring was already done in encryption option validation
+      rotated_keys_encryption_option= Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
+                                                  ? FIL_ENCRYPTION_ON
+                                                  : FIL_ENCRYPTION_DEFAULT;
+      DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+
+      uint tablespace_key_version;
+      byte *tablespace_key; 
+      //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
+      Encryption::get_latest_tablespace_key_or_create_new_one(m_create_info->encryption_key_id, &tablespace_key_version, &tablespace_key);
+      if (tablespace_key == NULL)
+      {
+        my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                        "Seems that keyring is down. It is not possible to create encrypted tables "
+                        " without keyring. Please install a keyring and try again.", MYF(0));
+        return(DB_UNSUPPORTED);
+      }
+      else
+        my_free(tablespace_key);
+  }
+  return DB_SUCCESS;
+}
+
 /** Create a table definition to an InnoDB database.
 @return ER_* level error */
 inline MY_ATTRIBUTE((warn_unused_result))
@@ -11092,6 +11123,7 @@ create_table_info_t::create_table_def()
 	ulint		num_v = 0;
 	ulint		space_id = 0;
 	ulint		actual_n_cols;
+        fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
 
 	DBUG_ENTER("create_table_def");
 	DBUG_PRINT("enter", ("table_name: %s", m_table_name));
@@ -11393,7 +11425,12 @@ err_col:
 
 	ut_ad(trx_state_eq(m_trx, TRX_STATE_NOT_STARTED));
 
-	err = enable_encryption(table);
+
+        if (Encryption::is_master_key_encryption(m_create_info->encrypt_type.str))
+	  err = enable_master_key_encryption(table);
+        else 
+          err = enable_keyring_encryption(table, rotated_keys_encryption_option);
+
 	if (err != DB_SUCCESS) {
 		dict_mem_table_free(table);
 		goto error_ret;
@@ -11482,68 +11519,9 @@ err_col:
 			algorithm = NULL;
 		}
 
-		const char*	encrypt = m_create_info->encrypt_type.str;
-
-                fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
-                //uint32_t encryption_key_id;
-
-                //if (m_create_info->was_encryption_key_id_set)
-                   //encryption_key_id= m_create_info->encryption_key_id; // TODO: Czy już tutaj powinienem sprawdzić czy klucz jest dostępny ?
-                                                                        //// TODO: To będzie też sprawdzane w check_table z crypt_data
-                                                                       //// TODO: Na razie założenie, że klucz nie zaczyna się od percona_ - czyli jest poprawny
-                //else
-                  //encryption_key_id= THDVAR(m_thd, default_encryption_key_id); //It's done earlier in validate
-
-
-
-                //LEX_STRING encryption_key_id; //TODO:Robert:For now it is LEX_STRING
-                if (!Encryption::is_master_key_encryption(encrypt))
-                {
-                  if (Encryption::is_no(m_create_info->encrypt_type.str))
-                        rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
-                  //else if((Encryption::is_none(m_create_info->encrypt_type.str) && srv_encrypt_tables)
-                          //|| Encryption::is_rotated_keys(m_create_info->encrypt_type.str))
-                  else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
-                          (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING && !Encryption::is_no(m_create_info->encrypt_type.str)))
-                  {
-                      // Check if keyring is up and the key exists in keyring was already done in encryption option validation
-                      rotated_keys_encryption_option= Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
-                                                                  ? FIL_ENCRYPTION_ON
-                                                                  : FIL_ENCRYPTION_DEFAULT;
-                      DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-
-                      uint tablespace_key_version;
-                      byte *tablespace_key; 
-                      //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
-                      Encryption::get_latest_tablespace_key_or_create_new_one(m_create_info->encryption_key_id, &tablespace_key_version, &tablespace_key);
-                      if (tablespace_key == NULL)
-                      {
-                        my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                                        "Seems that keyring is down. It is not possible to create encrypted tables "
-                                        " without keyring. Please install a keyring and try again.", MYF(0));
-                        err = DB_UNSUPPORTED;
-                      }
-                      else
-                        my_free(tablespace_key);
-                  }
-                  //else if(srv_encrypt_tables && !Encryption::is_no(m_create_info->encrypt_type.str)) //TODO: Shouldn't here be also check for encryption_key_id
-                                                                                                     ////Thus this and the above should be merged ?
-                  //{
-                      ////default encryption key should exists - this is checked on server startup
-                      //rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
-                      //DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                  //}
-                }
-
 		if (err == DB_SUCCESS) {
-			//err = row_create_table_for_mysql(
-				//table, algorithm, m_trx, false,
-                                //FIL_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
-                                //
-                                //
                         CreateInfoEncryptionKeyId create_info_encryption_key_id(m_create_info->was_encryption_key_id_set,
                             m_create_info->encryption_key_id);
-
 
                         err = row_create_table_for_mysql(
 				table, algorithm, m_trx, false,
@@ -12288,8 +12266,13 @@ create_table_info_t::create_option_encryption_is_valid() const
 		return(false);
 	}
 
+        // TODO : Może muszę rozdzielić ten warunek na dwa, jeden dla tmp tables, żeby mieć lepszy error message
 	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE
-	  && !Encryption::is_rotated_keys(m_create_info->encrypt_type.str)) {
+	    && (!Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
+            &&  !(Encryption::is_master_key_encryption(m_create_info->encrypt_type.str) &&
+                  m_create_info->options & HA_LEX_CREATE_TMP_TABLE))
+            &&  !(m_create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE))
+        {
 		my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
 			"InnoDB: Only KEYRING encrypted tables (ENCRYPTION=\'KEYRING\') can be created with "
 			"innodb_encrypt_tables=KEYRING_FORCE.", MYF(0));
@@ -12608,6 +12591,9 @@ ha_innobase::adjust_create_info_for_frm(
         bool	is_intrinsic =
 		(create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE) != 0;
 
+        bool    is_tmp =
+		(create_info->options & HA_LEX_CREATE_TMP_TABLE) != 0;
+
 	/* If table is intrinsic, it will use encryption for table based on
 	temporary tablespace encryption property. For non-intrinsic tables
 	without explicit encryption attribute, table will be forced to be
@@ -12616,19 +12602,49 @@ ha_innobase::adjust_create_info_for_frm(
 	    && create_info->encrypt_type.str == NULL)
         {
                 if ((!is_intrinsic && (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
-                                       srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE))
+                                       srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE ||
+                                       (is_tmp && 
+                                        (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
+                                         srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE))))
                     ||
-                    (is_intrinsic && srv_tmp_space.is_encrypted()))
+                    (is_intrinsic && srv_tmp_space.is_encrypted())
+                   )
 		{
 			create_info->encrypt_type = yes_string;
 		}
-                else if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
-                         srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
-                         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)
+                else if (!is_intrinsic &&
+                         (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
+                          srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
+                          srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE))
                 {
                         create_info->encrypt_type = rotated_keys_string;
                 }
         }
+
+
+	//if (create_info->encrypt_type.length == 0
+	    //&& create_info->encrypt_type.str == NULL)
+        //{
+                //if ((!is_intrinsic && (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
+                                       //srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE))
+                    //||
+                    //(is_intrinsic && srv_tmp_space.is_encrypted())
+                    //||
+                    //(is_tmp_but_not_intrinsic && 
+                     //(srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
+                      //srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE)))
+		//{
+			//create_info->encrypt_type = yes_string;
+		//}
+                //else if (!is_intrinsic &&
+                         //(srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
+                          //srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
+                          //srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE))
+                //{
+                        //create_info->encrypt_type = rotated_keys_string;
+                //}
+        //}
+
 }
 
 /*****************************************************************//**
@@ -14432,8 +14448,8 @@ innobase_create_tablespace(
 	bool atomic_blobs = page_size.is_compressed();
 	bool is_encrypted = ((alter_info->encrypt
 		&& (!Encryption::is_none(alter_info->encrypt_type.str) ||
-                    (srv_encrypt_tables = SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING && !Encryption::is_no(alter_info->encrypt_type.str)))) 
-                || srv_encrypt_tables); // TODO:Robert tu chyba nie powinno być || srv_encrypt_tables
+                    (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING && !Encryption::is_no(alter_info->encrypt_type.str)))));
+                //|| srv_encrypt_tables); // TODO:Robert tu chyba nie powinno być || srv_encrypt_tables
         //bool is_rotated_key = (alter_info->encrypt 
             //&& Encryption::is_rotated_keys(alter_info->encrypt_type.str));
 

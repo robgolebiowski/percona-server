@@ -5810,7 +5810,7 @@ check_if_ok_to_rename:
 	flags. There are places where it is done afterwards, there are places
 	where it isn't done. We need to inspect all code paths and check if
 	encryption flag can be set in one place. */
-	if (!Encryption::is_none(
+	if (Encryption::is_master_key_encryption(
 		ha_alter_info->create_info->encrypt_type.str)) {
 
 		/* Set the encryption flag. */
@@ -5824,6 +5824,8 @@ check_if_ok_to_rename:
 					   &version);
 
 		if (master_key == NULL) {
+                        my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+                                 MYF(0));
 			goto err_exit_no_heap;
 		} else {
 			my_free(master_key);

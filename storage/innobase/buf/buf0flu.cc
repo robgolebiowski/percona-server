@@ -1119,8 +1119,7 @@ buf_flush_write_block_low(
        else
        {
          ut_ad(space->crypt_data == NULL || space->crypt_data->encryption == FIL_ENCRYPTION_OFF ||
-               (space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables != SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING
-                                                                        && srv_encrypt_tables != SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED) ||
+               (space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables != SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING) ||
                space->crypt_data->encrypting_with_key_version == 0);
          //if (space->crypt_data != NULL)
          //{
