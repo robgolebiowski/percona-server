@@ -5,6 +5,7 @@ keyring_file	ACTIVE	KEYRING	keyring_file.so	GPL
 binlog	ACTIVE	STORAGE ENGINE	NULL	GPL
 mysql_native_password	ACTIVE	AUTHENTICATION	NULL	GPL
 sha256_password	ACTIVE	AUTHENTICATION	NULL	GPL
+PERFORMANCE_SCHEMA	ACTIVE	STORAGE ENGINE	NULL	GPL
 CSV	ACTIVE	STORAGE ENGINE	NULL	GPL
 MEMORY	ACTIVE	STORAGE ENGINE	NULL	GPL
 InnoDB	ACTIVE	STORAGE ENGINE	NULL	GPL
@@ -47,7 +48,6 @@ INNODB_SYS_VIRTUAL	ACTIVE	INFORMATION SCHEMA	NULL	GPL
 INNODB_TABLESPACES_ENCRYPTION	ACTIVE	INFORMATION SCHEMA	NULL	BSD
 MyISAM	ACTIVE	STORAGE ENGINE	NULL	GPL
 MRG_MYISAM	ACTIVE	STORAGE ENGINE	NULL	GPL
-PERFORMANCE_SCHEMA	ACTIVE	STORAGE ENGINE	NULL	GPL
 ARCHIVE	ACTIVE	STORAGE ENGINE	NULL	GPL
 BLACKHOLE	ACTIVE	STORAGE ENGINE	NULL	GPL
 FEDERATED	DISABLED	STORAGE ENGINE	NULL	GPL
@@ -91,20 +91,19 @@ select * from t6;
 a
 sooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecret
 ALTER TABLE t4 ENCRYPTION='N', ALGORITHM=INPLACE;
-Warnings:
-Warning	140	InnoDB: Ignored ENCRYPTION_KEY_ID 5 when encryption is disabled.
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 SPACE	NAME	ENCRYPTION_SCHEME	KEYSERVER_REQUESTS	MIN_KEY_VERSION	CURRENT_KEY_VERSION	KEY_ROTATION_PAGE_NUMBER	KEY_ROTATION_MAX_PAGE_NUMBER	CURRENT_KEY_ID	ROTATING_OR_FLUSHING
-3	mysql/servers	1	0	0	1	61	6	0	1
-4	mysql/help_topic	1	0	0	1	181	7	0	1
+2	mysql/plugin	1	0	1	1	NULL	NULL	0	0
+3	mysql/servers	1	0	1	1	NULL	NULL	0	0
 5	mysql/help_category	1	0	1	1	NULL	NULL	0	0
-6	mysql/help_relation	1	0	1	1	NULL	NULL	0	0
-7	mysql/help_keyword	1	0	1	1	NULL	NULL	0	0
-8	mysql/time_zone_name	1	0	1	1	NULL	NULL	0	0
-10	mysql/time_zone_transition	1	0	1	1	NULL	NULL	0	0
+7	mysql/help_keyword	1	0	0	1	0	0	0	1
 11	mysql/time_zone_transition_type	1	0	1	1	NULL	NULL	0	0
-12	mysql/time_zone_leap_second	1	0	1	1	NULL	NULL	0	0
+13	mysql/innodb_table_stats	1	0	1	1	NULL	NULL	0	0
+15	mysql/slave_relay_log_info	1	0	1	1	NULL	NULL	0	0
+16	mysql/slave_master_info	1	0	1	1	NULL	NULL	0	0
+17	mysql/slave_worker_info	1	0	1	1	NULL	NULL	0	0
 18	mysql/gtid_executed	1	0	1	1	NULL	NULL	0	0
+19	mysql/server_cost	1	0	1	1	NULL	NULL	0	0
 20	mysql/engine_cost	1	0	1	1	NULL	NULL	0	0
 21	sys/sys_config	1	0	1	1	NULL	NULL	0	0
 23	test/t1	1	0	1	1	NULL	NULL	0	0
@@ -112,8 +111,8 @@ SPACE	NAME	ENCRYPTION_SCHEME	KEYSERVER_REQUESTS	MIN_KEY_VERSION	CURRENT_KEY_VERS
 25	test/t3	0	0	0	1	NULL	NULL	0	0
 27	ts_encrypted	1	0	1	1	NULL	NULL	0	0
 28	test/t6	1	0	1	1	NULL	NULL	0	0
-29	test/t4	0	0	0	1	NULL	NULL	0	0
-0	innodb_system	1	0	0	1	1021	768	0	1
+29	test/t4	0	0	0	1	NULL	NULL	5	0
+0	innodb_system	1	0	0	1	841	768	0	1
 ALTER TABLE t4 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
 # ibdata1 expecting NOT_FOUND
 # It should be possible to mark table as not encrypted with INPLACE algorithm, given table is
@@ -282,7 +281,7 @@ INNODB_SYS_TABLES	CREATE TEMPORARY TABLE `INNODB_SYS_TABLES` (
 # t4 no  on expecting NOT FOUND
 # ibdata1 expecting NOT FOUND
 # ts_encrypted expecting NOT FOUND
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
 # Now turn off encryption and wait for threads to decrypt everything
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 NAME	MIN_KEY_VERSION
@@ -378,7 +377,7 @@ TABLE_ID	NAME	FLAG	N_COLS	SPACE	FILE_FORMAT	ROW_FORMAT	ZIP_PAGE_SIZE	SPACE_TYPE
 45	test/t4	33	4	30	Barracuda	Dynamic	0	Single
 42	test/t5	161	4	27	Barracuda	Dynamic	0	General
 47	test/t6	33	4	32	Barracuda	Dynamic	0	Single
-SET GLOBAL innodb_encrypt_tables = off;
+SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 # Only three tables should stayed encrypted - the ones with explicite encryption
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 NAME	MIN_KEY_VERSION
@@ -574,9 +573,9 @@ TABLE_ID	NAME	FLAG	N_COLS	SPACE	FILE_FORMAT	ROW_FORMAT	ZIP_PAGE_SIZE	SPACE_TYPE
 # t3 no  on expecting FOUND
 # t1 yes on expecting NOT FOUND
 # ibdata1 expecting NOT FOUND
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 # Now turn on encryption and wait for threads to encrypt all spaces
-SET GLOBAL innodb_encrypt_tables = on;
+SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 # Wait max 10 min for key encryption threads to encrypt all spaces
 include/assert.inc [Only one table should stay unencrypted i.e. t3]
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
@@ -678,7 +677,7 @@ TABLE_ID	NAME	FLAG	N_COLS	SPACE	FILE_FORMAT	ROW_FORMAT	ZIP_PAGE_SIZE	SPACE_TYPE
 # t3 no  on expecting FOUND
 # t1 yes on expecting NOT FOUND
 # ibdata1 expecting NOT FOUND
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 alter table t1 encryption='n';
 alter table t4 encryption='n';
 # Wait max 10 min for key encryption threads to encrypt all spaces (apart from t1,t3 and t4)
@@ -876,6 +875,6 @@ TABLE_ID	NAME	FLAG	N_COLS	SPACE	FILE_FORMAT	ROW_FORMAT	ZIP_PAGE_SIZE	SPACE_TYPE
 # t3 no  on expecting FOUND
 # t4 no  on expecting FOUND
 # ibdata1 expecting NOT FOUND
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 drop table t1, t2, t3, t4, t5, t6;
 drop tablespace ts_encrypted;

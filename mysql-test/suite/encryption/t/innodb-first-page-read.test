@@ -78,7 +78,7 @@ eval SELECT VARIABLE_VALUE <= $number_of_tables_that_could_be_opened FROM INFORM
 
 SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'innodb_pages0_read';
 
-set global innodb_encrypt_tables=OFF;
+set global innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 
 --echo # wait until tables are decrypted
 --let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0

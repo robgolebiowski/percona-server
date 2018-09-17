@@ -146,7 +146,7 @@ Warnings:
 Warning	1287	'INFORMATION_SCHEMA.GLOBAL_STATUS' is deprecated and will be removed in a future release. Please use performance_schema.global_status instead
 # restart
 SET GLOBAL innodb_encryption_threads = 4;
-SET GLOBAL innodb_encrypt_tables = off;
+SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 update innodb_page_compressed1 set c1 = c1 + 1;
 update innodb_page_compressed2 set c1 = c1 + 1;
 update innodb_page_compressed3 set c1 = c1 + 1;

@@ -627,7 +627,7 @@ uint get_global_default_encryption_key_id_value()
 handlerton::KeyringEncryptionVariables get_keyring_encryption_variables(THD *thd)
 {
      handlerton::KeyringEncryptionVariables keyring_encryption_variables;
-     keyring_encryption_variables.global_encrypt_tables= srv_encrypt_tables;
+     keyring_encryption_variables.global_encrypt_tables= srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING;
      keyring_encryption_variables.session_default_encryption_key_id = THDVAR(thd, default_encryption_key_id);
 
      return keyring_encryption_variables;

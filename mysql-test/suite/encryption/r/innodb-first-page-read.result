@@ -65,7 +65,7 @@ VARIABLE_VALUE
 44
 Warnings:
 Warning	1287	'INFORMATION_SCHEMA.GLOBAL_STATUS' is deprecated and will be removed in a future release. Please use performance_schema.global_status instead
-set global innodb_encrypt_tables=OFF;
+set global innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 # wait until tables are decrypted
 SELECT VARIABLE_VALUE <= 51 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'innodb_pages0_read';
 VARIABLE_VALUE <= 51

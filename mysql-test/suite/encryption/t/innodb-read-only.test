@@ -6,7 +6,7 @@
 let $cnt=600;
 while ($cnt)
 {
-    let $success=`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0`;
+    let $success=`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0`;
     if ($success)
     {
         let $cnt=0;
@@ -29,6 +29,6 @@ if (!$success)
 # MDEV-11835: InnoDB: Failing assertion: free_slot != NULL on
 # restarting server with encryption and read-only
 #
---let $restart_parameters=restart:--innodb-read-only=1 --innodb-encrypt-tables=1
+--let $restart_parameters=restart:--innodb-read-only=1 --innodb-encrypt-tables=ONLINE_TO_KEYRING
 --source include/restart_mysqld.inc
 --echo # All done
