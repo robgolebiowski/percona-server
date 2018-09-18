@@ -1045,6 +1045,13 @@ static void plugin_deinitialize(st_plugin_int *plugin, bool ref_check)
 
   mysql_mutex_assert_not_owner(&LOCK_plugin);
 
+  /*if (strcmp(plugin->name.str, "InnoDB") == 0 || strcmp(plugin->name.str, "keyring_file") == 0)
+  {
+    int x = 1;
+    x++;
+    (void)x;
+  }*/
+
 
   //sql_print_error("0. Deinitializing plugin: '%s'", plugin->name.str);
 
@@ -2028,6 +2035,8 @@ void plugin_shutdown(void)
   st_plugin_int **plugins, *plugin;
   st_plugin_dl **dl;
   bool skip_binlog = true;
+  //bool skip_keyrings = true;
+  std::list<st_plugin_int*> keyring_plugins;
 
   DBUG_ENTER("plugin_shutdown");
 
@@ -2052,21 +2061,27 @@ void plugin_shutdown(void)
       {
         plugin= plugin_array->at(i);
 
-	if (plugin->state == PLUGIN_IS_READY
-	    && strcmp(plugin->name.str, "binlog") == 0 && skip_binlog)
-	{
+	if (plugin->state == PLUGIN_IS_READY)
+        {
+	    if(strcmp(plugin->name.str, "binlog") == 0 && skip_binlog)
+	    {
 		skip_binlog = false;
-
-	} else if (plugin->state == PLUGIN_IS_READY && plugin->plugin->type != MYSQL_KEYRING_PLUGIN)
-        {
-          plugin->state= PLUGIN_IS_DELETED;
-          reap_needed= true;
-        } else if (plugin_array->size() == 1)
-        {
-          plugin->state= PLUGIN_IS_DELETED;
-          reap_needed= true;
-        }
+            }
+	    else if (plugin->plugin->type != MYSQL_KEYRING_PLUGIN)
+                     //|| !skip_keyrings)
+            {
+              plugin->state= PLUGIN_IS_DELETED;
+              reap_needed= true;
+            } else if (plugin->plugin->type == MYSQL_KEYRING_PLUGIN)
+              keyring_plugins.push_back(plugin);
+         }
       }
+      //if (!reap_needed && skip_keyrings)
+      //{
+        //// deinitialize keyrings as last ones
+        //skip_keyrings = false;
+        //reap_needed= true;
+      //}
       if (!reap_needed)
       {
         /*
@@ -2090,6 +2105,13 @@ void plugin_shutdown(void)
         plugins[i]->state= PLUGIN_IS_DYING;
     }
     mysql_mutex_unlock(&LOCK_plugin);
+
+    for(std::list<st_plugin_int*>::iterator keyring_iter = keyring_plugins.begin();
+        keyring_iter != keyring_plugins.end(); ++keyring_iter)
+    {
+       if (!((*keyring_iter)->state & PLUGIN_IS_UNINITIALIZED))
+          plugin_deinitialize(*keyring_iter, false);
+    }
 
     /*
       We loop through all plugins and call deinit() if they have one.

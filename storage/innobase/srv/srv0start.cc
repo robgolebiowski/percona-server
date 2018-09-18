@@ -3032,8 +3032,8 @@ innobase_shutdown_for_mysql(void)
 		dict_stats_thread_deinit();
                /* Shutdown key rotation threads */
                 fil_crypt_threads_cleanup(); // TODO:Robert: in the original there is also 
-                if (srv_n_fil_crypt_threads > 0)
-                  unlock_keyrings(NULL); 
+                //if (srv_n_fil_crypt_threads > 0)
+                  //unlock_keyrings(NULL); 
 
 //   srv_start_state_t: Document the flags. Replace SRV_START_STATE_STAT
   //  with SRV_START_STATE_REDO. The srv_bg_undo_sources replaces the
@@ -3095,6 +3095,8 @@ innobase_shutdown_for_mysql(void)
 
 	srv_was_started = FALSE;
 	srv_start_has_been_called = FALSE;
+
+        unlock_keyrings(NULL);
 
 	return(DB_SUCCESS);
 }
