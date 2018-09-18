@@ -15,6 +15,8 @@
 # 3) Restart the server
 # 4) Make sure t1 rotation completes
 
+SET GLOBAL innodb_encryption_threads=4;
+
 let MYSQLD_DATADIR = `SELECT @@datadir`;
 
 --let $id = `SELECT RAND()`
@@ -83,7 +85,7 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 --source include/search_pattern_in_file.inc
 
 --echo # t1 is only half rotatted, now we will check if the encryption can be completed after the restart
-#--let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age= --innodb-encryption-threads=4
+--let $restart_parameters=restart:--innodb-encryption-threads=4
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
@@ -99,6 +101,24 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 --let ABORT_ON=FOUND
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
+
+--let $wait_timeout= 600
+--echo # All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
+--echo # innodb_system
+--let $wait_condition=SELECT COUNT(*) = $tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 2
+--source include/wait_condition.inc
+
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+
+--let $wait_timeout= 600
+--echo # All tables should get decrypted, apart from t1.
+--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+--source include/wait_condition.inc
+
+#Cleanup
+
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 
 DROP TABLE t1;
 DROP PROCEDURE innodb_insert_proc;

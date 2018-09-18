@@ -3230,6 +3230,13 @@ dict_load_table_one(
 	ulint		len;
 	const char*	err_msg;
 	mtr_t		mtr;
+/*
+        if (strcmp(name.m_name, "mysql/time_zone_leap_second") == 0)
+        {
+          int x =1;
+          x = 2;
+          (void)x; 
+        }*/
 
 	DBUG_ENTER("dict_load_table_one");
 	DBUG_PRINT("dict_load_table_one", ("table: %s", name.m_name));

@@ -1768,13 +1768,13 @@ os_file_io_complete(
 	ut_a(offset > 0);
 	ut_ad(type.validate());
 
-        ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-        ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
+        //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+        //ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
 
-        if (space_id == 23 && page_no==260)
-        {
-          ib::error() << "In os_file_io_comple for test/t1, page = 260" << '\n';
-        }
+        //if (space_id == 23 && page_no==260)
+        //{
+          //ib::error() << "In os_file_io_comple for test/t1, page = 260" << '\n';
+        //}
 
 	if (!type.is_compression_enabled()) {
 
@@ -1791,16 +1791,16 @@ os_file_io_complete(
                 bool was_page_encrypted= encryption.is_encrypted_page(buf);
                 //bool was_page_compressed_and_encrypted= encryption.is_encrypted_and_compressed(buf);
 
-                if (space_id == 23 && page_no==260)
-                {
-                  if (was_page_encrypted)
-                  {
-                    ib::error() << "test/t1 page = 260 was_page_encrypted = " << was_page_encrypted
-                                << " srv_encrypt_tables = " << srv_encrypt_tables;
-                  }
-                  else
-                    ib::error() << "test/t1 page = 260 was not encrypted" ;
-                }
+                //if (space_id == 23 && page_no==260)
+                //{
+                  //if (was_page_encrypted)
+                  //{
+                    //ib::error() << "test/t1 page = 260 was_page_encrypted = " << was_page_encrypted
+                                //<< " srv_encrypt_tables = " << srv_encrypt_tables;
+                  //}
+                  //else
+                    //ib::error() << "test/t1 page = 260 was not encrypted" ;
+                //}
 
 
 
@@ -5910,10 +5910,10 @@ os_file_io(
           //TODO:Tutaj zapisać czy jest encrypted
           //bool was_page_compressed_and_encrypted= encryption.is_encrypted_and_compressed(buf);
 
-          if (space_id == 23 && page_no==260)
-          {
-            ib::error() << "write for test/t1 page = 260"  << '\n';
-          } 
+          //if (space_id == 23 && page_no==260)
+          //{
+            //ib::error() << "write for test/t1 page = 260"  << '\n';
+          //} 
         
         }
         
@@ -5974,16 +5974,16 @@ os_file_io(
 			if (offset > 0
 			    && (type.is_compressed() || type.is_read())) {
 
-                        ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                        ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
+                        //ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+                        //ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
 
 
                         //TODO:Tutaj zapisać czy jest encrypted
                         //bool was_page_compressed_and_encrypted= encryption.is_encrypted_and_compressed(buf);
-                        if (space_id == 23 && page_no==260)
-                        {
-                          ib::error() << "read for test/t1 page = 260"  << '\n';
-                        }
+                        //if (space_id == 23 && page_no==260)
+                        //{
+                          //ib::error() << "read for test/t1 page = 260"  << '\n';
+                        //}
 
 
 
@@ -9390,8 +9390,9 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 
         if (ret)
         {
-          ib::error() << "Encryption can't generate tablespace key";
+          ib::error() << "Encryption can't generate tablespace key : " << key_name;
           *tablespace_key = NULL;
+          return;
         }
 
         byte *system_tablespace_key = NULL;
@@ -9401,8 +9402,8 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 			   &key_len);
 
 	if (ret || system_tablespace_key == NULL) {
-		ib::error() << "Encryption can't find tablespace key, please check"
-				" that the keyring plugin is loaded. 1";
+		ib::error() << "Encryption can't find tablespace key " << key_name << " please check"
+				" that the keyring plugin is loaded.";
 		*tablespace_key = NULL;
                 my_free(key_type);
                 return;
@@ -9514,7 +9515,7 @@ Encryption::get_tablespace_key(uint key_id,
 
 	if (*tablespace_key == NULL) {
 		ib::error() << "Encryption can't find tablespace key, please check"
-				" the keyring plugin is loaded. 2";
+				" the keyring plugin is loaded.";
                 result = false;
 	}
    
