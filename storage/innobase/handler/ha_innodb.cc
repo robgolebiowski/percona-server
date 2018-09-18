@@ -12259,7 +12259,8 @@ create_table_info_t::create_option_encryption_is_valid() const
         //}
 
 	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE
-	  && !Encryption::is_master_key_encryption(m_create_info->encrypt_type.str)) {
+	  && (Encryption::is_no(m_create_info->encrypt_type.str) ||
+              Encryption::is_rotated_keys(m_create_info->encrypt_type.str))) {
 		my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
 			"InnoDB: Only Master Key encrypted tables (ENCRYPTION=\'Y\') can be created with "
 			"innodb_encrypt_tables=FORCE.", MYF(0));
@@ -12296,6 +12297,9 @@ create_table_info_t::create_option_encryption_is_valid() const
 	fil_space_t*	space = fil_space_get(space_id);
 	ulint		fsp_flags = space->flags;
 
+        //TODO: Change this so only master key encrypted tables could be stored in
+        //encrypted tablespaces - it is enought if I block creating ROTATED_KEYS encrypted tablespaces
+
 	bool tablespace_is_encrypted = FSP_FLAGS_GET_ENCRYPTION(fsp_flags);
 	const char *tablespace_name = m_create_info->tablespace != NULL ?
 		m_create_info->tablespace : space->name;
@@ -12309,6 +12313,12 @@ create_table_info_t::create_option_encryption_is_valid() const
 	}
 
 
+        if (!table_is_encrypted && tablespace_is_encrypted) {
+		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+			"InnoDB: Tablespace `%s` can contain only an"
+			" ENCRYPTED tables.", MYF(0), tablespace_name);
+		return(false);
+	}
 
 	/* Ignore nondefault key_id if encryption is set off */
 	//if (encrypt == FIL_ENCRYPTION_OFF &&

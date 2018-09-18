@@ -398,8 +398,11 @@ innobase_need_rebuild(
               Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
               !Encryption::is_rotated_keys(old_table->s->encrypt_type.str)
             ) ||
-            ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id //TODO:Should not I also check if table was encrypted ?
-                                                                                             //if not then maybe I do not need to rebuild ?
+            //(
+              //Encryption::is_rotated_keys(old_table->s->encrypt_type.str) &&
+              //Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
+              ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
+            //)
             )
           return true;
 
@@ -580,8 +583,10 @@ ha_innobase::check_if_supported_inplace_alter(
 	char*	old_encryption = this->table->s->encrypt_type.str;
 	char*	new_encryption = altered_table->s->encrypt_type.str;
 
-        if (Encryption::is_master_key_encryption(old_encryption) ||
+        if (Encryption::is_master_key_encryption(old_encryption) !=
             Encryption::is_master_key_encryption(new_encryption))
+
+            //Encryption::is_none(new_encryption))
 	//if ((Encryption::is_none(old_encryption) != Encryption::is_none(new_encryption)) ||
             //(Encryption::is_master_key_encryption(old_encryption) && Encryption::is_rotated_keys(new_encryption)) ||
             //(Encryption::is_rotated_keys(old_encryption) && Encryption::is_master_key_encryption(new_encryption))
@@ -5700,24 +5705,7 @@ ha_innobase::prepare_inplace_alter_table(
 		/* The clustered index is corrupted. */
 		my_error(ER_CHECK_NO_SUCH_TABLE, MYF(0));
 		DBUG_RETURN(true);
-	} else {
-		const char* invalid_opt = info.create_options_are_invalid();
-
-                //TODO:Robert: U nas wszystko jest handlowane przez create_options_are_invalid()
-		/* Check engine specific table options */
-		//if (const char* invalid_tbopt = info.check_table_options()) {
-			//my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),
-				 //table_type(), invalid_tbopt);
-			//goto err_exit_no_heap;
-		//}
-
-		if (invalid_opt) {
-			my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),
-				 table_type(), invalid_opt);
-			goto err_exit_no_heap;
-		}
-	}
-
+	} 
 	/* Check if any index name is reserved. */
 	if (innobase_index_name_is_reserved(
 		    m_user_thd,
