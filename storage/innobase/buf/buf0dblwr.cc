@@ -1342,7 +1342,7 @@ buf_dblwr_flush_buffered_writes(
 		buf_dblwr_check_page_lsn(dblwr_page);
 
                 // it can be already encrypted by encryption threads
-		if (encrypt_parallel_dblwr && bpage->encrypt == false
+		if (encrypt_parallel_dblwr && bpage->encrypt == false && space()->crypt_data == NULL
 		    && !buf_dblwr_disable_encryption(block)) {
 			buf_dblwr_encrypt_page(block, dblwr_page);
 		}

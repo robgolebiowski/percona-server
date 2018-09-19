@@ -1743,6 +1743,8 @@ recv_parse_or_apply_log_rec_body(
                      return NULL;
 
                    if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_V1,
+		              ENCRYPTION_MAGIC_SIZE) == 0 ||
+                       memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2,
 		              ENCRYPTION_MAGIC_SIZE) == 0) {
  
                         ut_ad(!is_system_tablespace(space_id));
@@ -1771,12 +1773,7 @@ recv_parse_or_apply_log_rec_body(
                         ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, len));
                         return ptr;
                   }
-                  else
-                  {
-                     recv_sys->set_corrupt_log();
-                     return NULL;
-                  }
-		}
+                }
 		break;
 
 	default:

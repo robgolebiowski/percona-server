@@ -4872,7 +4872,7 @@ fil_ibd_load(
 	space = fil_space_get_by_id(space_id);
 	mutex_exit(&fil_system->mutex);
 
-        ib::error() << "Robert: fil_ibd_load for space_id = " << space_id << '\n';
+        //ib::error() << "Robert: fil_ibd_load for space_id = " << space_id << '\n';
 
 	if (space != NULL) {
 		/* Compare the filename we are trying to open with the
