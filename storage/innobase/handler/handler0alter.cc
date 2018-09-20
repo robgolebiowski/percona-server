@@ -4685,7 +4685,8 @@ prepare_inplace_alter_table_dict(
                               my_free(master_key);
                       }
                    }
-                   else if (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt))
+                   else if (Encryption::is_rotated_keys(old_table->s->encrypt_type.str) &&
+                            (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt)))
                    {
                       // it is ROTATED_KEYS encryption - check if old's table encryption key is available 
                       if (Encryption::tablespace_key_exists(old_table->s->encryption_key_id) == false)

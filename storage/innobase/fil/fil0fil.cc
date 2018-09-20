@@ -8187,12 +8187,6 @@ fil_set_encryption(
 	byte*			iv,
         bool aquire_mutex)
 {
-	ut_ad(!is_system_or_undo_tablespace(space_id) || algorithm == Encryption::ROTATED_KEYS);
-
-	if (is_system_tablespace(space_id) && algorithm != Encryption::ROTATED_KEYS) {
-		return(DB_IO_NO_ENCRYPT_TABLESPACE);
-	}
-
         if (aquire_mutex)
 	  mutex_enter(&fil_system->mutex);
 

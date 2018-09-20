@@ -1926,8 +1926,8 @@ os_file_io_complete(
                         }
                         else
                         {
-                          if (!was_page_encrypted)
-                             mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+                          //if (!was_page_encrypted)
+                             //mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
                           return ret;
                         }
                 //TODO:Tutaj przypisanie wersji klucza i original page type na encrypted - to powinno sprawdzic jezeli strona jest zaszyfrowana i corrupted

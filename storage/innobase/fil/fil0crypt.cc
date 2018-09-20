@@ -1945,10 +1945,15 @@ fil_crypt_rotate_page(
               // might be already encrypted with RK. We re-encrypt them anyways. We could be calculating post - encryption checksum
               // here and decide based on them if the page is RK encrypted or MK encrypted, but this should be very rare case
               // and some extra-re-encryption will do no harm - and we safe on calculating checksums in normal execution
-              uint kv= space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY
+              //
+              // This is now also true for all the other encryption rotations
+              //
+              // We will rotate the pages from the begining if there was a crash
+              uint kv= (space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY ||
+                        space->crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) 
                          ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
                          : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
-                
+ 
               //if (strcmp(space->name, "test/t1") == 0)
               //{
                 //ib::error() << "Trying to write to " << space->name << '\n';
