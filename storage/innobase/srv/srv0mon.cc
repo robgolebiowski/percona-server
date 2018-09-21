@@ -965,12 +965,13 @@ static monitor_info_t	innodb_counter_info[] =
 	 MONITOR_NONE,
 	 MONITOR_DEFAULT_START, MONITOR_PAD_DECREMENTS},
 
-	{"compress_pages_encrypted", "compression",
+	/* ========== Counters for Encryption ========== */
+	{"pages_encrypted", "encryption",
 	 "Number of pages encrypted",
 	 MONITOR_NONE,
 	 MONITOR_DEFAULT_START, MONITOR_OVLD_PAGES_ENCRYPTED},
 
-	{"compress_pages_decrypted", "compression",
+	{"pages_decrypted", "encryption",
 	 "Number of pages decrypted",
 	 MONITOR_NONE,
 	 MONITOR_DEFAULT_START, MONITOR_OVLD_PAGES_DECRYPTED},
@@ -1734,6 +1735,13 @@ srv_mon_process_existing_counter(
 
 	case MONITOR_OVLD_LOG_PADDED:
 		value = srv_stats.log_padded;
+		break;
+
+        case MONITOR_OVLD_PAGES_ENCRYPTED:
+		value = srv_stats.pages_encrypted;
+		break;
+        case MONITOR_OVLD_PAGES_DECRYPTED:
+		value = srv_stats.pages_decrypted;
 		break;
 
 	/* innodb_dblwr_writes */

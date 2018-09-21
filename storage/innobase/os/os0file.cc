@@ -1280,11 +1280,11 @@ AIOHandler::post_io_processing(Slot* slot)
 			      || err == DB_CORRUPTION
 			      || err == DB_IO_DECOMPRESS_FAIL
                               || err == DB_IO_DECRYPT_FAIL);
-		} else if (!slot->type.is_log() && slot->type.is_read()) {
-                  ut_ad(is_encrypted_page(slot) == false);
-                  // we did not go to io_complete - so mark read page as unencrypted here
-                  mach_write_to_4(slot->buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-                  err = DB_SUCCESS;
+		//} else if (!slot->type.is_log() && slot->type.is_read()) {
+                  //ut_ad(is_encrypted_page(slot) == false);
+                  //// we did not go to io_complete - so mark read page as unencrypted here
+                  //mach_write_to_4(slot->buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+                  //err = DB_SUCCESS;
                 } else {
 
 			err = DB_SUCCESS;

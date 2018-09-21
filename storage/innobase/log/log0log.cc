@@ -2414,7 +2414,7 @@ wait_suspend_loop:
 
 	if (!srv_read_only_mode) {
 		log_make_checkpoint_at(LSN_MAX, TRUE);
-
+        }
           	log_mutex_enter();
 
 	        tracked_lsn = log_get_tracked_lsn();
@@ -2469,9 +2469,9 @@ wait_suspend_loop:
 
                   goto loop;
           }
-        } else {
-           lsn = srv_start_lsn; 
-        }
+        //} else {
+           //lsn = srv_start_lsn; 
+        //}
 
 	srv_shutdown_state = SRV_SHUTDOWN_LAST_PHASE;
 

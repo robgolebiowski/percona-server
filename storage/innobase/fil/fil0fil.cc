@@ -4041,7 +4041,7 @@ fil_ibd_create(
 	}
 
         //TODO: Robert czy destruktor space powinien niszczyc crypt_data ?
-	space = fil_space_create(name, space_id, flags, FIL_TYPE_TABLESPACE,
+	space = fil_space_create(name, space_id, flags, is_temp ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
 				 crypt_data, mode);
 
 	//DEBUG_SYNC_C("fil_ibd_created_space");

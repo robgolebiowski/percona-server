@@ -1012,11 +1012,11 @@ buf_flush_write_block_low(
 		return;
 	}
         // TODO:Robert: czy to są napewno dobre warunki ? - skopiowane z MariaDB
-	ut_ad(space->purpose == FIL_TYPE_TEMPORARY
-	      || space->purpose == FIL_TYPE_IMPORT
-	      || space->purpose == FIL_TYPE_TABLESPACE);
-	ut_ad((space->purpose == FIL_TYPE_TEMPORARY)
-	      == fsp_is_system_temporary(space->id));
+	//ut_ad(space->purpose == FIL_TYPE_TEMPORARY
+	      //|| space->purpose == FIL_TYPE_IMPORT
+	      //|| space->purpose == FIL_TYPE_TABLESPACE);
+	//ut_ad((space->purpose == FIL_TYPE_TEMPORARY)
+	      //== fsp_is_system_temporary(space->id));
 
 	page_t*	frame = NULL;
 #ifdef UNIV_DEBUG

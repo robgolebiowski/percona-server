@@ -2370,7 +2370,13 @@ dict_stats_report_error(dict_table_t* table)
 {
 	dberr_t		err;
 
-	FilSpace space(table->space);
+        uint32_t space_id = table->space;
+
+	DBUG_EXECUTE_IF(
+		"ib_rename_index_fail2",
+                space_id = 911;
+	);
+	FilSpace space(space_id);
 
 	if (!space()) {
 		ib::warn() << "Cannot save statistics for table "
