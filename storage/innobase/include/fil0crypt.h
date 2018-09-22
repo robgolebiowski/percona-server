@@ -43,6 +43,8 @@ Created 04/01/2015 Jan Lindström
 */
 #define MAGIC_SZ 6
 
+struct trx_t;
+
 static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {
 	's', 0xE, 0xC, 'R', 'E', 't' };
 
@@ -140,6 +142,12 @@ crypt_data_scheme_locker(
 
 struct fil_space_rotate_state_t
 {
+
+        fil_space_rotate_state_t()
+          : trx(NULL),
+            flush_observer(NULL)
+        {}
+
 	time_t start_time;	/*!< time when rotation started */
 	ulint active_threads;	/*!< active threads in space */
 	ulint next_offset;	/*!< next "free" offset */
@@ -155,6 +163,33 @@ struct fil_space_rotate_state_t
 		time_t last_scrub_completed; /*!< when was last scrub
 					     completed */
 	} scrubbing;
+
+        trx_t *trx;
+        FlushObserver *flush_observer;
+
+        void create_flush_observer(uint space_id);
+        //{
+          //ut_ad(flush_observer == NULL && trx == NULL);
+          //trx = trx_allocate_for_background();
+          //flush_observer = UT_NEW_NOKEY(FlushObserver(space_id,
+                                                      //trx, 
+                                                      //NULL));
+        //}
+
+        void destrory_flush_observer();
+        //{
+          //ut_ad(flush_observer != NULL && trx != NULL);
+          //UT_DELETE(flush_observer);
+          //flush_observer = NULL;
+          //trx_free_for_background(trx);
+          //trx = NULL;
+        //}
+
+		//flush_observer = UT_NEW_NOKEY(
+			//FlushObserver(new_table->space, trx, stage));
+
+		//trx_set_flush_observer(trx, flush_observer);
+
 };
 
 

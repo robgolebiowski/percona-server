@@ -432,6 +432,11 @@ public:
 		return(m_estimate);
 	}
 
+        uint get_number_of_pages_flushed()
+        {
+                return m_number_of_pages_flushed; 
+        }
+
 private:
 	/** Table space id */
 	ulint			m_space_id;
@@ -461,6 +466,8 @@ private:
 	/** LSN at which observer started observing. This is
 	used to find the dirty blocks that are dirtied before Observer */
 	const lsn_t		m_lsn;
+
+        ulint m_number_of_pages_flushed;
 };
 
 #endif /* !UNIV_HOTBACKUP */

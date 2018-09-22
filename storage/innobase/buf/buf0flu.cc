@@ -3961,7 +3961,8 @@ FlushObserver::FlushObserver(
 	m_stage(stage),
 	m_interrupted(false),
 	m_estimate(),
-	m_lsn(log_get_lsn())
+	m_lsn(log_get_lsn()),
+        m_number_of_pages_flushed(0)
 {
 	m_flushed = UT_NEW_NOKEY(std::vector<ulint>(srv_buf_pool_instances));
 	m_removed = UT_NEW_NOKEY(std::vector<ulint>(srv_buf_pool_instances));
@@ -4034,6 +4035,8 @@ FlushObserver::notify_remove(
 	ut_ad(buf_flush_list_mutex_own(buf_pool));
 
 	m_removed->at(buf_pool->instance_no)++;
+
+        m_number_of_pages_flushed++;
 
 #ifdef FLUSH_LIST_OBSERVER_DEBUG
 	ib::info() << "Remove <" << bpage->id.space()

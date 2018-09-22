@@ -415,6 +415,26 @@ fil_space_create_crypt_data(
 	return crypt_data;
 }
 
+void fil_space_rotate_state_t::create_flush_observer(uint space_id)
+{
+  ut_ad(flush_observer == NULL && trx == NULL);
+  trx = trx_allocate_for_background();
+  flush_observer = UT_NEW_NOKEY(FlushObserver(space_id,
+                                              trx, 
+                                              NULL));
+}
+
+void fil_space_rotate_state_t::destrory_flush_observer()
+{
+  ut_ad(flush_observer != NULL && trx != NULL);
+  UT_DELETE(flush_observer);
+  flush_observer = NULL;
+  trx_free_for_background(trx);
+  trx = NULL;
+}
+
+
+
 /******************************************************************
 Create a fil_space_crypt_t object
 @param[in]	encrypt_mode	FIL_ENCRYPTION_DEFAULT or
@@ -1141,19 +1161,22 @@ fil_crypt_start_encrypting_space(
                 //ut_ad(0);
 
               /* record lsn of update */
-              lsn_t end_lsn = mtr.commit_lsn();
+              //lsn_t end_lsn = mtr.commit_lsn();
 
               /* 4 - sync tablespace before publishing crypt data */
 
-              bool success = false;
-              ulint sum_pages = 0;
+              //bool success = false;
+              //ulint sum_pages = 0;
 
-              do {
-                      ulint n_pages = 0;
-                      success = buf_flush_lists(ULINT_MAX, end_lsn, &n_pages);
-                      buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
-                      sum_pages += n_pages;
-              } while (!success);
+              //do {
+                      //ulint n_pages = 0;
+                      //success = buf_flush_lists(ULINT_MAX, end_lsn, &n_pages);
+                      //buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
+                      //sum_pages += n_pages;
+              //} while (!success);
+              
+              buf_flush_request_force(LSN_MAX);
+              buf_flush_wait_flushed(LSN_MAX); 
 
               /* 5 - publish crypt data */
               mutex_enter(&fil_crypt_threads_mutex);
@@ -1701,6 +1724,15 @@ fil_crypt_start_rotate_space(
 
               crypt_data->rotate_state.start_time = time(0);
 
+              crypt_data->rotate_state.create_flush_observer(state->space->id);
+              //crypt_data->rotate_state.trx = trx_allocate_for_background();
+              //crypt_data->rotate_state.flush_observer = UT_NEW_NOKEY(FlushObserver(state->space->id,
+                                                                                   //crypt_data->rotate_state.trx, 
+                                                                                   //NULL));
+
+		//trx_set_flush_observer(trx, flush_observer);
+
+
               if (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED &&
                       crypt_data->is_encrypted() &&
                       key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
@@ -1724,7 +1756,7 @@ fil_crypt_start_rotate_space(
       crypt_data->rotate_state.active_threads++;
 
       /* Initialize thread local state */
-      state->end_lsn = crypt_data->rotate_state.end_lsn;
+      //state->end_lsn = crypt_data->rotate_state.end_lsn;
       state->min_key_version_found =
               crypt_data->rotate_state.min_key_version_found;
 
@@ -1927,14 +1959,17 @@ fil_crypt_rotate_page(
       //}
       mtr_t mtr;
       mtr.start();
+      mtr.set_log_mode(MTR_LOG_NO_REDO); // We do not need those pages to be redo log. Before we flush page 0, we make sure
+                                         // that all pages have been flushed to disk. If we fail to update page 0 we will rotate
+                                         // those pages again after restart - when encryption threads discover that there is work to do.
       if (buf_block_t* block = fil_crypt_get_page_throttle(state,
                                                            offset, &mtr,
                                                            &sleeptime_ms)) {
 
 
-              bool modified = false;
+              //bool modified = false;
               //int needs_scrubbing = BTR_SCRUB_SKIP_PAGE;
-              lsn_t block_lsn = block->page.newest_modification;
+              //lsn_t block_lsn = block->page.newest_modification;
               byte* frame = buf_block_get_frame(block);
               //TODO:Robert  - musze po dekrypcji dodac nowe pole do block - tak, zeby trzymac tam kv
               //uint kv =  mach_read_from_4(frame + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
@@ -1990,7 +2025,8 @@ fil_crypt_rotate_page(
                                  key_state->rotate_key_age)) {
 
                       mtr.set_named_space(space);
-                      modified = true;
+                      mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);
+                      //modified = true;
 
                       //if (strcmp(space->name, "test/t1") == 0)
                         //ib::error() << "Write to  " << space->name << " for offset = " << offset << '\n';
@@ -2020,19 +2056,19 @@ fil_crypt_rotate_page(
               }
 
               mtr.commit();
-              lsn_t end_lsn = mtr.commit_lsn();
+              //lsn_t end_lsn = mtr.commit_lsn();
 
-              if (modified) {
-                      /* if we modified page, we take lsn from mtr */
-                      ut_a(end_lsn > state->end_lsn);
-                      ut_a(end_lsn > block_lsn);
-                      state->end_lsn = end_lsn;
-              } else {
-                      /* if we did not modify page, check for max lsn */
-                      if (block_lsn > state->end_lsn) {
-                              state->end_lsn = block_lsn;
-                      }
-              }
+              //if (modified) {
+                      //[> if we modified page, we take lsn from mtr <]
+                      //ut_a(end_lsn > state->end_lsn);
+                      //ut_a(end_lsn > block_lsn);
+                      //state->end_lsn = end_lsn;
+              //} else {
+                      //[> if we did not modify page, check for max lsn <]
+                      //if (block_lsn > state->end_lsn) {
+                              //state->end_lsn = block_lsn;
+                      //}
+              //}
       } else {
               /* If block read failed mtr memo and log should be empty. */
               ut_ad(!mtr.has_modifications());
@@ -2580,32 +2616,44 @@ fil_crypt_flush_space(
       ut_ad(space->n_pending_ops > 0);
 
       /* flush tablespace pages so that there are no pages left with old key */
-      lsn_t end_lsn = crypt_data->rotate_state.end_lsn;
+      //lsn_t end_lsn = crypt_data->rotate_state.end_lsn;
 
-      if (end_lsn > 0 && !space->is_stopping()) {
-              bool success = false;
-              ulint n_pages = 0;
-              ulint sum_pages = 0;
+      ulint number_of_pages_flushed_so_far = crypt_data->rotate_state.flush_observer->get_number_of_pages_flushed();
+
+      if (space->is_stopping())
+        return DB_SUCCESS;
+
+      //if (end_lsn > 0 && !space->is_stopping()) {
+      //if (!space->is_stopping()) {
+              //bool success = false;
+              //ulint n_pages = 0;
+              //ulint sum_pages = 0;
+              ulint number_of_pages_flushed_now = 0;
+              log_free_check();
               uintmax_t start = ut_time_us(NULL);
 
-              do {
-                      success = buf_flush_lists(ULINT_MAX, end_lsn, &n_pages);
-                      buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
-                      sum_pages += n_pages;
-              } while (!success && !space->is_stopping());
-
-
+              crypt_data->rotate_state.flush_observer->flush();
 
               uintmax_t end = ut_time_us(NULL);
 
-              if (sum_pages && end > start) {
-                      state->cnt_waited += sum_pages;
+              number_of_pages_flushed_now = crypt_data->rotate_state.flush_observer->get_number_of_pages_flushed()
+                                            - number_of_pages_flushed_so_far;
+
+              if (number_of_pages_flushed_now > 0 && end > start) {
+                      state->cnt_waited += number_of_pages_flushed_now;
                       state->sum_waited_us += (end - start);
 
                       /* statistics */
-                      state->crypt_stat.pages_flushed += sum_pages;
+                      state->crypt_stat.pages_flushed += number_of_pages_flushed_now;
               }
-      }
+      //}
+      
+      crypt_data->rotate_state.destrory_flush_observer();
+
+      //UT_DELETE(crypt_data->rotate_state.flush_observer);
+      //crypt_data->rotate_state.flush_observer = NULL;
+      //trx_free_for_background(crypt_data->rotate_state.trx);
+      //crypt_data->rotate_state.trx = NULL;
 
       //ib::error() << "Robert: flushed for space: " << space->name << '\n';
       //ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
@@ -2742,9 +2790,9 @@ fil_crypt_complete_rotate_space(
                               state->min_key_version_found;
               }
 
-              if (state->end_lsn > crypt_data->rotate_state.end_lsn) {
-                      crypt_data->rotate_state.end_lsn = state->end_lsn;
-              }
+              //if (state->end_lsn > crypt_data->rotate_state.end_lsn) {
+                      //crypt_data->rotate_state.end_lsn = state->end_lsn;
+              //}
 
               ut_a(crypt_data->rotate_state.active_threads > 0);
               // Not updaing here - as MariaDB is doing only after flush
@@ -2825,7 +2873,8 @@ fil_crypt_complete_rotate_space(
               //}
 
               if (should_flush) {
-                      if (fil_crypt_flush_space(state) == DB_SUCCESS)
+                      if (fil_crypt_flush_space(state) == DB_SUCCESS) //fil_crypt_flush_space will return DB_SUCESS also if space is stopping
+                                                                      //maybe I should skip those opearations for stopping space also?
                       {
                         uint current_type = crypt_data->rotate_state.min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ? CRYPT_SCHEME_UNENCRYPTED
                                                                                                                    : crypt_data->type;
