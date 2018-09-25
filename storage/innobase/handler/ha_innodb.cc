@@ -12849,14 +12849,6 @@ create_table_info_t::innobase_table_flags()
 			    DBUG_RETURN(false);
                         }
                 }
-
-		if (m_create_info->options & HA_LEX_CREATE_TMP_TABLE) {
-			if (!Encryption::is_rotated_keys(encryption)) {
-				/* Can't encrypt shared tablespace */
-				my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
-				DBUG_RETURN(false);
-			}
-		}
 	}
 
 	/* Check if there are any FTS indexes defined on this table. */
@@ -23929,28 +23921,28 @@ innodb_encrypt_tables_validate(
         return 1;
        *static_cast<ulong*>(save)= use;
 
-        ulong encrypt_tables = *(ulong*)save;
+        //ulong encrypt_tables = *(ulong*)save;
 
         //TODO:Should not this abort the server?
         //This should create or get existing key
-        if (encrypt_tables
-            && !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(FIL_DEFAULT_ENCRYPTION_KEY)) {
-                push_warning_printf(thd, Sql_condition::SL_WARNING,
-                                    HA_ERR_UNSUPPORTED,
-                                    "InnoDB: cannot enable encryption, "
-                                    "encryption plugin is not available");
-                return 1;
-        }
+        //if (encrypt_tables
+            //&& !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(FIL_DEFAULT_ENCRYPTION_KEY)) {
+                //push_warning_printf(thd, Sql_condition::SL_WARNING,
+                                    //HA_ERR_UNSUPPORTED,
+                                    //"InnoDB: cannot enable encryption, "
+                                    //"encryption plugin is not available");
+                //return 1;
+        //}
 
-        if (!srv_fil_crypt_rotate_key_age) {
-                const char *msg = (encrypt_tables ? "enable" : "disable");
-                push_warning_printf(thd, Sql_condition::SL_WARNING,
-                                    HA_ERR_UNSUPPORTED,
-                                    "InnoDB: cannot %s encryption, "
-                                    "innodb_encryption_rotate_key_age=0"
-                                    " i.e. key rotation disabled", msg);
-                return 1;
-        }
+        //if (!srv_fil_crypt_rotate_key_age) {
+                //const char *msg = (encrypt_tables ? "enable" : "disable");
+                //push_warning_printf(thd, Sql_condition::SL_WARNING,
+                                    //HA_ERR_UNSUPPORTED,
+                                    //"InnoDB: cannot %s encryption, "
+                                    //"innodb_encryption_rotate_key_age=0"
+                                    //" i.e. key rotation disabled", msg);
+                //return 1;
+        //}
 
 	return 0;
 }

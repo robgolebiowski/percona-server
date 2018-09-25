@@ -7143,8 +7143,8 @@ fil_iterate(
 						    encrypted_with_rotated_keys ? iter.crypt_data->iv : iter.encryption_iv,
                                                     0, //TODO:Robert - maybe I should not set key version to 0 here, but to something like invalid key?
                                                     iter.encryption_key_id,
-                                                    iter.crypt_data->tablespace_iv,
-                                                    iter.crypt_data->tablespace_key);
+                                                    encrypted_with_rotated_keys ? iter.crypt_data->tablespace_iv : NULL,
+                                                    encrypted_with_rotated_keys ? iter.crypt_data->tablespace_key : NULL);
 
 			//read_request.encryption_algorithm(FSP_FLAGS_GET_ROTATED_KEYS(space_flags) ? Encryption::ROTATED_KEYS
                                                                                                   //: Encryption::AES);

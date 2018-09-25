@@ -4849,10 +4849,6 @@ mysql_prepare_create_table(THD *thd, const char *error_schema_name,
       DBUG_RETURN(TRUE);
     }
 
-    DBUG_ASSERT(encrypt_type->length == 0 || strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length) != 0 ||
-                encrypt_type->length == 12);
-
-
    // For ROTATED_KEYS table if encryption_key_id has not yet been assigned - assign default_encryption_key_id
    //if (0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length) &&
    if (false == create_info->was_encryption_key_id_set)
