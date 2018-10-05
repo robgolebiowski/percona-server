@@ -4086,7 +4086,6 @@ void handler::get_auto_increment(ulonglong offset, ulonglong increment,
   ha_index_end();
   (void) extra(HA_EXTRA_NO_KEYREAD);
   *first_value= nr;
-
   DBUG_VOID_RETURN;
 }
 

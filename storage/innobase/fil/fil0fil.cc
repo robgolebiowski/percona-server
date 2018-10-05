@@ -1283,6 +1283,13 @@ fil_space_free_low(
 	/* The tablespace must not be in fil_system->named_spaces. */
 	ut_ad(srv_fast_shutdown == 2 || space->max_lsn == 0);
 
+	/* Wait for fil_space_t::release_for_io(); after
+	fil_space_detach(), the tablespace cannot be found, so
+	fil_space_acquire_for_io() would return NULL */
+	while (space->n_pending_ios) {
+		os_thread_sleep(100);
+	}
+
 	for (fil_node_t* node = UT_LIST_GET_FIRST(space->chain);
 	     node != NULL; ) {
 		ut_d(space->size -= node->size);
@@ -2160,6 +2167,14 @@ fil_space_release_for_io(fil_space_t* space)
   //return false;
 //}
 
+/** Return the next fil_space_t.
+Once started, the caller must keep calling this until it returns NULL.
+fil_space_acquire() and fil_space_t::release() are invoked here which
+blocks a concurrent operation from dropping the tablespace.
+@param[in]	prev_space	Pointer to the previous fil_space_t.
+If NULL, use the first fil_space_t on fil_system.space_list.
+@return pointer to the next fil_space_t.
+@retval NULL if this was the last*/
 fil_space_t*
 fil_space_next(fil_space_t* prev_space)
 {
@@ -4044,7 +4059,7 @@ fil_ibd_create(
 	space = fil_space_create(name, space_id, flags, is_temp ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
 				 crypt_data, mode);
 
-	//DEBUG_SYNC_C("fil_ibd_created_space");
+        DEBUG_SYNC_C("fil_ibd_created_space");
 
         if (strcmp(space->name, "test/t2") == 0 && size == 0)
         {
@@ -4545,8 +4560,8 @@ skip_validate:
 		if (err == DB_SUCCESS) {
                   if (is_encrypted && !for_import && crypt_data == NULL) {
 
-                        if (strcmp(space->name, "test/t2") == 0)
-                          ib::error() << "There is no crypt_data for test/t2";
+                        //if (strcmp(space->name, "test/t2") == 0)
+                          //ib::error() << "There is no crypt_data for test/t2";
 
 			Datafile& df_current = df_remote.is_open() ?
 				df_remote: df_dict.is_open() ?

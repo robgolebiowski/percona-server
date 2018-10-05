@@ -161,13 +161,14 @@ uchar* st_encryption_scheme::get_key(uint version)
 
 uchar* st_encryption_scheme::get_key_or_create_one(uint *version, bool create_if_not_exists)
 {
-  ut_ad(*version != 0 || create_if_not_exists);
+  ut_ad(*version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
+        || create_if_not_exists);
 
-  if (*version != 0)
+  if (*version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
   {
     for (uint i = 0; i < array_elements(key); ++i)
     {
-      if(key[i].version == 0) // no more keys
+      if(key[i].version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) // no more keys
         break;
 
       if (key[i].version == *version)
@@ -177,7 +178,7 @@ uchar* st_encryption_scheme::get_key_or_create_one(uint *version, bool create_if
 
   // key not found
   uchar *tablespace_key = NULL;
-  uint tablespace_key_version = 0;
+  uint tablespace_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
   if (create_if_not_exists)
     Encryption::get_latest_tablespace_key_or_create_new_one(this->key_id, &tablespace_key_version, &tablespace_key);
   else

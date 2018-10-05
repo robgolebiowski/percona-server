@@ -4287,9 +4287,16 @@ loop:
 
 			/* Try to set table as corrupted instead of
 			asserting. */
-			if (page_id.space() != TRX_SYS_SPACE &&
-			    dict_set_corrupted_by_space(page_id.space())) {
-				return (NULL);
+			if (page_id.space() != TRX_SYS_SPACE) {
+                               if (fil_space_t* space
+				   = fil_space_acquire_for_io(
+					   page_id.space())) {
+				 bool set = dict_set_corrupted_by_space(space->id);
+                                 fil_space_release_for_io(space);
+				 if (set) {
+				   return NULL;
+				 }
+                          }
 			}
 
 			ib::fatal() << "Unable to read page " << page_id
@@ -5709,7 +5716,7 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 
 	//DBUG_ENTER("buf_page_check_corrupt");
         //TODO:Robert - to trzeba jeszcze dodać
-	//ut_ad(space->n_pending_ios > 0);
+        ut_ad(space->n_pending_ios > 0);
         //
         DBUG_PRINT("Robert", ("Checking if page : "UINT32PF":"UINT32PF" is corrupted",
                             bpage->id.space(), bpage->id.page_no()));

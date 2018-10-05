@@ -12224,24 +12224,23 @@ create_table_info_t::create_option_encryption_is_valid() const
           //}
         }
 
-        if (Encryption::is_master_key_encryption(m_create_info->encrypt_type.str) ||
-            Encryption::is_no(m_create_info->encrypt_type.str))
-        {
-          if (m_create_info->was_encryption_key_id_set)
-	  //if (m_create_info->encryption_key_id  != THDVAR(m_thd, default_encryption_key_id))
-          {
-		push_warning_printf(
-			m_thd, Sql_condition::SL_WARNING,
-			HA_WRONG_CREATE_OPTION,
-                        Encryption::is_no(m_create_info->encrypt_type.str)  
-			        ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled."
-                                : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when Master Key encryption is enabled.",
-			(uint)m_create_info->encryption_key_id
-		);
-                m_create_info->was_encryption_key_id_set = false;
-                m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-	  }
-        }
+        //if (Encryption::is_master_key_encryption(m_create_info->encrypt_type.str) ||
+            //Encryption::is_no(m_create_info->encrypt_type.str))
+        //{
+          //if (m_create_info->was_encryption_key_id_set)
+          //{
+		//push_warning_printf(
+			//m_thd, Sql_condition::SL_WARNING,
+			//HA_WRONG_CREATE_OPTION,
+                        //Encryption::is_no(m_create_info->encrypt_type.str)  
+				//? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled."
+                                //: "InnoDB: Ignored ENCRYPTION_KEY_ID %u when Master Key encryption is enabled.",
+			//(uint)m_create_info->encryption_key_id
+		//);
+                //m_create_info->was_encryption_key_id_set = false;
+                //m_create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+	  //}
+        //}
 
         // TODO:Robert table is not encrypted when temporary table // should differentiate between Oracle encryption and ROTATED_KEYS
 	bool table_is_encrypted =
@@ -12631,30 +12630,36 @@ ha_innobase::adjust_create_info_for_frm(
                 }
         }
 
+       LEX_STRING*	encrypt_type = &create_info->encrypt_type;
 
-	//if (create_info->encrypt_type.length == 0
-	    //&& create_info->encrypt_type.str == NULL)
-        //{
-                //if ((!is_intrinsic && (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
-                                       //srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE))
-                    //||
-                    //(is_intrinsic && srv_tmp_space.is_encrypted())
-                    //||
-                    //(is_tmp_but_not_intrinsic && 
-                     //(srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
-                      //srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE)))
-		//{
-			//create_info->encrypt_type = yes_string;
-		//}
-                //else if (!is_intrinsic &&
-                         //(srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
-                          //srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
-                          //srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE))
-                //{
-                        //create_info->encrypt_type = rotated_keys_string;
-                //}
-        //}
-
+       if (false == create_info->was_encryption_key_id_set)
+       {
+          if (Encryption::is_rotated_keys(encrypt_type->str) ||
+              (encrypt_type->length == 0 && srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING))
+          {
+            create_info->encryption_key_id = THDVAR(current_thd, default_encryption_key_id);
+            create_info->was_encryption_key_id_set = true;
+          }
+       }
+       else if (Encryption::is_master_key_encryption(encrypt_type->str) || Encryption::is_no(encrypt_type->str))// &&
+                //alter_info->was_encryption_key_id_set == false)
+       {
+           // if it is encrypted table with Master key encryption or marked as not to be encrypted and alter table
+           // does not have ENCRYPTION_KEY_ID - mark encryption key id as not set. 
+           // TODO: Add warning that encryption_key_id is ignored
+           //
+	   push_warning_printf(
+			current_thd, Sql_condition::SL_WARNING,
+			HA_WRONG_CREATE_OPTION,
+                        Encryption::is_no(encrypt_type->str)  
+			        ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled."
+                                : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when Master Key encryption is enabled.",
+			(uint)create_info->encryption_key_id
+		);
+           create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+           //create_info->encryption_key_id = THDVAR(current_thd, default_encryption_key_id);
+           create_info->was_encryption_key_id_set = false;
+       }
 }
 
 /*****************************************************************//**

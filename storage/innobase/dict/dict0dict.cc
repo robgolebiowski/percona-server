@@ -5840,6 +5840,7 @@ dict_set_corrupted_by_space(
 	return(TRUE);
 }
 
+
 /**********************************************************************//**
 Flags an index corrupted both in the data dictionary cache
 and in the SYS_INDEXES */

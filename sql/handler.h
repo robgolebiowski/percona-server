@@ -545,6 +545,8 @@ namespace AQP {
 /** ENCRYPTION="Y" used during table create. */
 #define HA_CREATE_USED_ENCRYPT          (1L << 27)
 
+#define HA_CREATE_USED_ENCRYPTION_KEY_ID (1L << 28)
+
 /*
   These structures are used to pass information from a set of SQL commands
   on add/drop/change tablespace definitions to the proper hton.
