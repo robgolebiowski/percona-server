@@ -295,7 +295,6 @@ public:
   */
   enum_with_validation          with_validation;
 
-  bool was_encryption_key_id_set;
 
   Alter_info() :
     flags(0),
@@ -303,8 +302,7 @@ public:
     num_parts(0),
     requested_algorithm(ALTER_TABLE_ALGORITHM_DEFAULT),
     requested_lock(ALTER_TABLE_LOCK_DEFAULT),
-    with_validation(ALTER_VALIDATION_DEFAULT),
-    was_encryption_key_id_set(false)
+    with_validation(ALTER_VALIDATION_DEFAULT)
   {}
 
   void reset()
@@ -321,7 +319,6 @@ public:
     requested_algorithm= ALTER_TABLE_ALGORITHM_DEFAULT;
     requested_lock= ALTER_TABLE_LOCK_DEFAULT;
     with_validation= ALTER_VALIDATION_DEFAULT;
-    was_encryption_key_id_set = false;
   }
 
 

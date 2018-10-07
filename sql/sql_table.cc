@@ -8302,7 +8302,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   if (!(used_fields & HA_CREATE_USED_CONNECTION))
     create_info->connect_string= table->s->connect_string;
 
-  if (!create_info->was_encryption_key_id_set)
+  if (!(used_fields & HA_CREATE_USED_ENCRYPTION_KEY_ID))
   {
     create_info->encryption_key_id= table->s->encryption_key_id;
     create_info->was_encryption_key_id_set= table->s->was_encryption_key_id_set;
@@ -8852,10 +8852,15 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
     create_info->encrypt_type.length= table->s->encrypt_type.length;
   }
 
+  // Encryption was changed to not ROTATED_KEYS and ALTER does not contain encryption_key_id
+  // mark it as not set then
   if (used_fields & HA_CREATE_USED_ENCRYPT &&
       0 != strncmp(create_info->encrypt_type.str, "ROTATED_KEYS", create_info->encrypt_type.length) &&
-      alter_info->was_encryption_key_id_set == false)
+      !(used_fields & HA_CREATE_USED_ENCRYPTION_KEY_ID))
+  {
+    create_info->used_fields&= ~(HA_CREATE_USED_ENCRYPTION_KEY_ID);
     create_info->was_encryption_key_id_set = false;
+  }
 
   /* Do not pass the update_create_info through to each partition. */
   if (table->file->ht->db_type == DB_TYPE_PARTITION_DB)

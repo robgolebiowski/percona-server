@@ -624,14 +624,6 @@ uint get_global_default_encryption_key_id_value()
 }
 
 
-handlerton::KeyringEncryptionVariables get_keyring_encryption_variables(THD *thd)
-{
-     handlerton::KeyringEncryptionVariables keyring_encryption_variables;
-     keyring_encryption_variables.global_encrypt_tables= srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING;
-     keyring_encryption_variables.session_default_encryption_key_id = THDVAR(thd, default_encryption_key_id);
-
-     return keyring_encryption_variables;
-}
 
 
 /** Set up InnoDB API callback function array */
@@ -4046,8 +4038,6 @@ innobase_init(
 	innobase_hton->rotate_encryption_master_key =
 		innobase_encryption_key_rotation;
 
-        innobase_hton->get_keyring_encryption_variables = 
-                get_keyring_encryption_variables;
 
 	innobase_hton->create_zip_dict = innobase_create_zip_dict;
 	innobase_hton->drop_zip_dict = innobase_drop_zip_dict;
