@@ -1348,18 +1348,6 @@ fil_crypt_space_needs_rotation(
                       //ib::error() << "key_state.key_version = " << key_state->key_version
                                   //<< " for table " << space->name;
               }
-              //if (strcmp(state->space->name, "test/t1") == 0)
-              //{
-                //ib::error() << "In fil_crypt_space_needs_rotation for test/t1"
-                            //<< " min_key_version = " << crypt_data->min_key_version
-                            //<< " latest_key_version = " << key_state->key_version
-                            //<< " rotate_key_age = " << key_state->rotate_key_age << '\n';
-              //}
-
-              //if (space->id == 23)
-              //{
-                 //ib::error() << "Starting encrypting space 23 - before checking if key needs rotation";
-              //}
 
               bool need_key_rotation = fil_crypt_needs_rotation(
                       crypt_data->encryption,
@@ -2022,24 +2010,21 @@ fil_crypt_rotate_page(
                       ut_ad(page_get_space_id(frame) == 0);
               } else if (fil_crypt_needs_rotation(
                                  crypt_data->encryption,
-                                 kv, key_state->key_version,
+                                 kv, crypt_data->encrypting_with_key_version,
                                  key_state->rotate_key_age)) {
 
                       mtr.set_named_space(space);
                       mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);
                       //modified = true;
 
-                      //if (strcmp(space->name, "test/t1") == 0)
-                        //ib::error() << "Write to  " << space->name << " for offset = " << offset << '\n';
                       /* force rotation by dummy updating page */
                       mlog_write_ulint(frame + FIL_PAGE_SPACE_ID,
                                        space_id, MLOG_4BYTES, &mtr);
                       // Mark page in a buffer as unencrypted
-                      if (key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
-                      {
-                         mlog_write_ulint(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, MLOG_4BYTES, &mtr);
-                        // TODO:Consider doing the same also for encrypted ? Setting key_version here and retrieving key here ? 
-                      }
+                      //if (key_state->key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+                         //mlog_write_ulint(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, MLOG_4BYTES, &mtr);
+                      // assign key version to a page in a buffer - so it would not be rotated more times
+                      mlog_write_ulint(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, crypt_data->encrypting_with_key_version, MLOG_4BYTES, &mtr);
 
                       /* statistics */
                       state->crypt_stat.pages_modified++;

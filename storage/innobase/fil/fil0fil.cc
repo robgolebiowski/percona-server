@@ -5948,6 +5948,65 @@ fil_report_invalid_page_access(
   //return true;
 //}
 
+inline
+void
+fil_io_set_keyring_encryption(IORequest& req_type,
+                              fil_space_t *space)
+{
+   ut_ad(space->crypt_data != NULL);
+
+   byte* key = NULL;
+   ulint key_len = 32; //32*8=256
+   byte* iv = NULL;
+   byte *tablespace_iv = NULL;
+   byte *tablespace_key = NULL;
+   uint key_version = 0;
+   uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+
+   mutex_enter(&space->crypt_data->mutex);
+
+   iv = space->crypt_data->iv;
+   key_id= space->crypt_data->key_id;
+
+   if (req_type.is_write())
+   {
+     if (space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
+     {
+       key = space->crypt_data->get_key_currently_used_for_encryption();
+       key_version = space->crypt_data->encrypting_with_key_version;
+       key_len = 32;
+     }
+     else
+     {
+       key = NULL;
+       key_len = 0;
+       iv = NULL;
+       key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+     }
+   }
+
+   if (req_type.is_read())
+   {
+     tablespace_iv = space->crypt_data->tablespace_iv;
+     tablespace_key = space->crypt_data->tablespace_key;
+     ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_ROTATED_KEY ||
+           space->crypt_data->tablespace_key != NULL);
+     key = space->crypt_data->tablespace_key;
+   }
+
+   req_type.encryption_key(key,
+			   key_len,
+                           iv,
+                           key_version,
+                           key_id,
+                           tablespace_iv,
+                           tablespace_key);
+
+   req_type.encryption_rotation(space->crypt_data->encryption_rotation);
+
+   mutex_exit(&space->crypt_data->mutex);
+}
+
 /** Set encryption information for IORequest.
 @param[in,out]	req_type	IO request
 @param[in]	page_id		page id
@@ -6013,126 +6072,22 @@ fil_io_set_encryption(
 	if (!req_type.is_log() && page_id.page_no() > 0 && (TRX_SYS_SPACE != page_id.space() || TRX_SYS_PAGE_NO != page_id.page_no())
 	    && space->encryption_type != Encryption::NONE)
 	{
-                //TODO: Here I also need to get a key for encryption or move it deeper into os0file
-                //uint key_version = space->encryption_type == Encryption::ROTATED_KEYS
-                                     //? get_latest_tablespace_key_version()
-                                     //: 0;
-                                     
-                                     //
-                                     //
-                                     //
-                byte* key = NULL;
-                ulint key_len = 32; //32*8=256
-                byte* iv = NULL;
-                byte *tablespace_iv = NULL;
-                byte *tablespace_key = NULL;
-                uint key_version = 0;
-                uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-
-                //if (strcmp(space->name, "test/t6") == 0)
-                  //ib::error() << "dummy test for " << space->name << '\n';
-
-                //ut_ad(space->encryption_type != Encryption::ROTATED_KEYS); //TODO:Robert:Cannot be called for ROTATED_KEYS
-
-                //TODO:Robert this test is invalid for MTR test create_or_replace.test
-                //if (req_type.is_write() && space->crypt_data != NULL && 
-                    //((srv_encrypt_tables && space->crypt_data->encryption != FIL_ENCRYPTION_OFF) ||
-                    //(!srv_encrypt_tables && space->crypt_data->encryption == FIL_ENCRYPTION_ON)))
-                  //ut_ad(bpage->encrypt != false);
-
                 if (space->encryption_type == Encryption::ROTATED_KEYS) 
                 {
                   ut_ad(space->crypt_data != NULL);
-                  //ut_ad(space->crypt_data->iv[0] != '\0'); //TO Chyba jest bez sensu assert, bo iv może się zaczynać od 0
-                  iv = space->crypt_data->iv;
-                  if (req_type.is_write())
-                  {
-                     //static void get_latest_tablespace_key(uint key_id,
-                           //uint *tablespace_key_version,
-			   //byte** tablespace_key);
 
-                    if (space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
-                    {
-                      key = space->crypt_data->get_key_currently_used_for_encryption();
-                      key_version = space->crypt_data->encrypting_with_key_version;
-                      //Encryption::get_latest_tablespace_key(space->crypt_data->key_id, &key_version, &key);
-                      key_len = 32;
-                    }
-                    else
-                    {
-                      key = NULL;
-                      key_len = 0;
-                      iv = NULL;
-                      key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-                    }
-
-                    //if (bpage->encrypt)
-                    //{
-                      //ut_ad(bpage->encryption_key != NULL); 
-                      //key = bpage->encryption_key;
-                      //key_version = bpage->encryption_key_version;
-                      //key_len = bpage->encryption_key_length;
-                    //}
-                    //else
-                    //{
-
-                      //if (strcmp(space->name, "test/t2") == 0)
-                        //ib::error() << "Setting key to unencrypted for space: " << space->name << '\n';
-
-                       //key = NULL;
-		      //key_len = 0;
-		      //iv = NULL;
-                      //key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-
-                      //ut_ad(key_version != (uint)(~0));
-                    //}
-
-                  }
-                  key_id= space->crypt_data->key_id;
-
-                  //if (strcmp(space->name, "test/t6") == 0)
-                    //ib::error() << "dummy test for " << space->name << '\n';
-
-
-
-                  if (req_type.is_read())
-                  {
-                    tablespace_iv = space->crypt_data->tablespace_iv;
-                    tablespace_key = space->crypt_data->tablespace_key;
-                    ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_ROTATED_KEY ||
-                          space->crypt_data->tablespace_key != NULL);
-                    key = space->crypt_data->tablespace_key;
-                  }
-                  //else
-                    //ut_ad(false); // we do not get encryption key here for ROTATED_KEYS when read
-                }
-                else 
+                  fil_io_set_keyring_encryption(req_type, space);
+                } else
                 {
-                  iv =  space->encryption_iv;
-                  key = space->encryption_key;
-                  key_len = space->encryption_klen;
-                }
+                  ut_ad(space->encryption_type == Encryption::AES);
+                  req_type.encryption_key(space->encryption_key,
+					32,
+                                        space->encryption_iv,
+                                        0, 0, NULL, NULL); // not relevant for Master Key encryption
 
-		//req_type.encryption_key(space->encryption_key,
-					//space->encryption_klen,
-                                        //iv);
-					//space->encryption_iv);
-                req_type.encryption_key(key,
-					key_len,
-                                        iv,
-                                        key_version,
-                                        key_id,
-                                        tablespace_iv,
-                                        tablespace_key);
-					//space->encryption_iv);
-
-                                        
-                //if (space->encryption_type == Encryption::ROTATED_KEYS)
-                req_type.encryption_algorithm(space->encryption_type);
-                if (space->crypt_data != NULL)
-                  req_type.encryption_rotation(space->crypt_data->encryption_rotation);
-                else 
                   req_type.encryption_rotation(Encryption::NO_ROTATION);
+                }
+                req_type.encryption_algorithm(space->encryption_type);
 	} else {
 		req_type.clear_encrypted();
 	}

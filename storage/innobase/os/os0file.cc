@@ -46,7 +46,6 @@ Created 10/21/1995 Heikki Tuuri
 #include "os0file.ic"
 #endif
 
-#include "fil0crypt.h"
 
 #include "srv0srv.h"
 #include "srv0start.h"
@@ -1278,14 +1277,8 @@ AIOHandler::post_io_processing(Slot* slot)
 			ut_ad(err == DB_SUCCESS
 			      || err == DB_UNSUPPORTED
 			      || err == DB_CORRUPTION
-			      || err == DB_IO_DECOMPRESS_FAIL
-                              || err == DB_IO_DECRYPT_FAIL);
-		//} else if (!slot->type.is_log() && slot->type.is_read()) {
-                  //ut_ad(is_encrypted_page(slot) == false);
-                  //// we did not go to io_complete - so mark read page as unencrypted here
-                  //mach_write_to_4(slot->buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-                  //err = DB_SUCCESS;
-                } else {
+			      || err == DB_IO_DECOMPRESS_FAIL);
+		} else {
 
 			err = DB_SUCCESS;
 		}
@@ -1733,6 +1726,79 @@ os_file_read_string(
 	}
 }
 
+static
+dberr_t
+verify_post_encryption_checksum(const IORequest&type,
+                                Encryption &encryption,
+                                byte* buf,
+                                ulint		src_len,
+	                        ulint		offset)
+{
+   bool is_crypt_checksum_correct = false; // For MK encryption is_crypt_checksum_correct stays false
+   if (encryption.m_type == Encryption::ROTATED_KEYS)
+   {
+     if (type.is_page_zip_compressed())
+     {
+       byte zip_magic[ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN];
+       memcpy(zip_magic, buf + FIL_PAGE_ZIP_ROTATED_KEYS_MAGIC,
+              ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN);
+       is_crypt_checksum_correct = memcmp(zip_magic, ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC,
+                                          ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN) == 0;
+     }
+     else
+       is_crypt_checksum_correct = fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(),
+                                                                   encryption.is_encrypted_and_compressed(buf), offset);
+
+     if (encryption.m_encryption_rotation == Encryption::NO_ROTATION && !is_crypt_checksum_correct) // There is no re-encryption going on
+     {
+       ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+       ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
+       ib::error() << "Post - encryption checksum verification failed - decryption failed for space id = " << space_id
+                   << " page_no = " << page_no;
+
+       return (DB_IO_DECRYPT_FAIL);
+     }
+   }
+
+   if (encryption.m_encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY) // There is re-encryption going on
+   {
+     if (is_crypt_checksum_correct) // assume page is RK encrypted
+       encryption.m_type = Encryption::ROTATED_KEYS; 
+     else
+     {
+       encryption.m_type = Encryption::AES; // assume page is MK encrypted
+       ut_ad(encryption.m_tablespace_iv != NULL);
+       encryption.m_iv = encryption.m_tablespace_iv; // iv comes from tablespace header for MK encryption
+       ut_ad(encryption.m_tablespace_key != NULL);
+       encryption.m_key = encryption.m_tablespace_key;
+     }
+   }
+
+   return DB_SUCCESS;
+}
+
+static
+void
+assing_key_version(byte* buf,
+                   Encryption	&encryption,
+                   bool is_page_encrypted)
+{
+    ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
+    if(page_type != FIL_PAGE_TYPE_ALLOCATED) // page allocated needs to be all zeros
+    {
+      if (is_page_encrypted)
+      {
+        mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
+        ut_ad(encryption.m_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+        mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
+      }
+      else
+        mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+    }
+    else
+        mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, 0); //needs to be 0 for freshly allocated pages
+}
+
 /** Decompress after a read and punch a hole in the file if it was a write
 @param[in]	type		IO context
 @param[in]	fh		Open file handle
@@ -1742,17 +1808,6 @@ os_file_read_string(
 @param[in]	len		Used buffer length for write and output
 				buf len for read
 @return DB_SUCCESS or error code */
-
-//bool
-//fil_space_verify_crypt_checksum();
-	//byte* 			page,
-	//const ulint	        page_size,
-        //bool                    is_zip_compressed,
-        //bool                    is_new_schema_compressed, 
-	////ulint			space_id,
-	//ulint			offset);
-
-
 static
 dberr_t
 os_file_io_complete(
@@ -1768,14 +1823,6 @@ os_file_io_complete(
 	ut_a(offset > 0);
 	ut_ad(type.validate());
 
-        //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-        //ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
-
-        //if (space_id == 23 && page_no==260)
-        //{
-          //ib::error() << "In os_file_io_comple for test/t1, page = 260" << '\n';
-        //}
-
 	if (!type.is_compression_enabled()) {
 
 		return(DB_SUCCESS);
@@ -1786,155 +1833,26 @@ os_file_io_complete(
 
 		ut_ad(!type.is_log());
 
+                bool is_page_encrypted= encryption.is_encrypted_page(buf);
 
-                //TODO:Tutaj zapisać czy jest encrypted
-                bool was_page_encrypted= encryption.is_encrypted_page(buf);
-                //bool was_page_compressed_and_encrypted= encryption.is_encrypted_and_compressed(buf);
-
-                //if (space_id == 23 && page_no==260)
-                //{
-                  //if (was_page_encrypted)
-                  //{
-                    //ib::error() << "test/t1 page = 260 was_page_encrypted = " << was_page_encrypted
-                                //<< " srv_encrypt_tables = " << srv_encrypt_tables;
-                  //}
-                  //else
-                    //ib::error() << "test/t1 page = 260 was not encrypted" ;
-                //}
-
-
-
-                // Before we try to decrypt, first we need to validate if checksum is valid
-                // for ROTATED_KEYS encrypted tables
-                //
-                if (was_page_encrypted)
+                if (is_page_encrypted)
                 {
-                  bool is_crypt_checksum_correct = false; // For MK encryption is_crypt_checksum_correct stays false
-                  if (encryption.m_type == Encryption::ROTATED_KEYS)
-                  {
-                    if (type.is_page_zip_compressed())
-                    {
-                      byte zip_magic[ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN];
-                      memcpy(zip_magic, buf + FIL_PAGE_ZIP_ROTATED_KEYS_MAGIC,
-                             ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN);
-                      is_crypt_checksum_correct = memcmp(zip_magic, ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC,
-                                                         ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN) == 0;
-                    }
-                    else
-                      is_crypt_checksum_correct = fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(),
-                                                                                  encryption.is_encrypted_and_compressed(buf), offset);
-
-
-                    //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                    //if (space_id == 23)
-                    //{
-                      //DBUG_EXECUTE_IF(
-				//"encryption_post_enc_checksum_verification_fail_on_t1",
-                                //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                                //ib::error() << "Robert executing";
-                                //if (space_id == 23)
-                                  //is_crypt_checksum_correct = false;);
-                    //}
-
-
-                    if (encryption.m_encryption_rotation == Encryption::NO_ROTATION && !is_crypt_checksum_correct) // There is no re-encryption going on
-                    {
-                      ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                      ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
-                      //ut_ad(0);
-                      ib::error() << "Post - encryption checksum verification failed - decryption failed for space id = " << space_id
-                                  << " page_no = " << page_no;
-
-                      return (DB_IO_DECRYPT_FAIL);
-                    }
-                  }
-
-                  if (encryption.m_encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY) // There is re-encryption going on
-                  {
-                    if (is_crypt_checksum_correct) // assume page is RK encrypted
-                      encryption.m_type = Encryption::ROTATED_KEYS; 
-                    else
-                    {
-                      encryption.m_type = Encryption::AES; // assume page is MK encrypted
-                      ut_ad(encryption.m_tablespace_iv != NULL);
-                      encryption.m_iv = encryption.m_tablespace_iv; // iv comes from tablespace header for MK encryption
-                      ut_ad(encryption.m_tablespace_key != NULL);
-                      encryption.m_key = encryption.m_tablespace_key;
-                    }
-                  }
+                  dberr_t err = verify_post_encryption_checksum(type, encryption, buf, src_len, offset);
+                  if (err != DB_SUCCESS)
+                    return err;
                 }
                 
-                
-                //if (was_page_encrypted && !type.is_page_zip_compressed() && encryption.m_type == Encryption::ROTATED_KEYS)
-                //{
-                   //if (!fil_space_verify_crypt_checksum(buf, src_len, type.is_page_zip_compressed(), encryption.is_encrypted_and_compressed(buf), offset))
-                   //{
-                      //ulint space_id = mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-                      //ulint page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
-
-                      ////ut_ad(0);
-                      //ib::error() << "Post - encryption checksum verification failed - decryption failed for space id = " << space_id
-                                  //<< " page_no = " << page_no;
-
-                      //return (DB_IO_DECRYPT_FAIL);
-                   //}
-                //}
-               
-
 		ret = encryption.decrypt(type, buf, src_len, scratch, len);
-		if (ret == DB_SUCCESS) {
-                //TODO:Jeżeli było encrypted to po dekompresji przypisać wersje klucza
-			ret = os_file_decompress_page(
-					type.is_dblwr_recover(),
-					buf, scratch, len);
-                        if (ret == DB_SUCCESS && encryption.m_type == Encryption::ROTATED_KEYS)
-                        {
-         	            ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
-        //if (original_type != FIL_PAGE_TYPE_ALLOCATED && page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED)
-                            if(page_type != FIL_PAGE_TYPE_ALLOCATED) // page allocated needs to be all zeros
-                            {
-                              if (was_page_encrypted) 
-                              {
-                                mach_write_to_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1, FIL_PAGE_ENCRYPTED);
-                                ut_ad(encryption.m_key_version != 0);
-                                mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
-                                //mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM, encryption.m_checksum);
-                                //if (type.is_zip_compressed())
-                                //{
-                                  //mach_write_to_4(buf + FIL_PAGE_LSN + 4, *(uint*)(buf + UNIV_PAGE_SIZE - 4)); // TODO: maybe change to memcpy
-                                //}
-                                //if (was_page_compressed_and_encrypted)
-                                //{
-                                  //uint16_t original_size = static_cast<uint16_t>(mach_read_from_2(buf + FIL_PAGE_ORIGINAL_SIZE_V1));
-                                  //memcpy(buf + FIL_PAGE_LSN + 4, buf + (original_size + FIL_PAGE_DATA) - FIL_PAGE_END_LSN_OLD_CHKSUM + 4, 4); // TODO: maybe change to memcpy
-                                  //memcpy(buf + FIL_PAGE_LSN + 4, buf + UNIV_PAGE_SIZE - 4, 4); // TODO: maybe change to memcpy
+		if (ret != DB_SUCCESS)
+                  return ret;
 
-
-                                        //control->m_original_size = static_cast<uint16_t>(
-              //mach_read_from_2(page + FIL_PAGE_ORIGINAL_SIZE_V1));
-
-                                //}
-                                // Do not write key version before all information from compressed page header is optained
-                                // FIL_PAGE_ENCRYPTION_KEY_VERSION overrides those information
-                                //mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, encryption.m_key_version);
-                              }
-                              else
-                                mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-                            }
-                            else
-                                mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, 0); //needs to be 0 for freshly allocated pages
-                        }
-                        else
-                        {
-                          //if (!was_page_encrypted)
-                             //mach_write_to_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-                          return ret;
-                        }
-                //TODO:Tutaj przypisanie wersji klucza i original page type na encrypted - to powinno sprawdzic jezeli strona jest zaszyfrowana i corrupted
-                //Jeżeli nie było encrypted a strona jest ROTATED_KEYS to przypisać key_version not encrypted
-		} else {
-			return(ret);
-		}
+	        ret = os_file_decompress_page(type.is_dblwr_recover(),
+					      buf, scratch, len);
+                if (ret != DB_SUCCESS)
+                  return ret;
+                if (encryption.m_type == Encryption::ROTATED_KEYS
+                    && is_page_encrypted) // is_page_encrypted meaning page was encrypted before calling decrypt
+                  assing_key_version(buf, encryption, is_page_encrypted);
 
 	} else if (type.punch_hole()) {
 
@@ -5899,8 +5817,8 @@ os_file_io(
 	}
 
 
-        ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-        ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
+        //ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+        //ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
 
 	/* We do encryption after compression, since if we do encryption
 	before compression, the encrypted data will cause compression fail
@@ -5943,18 +5861,18 @@ os_file_io(
                   }
                 }
         }
-        if (type.is_encrypted() == false && type.is_write() && !type.is_compressed() && offset > 0 &&
-            type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS) // need to figure out something for compressed,
-                                                                            // TODO:ten warunek nie ma sensu - najpierw spradzam czy type jest NONE w is_encrypted
-                                                                            // a poźniej czy jest różny od ROTATED_KEYS ... 
-        {
-          mach_write_to_4(reinterpret_cast<byte*>(buf) +  FIL_PAGE_ENCRYPTION_KEY_VERSION, 0);
-          if (space_id == 2 && page_no==3)
-          {
-            ib::error() << "Overwritten key_version with 0"  << '\n';
-          }
+        //if (type.is_encrypted() == false && type.is_write() && !type.is_compressed() && offset > 0 &&
+            //type.encryption_algorithm().m_type == Encryption::ROTATED_KEYS) // need to figure out something for compressed,
+                                                                            //// TODO:ten warunek nie ma sensu - najpierw spradzam czy type jest NONE w is_encrypted
+                                                                            //// a poźniej czy jest różny od ROTATED_KEYS ... 
+        //{
+          //mach_write_to_4(reinterpret_cast<byte*>(buf) +  FIL_PAGE_ENCRYPTION_KEY_VERSION, 0);
+          //if (space_id == 2 && page_no==3)
+          //{
+            //ib::error() << "Overwritten key_version with 0"  << '\n';
+          //}
 
-        }
+        //}
 
 	SyncFileIO	sync_file_io(file, buf, n, offset);
 
