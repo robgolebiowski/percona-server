@@ -6639,6 +6639,7 @@ fil_aio_wait(
                         }
                         return;
                 }
+		// fallthrough
 	case FIL_TYPE_LOG:
 		srv_set_io_thread_op_info(segment, "complete io for log");
 		log_io_complete(static_cast<log_group_t*>(message));

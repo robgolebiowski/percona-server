@@ -1493,7 +1493,7 @@ os_file_compress_page(
 	*dst_len = ut_calc_align(len, block_size);
 
 	//ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
-	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys) ? 8 : 0);
+	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys ? 8 : 0));
 
 	/* Clear out the unused portion of the page. */
 	if (len % block_size) {
