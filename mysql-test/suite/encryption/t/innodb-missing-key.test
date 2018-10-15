@@ -13,6 +13,7 @@ call mtr.add_suppression("\\[Error\\] InnoDB: Page is still encrypted");
 call mtr.add_suppression("\\[Warning\\] InnoDB: Table is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
 
 #--echo # Start server with keys2.tx
+#--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 #--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 #--source include/restart_mysqld.inc
 
@@ -53,6 +54,7 @@ INSERT INTO t3 SELECT * FROM t1;
 --echo
 --echo # Restart server with keys3.txt
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 --source include/restart_mysqld.inc
 
 set global innodb_encryption_rotate_key_age = 1;
@@ -72,6 +74,7 @@ SELECT COUNT(1) FROM t1;
 --echo
 --echo # Start server with keys2.txt
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 --source include/restart_mysqld.inc
 
 SELECT COUNT(1) FROM t1;

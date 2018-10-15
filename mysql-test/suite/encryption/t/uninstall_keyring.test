@@ -88,6 +88,7 @@ SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 --echo # Restart with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with ROTATED_KEYS.
 
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=../../../../../../../mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=$error_log --innodb-encrypt-tables=OFF
+--let $restart_hide_args=1
 --source include/restart_mysqld.inc
 
 # Check that keyring_file was not properly intialized by checking error log
@@ -129,6 +130,7 @@ INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 eval SET @@global.keyring_file_data= '$MYSQL_TMP_DIR/mysecret_keyring';
 
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=../../../../../../../mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=$error_log
+--let $restart_hide_args=1
 --source include/restart_mysqld.inc
 
 # keyring file is not functional, try droping t2 encryption
@@ -151,6 +153,7 @@ CREATE TABLE t5 (a varchar(255)) engine=innodb;
 INSERT t5 VALUES (repeat('foobarsecret', 12));
 CREATE TABLE t6 (a varchar(255)) engine=innodb;
 INSERT t6 VALUES (repeat('foobarsecret', 12));
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 eval SET @@global.keyring_file_data= '$MYSQL_TMP_DIR/mysecret_keyring';
 SET GLOBAL innodb_encryption_threads=3;
 SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
@@ -161,6 +164,7 @@ SET GLOBAL innodb_encryption_threads=0;
 UNINSTALL PLUGIN keyring_file;
 
 --let $restart_parameters=restart:--innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=$error_log
+--let $restart_hide_args=1
 --source include/restart_mysqld.inc
 
 DROP TABLE t1,t2,t3,t4,t5,t6,t7;

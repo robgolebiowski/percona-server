@@ -840,6 +840,9 @@ recv_sys_close(void)
 		ut_free(recv_sys->buf);
 		ut_free(recv_sys->last_block_buf_start);
 
+		/* Call the destructor for recv_sys_t::dblwr member */
+		recv_sys->dblwr.~recv_dblwr_t();
+
 		mutex_free(&recv_sys->mutex);
 
 		ut_free(recv_sys);

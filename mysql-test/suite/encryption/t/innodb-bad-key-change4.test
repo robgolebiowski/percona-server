@@ -13,6 +13,7 @@ call mtr.add_suppression("\\[Error\\] InnoDB: Page is still encrypted");
 call mtr.add_suppression("\\[Warning\\] InnoDB: Table is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
 
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_file_per_table = ON;
@@ -23,9 +24,11 @@ INSERT INTO t1 VALUES (1,'foo'),(2,'bar');
 
 
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 --source include/restart_mysqld.inc
 
 #--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys3.txt
+#--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 #--source include/restart_mysqld.inc
 
 #SET GLOBAL innodb_stats_persistent=OFF;
@@ -40,11 +43,13 @@ CHECK TABLE t1;
 SHOW WARNINGS;
 
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 --source include/restart_mysqld.inc
 
 call mtr.add_suppression("\\[Warning\\] InnoDB: Table in tablespace is encrypted .*");
 #SET GLOBAL innodb_stats_persistent=OFF;
 #--let $restart_parameters=--plugin-load-add=file_key_management.so --file-key-management --file-key-management-filename=$MYSQLTEST_VARDIR/std_data/keys2.txt
+#--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 #--source include/restart_mysqld.inc
 
 DROP TABLE t1;
