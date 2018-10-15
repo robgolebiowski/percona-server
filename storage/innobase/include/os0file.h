@@ -430,15 +430,36 @@ struct Encryption {
 	};
 
 	/** Default constructor */
-	Encryption() : m_type(NONE), m_encryption_rotation(NO_ROTATION) { } //, m_was_page_encrypted_when_read(false) { };
+	Encryption():
+		m_type(NONE),
+		m_key(NULL),
+		m_klen(0),
+		m_key_allocated(false),
+		m_iv(NULL),
+		m_tablespace_iv(NULL),
+		m_tablespace_key(NULL),
+		m_key_version(0),
+		m_key_id(0),
+		m_checksum(0),
+		m_encryption_rotation(NO_ROTATION)
+		//m_was_page_encrypted_when_read(false)
+	{}
 
 	/** Specific constructor
 	@param[in]	type		Algorithm type */
-	explicit Encryption(Type type)
-		:
+	explicit Encryption(Type type):
 		m_type(type),
-                m_encryption_rotation(NO_ROTATION) 
-                //m_was_page_encrypted_when_read(false)
+		m_key(NULL),
+		m_klen(0),
+		m_key_allocated(false),
+		m_iv(NULL),
+		m_tablespace_iv(NULL),
+		m_tablespace_key(NULL),
+		m_key_version(0),
+		m_key_id(0),
+		m_checksum(0),
+		m_encryption_rotation(NO_ROTATION)
+		//m_was_page_encrypted_when_read(false)
 	{
 #ifdef UNIV_DEBUG
 		switch (m_type) {
@@ -452,19 +473,58 @@ struct Encryption {
 	}
 
 	/** Copy constructor */
-	Encryption(const Encryption& other)
-		:
+	Encryption(const Encryption& other):
 		m_type(other.m_type),
 		m_key(other.m_key),
 		m_klen(other.m_klen),
+		m_key_allocated(other.m_key_allocated),
 		m_iv(other.m_iv),
-                m_tablespace_iv(other.m_tablespace_iv),
-                m_tablespace_key(other.m_tablespace_key),
-                m_key_version(other.m_key_version),
+		m_tablespace_iv(other.m_tablespace_iv),
+		m_tablespace_key(other.m_tablespace_key),
+		m_key_version(other.m_key_version),
 		m_key_id(other.m_key_id),
-                m_encryption_rotation(other.m_encryption_rotation)
-                //m_was_page_encrypted_when_read(false)
-	{ };
+		m_checksum(other.m_checksum),
+		m_encryption_rotation(other.m_encryption_rotation)
+		//m_was_page_encrypted_when_read(false)
+	{
+		if (other.m_key_allocated && other.m_key != NULL)
+			m_key = static_cast<byte *>(
+				my_memdup(PSI_NOT_INSTRUMENTED,
+					other.m_key, other.m_klen, MYF(0)));
+	}
+	
+	Encryption& operator = (const Encryption& other) {
+		Encryption tmp(other);
+		swap(tmp);
+		return *this;
+	}
+	
+	void swap(Encryption& other) {
+		std::swap(m_type, other.m_type);
+		std::swap(m_key, other.m_key);
+		std::swap(m_klen, other.m_klen);
+		std::swap(m_key_allocated, other.m_key_allocated);
+		std::swap(m_iv, other.m_iv);
+		std::swap(m_tablespace_iv, other.m_tablespace_iv);
+		std::swap(m_tablespace_key, other.m_tablespace_key);
+		std::swap(m_key_version, other.m_key_version);
+		std::swap(m_key_id, other.m_key_id);
+		std::swap(m_checksum, other.m_checksum);
+		std::swap(m_encryption_rotation, other.m_encryption_rotation);
+	}
+	
+	~Encryption() {
+		if (m_key_allocated && m_key != NULL)
+			my_free(m_key);
+	}
+
+	void set_key(byte *key, ulint key_len, bool allocated) {
+		if (m_key_allocated && m_key != NULL)
+			my_free(m_key);
+		m_key = key;
+		m_klen = key_len;
+		m_key_allocated = allocated;
+	}
 
 	/** Check if page is encrypted page or not
 	@param[in]	page	page which need to check
@@ -615,6 +675,9 @@ struct Encryption {
 	/** Encrypt key length*/
 	ulint			m_klen;
 
+	/** Encrypt key allocated */
+	bool			m_key_allocated;
+
 	/** Encrypt initial vector */
 	byte*			m_iv;
 
@@ -642,7 +705,7 @@ struct Encryption {
 
         Encryption_rotation     m_encryption_rotation;
 private:
-//TODO: Robert: Is it needed here?
+	//TODO: Robert: Is it needed here?
         static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
 
         static void get_latest_system_key(const char *system_key_name, byte **key, uint *key_version,
@@ -962,6 +1025,7 @@ public:
 	@param[in] iv		The encryption iv to use */
 	void encryption_key(byte* key,
 			    ulint key_len,
+			    bool key_allocated,
 			    byte* iv,
                             uint key_version,
                             uint key_id,
@@ -969,8 +1033,7 @@ public:
                             byte *tablespace_key)
 	{
                 //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
-		m_encryption.m_key = key;
-		m_encryption.m_klen = key_len;
+		m_encryption.set_key(key, key_len, key_allocated);
 		m_encryption.m_iv = iv;
                 m_encryption.m_key_version = key_version;
                 m_encryption.m_key_id = key_id;
@@ -1001,8 +1064,7 @@ public:
 	/** Clear all encryption related flags */
 	void clear_encrypted()
 	{
-		m_encryption.m_key = NULL;
-		m_encryption.m_klen = 0;
+		m_encryption.set_key(NULL, 0, false);
 		m_encryption.m_iv = NULL;
 		m_encryption.m_type = Encryption::NONE;
                 m_encryption.m_encryption_rotation = Encryption::NO_ROTATION;

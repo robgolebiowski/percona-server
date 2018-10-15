@@ -112,6 +112,11 @@ struct st_encryption_scheme_key {
 
 // Merge it with fil_crypt_data
 struct st_encryption_scheme {
+	st_encryption_scheme() {
+	}
+
+	~st_encryption_scheme();
+
   unsigned char iv[16];
   struct st_encryption_scheme_key key[3]; //TODO : Why do I need this ?
 
@@ -127,6 +132,9 @@ struct st_encryption_scheme {
   unsigned int type; 
 
   //void (*locker)(struct st_encryption_scheme *self, int release);
+private:
+	st_encryption_scheme(const st_encryption_scheme&);
+	st_encryption_scheme& operator = (const st_encryption_scheme &);
 };
 
 /** is encryption enabled */

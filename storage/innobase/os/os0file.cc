@@ -1859,7 +1859,8 @@ os_file_io_complete(
                       ut_ad(encryption.m_tablespace_iv != NULL);
                       encryption.m_iv = encryption.m_tablespace_iv; // iv comes from tablespace header for MK encryption
                       ut_ad(encryption.m_tablespace_key != NULL);
-                      encryption.m_key = encryption.m_tablespace_key;
+		      encryption.set_key(encryption.m_tablespace_key,
+					ENCRYPTION_KEY_LEN, false);
                     }
                   }
                 }
@@ -9546,6 +9547,7 @@ void Encryption::get_latest_system_key(const char *system_key_name,
   }
 
   parse_system_key(system_key, system_key_len, key_version, (uchar**)key, key_length);
+  my_free(system_key);
 #endif
 }
 
@@ -10379,14 +10381,15 @@ Encryption::decrypt(
             //memset(m_key, 0, ENCRYPTION_KEY_LEN);
           //m_key = NULL;
           size_t key_len;
-          if (get_tablespace_key(m_key_id, uuid, m_key_version, &m_key, &key_len) == false)
+	  byte* key;
+          if (get_tablespace_key(m_key_id, uuid, m_key_version, &key, &key_len) == false)
           {
             if (block != NULL)
               os_free_block(block);
             return (DB_IO_DECRYPT_FAIL);
           }
           //get_tablespace_key(m_key_id, uuid, 0, &m_key, &key_len);
-          m_klen = static_cast<ulint>(key_len);
+	  set_key(key, static_cast<ulint>(key_len), true);
           //if (m_key == NULL)
             //return (DB_IO_DECRYPT_FAIL);
         }
@@ -10667,6 +10670,7 @@ os_dblwr_encrypt_page(
 	write_request.encryption_key(
 		space->encryption_key,
 		space->encryption_klen,
+		false,
 		space->encryption_iv,
                 0, 0, NULL, NULL);
 	write_request.encryption_algorithm(
@@ -10723,6 +10727,7 @@ os_dblwr_decrypt_page(
 	decrypt_request.encryption_key(
 			space->encryption_key,
 			space->encryption_klen,
+			false,
 			space->encryption_iv,
                         0, 0, NULL, NULL);
 

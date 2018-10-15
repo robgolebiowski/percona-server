@@ -874,6 +874,10 @@ recv_sys_mem_free(void)
 #endif /* !UNIV_HOTBACKUP */
 		ut_free(recv_sys->buf);
 		ut_free(recv_sys->last_block_buf_start);
+
+		/* Call the destructor for recv_sys_t::dblwr member */
+		recv_sys->dblwr.~recv_dblwr_t();
+
 		ut_free(recv_sys);
 		recv_sys = NULL;
 	}
@@ -4638,6 +4642,7 @@ recv_dblwr_t::decrypt_sys_dblwr_pages()
 	decrypt_request.encryption_key(
 			space->encryption_key,
 			space->encryption_klen,
+			false,
 			space->encryption_iv,
                         0, 0, NULL, NULL);
 

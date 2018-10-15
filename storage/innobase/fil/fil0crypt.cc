@@ -154,6 +154,14 @@ bool fil_space_crypt_t::load_needed_keys_into_local_cache()
   return true;
 }
 
+st_encryption_scheme::~st_encryption_scheme()
+{
+	for (size_t i = 0; i < array_elements(key); ++i) {
+		if (key[i].key != NULL)
+			my_free(key[i].key);
+	}
+}
+
 uchar* st_encryption_scheme::get_key(uint version)
 {
   return get_key_or_create_one(&version, false);
@@ -300,6 +308,7 @@ fil_space_crypt_t::fil_space_crypt_t(
                                   key_found = true;
                                   min_key_version = key_version;
                                 }
+				my_free(key);
                                 //min_key_version = Encryption::encryption_get_latest_version(key_id);
                                  //min_key_version= key_get_latest_version(); //This means table was created with ROTATED_KEYS = thus we know that this table is encrypted
                                                                           //min_key_version should be set to key_version, when create_key is false it means it was not created
@@ -2206,7 +2215,7 @@ dberr_t
 fts_update_encrypted_tables_flag(
       trx_t*		trx,		/* in/out: transaction that
                                       covers the update */
-      table_id_t        *table_id, 
+      table_id_t        table_id, 
       bool              set)	/* in: Table for which we want
                                       to set the root table->flags2 */
 {
@@ -2239,7 +2248,7 @@ fts_update_encrypted_tables_flag(
 
       info = pars_info_create();
 
-      pars_info_add_ull_literal(info, "table_id", *table_id);
+      pars_info_add_ull_literal(info, "table_id", table_id);
       pars_info_bind_int4_literal(info, "flags2", &flags2);
 
       pars_info_bind_function(
@@ -2396,7 +2405,7 @@ fts_update_encrypted_flag_for_tablespace_sql(
 
 static
 dberr_t
-get_tables_ids_in_space_sql(
+get_table_ids_in_space_sql(
       trx_t*		trx,		// in/out: transaction that
       fil_space_t *space,
       ib_vector_t* tables_ids
@@ -2431,46 +2440,6 @@ get_tables_ids_in_space_sql(
       return(err);
 }
 
-struct TransactionAndHeapGuard
-{
-  TransactionAndHeapGuard(trx_t *trx)
-    : trx(trx), heap(NULL), do_rollback(true)
-  {}
-
-  void set_transaction(trx_t *trx)
-  {
-    this->trx = trx; 
-  }
-
-  void set_heap(mem_heap_t *heap)
-  {
-    this->heap = heap;
-  }
-
-  void commit()
-  {
-    ut_ad(trx != NULL);
-    fts_sql_commit(trx);
-    do_rollback = false;
-  }
-
-  ~TransactionAndHeapGuard()
-  {
-    if (trx && do_rollback) 
-      fts_sql_rollback(trx);
-
-    //TODO = Why no free for heap ?
-
-    row_mysql_unlock_data_dictionary(trx);
-    trx_free_for_background(trx);
-  }
-
-private:
-  trx_t *trx;
-  mem_heap_t *heap;
-  bool do_rollback;
-};
-
 static
 void
 fil_revert_encryption_flag_updates(ib_vector_t* tables_ids_to_revert_if_error, bool set)
@@ -2497,109 +2466,292 @@ fil_revert_encryption_flag_updates(ib_vector_t* tables_ids_to_revert_if_error, b
   }
 }
 
+class TransactionAndHeapGuard
+{
+public:
+	TransactionAndHeapGuard():
+		dict_operation_locked(false),
+		trx(NULL),
+		dict_sys_mutex_entered(false),
+		heap(NULL),
+		heap_alloc(NULL),
+		table_ids(NULL),
+		table_ids_to_revert(NULL),
+		do_rollback(true)
+	{}
+	
+	bool lock_x_dict_operation_lock(fil_space_t *space) {
+		ut_ad(!dict_operation_locked && trx == NULL &&
+			!dict_sys_mutex_entered && heap == NULL &&
+			heap_alloc == NULL && table_ids == NULL &&
+			table_ids_to_revert == NULL);
+
+		// This should only wait in rare cases
+		while (!rw_lock_x_lock_nowait(dict_operation_lock)) {
+			//os_thread_sleep(6000);
+			os_thread_sleep(6);
+			if (space->stop_new_ops) // space is about to be dropped
+				return false;  // do not try to lock the DD
+		}
+		dict_operation_locked = true;
+		return true;
+	}
+
+	bool allocate_trx() {
+		ut_ad(dict_operation_locked && trx == NULL &&
+			!dict_sys_mutex_entered && heap == NULL &&
+			heap_alloc == NULL && table_ids == NULL &&
+			table_ids_to_revert == NULL);
+
+		trx = trx_allocate_for_background();
+		if(trx == NULL)
+			return false;
+		trx->op_info = "setting encrypted flag";
+		trx->dict_operation_lock_mode = RW_X_LATCH;
+		return true;
+	}
+
+	void enter_dict_sys_mutex() {
+		ut_ad(dict_operation_locked && trx != NULL &&
+			!dict_sys_mutex_entered && heap == NULL &&
+			heap_alloc == NULL && table_ids == NULL &&
+			table_ids_to_revert == NULL);
+
+		dict_mutex_enter_for_mysql();
+		dict_sys_mutex_entered = true;
+	}
+
+	bool create_heap() {
+		ut_ad(dict_operation_locked && trx != NULL &&
+			dict_sys_mutex_entered && heap == NULL &&
+			heap_alloc == NULL && table_ids == NULL &&
+			table_ids_to_revert == NULL);
+
+		// TODO: consider moving expensive operation out of dict_sys->mutex
+		heap = mem_heap_create(1024); 
+		return heap != NULL;
+	}
+
+	bool create_allocator() {
+		ut_ad(dict_operation_locked && trx != NULL &&
+			dict_sys_mutex_entered && heap != NULL &&
+			heap_alloc == NULL && table_ids == NULL &&
+			table_ids_to_revert == NULL);
+
+		heap_alloc = ib_heap_allocator_create(heap);
+		return heap_alloc != NULL;
+	}
+
+	bool create_table_ids_vector() {
+		ut_ad(dict_operation_locked && trx != NULL &&
+			dict_sys_mutex_entered && heap != NULL &&
+			heap_alloc != NULL && table_ids == NULL &&
+			table_ids_to_revert == NULL);
+
+		table_ids = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
+		return table_ids != NULL;
+	}
+
+	bool create_table_ids_to_revert_vector() {
+		ut_ad(dict_operation_locked && trx != NULL &&
+			dict_sys_mutex_entered && heap != NULL &&
+			heap_alloc != NULL && table_ids != NULL &&
+			table_ids_to_revert == NULL);
+
+		table_ids_to_revert = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
+		return table_ids_to_revert != NULL;
+	}
+
+	bool is_table_ids_empty() const {
+		ut_ad(dict_operation_locked && trx != NULL &&
+			dict_sys_mutex_entered && heap != NULL &&
+			heap_alloc != NULL && table_ids != NULL &&
+			table_ids_to_revert != NULL);
+
+		return ib_vector_is_empty(table_ids);
+	}
+
+	table_id_t pop_from_table_ids() {
+		ut_ad(table_ids != NULL);
+
+		return *static_cast<table_id_t*>(ib_vector_pop(table_ids));
+	}
+
+	void push_to_table_ids_to_revert(table_id_t table_id) {
+		ut_ad(table_ids_to_revert != NULL);
+
+		ib_vector_push(table_ids_to_revert, &table_id);
+	}
+
+	trx_t* get_trx() {
+		ut_ad(trx != NULL);
+		return trx;
+	}
+
+	ib_vector_t*	get_table_ids() {
+		ut_ad(table_ids != NULL);
+		return table_ids;
+	}
+
+	ib_vector_t*	get_table_ids_to_revert() {
+		ut_ad(table_ids_to_revert != NULL);
+		return table_ids_to_revert;
+	}
+
+	void commit() {
+		ut_ad(dict_operation_locked && trx != NULL &&
+			dict_sys_mutex_entered && heap != NULL &&
+			heap_alloc != NULL && table_ids != NULL &&
+			table_ids_to_revert != NULL);
+
+		fts_sql_commit(trx);
+		do_rollback = false;
+	}
+	
+	~TransactionAndHeapGuard() {
+		if (trx && do_rollback) 
+			fts_sql_rollback(trx);
+
+
+		/*
+		if (table_ids_to_revert != NULL)
+			ib_vector_free(table_ids_to_revert);
+
+		if (table_ids != NULL)
+			ib_vector_free(table_ids);
+
+		if (heap_alloc != NULL)
+			ib_heap_allocator_free(heap_alloc);
+		*/
+
+		if (heap != NULL)
+			mem_heap_free(heap);
+
+		if (dict_sys_mutex_entered)
+			dict_mutex_exit_for_mysql();
+
+		if (dict_operation_locked) {
+			rw_lock_x_unlock(dict_operation_lock);
+			trx->dict_operation_lock_mode = 0;
+		}
+
+		if (trx != NULL)
+			trx_free_for_background(trx);
+	}
+
+private:
+	TransactionAndHeapGuard(const TransactionAndHeapGuard&);
+	TransactionAndHeapGuard& operator =(const TransactionAndHeapGuard&);
+
+	bool		dict_operation_locked;
+	trx_t*		trx;
+	bool		dict_sys_mutex_entered;
+	mem_heap_t*	heap;
+	ib_alloc_t*	heap_alloc;
+	ib_vector_t*	table_ids;
+	ib_vector_t*	table_ids_to_revert;
+
+	bool		do_rollback;
+};
+
+
 static
 dberr_t
-fil_update_encrypted_flag(fil_space_t *space,
-                          bool set)
+fil_update_encrypted_flag(fil_space_t *space, bool set)
 {
+	// We are only modifying DD so the lock on DD is enough, we do not need
+	// lock on space
+	
+	//trx_t* trx_set_encrypted = trx_allocate_for_background();
+	//TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
+	//trx_set_encrypted->op_info = "setting encrypted flag";
 
-  // We are only modifying DD so the lock on DD is enough, we do not need
-  // lock on space
+	TransactionAndHeapGuard	guard;
 
-  //trx_t* trx_set_encrypted = trx_allocate_for_background();
-  //TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
-  //trx_set_encrypted->op_info = "setting encrypted flag";
-
-  while(rw_lock_x_lock_nowait(dict_operation_lock) == false) // This should only wait in rare cases
-  {
-    //os_thread_sleep(6000);
-    os_thread_sleep(6);
-    if (space->stop_new_ops) // space is about to be dropped
-      return DB_SUCCESS;      // do not try to lock the DD
-  }
-
-  trx_t* trx_set_encrypted = trx_allocate_for_background();
-  TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
-  trx_set_encrypted->op_info = "setting encrypted flag";
-
-  trx_set_encrypted->dict_operation_lock_mode = RW_X_LATCH;
-  mutex_enter(&dict_sys->mutex);
-
-  if (space->stop_new_ops) // space is about to be dropped
-   return DB_SUCCESS;
-
-  mem_heap_t* heap = mem_heap_create(1024); // TODO:consider moving expensive operation out of dict_sys->mutex
-  transaction_and_heap_guard.set_heap(heap);
-  
-  ib_alloc_t* heap_alloc = ib_heap_allocator_create(heap);
-
-  /* We store the table ids of all the FTS indexes that were found. */
-  ib_vector_t* tables_ids = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
-
-  dberr_t error = get_tables_ids_in_space_sql(trx_set_encrypted, space, tables_ids);
-
-  if (error != DB_SUCCESS)
-    return error;
-
-  // First update tablespace's encryption flag
-  error = fts_update_encrypted_flag_for_tablespace_sql(trx_set_encrypted,
-                                                       space->id,
-                                                       set);
-  if (error != DB_SUCCESS)
-    return error;
-
-  ib_vector_t* tables_ids_to_revert_if_error = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
-
-  while (!ib_vector_is_empty(tables_ids))
-  {
-    table_id_t *table_id = static_cast<table_id_t*>(
-                      ib_vector_pop(tables_ids));
-
-     // Update table's encryption flag
-     error = fts_update_encrypted_tables_flag(trx_set_encrypted,
-                                              table_id,
-                                              set);
-
-     DBUG_EXECUTE_IF(
-        "fail_encryption_flag_update_on_t3",
-         dict_table_t *table = dict_table_open_on_id(*table_id, TRUE,
-                                  DICT_TABLE_OP_NORMAL);
-
-         if (strcmp(table->name.m_name, "test/t3") == 0)
-           error = DB_ERROR; 
-         dict_table_close(table, TRUE, FALSE);
-      );
-
-     
-     if (error != DB_SUCCESS)
-     {
-       fil_revert_encryption_flag_updates(tables_ids_to_revert_if_error, !set);
-       return error;
-     }
-
-    dict_table_t *table = dict_table_open_on_id(*table_id, TRUE,
-                                  DICT_TABLE_OP_NORMAL);
-
-    ut_ad(table != NULL);
-
-    if (set)
-    {
-        //ib::error() << "Setting encryption for table " << table->name.m_name; 
-        DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-    }
-    else
-        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+	if (!guard.lock_x_dict_operation_lock(space))
+		return DB_SUCCESS;
 
 
-    ib_vector_push(tables_ids_to_revert_if_error, table_id);
+	if(!guard.allocate_trx())
+		return DB_ERROR;
 
-    dict_table_close(table, TRUE, FALSE);
-  }
+	guard.enter_dict_sys_mutex();
+
+	if (space->stop_new_ops) // space is about to be dropped
+		return DB_SUCCESS;
+
+	if (!guard.create_heap())
+		return DB_OUT_OF_MEMORY;
+
+	if (!guard.create_allocator())
+		return DB_OUT_OF_MEMORY;
+
+	/* We store the table ids of all the FTS indexes that were found. */
+	if(!guard.create_table_ids_vector())
+		return DB_OUT_OF_MEMORY;
+
+	dberr_t	error = get_table_ids_in_space_sql(guard.get_trx(), space,
+				guard.get_table_ids());
+	if (error != DB_SUCCESS)
+		return error;
+
+	// First update tablespace's encryption flag
+	error = fts_update_encrypted_flag_for_tablespace_sql(guard.get_trx(),
+			space->id, set);
+	if (error != DB_SUCCESS)
+		return error;
+
+	if (!guard.create_table_ids_to_revert_vector())
+		return DB_OUT_OF_MEMORY;
+
+	while (!guard.is_table_ids_empty())
+	{
+		table_id_t	table_id = guard.pop_from_table_ids();
+
+		// Update table's encryption flag
+		error = fts_update_encrypted_tables_flag(guard.get_trx(),
+				table_id, set);
+
+		DBUG_EXECUTE_IF(
+			"fail_encryption_flag_update_on_t3",
+			dict_table_t*	table =
+				dict_table_open_on_id(table_id, TRUE,
+					DICT_TABLE_OP_NORMAL);
+
+			if (strcmp(table->name.m_name, "test/t3") == 0)
+				error = DB_ERROR; 
+			dict_table_close(table, TRUE, FALSE);
+		);
+
+		if (error != DB_SUCCESS)
+		{
+			fil_revert_encryption_flag_updates(
+				guard.get_table_ids_to_revert(), !set);
+			return error;
+		}
+
+		dict_table_t*	table = dict_table_open_on_id(table_id, TRUE,
+					DICT_TABLE_OP_NORMAL);
+
+		ut_ad(table != NULL);
+
+		if (set)
+		{
+			//ib::error() << "Setting encryption for table " << table->name.m_name; 
+			DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+		}
+		else
+			DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
 
 
-  transaction_and_heap_guard.commit();
+		guard.push_to_table_ids_to_revert(table_id);
 
-  return DB_SUCCESS;
+		dict_table_close(table, TRUE, FALSE);
+	}
+
+	guard.commit();
+
+	return DB_SUCCESS;
 }
 
 /***********************************************************************
@@ -2621,8 +2773,10 @@ fil_crypt_flush_space(
 
       ulint number_of_pages_flushed_so_far = crypt_data->rotate_state.flush_observer->get_number_of_pages_flushed();
 
-      if (space->is_stopping())
-        return DB_SUCCESS;
+	if (space->is_stopping()) {
+		crypt_data->rotate_state.destrory_flush_observer();
+		return DB_SUCCESS;
+	}
 
       //if (end_lsn > 0 && !space->is_stopping()) {
       //if (!space->is_stopping()) {
