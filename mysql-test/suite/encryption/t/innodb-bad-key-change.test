@@ -21,6 +21,7 @@ call mtr.add_suppression("\\[Warning\\] InnoDB: Table in tablespace is encrypted
 
 --echo # Start server with keys2.txt
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 --source include/restart_mysqld.inc
 
 SET GLOBAL innodb_file_per_table = ON;
@@ -40,6 +41,7 @@ SELECT * FROM t1;
 --echo
 --echo # Restart server with keysbad3.txt
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
 --source include/restart_mysqld.inc
 
 --disable_warnings
@@ -47,8 +49,9 @@ SELECT * FROM t1;
 SELECT * FROM t1;
 --enable_warnings
 
--- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
--- source include/restart_mysqld.inc
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
+--source include/restart_mysqld.inc
 
 --disable_warnings
 --replace_regex /tablespace [0-9]*/tablespace /
@@ -61,8 +64,9 @@ DROP TABLE t1;
 #
 
 --echo # Start server with keys3.txt
--- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
--- source include/restart_mysqld.inc
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
+--source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;
 
@@ -73,8 +77,9 @@ INSERT INTO t2 VALUES ('foobar',1,2);
 
 --echo
 --echo # Restart server with keys2.txt
--- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
--- source include/restart_mysqld.inc
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
+--source include/restart_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=ON;
 
@@ -116,5 +121,6 @@ DROP TABLE t2;
 
 --echo
 --echo # Start server with keys2.txt
--- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
--- source include/restart_mysqld.inc
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--replace_result $MYSQLTEST_VARDIR <MYSQLTEST_VARDIR>
+--source include/restart_mysqld.inc

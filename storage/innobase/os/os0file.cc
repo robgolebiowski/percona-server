@@ -5900,8 +5900,8 @@ os_file_io(
 	}
 
 
-        ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-        ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
+        // ulint space_id = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+        // ulint page_no = mach_read_from_4(reinterpret_cast<byte*>(buf) + FIL_PAGE_OFFSET);
 
 	/* We do encryption after compression, since if we do encryption
 	before compression, the encrypted data will cause compression fail
@@ -5949,11 +5949,11 @@ os_file_io(
                                                                             // TODO:ten warunek nie ma sensu - najpierw spradzam czy type jest NONE w is_encrypted
                                                                             // a poźniej czy jest różny od ROTATED_KEYS ... 
         {
-          mach_write_to_4(reinterpret_cast<byte*>(buf) +  FIL_PAGE_ENCRYPTION_KEY_VERSION, 0);
-          if (space_id == 2 && page_no==3)
-          {
-            ib::error() << "Overwritten key_version with 0"  << '\n';
-          }
+          // mach_write_to_4(reinterpret_cast<byte*>(buf) +  FIL_PAGE_ENCRYPTION_KEY_VERSION, 0);
+          // if (space_id == 2 && page_no==3)
+          // {
+          //   ib::error() << "Overwritten key_version with 0"  << '\n';
+          // }
 
         }
 
