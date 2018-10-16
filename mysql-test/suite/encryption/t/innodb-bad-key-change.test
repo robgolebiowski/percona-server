@@ -20,6 +20,7 @@ call mtr.add_suppression("\\[Warning\\] InnoDB: Cannot save statistics for table
 call mtr.add_suppression("\\[Warning\\] InnoDB: Table in tablespace is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
 
 --echo # Start server with keys2.txt
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 --source include/restart_mysqld.inc
 
@@ -39,6 +40,7 @@ SELECT * FROM t1;
 
 --echo
 --echo # Restart server with keysbad3.txt
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
 --source include/restart_mysqld.inc
 
@@ -47,8 +49,9 @@ SELECT * FROM t1;
 SELECT * FROM t1;
 --enable_warnings
 
--- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
--- source include/restart_mysqld.inc
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
+--source include/restart_mysqld.inc
 
 --disable_warnings
 --replace_regex /tablespace [0-9]*/tablespace /
@@ -61,6 +64,7 @@ DROP TABLE t1;
 #
 
 --echo # Start server with keys3.txt
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 -- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
 -- source include/restart_mysqld.inc
 
@@ -73,6 +77,7 @@ INSERT INTO t2 VALUES ('foobar',1,2);
 
 --echo
 --echo # Restart server with keys2.txt
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 -- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 -- source include/restart_mysqld.inc
 
@@ -116,5 +121,6 @@ DROP TABLE t2;
 
 --echo
 --echo # Start server with keys2.txt
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 -- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 -- source include/restart_mysqld.inc

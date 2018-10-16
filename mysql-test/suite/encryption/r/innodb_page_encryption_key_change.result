@@ -1,5 +1,5 @@
 # Restart mysqld --loose-file-key-management-filename=keys2.txt
-# restart:--keyring-file-data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/std_data/keys2.txt
+# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys2.txt
 create table innodb_normal(c1 bigint not null, b char(200)) engine=innodb;
 show warnings;
 Level	Code	Message
@@ -75,7 +75,7 @@ variable_value >= 0
 Warnings:
 Warning	1287	'INFORMATION_SCHEMA.GLOBAL_STATUS' is deprecated and will be removed in a future release. Please use performance_schema.global_status instead
 # Restart mysqld --loose-file-key-management-filename=keys3.txt
-# restart:--keyring-file-data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/std_data/keys3.txt
+# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys3.txt
 select * from innodb_normal;
 c1	b
 1	test1

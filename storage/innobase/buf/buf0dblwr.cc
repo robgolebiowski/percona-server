@@ -1315,13 +1315,13 @@ buf_dblwr_flush_buffered_writes(
                 if (space() && space()->crypt_data && space()->crypt_data->should_encrypt() && space()->crypt_data->encrypting_with_key_version != 0) //TODO:Robert Space might be already dropped - one more reason to
                                                                                              //have encryption earlier
                 {
-                  bpage->encryption_key = space()->crypt_data->get_key_currently_used_for_encryption();
+                  //bpage->encryption_key = space()->crypt_data->get_key_currently_used_for_encryption();
                   bpage->encryption_key_version = space()->crypt_data->encrypting_with_key_version;
                   //Encryption::get_latest_tablespace_key(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
                   ////It seems that it can reach here before variable encrypt_tables is validated - which is weird .. -
                   //if (space()->crypt_data->key_id == 0 && bpage->encryption_key == NULL)
                     //Encryption::get_latest_tablespace_key_or_create_new_one(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
-                  ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
+                  //ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
                   bpage->encrypt = true; //TODO:Robert!: For now double write buffer stays unencrypted!
                   bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
                 }

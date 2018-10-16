@@ -58,6 +58,9 @@ Created 10/25/1995 Heikki Tuuri
 
 #include "system_key.h"
 
+
+extern uint	srv_n_fil_crypt_threads;
+
 /** Tries to close a file in the LRU list. The caller must hold the fil_sys
 mutex.
 @return true if success, false if should retry later; since i/o's
@@ -811,15 +814,18 @@ retry:
                     (
                       (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) && space->crypt_data->min_key_version == 0) ||
                       (!FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) && space->crypt_data->min_key_version != 0)
-                    ) && FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) != FSP_FLAGS_GET_ENCRYPTION(relevant_flags) 
+                    ) && FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) != FSP_FLAGS_GET_ENCRYPTION(relevant_flags)
                    )
                 {
-                  ib::warn() << "Table encryption flag is " <<  (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) ? "ON" : "OFF")
-                             << " in the data dictionary but the encryption flag in file " << node->name << " is " 
-                             << (FSP_FLAGS_GET_ENCRYPTION(relevant_flags) ? "ON" : "OFF")
-                             << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
-                             << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
-                             << " could finish up the rotation.";
+                  if (srv_n_fil_crypt_threads == 0)
+                  {
+                    ib::warn() << "Table encryption flag is " <<  (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) ? "ON" : "OFF")
+                               << " in the data dictionary but the encryption flag in file " << node->name << " is " 
+                               << (FSP_FLAGS_GET_ENCRYPTION(relevant_flags) ? "ON" : "OFF")
+                               << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
+                               << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
+                               << " could finish up the rotation.";
+                  }
                   // exclude encryption flag from validation
                   relevant_space_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
                   relevant_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
@@ -916,7 +922,11 @@ retry:
 add_size:
 #endif /* UNIV_HOTBACKUP */
 			space->size += node->size;
+                        //ib::error() << "Setting size for " << space->name << " size = " << space->size;
+                        ut_ad(space->size);
 		}
+                //else
+                  //ib::error() << "Not setting size for " << space->name << " node size = " << node->size;
 	}
 
 	/* printf("Opening file %s\n", node->name); */
@@ -4048,7 +4058,8 @@ fil_ibd_create(
             || (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING || create_info_encryption_key_id.was_encryption_key_id_set)) {
 		crypt_data = fil_space_create_crypt_data(mode,
                                                          create_info_encryption_key_id.encryption_key_id);
-            if (crypt_data->should_encrypt())
+
+            if (crypt_data->should_encrypt() || create_info_encryption_key_id.was_encryption_key_id_set)
             {
               crypt_data->encrypting_with_key_version = crypt_data->key_get_latest_version();
               crypt_data->load_needed_keys_into_local_cache();
@@ -5947,12 +5958,15 @@ fil_report_invalid_page_access(
 
   //return true;
 //}
-
+static bool set_min_key_version;
+static byte key_min[32];
 inline
 void
 fil_io_set_keyring_encryption(IORequest& req_type,
-                              fil_space_t *space)
+                              fil_space_t *space,
+                              const page_id_t& page_id)
 {
+   set_min_key_version= false;
    ut_ad(space->crypt_data != NULL);
 
    byte* key = NULL;
@@ -5972,12 +5986,15 @@ fil_io_set_keyring_encryption(IORequest& req_type,
    {
      if (space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
      {
+       //ib::error() << "Encrypting page for space = " << space->id;
        key = space->crypt_data->get_key_currently_used_for_encryption();
        key_version = space->crypt_data->encrypting_with_key_version;
        key_len = 32;
      }
      else
      {
+       //ib::error() << "Writing page unencrypted for space = " << space->id
+                   //<< " page_id = " << page_id.page_no();
        key = NULL;
        key_len = 0;
        iv = NULL;
@@ -5991,7 +6008,27 @@ fil_io_set_keyring_encryption(IORequest& req_type,
      tablespace_key = space->crypt_data->tablespace_key;
      ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_ROTATED_KEY ||
            space->crypt_data->tablespace_key != NULL);
-     key = space->crypt_data->tablespace_key;
+     // retrieve key with min_key_version from local cache. In normal situation this is the key needed for
+     // decryption. In rare cases when re-encryption was aborted - due to server crash or shutdown there
+     // can be one more key version needed to decrypt tablespace - we will find this version in decrypt and
+     // retrieve needed version. 
+     if (space->crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+     {
+       key= space->crypt_data->get_min_key_version_key();
+       memcpy(key_min, key, 32);
+       set_min_key_version = true;
+       char testblock[32];
+       memset(testblock,0,32);
+       ut_ad(memcmp(key,testblock, 32) != 0); 
+       ut_ad(key != NULL);
+       key_version = key == NULL ? ENCRYPTION_KEY_VERSION_INVALID
+                                 : space->crypt_data->min_key_version;
+     }
+     else
+     {
+       key= NULL;
+       key_version= ENCRYPTION_KEY_VERSION_INVALID;
+     }
    }
 
    req_type.encryption_key(key,
@@ -6017,7 +6054,7 @@ fil_io_set_encryption(
 	IORequest&		req_type,
 	const page_id_t&	page_id,
 	fil_space_t*		space)
-        //buf_page_t*	bpage)
+        //buf_page_t*     	bpage)
 {
 
 	/* Explicit request to disable encryption */
@@ -6076,7 +6113,7 @@ fil_io_set_encryption(
                 {
                   ut_ad(space->crypt_data != NULL);
 
-                  fil_io_set_keyring_encryption(req_type, space);
+                  fil_io_set_keyring_encryption(req_type, space, page_id);
                 } else
                 {
                   ut_ad(space->encryption_type == Encryption::AES);

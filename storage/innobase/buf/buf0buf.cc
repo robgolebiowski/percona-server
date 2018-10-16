@@ -828,8 +828,10 @@ buf_page_is_corrupted(
 			if ((i < FIL_PAGE_FILE_FLUSH_LSN
 			     || i >= FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID)
 			    && read_buf[i] != 0) {
-
-				break;
+                             if (i >= FIL_PAGE_ENCRYPTION_KEY_VERSION &&
+                                 i <= FIL_PAGE_ENCRYPTION_KEY_VERSION + 3) //those for bytes might not be 0 for keyring encryption
+                               continue;
+			     break;
 			}
 		}
 #ifdef UNIV_INNOCHECKSUM
@@ -5728,8 +5730,21 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 	byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
 		((buf_block_t*) bpage)->frame;
 #ifdef UNIV_INNOCHECKSUM
-        return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
-        //return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space())) ? DB_PAGE_CORRUPTED : DB_SUCCESS;
+       //if (original_page_type == FIL_PAGE_ENCRYPTED && page_type == FIL_PAGE_TYPE_ALLOCATED)
+       //{
+        //key_version = mach_read_from_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+        //if (key_version != 0)
+          //mach_write_to_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, 0); // need to be 0 for allocated pages so check would pass
+       //}
+       
+       //ibool ret_val = buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
+
+       return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
+
+       //if (original_page_type == FIL_PAGE_ENCRYPTED && page_type == FIL_PAGE_TYPE_ALLOCATED && key_version != 0)
+         //mach_write_to_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, key_version); // need to be 0 for allocated pages so check would pass
+
+       //return ret_val;
 #else
 
         dberr_t err = DB_SUCCESS;
@@ -5770,8 +5785,21 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         /* If traditional checksums match, we assume that page is
 	   not anymore encrypted. */
        //bpage->is_corrupt can be already set if post-encryption checksum verification failed
+
+       //ulint key_version = 0;
+       
+       //if (original_page_type == FIL_PAGE_ENCRYPTED && page_type == FIL_PAGE_TYPE_ALLOCATED)
+       //{
+        //key_version = mach_read_from_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+        //if (key_version != 0)
+          //mach_write_to_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, 0); // need to be 0 for allocated pages so check would pass
+       //}
+       
        corrupted = bpage->is_corrupt || buf_page_is_corrupted(
 			true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
+
+       //if (original_page_type == FIL_PAGE_ENCRYPTED && page_type == FIL_PAGE_TYPE_ALLOCATED && key_version != 0)
+        //mach_write_to_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, key_version); // need to be 0 for allocated pages so check would pass
 
         if (!corrupted) {
             bpage->encrypted = false;

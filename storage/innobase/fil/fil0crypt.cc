@@ -127,12 +127,39 @@ uint fil_get_encrypt_info_size(const uint iv_len)
            + ENCRYPTION_KEY_LEN;// tablespace iv
 }
 
-uchar* st_encryption_scheme::get_key_currently_used_for_encryption()
+uchar* fil_space_crypt_t::get_key_currently_used_for_encryption()
 {
-  ut_ad(encrypting_with_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-  return get_key(encrypting_with_key_version);
+  //ut_ad(mutex_own(&this->mutex));
+  return get_cached_key(cached_encryption_key, encrypting_with_key_version);
 }
 
+uchar * fil_space_crypt_t::get_min_key_version_key()
+{
+  //ut_ad(mutex_own(&this->mutex));
+  return get_cached_key(cached_min_key_version_key, min_key_version);
+}
+
+uchar * fil_space_crypt_t::get_cached_key(Cached_key &cached_key, uint key_version)
+{
+  //ut_ad(mutex_own(&this->mutex));
+  ut_ad(key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+  if (cached_key.key_version == key_version)
+    return cached_key.key;
+
+  if (cached_key.key != NULL)
+  {
+    my_free(cached_key.key);
+    cached_key.key= NULL;
+  }
+  cached_key.key_version = ENCRYPTION_KEY_VERSION_INVALID;
+
+  Encryption::get_tablespace_key(this->key_id, key_version, &cached_key.key,
+                                 &cached_key.key_len);
+  ut_ad(cached_key.key == NULL ||
+        cached_key.key_len == ENCRYPTION_KEY_LEN);
+
+  return cached_key.key;
+}
 
 bool fil_space_crypt_t::load_needed_keys_into_local_cache()
 {
@@ -178,11 +205,12 @@ uchar* st_encryption_scheme::get_key_or_create_one(uint *version, bool create_if
 
   // key not found
   uchar *tablespace_key = NULL;
-  uint tablespace_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-  if (create_if_not_exists)
-    Encryption::get_latest_tablespace_key_or_create_new_one(this->key_id, &tablespace_key_version, &tablespace_key);
-  else
-    Encryption::get_latest_tablespace_key(this->key_id, &tablespace_key_version, &tablespace_key);
+  //uint tablespace_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+  //if (create_if_not_exists)
+    //Encryption::get_latest_tablespace_key_or_create_new_one(this->key_id, &tablespace_key_version, &tablespace_key);
+  //else
+  size_t key_len;
+  Encryption::get_tablespace_key(this->key_id, *version, &tablespace_key, &key_len);
     
   if (tablespace_key == NULL)
     return NULL;
@@ -201,9 +229,9 @@ uchar* st_encryption_scheme::get_key_or_create_one(uint *version, bool create_if
     key[i] = key[i - 1];
   }
   key[0].key= tablespace_key;
-  key[0].version = tablespace_key_version;
+  key[0].version = *version;
 
-  *version = tablespace_key_version;
+  //*version = *vers;
 
   return tablespace_key;
 }
@@ -418,20 +446,31 @@ fil_space_create_crypt_data(
 
 void fil_space_rotate_state_t::create_flush_observer(uint space_id)
 {
-  ut_ad(flush_observer == NULL && trx == NULL);
+  //ut_ad(flush_observer == NULL && trx == NULL);
+  // in case when threads number is decreased - an encryption thread might be asked to shutdown
+  //flush_observer->flush();
+  destroy_flush_observer();
   trx = trx_allocate_for_background();
   flush_observer = UT_NEW_NOKEY(FlushObserver(space_id,
                                               trx, 
                                               NULL));
+  trx_set_flush_observer(trx, flush_observer);
 }
 
-void fil_space_rotate_state_t::destrory_flush_observer()
+void fil_space_rotate_state_t::destroy_flush_observer()
 {
-  ut_ad(flush_observer != NULL && trx != NULL);
-  UT_DELETE(flush_observer);
-  flush_observer = NULL;
-  trx_free_for_background(trx);
-  trx = NULL;
+  //ut_ad(flush_observer != NULL && trx != NULL);
+  if (flush_observer != NULL)
+  {
+    flush_observer->flush();
+    UT_DELETE(flush_observer);
+    flush_observer = NULL;
+  }
+  if (trx != NULL)
+  {
+    trx_free_for_background(trx);
+    trx = NULL;
+  }
 }
 
 
@@ -1018,6 +1057,8 @@ fil_crypt_read_crypt_data(fil_space_t* space)
 
       //if (encryption_klen != 0 || space->size) {
       if (space->crypt_data && space->size) {
+           //|| space->size 
+           //|| !fil_space_get_size(space->id)) {
               /* The encryption metadata has already been read, or
               the tablespace is not encrypted and the file has been
               opened already. */
@@ -1635,11 +1676,20 @@ fil_crypt_find_space_to_rotate(
       }
 
       while (!state->should_shutdown() && state->space) {
-              fil_crypt_read_crypt_data(state->space);
+	      /* If there is no crypt data and we have not yet read
+	      page 0 for this tablespace, we need to read it before
+	      we can continue. */
+	      //if (!state->space->crypt_data) {
+			fil_crypt_read_crypt_data(state->space);
+	      //}
+              //fil_crypt_read_crypt_data(state->space);
 
+              //ib::error() << "Checking if can rotate " << state->space->name << " space_size= " << state->space->size;
 
+              ut_ad(state->space->size);
 
               // if space is marked as encrytped this means some of the pages are encrypted and space should be skipped
+              // size must be set - i.e. tablespace has been read
               if (!state->space->is_encrypted && !state->space->exclude_from_rotation && fil_crypt_space_needs_rotation(state, key_state, recheck)) {
                               ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_INVALID);
                               /* init state->min_key_version_found before
@@ -1713,13 +1763,14 @@ fil_crypt_start_rotate_space(
 
               crypt_data->rotate_state.start_time = time(0);
 
+              //ib::error() << "Creating flush observer for space id=" << state->space->id;
               crypt_data->rotate_state.create_flush_observer(state->space->id);
               //crypt_data->rotate_state.trx = trx_allocate_for_background();
               //crypt_data->rotate_state.flush_observer = UT_NEW_NOKEY(FlushObserver(state->space->id,
                                                                                    //crypt_data->rotate_state.trx, 
                                                                                    //NULL));
 
-		//trx_set_flush_observer(trx, flush_observer);
+                //trx_set_flush_observer(trx, flush_observer);
 
 
               if (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED &&
@@ -1973,12 +2024,13 @@ fil_crypt_rotate_page(
               // This is now also true for all the other encryption rotations
               //
               // We will rotate the pages from the begining if there was a crash
-              uint kv= (space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY ||
-                        space->crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) 
-                         ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
-                         : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+              uint kv= space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY// ||
+                        //space->crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) 
+                        ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
+                        : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
  
               //if (strcmp(space->name, "test/t1") == 0)
+              //if (space->id == 0)
               //{
                 //ib::error() << "Trying to write to " << space->name << '\n';
                 //ib::error() << "Space id = " << space->id << '\n';
@@ -2012,6 +2064,11 @@ fil_crypt_rotate_page(
                                  crypt_data->encryption,
                                  kv, crypt_data->encrypting_with_key_version,
                                  key_state->rotate_key_age)) {
+
+                //ib::error() << "Write to " << space->name << '\n';
+                //ib::error() << "Space id = " << space->id << '\n';
+                //ib::error() << "for offset = " << offset << '\n';
+ 
 
                       mtr.set_named_space(space);
                       mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);
@@ -2573,7 +2630,10 @@ fil_update_encrypted_flag(fil_space_t *space,
         DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
     }
     else
+    {
+        //ib::error() << "UnSetting encryption for table " << table->name.m_name; 
         DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+    }
 
 
     ib_vector_push(tables_ids_to_revert_if_error, table_id);
@@ -2634,16 +2694,14 @@ fil_crypt_flush_space(
               }
       //}
       
-      crypt_data->rotate_state.destrory_flush_observer();
+      //ib::error() << "Destroying flush observer for space id=" << state->space->id;
+      crypt_data->rotate_state.destroy_flush_observer();
 
       //UT_DELETE(crypt_data->rotate_state.flush_observer);
       //crypt_data->rotate_state.flush_observer = NULL;
       //trx_free_for_background(crypt_data->rotate_state.trx);
       //crypt_data->rotate_state.trx = NULL;
 
-      //ib::error() << "Robert: flushed for space: " << space->name << '\n';
-      //ib::error() << "min_key_version: " << crypt_data->min_key_version << '\n';
-      //ib::error() << "innodb-tables-encrypt: " << srv_encrypt_tables << '\n';
 
       // We do not assign the type to crypt_data just yet. We do it after write_page0 so the in-memory crypt_data
       // would be in sync with the crypt_data on disk
@@ -2734,10 +2792,13 @@ fil_crypt_flush_space(
               mtr.set_named_space(space);
               crypt_data->write_page0(space, block->frame, &mtr, crypt_data->rotate_state.min_key_version_found, current_type,
                                       Encryption::NO_ROTATION);
+
+
               //ib::error() << "Successfuly updated page0 for table = " << space->name;
       }
 
       mtr.commit();
+
 
       return DB_SUCCESS;
 
@@ -2897,6 +2958,13 @@ fil_crypt_complete_rotate_space(
 
       } else {
               mutex_enter(&crypt_data->mutex);
+              //if (crypt_data->rotate_state.flush_observer != NULL)
+              //{
+                //crypt_data->rotate_state.flush_observer->flush();
+                //ib::error() << "Destroying flush observer for space id=" << state->space->id;
+                //crypt_data->rotate_state.destroy_flush_observer();
+              //}
+                
               ut_a(crypt_data->rotate_state.active_threads > 0);
               crypt_data->rotate_state.active_threads--;
               mutex_exit(&crypt_data->mutex);
@@ -3049,6 +3117,8 @@ DECLARE_THREAD(fil_crypt_thread)(
 
       /* release current space if shutting down */
       if (thr.space) {
+              
+
               fil_space_release(thr.space);
               thr.space = NULL;
       }

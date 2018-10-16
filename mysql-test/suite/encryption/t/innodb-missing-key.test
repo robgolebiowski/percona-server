@@ -52,6 +52,7 @@ INSERT INTO t3 SELECT * FROM t1;
 
 --echo
 --echo # Restart server with keys3.txt
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
 --source include/restart_mysqld.inc
 
@@ -71,6 +72,7 @@ SELECT COUNT(1) FROM t1;
 
 --echo
 --echo # Start server with keys2.txt
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 --source include/restart_mysqld.inc
 

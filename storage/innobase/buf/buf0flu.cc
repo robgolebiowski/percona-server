@@ -1081,23 +1081,28 @@ buf_flush_write_block_low(
 	adds an overhead during flushing. */
 
        ut_ad(space != NULL);
+
+
          
-       if (space->crypt_data != NULL && 
-           space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
-       {
-         bpage->encryption_key= space->crypt_data->get_key_currently_used_for_encryption();
-         bpage->encryption_key_version= space->crypt_data->encrypting_with_key_version;
-         ut_ad(bpage->encryption_key != NULL);
-         bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
-         bpage->encrypt= true;
-       }
-       else
-       {
-         ut_ad(space->crypt_data == NULL || space->crypt_data->encryption == FIL_ENCRYPTION_OFF ||
-               (space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables != SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING) ||
-               space->crypt_data->encrypting_with_key_version == 0);
-         bpage->encrypt= false;
-       }
+       //if (space->crypt_data != NULL && 
+           //space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0)
+       //{
+         //mutex_enter(&space->crypt_data->mutex);
+         //bpage->encryption_key= space->crypt_data->get_key_currently_used_for_encryption();
+         //bpage->encryption_key_version= space->crypt_data->encrypting_with_key_version;
+         //ut_ad(bpage->encryption_key != NULL);
+         //bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
+         //bpage->encrypt= true;
+         //mutex_exit(&space->crypt_data->mutex);
+       //}
+       //else
+       //{
+         //ut_ad(space->crypt_data == NULL || space->crypt_data->encryption == FIL_ENCRYPTION_OFF ||
+               //(space->crypt_data->encryption == FIL_ENCRYPTION_DEFAULT && srv_encrypt_tables != SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING) ||
+               //space->crypt_data->encrypting_with_key_version == 0);
+         //bpage->encrypt= false;
+       //}
+
 
 	if (!srv_use_doublewrite_buf
 	    || buf_dblwr == NULL
@@ -3950,7 +3955,7 @@ FlushObserver::FlushObserver(
 /** FlushObserver deconstructor */
 FlushObserver::~FlushObserver()
 {
-	ut_ad(buf_flush_get_dirty_pages_count(m_space_id, this) == 0);
+	//ut_ad(buf_flush_get_dirty_pages_count(m_space_id, this) == 0);
 
 	UT_DELETE(m_flushed);
 	UT_DELETE(m_removed);
