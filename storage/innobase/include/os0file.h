@@ -430,14 +430,15 @@ struct Encryption {
 	};
 
 	/** Default constructor */
-	Encryption() : m_type(NONE), m_encryption_rotation(NO_ROTATION) { } //, m_was_page_encrypted_when_read(false) { };
+	Encryption() : m_type(NONE), m_encryption_rotation(NO_ROTATION), m_free_key_on_delete(false) { }
 
 	/** Specific constructor
 	@param[in]	type		Algorithm type */
 	explicit Encryption(Type type)
 		:
 		m_type(type),
-                m_encryption_rotation(NO_ROTATION) 
+                m_encryption_rotation(NO_ROTATION),
+                m_free_key_on_delete(false)
                 //m_was_page_encrypted_when_read(false)
 	{
 #ifdef UNIV_DEBUG
@@ -462,9 +463,20 @@ struct Encryption {
                 m_tablespace_key(other.m_tablespace_key),
                 m_key_version(other.m_key_version),
 		m_key_id(other.m_key_id),
-                m_encryption_rotation(other.m_encryption_rotation)
+                m_encryption_rotation(other.m_encryption_rotation),
+                m_free_key_on_delete(other.m_free_key_on_delete)
                 //m_was_page_encrypted_when_read(false)
 	{ };
+
+        ~Encryption()
+        {
+          //if (m_free_key_on_delete)
+          //{
+           //ut_ad(m_key != NULL && m_klen > 0);
+           //memset_s(m_key, m_klen, 0, m_klen);
+           //my_free(m_key);
+          //}
+        }
 
 	/** Check if page is encrypted page or not
 	@param[in]	page	page which need to check
@@ -515,6 +527,7 @@ struct Encryption {
         @param[in,out]	value	Encryption value */
 	static void random_value(byte* value);
 
+
         //TODO:Robert: Czy to powinno być tutaj robione ?
         static void create_tablespace_key(byte** tablespace_key,
                                           uint key_id);
@@ -542,7 +555,6 @@ struct Encryption {
 			                                        byte** tablespace_key);
 
         static bool get_tablespace_key(uint key_id,
-                                       char* srv_uuid,
                                        uint tablespace_key_version,
                                        byte** tablespace_key,
                                        size_t *key_len);
@@ -641,12 +653,18 @@ struct Encryption {
 	static char		uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 
         Encryption_rotation     m_encryption_rotation;
+
+        bool                    m_free_key_on_delete;
 private:
 //TODO: Robert: Is it needed here?
         static void get_keyring_key(const char *key_name, byte** key, size_t *key_len);
 
         static void get_latest_system_key(const char *system_key_name, byte **key, uint *key_version,
                                           size_t *key_length);
+
+        static void fill_key_name(char *key_name, uint key_id);
+
+        static void fill_key_name(char* key_name, uint key_id, uint key_version);
 };
 
 /** Types for AIO operations @{ */

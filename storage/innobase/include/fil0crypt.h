@@ -110,6 +110,22 @@ struct st_encryption_scheme_key {
   uchar *key;
 };
 
+struct Cached_key
+{
+  byte *key;
+  uint key_version;
+  ulong key_len;
+
+  ~Cached_key()
+  {
+    if (key != NULL)
+    {
+      memset_s(key, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
+      my_free(key);
+    }
+  }
+};
+
 // Merge it with fil_crypt_data
 struct st_encryption_scheme {
   unsigned char iv[16];
@@ -117,7 +133,7 @@ struct st_encryption_scheme {
 
   uchar* get_key_or_create_one(uint *version, bool create_if_not_exists);
   uchar* get_key(uint version);
-  uchar* get_key_currently_used_for_encryption();
+  //uchar* get_key_currently_used_for_encryption();
 
 
   uint encrypting_with_key_version;
@@ -176,7 +192,7 @@ struct fil_space_rotate_state_t
                                                       //NULL));
         //}
 
-        void destrory_flush_observer();
+        void destroy_flush_observer();
         //{
           //ut_ad(flush_observer != NULL && trx != NULL);
           //UT_DELETE(flush_observer);
@@ -297,10 +313,19 @@ struct fil_space_crypt_t : st_encryption_scheme
         }
 
         bool load_needed_keys_into_local_cache();
+        uchar* get_min_key_version_key();
+        uchar* get_key_currently_used_for_encryption();
 
 	uint min_key_version; // min key version for this space
 	ulint page0_offset;   // byte offset on page 0 for crypt data //TODO:Robert: po co to ?
 	fil_encryption_t encryption; // Encryption setup
+
+        // key being used for encryption
+        Cached_key cached_encryption_key;
+        // in normal situation the only key needed to decrypt the tablespace
+        Cached_key cached_min_key_version_key;
+
+        uchar * get_cached_key(Cached_key &cached_key, uint key_version);
 
 	ib_mutex_t mutex;   // mutex protecting following variables
 

@@ -1579,7 +1579,7 @@ for compressed and uncompressed frames */
 
 class buf_page_t {
 public:
-       byte *encryption_key;
+       //byte*encryption_key;
        uint encryption_key_version;
        uint encryption_key_length;
        bool encrypt;
