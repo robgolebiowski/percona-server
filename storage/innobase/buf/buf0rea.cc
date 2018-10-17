@@ -918,6 +918,7 @@ buf_read_ibuf_merge_pages(
 			tablespace: remove the entries for that page */
 			ibuf_merge_or_delete_for_page(NULL, page_id,
 						      &page_size, FALSE);
+			// fallthrough
 		case DB_PAGE_CORRUPTED:
 		case DB_DECRYPTION_FAILED:
 			ib::error() << "Failed to read or decrypt " << page_id

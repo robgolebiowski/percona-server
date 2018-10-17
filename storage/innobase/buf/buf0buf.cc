@@ -5720,7 +5720,7 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
         //TODO:Robert - to trzeba jeszcze dodać
         ut_ad(space->n_pending_ios > 0);
         //
-        DBUG_PRINT("Robert", ("Checking if page : "UINT32PF":"UINT32PF" is corrupted",
+        DBUG_PRINT("Robert", ("Checking if page : " UINT32PF ":" UINT32PF " is corrupted",
                             bpage->id.space(), bpage->id.page_no()));
 
         //ib_uint32_t space_id = bpage->id.space();
