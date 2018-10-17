@@ -413,8 +413,7 @@ public:
 		return(m_estimate);
 	}
 
-        uint get_number_of_pages_flushed()
-        {
+        uint get_number_of_pages_flushed() const {
                 return m_number_of_pages_flushed; 
         }
 

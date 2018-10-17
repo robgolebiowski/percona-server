@@ -43,7 +43,6 @@ Created 2011/12/19
 
 #ifndef UNIV_HOTBACKUP
 
-
 /** The doublewrite buffer */
 buf_dblwr_t*	buf_dblwr = NULL;
 
@@ -631,12 +630,6 @@ buf_dblwr_init_or_load_pages(
 		page += univ_page_size.physical();
 	}
 
-	//err = buf_parallel_dblwr_make_path();
-	//if (err != DB_SUCCESS) {
-
-		//ut_free(unaligned_read_buf);
-		//return(err);
-	//}
 
 	ut_ad(parallel_dblwr_buf.file.is_closed());
 	bool success;
@@ -866,7 +859,7 @@ buf_dblwr_process(void)
 
                                 if (space->crypt_data == NULL) // if it was crypt_data encrypted it was already decrypted
                                   err = os_dblwr_decrypt_page(
-					  space, page);
+					space, page);
 
 				if (err != DB_SUCCESS || buf_page_is_corrupted(
 					true, page, page_size,
@@ -1302,30 +1295,6 @@ buf_dblwr_flush_buffered_writes(
 
 		page_t*	dblwr_page = write_buf + len2;
 
-
-                //TODO:Temporarily encrypt pages once for writing data into tablespace file and the second time when writing data to double write buffer
-                buf_page_t *bpage = &(((buf_block_t*)dblwr_shard->buf_block_arr[i])->page);
-                //FilSpace space (bpage->id.space()); // this is a guard
-                FilSpace space (TRX_SYS_SPACE); // this is a guard
-                                                // Temporarily encrypt all pages in doulbe write buffer with system's tablespace key
-
-                bpage->encrypt = false;
-                
-                //TODO:Those keys will need to be fried somewhere
-                if (space() && space()->crypt_data && space()->crypt_data->should_encrypt() && space()->crypt_data->encrypting_with_key_version != 0) //TODO:Robert Space might be already dropped - one more reason to
-                                                                                             //have encryption earlier
-                {
-                  //bpage->encryption_key = space()->crypt_data->get_key_currently_used_for_encryption();
-                  bpage->encryption_key_version = space()->crypt_data->encrypting_with_key_version;
-                  //Encryption::get_latest_tablespace_key(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
-                  ////It seems that it can reach here before variable encrypt_tables is validated - which is weird .. -
-                  //if (space()->crypt_data->key_id == 0 && bpage->encryption_key == NULL)
-                    //Encryption::get_latest_tablespace_key_or_create_new_one(space()->crypt_data->key_id, &bpage->encryption_key_version, &bpage->encryption_key);
-                  //ut_ad(bpage->encryption_key != NULL); // It is quaranteed that encryption key here is already present in keyring cache
-                  bpage->encrypt = true; //TODO:Robert!: For now double write buffer stays unencrypted!
-                  bpage->encryption_key_length = ENCRYPTION_KEY_LEN;
-                }
-
 		if (buf_block_get_state(block) != BUF_BLOCK_FILE_PAGE
 		    || block->page.zip.data) {
 			/* No simple validate for compressed
@@ -1341,8 +1310,9 @@ buf_dblwr_flush_buffered_writes(
 		buffer has sane LSN values. */
 		buf_dblwr_check_page_lsn(dblwr_page);
 
-                // it can be already encrypted by encryption threads
-		if (encrypt_parallel_dblwr && bpage->encrypt == false && space()->crypt_data == NULL
+		// it can be already encrypted by encryption threads
+		FilSpace space (TRX_SYS_SPACE);
+		if (encrypt_parallel_dblwr && space()->crypt_data == NULL
 		    && !buf_dblwr_disable_encryption(block)) {
 			buf_dblwr_encrypt_page(block, dblwr_page);
 		}
@@ -1558,7 +1528,7 @@ retry:
 
 	IORequest	write_request(IORequest::WRITE);
 
-	if (bpage->encrypt == false && buf_dblwr_disable_encryption((buf_block_t*)bpage)) {
+	if (buf_dblwr_disable_encryption((buf_block_t*)bpage)) {
 		write_request.disable_encryption();
 	}
 
@@ -1583,8 +1553,7 @@ retry:
 		       page_id_t(TRX_SYS_SPACE, offset), univ_page_size, 0,
 		       univ_page_size.physical(),
 		       (void*) ((buf_block_t*) bpage)->frame,
-                       bpage);
-		       //NULL);
+		       NULL);
 	}
 
 	/* Now flush the doublewrite buffer data to disk */
