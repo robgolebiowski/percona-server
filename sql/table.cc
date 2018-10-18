@@ -2215,9 +2215,6 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
           share->was_encryption_key_id_set= true;
           next_chunk += 4 + strlen("ENCRYPTION_KEY_ID");
     }
-
-    DBUG_ASSERT(share->encrypt_type.length == 0 || strncmp(share->encrypt_type.str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) != 0 ||
-                share->encrypt_type.length == strlen("ROTATED_KEYS"));
   }
   share->key_block_size= uint2korr(head+62);
 
@@ -2748,9 +2745,6 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
   bitmap_set_all(&share->all_set);
 
   delete handler_file;
-
-  DBUG_ASSERT(share->encrypt_type.length == 0 || strncmp(share->encrypt_type.str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) != 0 ||
-              share->encrypt_type.length == strlen("ROTATED_KEYS"));
 #ifndef DBUG_OFF
   if (use_hash)
     (void) my_hash_check(&share->name_hash);

@@ -295,7 +295,6 @@ public:
   */
   enum_with_validation          with_validation;
 
-
   Alter_info() :
     flags(0),
     keys_onoff(LEAVE_AS_IS),

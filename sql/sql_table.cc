@@ -4848,44 +4848,6 @@ mysql_prepare_create_table(THD *thd, const char *error_schema_name,
 	       encrypt_type->str, "ENCRYPTION", TABLE_COMMENT_MAXLEN);
       DBUG_RETURN(TRUE);
     }
-
-   // For ROTATED_KEYS table if encryption_key_id has not yet been assigned - assign default_encryption_key_id
-   //if (0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length) &&
-
-   //const LEX_STRING storage_engine= { C_STRING_WITH_LEN("innodb") };
-   //plugin_ref se_plugin;
-   //handlerton *hton;
-
-   //if ((se_plugin= ha_resolve_by_name(current_thd, &storage_engine, false)))
-   //{
-     //hton= plugin_data<handlerton *>(se_plugin);
-   //}
-   //else
-   //{
-     //my_error(ER_MASTER_KEY_ROTATION_SE_UNAVAILABLE, MYF(0)); // TODO: Change the error message
-     //return true;
-   //}
-
-   //handlerton::KeyringEncryptionVariables keyring_encryption_variables = hton->get_keyring_encryption_variables(current_thd);
-
-   //if (false == create_info->was_encryption_key_id_set)
-   //{
-      //if ((0 != encrypt_type->length && 0 == strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length)) ||
-          //(encrypt_type->length == 0 && keyring_encryption_variables.global_encrypt_tables == true))
-      //{
-        //create_info->encryption_key_id = keyring_encryption_variables.session_default_encryption_key_id;  
-        //create_info->was_encryption_key_id_set = true;
-      //}
-   //}
-   //else if (0 != encrypt_type->length && 0 != strncmp(encrypt_type->str, "ROTATED_KEYS", encrypt_type->length) &&
-            //alter_info->was_encryption_key_id_set == false)
-   //{
-       //// if it is encrypted table with Master key encryption or marked as not to be encrypted and alter table
-       //// does not have ENCRYPTION_KEY_ID - mark encryption key id as not set. 
-       //create_info->encryption_key_id = keyring_encryption_variables.session_default_encryption_key_id;  
-       //create_info->was_encryption_key_id_set = false;
-   //}
-
   }
 
   DBUG_RETURN(FALSE);
@@ -8853,7 +8815,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   }
 
   // Encryption was changed to not ROTATED_KEYS and ALTER does not contain encryption_key_id
-  // mark it as not set then
+  // mark encryption_key_id as not set then
   if (used_fields & HA_CREATE_USED_ENCRYPT &&
       0 != strncmp(create_info->encrypt_type.str, "ROTATED_KEYS", create_info->encrypt_type.length) &&
       !(used_fields & HA_CREATE_USED_ENCRYPTION_KEY_ID))

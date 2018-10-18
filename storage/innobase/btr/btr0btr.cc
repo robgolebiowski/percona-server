@@ -176,21 +176,11 @@ btr_root_block_get(
 	buf_block_t*	block = btr_block_get(page_id, page_size, mode,
 					      index, mtr);
 
-	//if (!block) {
-		//if (index && index->table) {
-			//index->table->set_file_unreadable();
 	if (!block && index && index->table && !index->table->is_readable()) {
-			//index->table->set_file_unreadable();
 
-                        ib::warn() << "Table in tablespace is encrypted but encryption service or"
+			ib::warn() << "Table in tablespace is encrypted but encryption service or"
 				" used key_id is not available. "
 				" Can't continue reading table.";
-			//ib_push_warning(
-				//static_cast<THD*>(NULL), DB_DECRYPTION_FAILED,
-				//"Table %s in tablespace %lu is encrypted but encryption service or"
-				//" used key_id is not available. "
-				//" Can't continue reading table.",
-				//index->table->name, space);
 		return NULL;
 	}
 
@@ -575,8 +565,8 @@ btr_get_size(
 
 	root = btr_root_get(index, mtr);
 
-        if (!root && index->table->is_readable() == false)
-          return ULINT_UNDEFINED;
+	if (!root && index->table->is_readable() == false)
+		return ULINT_UNDEFINED;
 
 	SRV_CORRUPT_TABLE_CHECK(root,
 	{
@@ -983,17 +973,17 @@ btr_free_root_check(
 		page_id, page_size, RW_X_LATCH, mtr);
 
 	if (block) {
-          buf_block_dbg_add_level(block, SYNC_TREE_NODE);
+		buf_block_dbg_add_level(block, SYNC_TREE_NODE);
 
-          if (fil_page_index_page_check(block->frame)
-              && index_id == btr_page_get_index_id(block->frame)) {
-                  /* This should be a root page.
-                  It should not be possible to reassign the same
-                  index_id for some other index in the tablespace. */
-                  ut_ad(page_is_root(block->frame));
-          } else {
-                  block = NULL;
-          }
+		if (fil_page_index_page_check(block->frame)
+		   && index_id == btr_page_get_index_id(block->frame)) {
+			/* This should be a root page.
+			It should not be possible to reassign the same
+			index_id for some other index in the tablespace. */
+			ut_ad(page_is_root(block->frame));
+		} else {
+			block = NULL;
+		}
         }
 
 	return(block);
@@ -5109,7 +5099,6 @@ btr_validate_spatial_index(
 /**************************************************************//**
 Checks the consistency of an index tree.
 @return	DB_SUCCESS if ok, error code if not */
-//@return true if ok */
 dberr_t
 btr_validate_index(
 /*===============*/
@@ -5127,8 +5116,8 @@ btr_validate_index(
 
 	if (dict_index_is_spatial(index)) {
 		if (!btr_validate_spatial_index(index, trx)) {
-                     err = DB_ERROR;
-                }
+			err = DB_ERROR;
+		}
 	}
 
 	mtr_t		mtr;
@@ -5143,7 +5132,6 @@ btr_validate_index(
 		}
 	}
 
-	//bool	ok = true;
 	page_t*	root = btr_root_get(index, &mtr);
 
 	if (root == NULL && !index->is_readable()) {
@@ -5155,8 +5143,7 @@ btr_validate_index(
 	SRV_CORRUPT_TABLE_CHECK(root,
 	{
 		mtr_commit(&mtr);
-		//return(false);
-                return DB_CORRUPTION;
+		return DB_CORRUPTION;
 	});
 
 	ulint	n = btr_page_get_level(root, &mtr);

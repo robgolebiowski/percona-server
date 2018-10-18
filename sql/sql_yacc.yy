@@ -5062,6 +5062,7 @@ opt_ts_encryption:
             Lex->alter_tablespace_info->encrypt_type= $3;
           }
         ;
+
 ts_wait:
           WAIT_SYM
           {
