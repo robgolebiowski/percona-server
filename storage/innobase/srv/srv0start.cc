@@ -460,7 +460,7 @@ create_log_files(
 		"innodb_redo_log", SRV_LOG_SPACE_FIRST_ID,
 		fsp_flags_set_page_size(0, univ_page_size),
 		FIL_TYPE_LOG,
-                NULL/* innodb_encrypt_log works at a different level */);
+                NULL);
 	ut_a(fil_validate());
 	ut_a(log_space != NULL);
 
@@ -1344,7 +1344,7 @@ srv_shutdown_all_bg_threads()
 				srv_purge_wakeup();
 			}
 
-                        if (srv_n_fil_crypt_threads_started) {
+			if (srv_n_fil_crypt_threads_started) {
 				os_event_set(fil_crypt_threads_event);
 			}
 		}
@@ -2386,7 +2386,7 @@ files_checked:
 		{
 			/* Create the thread which prints InnoDB monitor
 			info */
-                        srv_monitor_active = true;
+			srv_monitor_active = true;
 			os_thread_create(
 				srv_monitor_thread,
 				NULL, thread_ids + 4 + SRV_MAX_N_IO_THREADS);
@@ -2726,10 +2726,10 @@ files_checked:
 		os_thread_create(
 			lock_wait_timeout_thread,
 			NULL, thread_ids + 2 + SRV_MAX_N_IO_THREADS);
-                lock_sys->timeout_thread_active = true;
+		lock_sys->timeout_thread_active = true;
 
 		/* Create the thread which warns of long semaphore waits */
-                srv_error_monitor_active = true;
+		srv_error_monitor_active = true;
 		os_thread_create(
 			srv_error_monitor_thread,
 			NULL, thread_ids + 3 + SRV_MAX_N_IO_THREADS);
@@ -2912,7 +2912,7 @@ files_checked:
 		}
 
 		/* Create the buffer pool dump/load thread */
-                srv_buf_dump_thread_active = true;
+		srv_buf_dump_thread_active = true;
 		os_thread_create(buf_dump_thread, NULL, NULL);
 
 		/* Create the dict stats gathering thread */
@@ -2923,7 +2923,6 @@ files_checked:
 		fts_optimize_init();
 
 		fil_system_enter();
-		//btr_scrub_init();
 		fil_crypt_threads_init();
 		fil_system_exit();
 
@@ -2935,8 +2934,6 @@ files_checked:
 	os_thread_create(buf_resize_thread, NULL, NULL);
 
 	srv_was_started = TRUE;
-
-
 	return(DB_SUCCESS);
 }
 
@@ -2989,8 +2986,7 @@ innobase_shutdown_for_mysql(void)
 	if (!srv_read_only_mode) {
 		fts_optimize_shutdown();
 		dict_stats_shutdown();
-
- 	}
+	}
 
 	/* 1. Flush the buffer pool to disk, write the current lsn to
 	the tablespace header(s), and copy all log data to archive.
@@ -3030,14 +3026,8 @@ innobase_shutdown_for_mysql(void)
 
 	if (!srv_read_only_mode) {
 		dict_stats_thread_deinit();
-               /* Shutdown key rotation threads */
-                fil_crypt_threads_cleanup(); // TODO:Robert: in the original there is also 
-                //if (srv_n_fil_crypt_threads > 0)
-                  //unlock_keyrings(NULL); 
-
-//   srv_start_state_t: Document the flags. Replace SRV_START_STATE_STAT
-  //  with SRV_START_STATE_REDO. The srv_bg_undo_sources replaces the
-  //  original use of SRV_START_STATE_STAT.
+		/* Shutdown key rotation threads */
+		fil_crypt_threads_cleanup();
 	}
 
 	/* This must be disabled before closing the buffer pool
@@ -3096,7 +3086,7 @@ innobase_shutdown_for_mysql(void)
 	srv_was_started = FALSE;
 	srv_start_has_been_called = FALSE;
 
-        unlock_keyrings(NULL);
+	unlock_keyrings(NULL);
 
 	return(DB_SUCCESS);
 }

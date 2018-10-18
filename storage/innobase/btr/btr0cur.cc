@@ -1125,25 +1125,18 @@ retry_page_get:
 	if (err != DB_SUCCESS) {
 		ut_ad(block == NULL);
 		if (err == DB_DECRYPTION_FAILED) {
-                        ib::warn() << "Table is encrypted but encryption service or"
+			ib::warn() << "Table is encrypted but encryption service or"
 				" used key_id is not available. "
 				" Can't continue reading table.";
 
-       /*                 ib_push_warning((void *)NULL,*/
-				//DB_DECRYPTION_FAILED,
-				//"Table %s is encrypted but encryption service or"
-				//" used key_id is not available. "
-				//" Can't continue reading table.",
-				/*index->table->name);*/
-
-				page_cursor->block = 0;
-				page_cursor->rec = 0;
+			page_cursor->block = 0;
+			page_cursor->rec = 0;
 			index->table->set_file_unreadable();
-                        if (estimate) {
+			if (estimate) {
 
-                                cursor->path_arr->nth_rec =
-                                        ULINT_UNDEFINED;
-                        }
+				cursor->path_arr->nth_rec =
+					ULINT_UNDEFINED;
+			}
 		}
 
 		goto func_exit;
@@ -1264,26 +1257,18 @@ retry_page_get:
 
 			if (err != DB_SUCCESS) {
 				if (err == DB_DECRYPTION_FAILED) {
-                                        ib::warn() << "Table is encrypted but encryption service or"
+					ib::warn() << "Table is encrypted but encryption service or"
 						" used key_id is not available. "
 						" Can't continue reading table.";
-                                if (estimate) {
+					if (estimate) {
 
-                                        page_cursor->block = 0;
-                                        page_cursor->rec = 0;
-                                        cursor->path_arr->nth_rec =
-                                                ULINT_UNDEFINED;
-                                }
-
-					//ib_push_warning((void *)NULL,
-						//DB_DECRYPTION_FAILED,
-						//"Table %s is encrypted but encryption service or"
-						//" used key_id is not available. "
-						//" Can't continue reading table.",
-						//index->table->name);
+						page_cursor->block = 0;
+						page_cursor->rec = 0;
+						cursor->path_arr->nth_rec =
+							ULINT_UNDEFINED;
+					}
 					index->table->set_file_unreadable();
 				}
-
 				goto func_exit;
 			}
 
@@ -1305,22 +1290,16 @@ retry_page_get:
 
 		if (err != DB_SUCCESS) {
 			if (err == DB_DECRYPTION_FAILED) {
-                                ib::warn() << "Table is encrypted but encryption service or"
+				ib::warn() << "Table is encrypted but encryption service or"
 					" used key_id is not available. "
 					" Can't continue reading table.";
-				//ib_push_warning((void *)NULL,
-					//DB_DECRYPTION_FAILED,
-					//"Table %s is encrypted but encryption service or"
-					//" used key_id is not available. "
-					//" Can't continue reading table.",
-					//index->table->name);
-                                if (estimate) {
-                                        page_cursor->block = 0;
-                                        page_cursor->rec = 0;
+				if (estimate) {
+					page_cursor->block = 0;
+					page_cursor->rec = 0;
 
-                                        cursor->path_arr->nth_rec =
-                                                ULINT_UNDEFINED;
-                                }
+					cursor->path_arr->nth_rec =
+						ULINT_UNDEFINED;
+				}
 				index->table->set_file_unreadable();
 			}
 
@@ -2183,7 +2162,6 @@ btr_cur_search_to_nth_level_with_no_latch(
 
 		ut_ad(n_blocks < BTR_MAX_LEVELS);
 
-                // TODO:Robert: Też with_no_latches funkcja i nie uwzględniamy nulla
 		block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
 				buf_mode, file, line, mtr, mark_dirty);
 
@@ -2378,23 +2356,16 @@ btr_cur_open_at_index_side_func(
 
 		if (err != DB_SUCCESS) {
 			if (err == DB_DECRYPTION_FAILED) {
-                                ib::warn() << "Table is encrypted but encryption service or"
+				ib::warn() << "Table is encrypted but encryption service or"
 					" used key_id is not available. "
 					" Can't continue reading table.";
-					///index->table->name);
-                                page_cursor->block = 0;
-                                page_cursor->rec = 0;
-                                if (estimate) {
+				page_cursor->block = 0;
+				page_cursor->rec = 0;
+				if (estimate) {
 
-                                        cursor->path_arr->nth_rec = ULINT_UNDEFINED;
-                                }
+					cursor->path_arr->nth_rec = ULINT_UNDEFINED;
+				}
 
-                                  //ib_push_warning((void *)NULL,
-                                          //DB_DECRYPTION_FAILED,
-                                          //"Table %s is encrypted but encryption service or"
-					//" used key_id is not available. "
-					//" Can't continue reading table.",
-					//index->table->name);
 				index->table->set_file_unreadable();
 			}
 			goto exit_loop;
@@ -2636,7 +2607,7 @@ exit_loop:
 		mem_heap_free(heap);
 	}
 
-        return err;
+	return err;
 }
 
 /** Opens a cursor at either end of an index.
@@ -2651,7 +2622,6 @@ as they are not shared and so there is no need of latching.
 @param[in]	line		line where called
 @param[in,out]	mtr		mini transaction
 */
-
 void
 btr_cur_open_at_index_side_with_no_latch_func(
 	bool		from_left,
@@ -2688,7 +2658,6 @@ btr_cur_open_at_index_side_with_no_latch_func(
 
 		ut_ad(n_blocks < BTR_MAX_LEVELS);
 
-                // TODO:Robert - tutaj nie uwzględniamy NULLa
 		block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
 					 BUF_GET, file, line, mtr);
 
@@ -2865,26 +2834,11 @@ btr_cur_open_at_rnd_pos_func(
 
 		if (err != DB_SUCCESS) {
 			if (err == DB_DECRYPTION_FAILED) {
-                               //push_warning_printf(NULL, Sql_condition::SL_WARNING,
-                                       //HA_ERR_DECRYPTION_FAILED, "Table %s in tablespace %u encrypted."
-                                          //"However key management plugin or used key_id is not found or"
-                                          //" used encryption algorithm or method does not match.",
-                                          //table->name.m_name, table->space);
-                                          //
-                               // TODO: Robert na razie olewam, ale bedzie trzeba dodac
-                               ib::warn() << "Table %s is encrypted but encryption service or"
-					     " used key_id is not available. "
-					     " Can't continue reading table.";
-					     //index->table->name;
-
-                                page_cursor->block = 0;
-                                page_cursor->rec = 0;
-				//ib_push_warning((void *)NULL,
-					//DB_DECRYPTION_FAILED,
-					//"Table %s is encrypted but encryption service or"
-					//" used key_id is not available. "
-					//" Can't continue reading table.",
-					//index->table->name);
+				ib::warn() << "Table %s is encrypted but encryption service or"
+						" used key_id is not available. "
+						" Can't continue reading table.";
+				page_cursor->block = 0;
+				page_cursor->rec = 0;
 				index->table->set_file_unreadable();
 			}
 
@@ -5755,7 +5709,7 @@ btr_estimate_n_rows_in_range_on_level(
 		mtr_t		mtr;
 		page_t*		page;
 		buf_block_t*	block;
-		dberr_t		err=DB_SUCCESS;
+		dberr_t		err = DB_SUCCESS;
 
 		mtr_start(&mtr);
 
@@ -5772,16 +5726,10 @@ btr_estimate_n_rows_in_range_on_level(
 
 		if (err != DB_SUCCESS) {
 			if (err == DB_DECRYPTION_FAILED) {
-                                ib::warn() << "Table is encrypted but encryption service or"
-                                        " used key_id is not available. "
+				ib::warn() << "Table is encrypted but encryption service or"
+					" used key_id is not available. "
 					" Can't continue reading table.";
 
-				//ib_push_warning((void *)NULL,
-					//DB_DECRYPTION_FAILED,
-					//"Table %s is encrypted but encryption service or"
-					//" used key_id is not available. "
-					//" Can't continue reading table.",
-					//index->table->name);
 				index->table->set_file_unreadable();
 			}
 
@@ -5932,19 +5880,19 @@ btr_estimate_n_rows_in_range_low(
 					    &cursor, 0,
 					    __FILE__, __LINE__, &mtr);
 
-                if (index->is_readable())
-                {
-                  ut_ad(!page_rec_is_infimum(btr_cur_get_rec(&cursor)));
+		if (index->is_readable())
+		{
+			ut_ad(!page_rec_is_infimum(btr_cur_get_rec(&cursor)));
 
-                  /* We should count the border if there are any records to
-                  match the criteria, i.e. if the maximum record on the tree is
-                  5 and x > 3 is specified then the cursor will be positioned at
-                  5 and we should count the border, but if x > 7 is specified,
-                  then the cursor will be positioned at 'sup' on the rightmost
-                  leaf page in the tree and we should not count the border. */
-                  should_count_the_left_border
-                          = !page_rec_is_supremum(btr_cur_get_rec(&cursor));
-                }
+			/* We should count the border if there are any records to
+			match the criteria, i.e. if the maximum record on the tree is
+			5 and x > 3 is specified then the cursor will be positioned at
+			5 and we should count the border, but if x > 7 is specified,
+			then the cursor will be positioned at 'sup' on the rightmost
+			leaf page in the tree and we should not count the border. */
+			should_count_the_left_border
+				= !page_rec_is_supremum(btr_cur_get_rec(&cursor));
+		}
 	} else {
 		dberr_t err = btr_cur_open_at_index_side(true, index,
 					   BTR_SEARCH_LEAF | BTR_ESTIMATE,
@@ -5959,16 +5907,15 @@ btr_estimate_n_rows_in_range_low(
 				   << " index: " << index->name;
 		}
 
-                if (index->is_readable())
-                {
+		if (index->is_readable()) {
                   ut_ad(page_rec_is_infimum(btr_cur_get_rec(&cursor)));
 
-                  /* The range specified is wihout a left border, just
-                  'x < 123' or 'x <= 123' and btr_cur_open_at_index_side()
-                  positioned the cursor on the infimum record on the leftmost
-                  page, which must not be counted. */
-                  should_count_the_left_border = false;
-                }
+			/* The range specified is wihout a left border, just
+			'x < 123' or 'x <= 123' and btr_cur_open_at_index_side()
+			positioned the cursor on the infimum record on the leftmost
+			page, which must not be counted. */
+			should_count_the_left_border = false;
+		}
 	}
 
 	mtr_commit(&mtr);

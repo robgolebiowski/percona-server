@@ -631,7 +631,7 @@ PageBulk::latch()
 
 	ut_ad(m_cur_rec > m_page && m_cur_rec < m_heap_top);
 
-        return (m_err);
+	return (m_err);
 }
 
 /** Split a page

@@ -743,7 +743,6 @@ buf_page_is_corrupted(
 
 		/* Stored log sequence numbers at the start and the end
 		of page do not match */
-                //ut_ad(0); //Robert: Added by me
 
 		return(TRUE);
 	}
@@ -828,10 +827,10 @@ buf_page_is_corrupted(
 			if ((i < FIL_PAGE_FILE_FLUSH_LSN
 			     || i >= FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID)
 			    && read_buf[i] != 0) {
-                             if (i >= FIL_PAGE_ENCRYPTION_KEY_VERSION &&
-                                 i <= FIL_PAGE_ENCRYPTION_KEY_VERSION + 3) //those for bytes might not be 0 for keyring encryption
-                               continue;
-			     break;
+				if (i >= FIL_PAGE_ENCRYPTION_KEY_VERSION &&
+				    i <= FIL_PAGE_ENCRYPTION_KEY_VERSION + 3) //those four bytes might not be 0 for keyring encryption
+					continue;
+				break;
 			}
 		}
 #ifdef UNIV_INNOCHECKSUM
@@ -3022,7 +3021,7 @@ DECLARE_THREAD(buf_resize_thread)(
 {
 	my_thread_init();
 
-	//srv_buf_resize_thread_active = true;
+	srv_buf_resize_thread_active = true;
 
 	while (srv_shutdown_state == SRV_SHUTDOWN_NONE) {
 		os_event_wait(srv_buf_resize_event);
@@ -4108,7 +4107,7 @@ buf_page_get_gen(
 	ulint			line,
 	mtr_t*			mtr,
 	bool			dirty_with_no_latch,
-        dberr_t*		err)
+	dberr_t*		err)
 
 {
 	buf_block_t*	block;
@@ -4250,7 +4249,7 @@ loop:
 			return(NULL);
 		}
 
-                /* Decryption, decompression as
+		/* Decryption, decompression as
 		well as error handling takes place at a lower level.
 		Here we only need to know whether the page really is
 		corrupted, or if an encrypted page with a valid
@@ -4283,22 +4282,21 @@ loop:
 			nonzero. There is no checksum on field
 			FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION. */
 			if (local_err == DB_DECRYPTION_FAILED) {
-                          //TODO:Robert Should not here be added dict_set_encrypted_by_space ?
 				return (NULL);
 			}
 
 			/* Try to set table as corrupted instead of
 			asserting. */
 			if (page_id.space() != TRX_SYS_SPACE) {
-                               if (fil_space_t* space
-				   = fil_space_acquire_for_io(
+				if (fil_space_t* space
+				   = fil_space_acquire_for_io (
 					   page_id.space())) {
-				 bool set = dict_set_corrupted_by_space(space->id);
-                                 fil_space_release_for_io(space);
-				 if (set) {
-				   return NULL;
-				 }
-                          }
+					bool set = dict_set_corrupted_by_space(space->id);
+					fil_space_release_for_io(space);
+					if (set) {
+						return NULL;
+					}
+				}
 			}
 
 			ib::fatal() << "Unable to read page " << page_id
@@ -5103,7 +5101,6 @@ buf_page_init_low(
 	bpage->newest_modification = 0;
 	bpage->oldest_modification = 0;
 	HASH_INVALIDATE(bpage, hash);
-        //TODO: Robert they do not 
 	bpage->is_corrupt = false;
 	bpage->encrypted = false;
         bpage->encrypt = false;
@@ -5699,7 +5696,7 @@ buf_mark_space_corrupt(
 	}
 
 	/* After this point bpage can't be referenced. */
-        buf_LRU_free_one_page(bpage);
+	buf_LRU_free_one_page(bpage);
 	
 	mutex_exit(&buf_pool->LRU_list_mutex);
 
@@ -5713,48 +5710,21 @@ static
 dberr_t 
 buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 {
-  //    bpage->is_corrupted and bpage_encrypted could be set to true when we come here in case post-encryption checksum failed
-  //
-
-	//DBUG_ENTER("buf_page_check_corrupt");
-        //TODO:Robert - to trzeba jeszcze dodać
-        ut_ad(space->n_pending_ios > 0);
-        //
-        DBUG_PRINT("Robert", ("Checking if page : " UINT32PF ":" UINT32PF " is corrupted",
-                            bpage->id.space(), bpage->id.page_no()));
-
-        //ib_uint32_t space_id = bpage->id.space();
-        //ib_uint32_t page_no = bpage->id.page_no();
-
-        //ib::info() << "Checking if is corrupted for space = " << space_id << " page_id = " << page_no;
+	ut_ad(space->n_pending_ios > 0);
 	byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
 		((buf_block_t*) bpage)->frame;
 #ifdef UNIV_INNOCHECKSUM
-       //if (original_page_type == FIL_PAGE_ENCRYPTED && page_type == FIL_PAGE_TYPE_ALLOCATED)
-       //{
-        //key_version = mach_read_from_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
-        //if (key_version != 0)
-          //mach_write_to_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, 0); // need to be 0 for allocated pages so check would pass
-       //}
-       
-       //ibool ret_val = buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
-
-       return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
-
-       //if (original_page_type == FIL_PAGE_ENCRYPTED && page_type == FIL_PAGE_TYPE_ALLOCATED && key_version != 0)
-         //mach_write_to_4(dst_frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, key_version); // need to be 0 for allocated pages so check would pass
-
-       //return ret_val;
+	return buf_page_is_corrupted(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
 #else
 
-        dberr_t err = DB_SUCCESS;
+	dberr_t err = DB_SUCCESS;
 	bool corrupted = bpage->is_corrupt;
-        fil_space_crypt_t* crypt_data = space->crypt_data;
-        ulint page_type= mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
-        ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
-        //bpage->encrypted can be already set if post-encryption checksum verification failed
-        bpage->encrypted = bpage->encrypted || original_page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED_RTREE ||
-                           page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED; // TODO:Robert może rozdzielić to na dwie zmienne
+	fil_space_crypt_t* crypt_data = space->crypt_data;
+	ulint page_type= mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
+	ulint original_page_type= mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
+
+	bpage->encrypted = bpage->encrypted || original_page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED_RTREE ||
+			   page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED; // TODO:Robert może rozdzielić to na dwie zmienne
                                                                                                         // TODO:is_encrypted i was_page_read_encrypted
         
 
