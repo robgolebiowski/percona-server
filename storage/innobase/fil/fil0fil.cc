@@ -6033,6 +6033,7 @@ fil_io_set_keyring_encryption(IORequest& req_type,
 
    req_type.encryption_key(key,
 			   key_len,
+			   false,
                            iv,
                            key_version,
                            key_id,
@@ -6119,6 +6120,7 @@ fil_io_set_encryption(
                   ut_ad(space->encryption_type == Encryption::AES);
                   req_type.encryption_key(space->encryption_key,
 					32,
+					false,
                                         space->encryption_iv,
                                         0, 0, NULL, NULL); // not relevant for Master Key encryption
 
@@ -7148,6 +7150,7 @@ fil_iterate(
 		if ((iter.encryption_key != NULL || encrypted_with_rotated_keys) && offset != 0) {
 			read_request.encryption_key(encrypted_with_rotated_keys ? iter.crypt_data->tablespace_key : iter.encryption_key,
 						    ENCRYPTION_KEY_LEN,
+						    false,
 						    encrypted_with_rotated_keys ? iter.crypt_data->iv : iter.encryption_iv,
                                                     0, //TODO:Robert - maybe I should not set key version to 0 here, but to something like invalid key?
                                                     iter.encryption_key_id,
@@ -7213,6 +7216,7 @@ fil_iterate(
 		if (iter.encryption_key != NULL && offset != 0 && iter.crypt_data == NULL) {
 			write_request.encryption_key(iter.encryption_key,
 						     ENCRYPTION_KEY_LEN,
+						     false,
 						     iter.encryption_iv,
                                                      iter.encryption_key_version,
                                                      iter.encryption_key_id,
@@ -7241,6 +7245,7 @@ fil_iterate(
                                                      //iter.crypt_data->key_id);
 			write_request.encryption_key(iter.encryption_key,
 						     ENCRYPTION_KEY_LEN,
+						     false,
 						     iter.encryption_iv,
                                                      iter.encryption_key_version,
                                                      iter.crypt_data->key_id,

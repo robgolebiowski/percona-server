@@ -1482,7 +1482,7 @@ os_file_compress_page(
 	*dst_len = ut_calc_align(len, block_size);
 
 	//ulint		out_len = src_len - (FIL_PAGE_DATA + block_size + ((will_be_encrypted_with_rotated_keys) ? 4 : 0));
-	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys ? 8 : 0))
+	ut_ad(*dst_len >= len && *dst_len <= out_len + FIL_PAGE_DATA + (will_be_encrypted_with_rotated_keys ? 8 : 0));
 
 	/* Clear out the unused portion of the page. */
 	if (len % block_size) {
@@ -1818,14 +1818,16 @@ load_key_needed_for_decryption(
 		if (key_version_read_from_page == encryption.m_key_version)
 				ut_ad(memcmp(key_read, encryption.m_key, key_len) == 0);
 
-		encryption.m_key = key_read;
+		// TODO: Allocated or not depends on whether key was taken from cache or keyring
+                encryption.set_key(key_read, static_cast<ulint>(key_len), true);
+                //encryption.m_key = key_read;
 		//******
 
 		ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID &&
 		      key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-		encryption.m_klen = static_cast<ulint>(key_len);
+		//encryption.m_klen = static_cast<ulint>(key_len);
 		encryption.m_key_version = key_version_read_from_page;
-		encryption.m_free_key_on_delete= true; // we own the key
+		//encryption.m_free_key_on_delete= true; // we own the key
 	}
 	else {
 		ut_ad(encryption.m_type == Encryption::AES);
@@ -1836,7 +1838,8 @@ load_key_needed_for_decryption(
 		ut_ad(encryption.m_tablespace_iv != NULL);
 		encryption.m_iv = encryption.m_tablespace_iv; // iv comes from tablespace header for MK encryption
 		ut_ad(encryption.m_tablespace_key != NULL);
-		encryption.m_key = encryption.m_tablespace_key;
+		encryption.set_key(encryption.m_tablespace_key,
+				   ENCRYPTION_KEY_LEN, false);
 	}
 
 	return true;
@@ -9400,6 +9403,7 @@ Encryption::get_latest_system_key(const char *system_key_name,
 	}
 
 	parse_system_key(system_key, system_key_len, key_version, (uchar**)key, key_length);
+	my_free(system_key);
 #endif
 }
 
@@ -10262,6 +10266,7 @@ os_dblwr_encrypt_page(
 	write_request.encryption_key(
 		space->encryption_key,
 		space->encryption_klen,
+		false,
 		space->encryption_iv,
 		0, 0, NULL, NULL);
 	write_request.encryption_algorithm(
@@ -10318,6 +10323,7 @@ os_dblwr_decrypt_page(
 	decrypt_request.encryption_key(
 			space->encryption_key,
 			space->encryption_klen,
+			false,
 			space->encryption_iv,
 			0, 0, NULL, NULL);
 

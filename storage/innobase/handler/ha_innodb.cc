@@ -11423,6 +11423,7 @@ err_col:
 
 	if (err != DB_SUCCESS) {
 		dict_mem_table_free(table);
+		mem_heap_free(heap);
 		goto error_ret;
 	}
 
