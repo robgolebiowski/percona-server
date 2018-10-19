@@ -80,10 +80,10 @@ buf_calc_page_crc32(
 }
 
 uint32_t
-buf_calc_page_crc32_encrypted_with_rk(
-        const byte*	page,
-        uint            page_size,
-        bool		use_legacy_big_endian /* = false */)
+buf_calc_page_crc32_encrypted_with_keyring(
+	const byte*	page,
+	uint            page_size,
+	bool		use_legacy_big_endian /* = false */)
 {
 	ut_crc32_func_t	crc32_func = use_legacy_big_endian
 		? ut_crc32_legacy_big_endian

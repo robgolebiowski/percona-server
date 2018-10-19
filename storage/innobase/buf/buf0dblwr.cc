@@ -39,7 +39,6 @@ Created 2011/12/19
 #include "page0zip.h"
 #include "trx0sys.h"
 #include "os0file.h"
-#include "fil0crypt.h"
 
 #ifndef UNIV_HOTBACKUP
 
@@ -857,8 +856,8 @@ buf_dblwr_process(void)
 
 				dberr_t	err = DB_SUCCESS;
 
-                                if (space->crypt_data == NULL) // if it was crypt_data encrypted it was already decrypted
-                                  err = os_dblwr_decrypt_page(
+				if (space->crypt_data == NULL) // if it was crypt_data encrypted it was already decrypted
+					err = os_dblwr_decrypt_page(
 					space, page);
 
 				if (err != DB_SUCCESS || buf_page_is_corrupted(
@@ -1129,12 +1128,8 @@ buf_dblwr_check_block(
 		/* TODO: validate also non-index pages */
 		return;
 	case FIL_PAGE_TYPE_ALLOCATED:
-		/* empty pages should never be flushed */
-                //TODO:Robert w MariaDB tutaj jest return - sprawdz czy jezeli zmienisz w MariaDB na break to sie sypnie`
-                //ut_ad(0);
-                return;
-                //ut_ad(0);
-		//break;
+		/* empty pages could be flushed by encryption threads */
+		return;
 	}
 
 	buf_dblwr_assert_on_corrupt_block(block);

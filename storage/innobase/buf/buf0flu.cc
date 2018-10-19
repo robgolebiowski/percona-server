@@ -1111,7 +1111,7 @@ buf_flush_write_block_low(
 		LRU list as well. */
 		buf_page_io_complete(bpage, true);
 
-                ut_ad(err == DB_SUCCESS);
+		ut_ad(err == DB_SUCCESS);
 	}
 
 	/* Increment the counter of I/O operations used
@@ -3905,7 +3905,7 @@ FlushObserver::FlushObserver(
 	m_interrupted(false),
 	m_estimate(),
 	m_lsn(log_get_lsn()),
-        m_number_of_pages_flushed(0)
+	m_number_of_pages_flushed(0)
 {
 	m_flushed = UT_NEW_NOKEY(std::vector<ulint>(srv_buf_pool_instances));
 	m_removed = UT_NEW_NOKEY(std::vector<ulint>(srv_buf_pool_instances));
@@ -3923,7 +3923,7 @@ FlushObserver::FlushObserver(
 /** FlushObserver deconstructor */
 FlushObserver::~FlushObserver()
 {
-	//ut_ad(buf_flush_get_dirty_pages_count(m_space_id, this) == 0);
+	ut_ad(buf_flush_get_dirty_pages_count(m_space_id, this) == 0);
 
 	UT_DELETE(m_flushed);
 	UT_DELETE(m_removed);
@@ -3979,7 +3979,7 @@ FlushObserver::notify_remove(
 
 	m_removed->at(buf_pool->instance_no)++;
 
-        m_number_of_pages_flushed++;
+        os_atomic_increment_ulint(&m_number_of_pages_flushed, 1);
 
 #ifdef FLUSH_LIST_OBSERVER_DEBUG
 	ib::info() << "Remove <" << bpage->id.space()

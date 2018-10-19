@@ -4827,6 +4827,7 @@ row_drop_table_for_mysql(
 	pars_info_t*	info			= NULL;
 	mem_heap_t*	heap			= NULL;
 	bool		is_intrinsic_temp_table	= false;
+	bool was_master_key_id_mutex_locked	= false;
 
 	DBUG_ENTER("row_drop_table_for_mysql");
 	DBUG_PRINT("row_drop_table_for_mysql", ("table: '%s'", name));
@@ -5348,8 +5349,9 @@ row_drop_table_for_mysql(
 			}
 		}
 
-		if (is_encrypted) {
+		if (is_encrypted && !table->rotated_keys_info.page0_has_crypt_data) {
 			/* Require the mutex to block key rotation. */
+			was_master_key_id_mutex_locked = true;
 			mutex_enter(&master_key_id_mutex);
 		}
 		/* We can now drop the single-table tablespace. */
@@ -5357,7 +5359,7 @@ row_drop_table_for_mysql(
 			space_id, tablename, filepath,
 			is_temp, is_encrypted, trx);
 
-		if (is_encrypted) {
+		if (was_master_key_id_mutex_locked) {
 			mutex_exit(&master_key_id_mutex);
 		}
 		break;

@@ -50,7 +50,6 @@ Created 4/24/1996 Heikki Tuuri
 #include "srv0srv.h"
 #include <stack>
 #include <set>
-#include <cstring>
 
 /** Following are the InnoDB system tables. The positions in
 this array are referenced by enum dict_system_table_id. */
@@ -1372,7 +1371,7 @@ dict_check_sys_tablespaces(
 		opened. */
 		char*	filepath = dict_get_first_path(space_id);
 
-                Rotated_keys_info rotated_keys_info;
+		Rotated_keys_info rotated_keys_info;
 
 		/* Check that the .ibd file exists. */
 		dberr_t	err = fil_ibd_open(
@@ -1543,19 +1542,9 @@ dict_check_sys_tables(
 			   ("name: %p, '%s'", table_name.m_name,
 			    table_name.m_name));
 
-
-
 		dict_sys_tables_rec_read(rec, table_name,
 					 &table_id, &space_id,
 					 &n_cols, &flags, &flags2);
-
-                //if (strcmp(table_name.m_name, "test/t2") == 0)
-                //{
-                  //ib::error() << "Flags for test/t2 :'\n'";
-                  //ib::error() << "flags = " << flags << '\n';
-                  //ib::error() << "flags2 = " << flags2 << '\n';
-                //}
-
 		if (flags == ULINT_UNDEFINED
 		    || is_system_tablespace(space_id)) {
 			ut_free(table_name.m_name);
@@ -1616,7 +1605,6 @@ dict_check_sys_tables(
 		If the file is found elsewhere (from an ISL or the default
 		location) or this path is the same file but looks different,
 		fil_ibd_open() will update the dictionary with what is
-
 		opened. */
 		char*	filepath = dict_get_first_path(space_id);
 
@@ -1626,10 +1614,8 @@ dict_check_sys_tables(
 		ulint	fsp_flags = dict_tf_to_fsp_flags(flags,
 							 is_temp,
 							 is_encrypted);
-                                                         //is_rotated_keys); //TODO:Robert is_rotated_keys passed here does not have sense anymore
-                                                                           //to be removed
 
-                Rotated_keys_info rotated_keys_info;
+		Rotated_keys_info rotated_keys_info;
 
 		dberr_t	err = fil_ibd_open(
 			validate,
@@ -1639,7 +1625,7 @@ dict_check_sys_tables(
 			fsp_flags,
 			space_name,
 			filepath,
-                        rotated_keys_info);
+			rotated_keys_info);
 
 		if (err != DB_SUCCESS) {
 			ib::warn() << "Ignoring tablespace "
@@ -3165,7 +3151,7 @@ dict_load_tablespace(
 					       false,
 					       dict_table_is_encrypted(table));
 
-        Rotated_keys_info rotated_keys_info;
+	Rotated_keys_info rotated_keys_info;
 
 	dberr_t err = fil_ibd_open(
 		true, false, FIL_TYPE_TABLESPACE, table->space,
@@ -3176,16 +3162,7 @@ dict_load_tablespace(
 		table->set_file_unreadable();
 	}
 
-        table->rotated_keys_info = rotated_keys_info;
-        //if (err == DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND)
-        //{
-                //table->set_rotated_keys_encryption_key_is_missing();
-        //}
-
-        //if (has_crypt_data)
-        //{
-                //table->set_has_crypt_data();
-        //}
+	table->rotated_keys_info = rotated_keys_info;
 
 	ut_free(shared_space_name);
 	ut_free(filepath);
@@ -3230,13 +3207,6 @@ dict_load_table_one(
 	ulint		len;
 	const char*	err_msg;
 	mtr_t		mtr;
-/*
-        if (strcmp(name.m_name, "mysql/time_zone_leap_second") == 0)
-        {
-          int x =1;
-          x = 2;
-          (void)x; 
-        }*/
 
 	DBUG_ENTER("dict_load_table_one");
 	DBUG_PRINT("dict_load_table_one", ("table: %s", name.m_name));
@@ -3465,10 +3435,6 @@ dict_load_table_on_id(
 	dict_err_ignore_t	ignore_err)	/*!< in: errors to ignore
 						when loading the table */
 {
-	DBUG_ENTER("dict_load_table_on_id");
-	DBUG_PRINT("dict_load_table_on_id",
-		   ("table_id: %lu", table_id));
-
 	byte		id_buf[8];
 	btr_pcur_t	pcur;
 	mem_heap_t*	heap;
@@ -3553,7 +3519,7 @@ check_rec:
 	mtr_commit(&mtr);
 	mem_heap_free(heap);
 
-	DBUG_RETURN(table);
+	return(table);
 }
 
 /********************************************************************//**

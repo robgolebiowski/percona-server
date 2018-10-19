@@ -51,7 +51,7 @@ buf_calc_page_crc32(
 //ROBERT: In case of RK we need to take into accout the page_size -
 // That can be different for compressed tables
 uint32_t
-buf_calc_page_crc32_encrypted_with_rk(
+buf_calc_page_crc32_encrypted_with_keyring(
         const byte*	page,
         uint            page_size,
         bool		use_legacy_big_endian = false);

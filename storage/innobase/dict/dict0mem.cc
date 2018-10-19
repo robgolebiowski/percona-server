@@ -171,7 +171,7 @@ dict_mem_table_create(
 
 	table->is_corrupt = false;
 
-        table->file_unreadable = false;
+	table->file_unreadable = false;
 
 #endif /* !UNIV_HOTBACKUP */
 

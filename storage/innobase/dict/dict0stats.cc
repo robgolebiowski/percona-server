@@ -862,8 +862,8 @@ dict_stats_update_transient_for_index(
 		/* We don't handle the return value since it will be false
 		only when some thread is dropping the table and we don't
 		have to empty the statistics of the to be dropped index */
-		        btr_estimate_number_of_different_key_vals(index);
-                }
+			btr_estimate_number_of_different_key_vals(index);
+		}
 	}
 }
 
@@ -2370,11 +2370,11 @@ dict_stats_report_error(dict_table_t* table)
 {
 	dberr_t		err;
 
-        uint32_t space_id = table->space;
+	uint32_t space_id = table->space;
 
 	DBUG_EXECUTE_IF(
 		"ib_rename_index_fail2",
-                space_id = 911;
+		space_id = 911;
 	);
 	FilSpace space(space_id);
 
@@ -2389,8 +2389,8 @@ dict_stats_report_error(dict_table_t* table)
 			   << table->name
 			   << " because file " << space()->chain.start->name
 			   << (table->corrupted
-			       ? " is corrupted."
-			       : " cannot be decrypted.");
+				? " is corrupted."
+				: " cannot be decrypted.");
 		err = table->corrupted ? DB_CORRUPTION : DB_DECRYPTION_FAILED;
 	}
 
@@ -2417,22 +2417,11 @@ dict_stats_save(
 	char		db_utf8[MAX_DB_UTF8_LEN];
 	char		table_utf8[MAX_TABLE_UTF8_LEN];
 
-    
-
 	if (!table_orig->is_readable()) {
 		return (dict_stats_report_error(table_orig));
 	}
 
 	table = dict_stats_snapshot_create(table_orig);
-
-        //ib::error() << "Saving stats for table "
-			//<< table->name;
-        //if (table_orig->is_readable())
-          //ib::error() << ':' << "is readable" << '\n';
-        //else
-          //ib::error() << ':' << "is not readable" << '\n';
-
-
 
 	dict_fs2utf8(table->name.m_name, db_utf8, sizeof(db_utf8),
 		     table_utf8, sizeof(table_utf8));

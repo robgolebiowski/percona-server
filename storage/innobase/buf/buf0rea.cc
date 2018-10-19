@@ -210,13 +210,9 @@ buf_read_page_low(
 		thd_wait_end(NULL);
 	}
 
-        // assume bpage to not be corrupted after a read
-        bpage->is_corrupt = bpage->encrypted = false;
+	bpage->is_corrupt = bpage->encrypted = false;
 
 	if (*err != DB_SUCCESS) {
-                // TODO: Robert: Maybe I should add handling decryption error here too - instead of returning DB_SUCCESS and later checking
-                // TODO: Robert: that checksums are not valid
-
 		if (*err == DB_TABLESPACE_TRUNCATED) {
 			/* Remove the page which is outside the
 			truncated tablespace bounds when recovering
@@ -235,8 +231,6 @@ buf_read_page_low(
 			return(0);
 		} else if (*err == DB_IO_DECRYPT_FAIL)
                 {
-                        //Robert: The most probably post-encryption verification failed
-                        bpage->is_corrupt= true;
                         bpage->encrypted= true;
                 }
 
@@ -249,7 +243,7 @@ buf_read_page_low(
 		/* The i/o is already completed when we arrive from
 		fil_read */
 
-	        *err = buf_page_io_complete(bpage);
+		*err = buf_page_io_complete(bpage);
 
 		if (*err != DB_SUCCESS) {
 			return(0);
@@ -426,7 +420,7 @@ read_ahead:
 			case DB_SUCCESS:
 			case DB_TABLESPACE_TRUNCATED:
 			case DB_ERROR:
-                        case DB_IO_DECRYPT_FAIL:
+			case DB_IO_DECRYPT_FAIL:
 				break;
 			case DB_TABLESPACE_DELETED:
 				ib::info() << "Random readahead trying to"
@@ -813,7 +807,7 @@ buf_read_ahead_linear(
 					<< page_id_t(page_id.space(), i)
 					<< " in nonexisting or being-dropped"
 					" tablespace";
-                                break;
+				break;
 			case DB_SUCCESS:
 			case DB_TABLESPACE_TRUNCATED:
 			case DB_ERROR:
@@ -1011,7 +1005,7 @@ buf_read_recv_pages(
 		} else if (err == DB_PAGE_CORRUPTED) {
 			ib::error() << "Recovery failed due to corrupted page "
 				<< cur_page_id;
-                }
+		}
 	}
 
 	os_aio_simulated_wake_handler_threads();

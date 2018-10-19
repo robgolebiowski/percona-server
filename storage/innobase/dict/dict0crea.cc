@@ -370,9 +370,6 @@ dict_build_table_def_step(
 	trx_t*	trx = thr_get_trx(thr);
 	dict_table_assign_new_id(table, trx);
 
-	//err = dict_build_tablespace_for_table(table);
-        //TODO: Robert added by me
-//TODO: I am only taking encryption mode from node, so I can just pass encryption mode
 	err = dict_build_tablespace_for_table(table, node);
 	if (err != DB_SUCCESS) {
 		return(err);
@@ -391,7 +388,7 @@ dict_build_table_def_step(
 dberr_t
 dict_build_tablespace(
 	Tablespace*	tablespace,
-        tab_node_t*	node) // TODO : change this parameter only to encryption mode
+	tab_node_t*	node)
 {
 	dberr_t		err	= DB_SUCCESS;
 	mtr_t		mtr;
@@ -425,8 +422,8 @@ dict_build_tablespace(
 		datafile->filepath(),
 		tablespace->flags(),
 		FIL_IBD_FILE_INITIAL_SIZE,
-                node ? node->mode : FIL_ENCRYPTION_DEFAULT,
-                node ? node->create_info_encryption_key_id : CreateInfoEncryptionKeyId());
+		node ? node->mode : FIL_ENCRYPTION_DEFAULT,
+		node ? node->create_info_encryption_key_id : CreateInfoEncryptionKeyId());
 	if (err != DB_SUCCESS) {
 		return(err);
 	}
@@ -446,7 +443,6 @@ dict_build_tablespace(
 	/* Once we allow temporary general tablespaces, we must do this;
 	mtr_set_log_mode(&mtr, MTR_LOG_NO_REDO); */
 	ut_a(!FSP_FLAGS_GET_TEMPORARY(tablespace->flags()));
-        //TODO:Robert: Tutaj jest zapisywany MLOG_CRYPT_DATA
 	bool ret = fsp_header_init(space, FIL_IBD_FILE_INITIAL_SIZE, &mtr);
 	mtr_commit(&mtr);
 
@@ -463,7 +459,7 @@ dict_build_tablespace(
 dberr_t
 dict_build_tablespace_for_table(
 	dict_table_t*	table,
-        tab_node_t*	node) // TODO : change this parameter only to encryption mode
+        tab_node_t*	node)
 {
 	dberr_t		err	= DB_SUCCESS;
 	mtr_t		mtr;
@@ -482,10 +478,11 @@ dict_build_tablespace_for_table(
 			DICT_TF2_FLAG_UNSET(table,
 					    DICT_TF2_FTS_AUX_HEX_NAME););
 
-        if (node && (node->mode == FIL_ENCRYPTION_ON ||
-                    (node->mode == FIL_ENCRYPTION_DEFAULT &&
-                     srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)))
-          DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+	if (node && (node->mode == FIL_ENCRYPTION_ON ||
+			(node->mode == FIL_ENCRYPTION_DEFAULT &&
+			 (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING
+			  || srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE))))
+		DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
 
 	if (needs_file_per_table) {
 		/* This table will need a new tablespace. */
@@ -511,7 +508,6 @@ dict_build_tablespace_for_table(
 		bool	is_temp = dict_table_is_temporary(table);
 		bool	is_encrypted = (srv_tmp_tablespace_encrypt && is_temp)
 					|| dict_table_is_encrypted(table);
-                //bool    is_rotated_keys = dict_table_is_rotated_keys(table);
 		bool	has_data_dir = DICT_TF_HAS_DATA_DIR(table->flags);
 		ulint	fsp_flags = dict_tf_to_fsp_flags(table->flags,
 							 is_temp,
@@ -550,8 +546,8 @@ dict_build_tablespace_for_table(
 		err = fil_ibd_create(
 			space, table->name.m_name, filepath, fsp_flags,
 			FIL_IBD_FILE_INITIAL_SIZE,
-                        node ? node->mode : FIL_ENCRYPTION_DEFAULT,
-                        node ? node->create_info_encryption_key_id : CreateInfoEncryptionKeyId());
+			node ? node->mode : FIL_ENCRYPTION_DEFAULT,
+			node ? node->create_info_encryption_key_id : CreateInfoEncryptionKeyId());
 
 		ut_free(filepath);
 
@@ -1376,9 +1372,9 @@ tab_create_graph_create(
 /*====================*/
 	dict_table_t*	table,	/*!< in: table to create, built as a memory data
 				structure */
-	mem_heap_t*	heap,    /*!< in: heap where created */
-        fil_encryption_t mode,	/*!< in: encryption mode */
-        const CreateInfoEncryptionKeyId &create_info_encryption_key_id) /*!< in: encryption key_id */
+	mem_heap_t*	heap,	/*!< in: heap where created */
+	fil_encryption_t mode,	/*!< in: encryption mode */
+	const CreateInfoEncryptionKeyId &create_info_encryption_key_id) /*!< in: encryption key_id */
 {
 	tab_node_t*	node;
 
@@ -2752,9 +2748,6 @@ dict_replace_tablespace_in_dictionary(
 		trx->op_info = "committing tablespace and datafile definition";
 		trx_commit(trx);
 	}
-
-        //ib::error() << "Robert now: Added tabelspace definition for space = "
-                        //<< space_id;
 
 	trx->op_info = "";
 

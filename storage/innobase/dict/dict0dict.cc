@@ -1083,11 +1083,6 @@ dict_table_open_on_id(
 	ibool		dict_locked,	/*!< in: TRUE=data dictionary locked */
 	dict_table_op_t	table_op)	/*!< in: operation to perform */
 {
-	DBUG_ENTER("dict_table_open_on_id");
-        DBUG_PRINT("dict_table_open_on_id",
-		   ("table_id: %lu", table_id));
-
-
 	dict_table_t*	table;
 
 	if (!dict_locked) {
@@ -1118,7 +1113,7 @@ dict_table_open_on_id(
 			table, table_op == DICT_TABLE_OP_DROP_ORPHAN);
 	}
 
-	DBUG_RETURN(table);
+	return(table);
 }
 
 /********************************************************************//**
@@ -5801,7 +5796,7 @@ dict_find_single_table_by_space(
 	return(NULL);
 }
 
-/** Flag a table with specified space_id encrypted in the data dictionary
+/** Flags a table with specified space_id encrypted in the data dictionary
 cache
 @param[in]	space_id	Tablespace id */
 void
@@ -5811,8 +5806,8 @@ dict_set_encrypted_by_space(ulint	space_id)
 
 	table = dict_find_single_table_by_space(space_id);
 
-        if (table)
-            table->set_file_unreadable();
+	if (table)
+		table->set_file_unreadable();
 }
 
 /**********************************************************************//**
@@ -5835,11 +5830,9 @@ dict_set_corrupted_by_space(
 	/* mark the table->corrupted bit only, since the caller
 	could be too deep in the stack for SYS_INDEXES update */
 	table->corrupted = TRUE;
-        //table->set_file_unreadable();
 
 	return(TRUE);
 }
-
 
 /**********************************************************************//**
 Flags an index corrupted both in the data dictionary cache
@@ -6110,7 +6103,7 @@ dict_table_set_corrupt_by_space(
 	while (table) {
 		if (table->space == space_id) {
 			table->is_corrupt = true;
-                        table->file_unreadable = true;
+			table->file_unreadable = true;
 			found = true;
 		}
 
@@ -7037,7 +7030,6 @@ dict_tf_to_fsp_flags(
 	ulint	table_flags,
 	bool	is_temp,
 	bool	is_encrypted)
-        //bool    is_rotated_keys)
 {
 	DBUG_EXECUTE_IF("dict_tf_to_fsp_flags_failure",
 			return(ULINT_UNDEFINED););
@@ -7062,7 +7054,6 @@ dict_tf_to_fsp_flags(
 						   is_shared,
 						   is_temp,
 						   is_encrypted);
-                                                   //is_rotated_keys);
 
 	return(fsp_flags);
 }

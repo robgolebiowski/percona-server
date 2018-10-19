@@ -753,15 +753,17 @@ row_quiesce_table_start(
 	if (!trx_is_interrupted(trx)) {
 		extern	ib_mutex_t	master_key_id_mutex;
 
-		if (dict_table_is_encrypted(table)) { //TODO:Robert this should not be blocked for ROTATED_KEYS
+		bool was_master_key_id_mutex_locked = false;
+		if (dict_table_is_encrypted(table) && !table->rotated_keys_info.page0_has_crypt_data) {
 			/* Require the mutex to block key rotation. */
+			was_master_key_id_mutex_locked = true;
 			mutex_enter(&master_key_id_mutex);
 		}
 
 		buf_LRU_flush_or_remove_pages(
 			table->space, BUF_REMOVE_FLUSH_WRITE, trx);
 
-		if (dict_table_is_encrypted(table)) {
+		if (was_master_key_id_mutex_locked) {
 			mutex_exit(&master_key_id_mutex);
 		}
 
