@@ -3012,15 +3012,9 @@ row_ins_sec_index_entry_low(
 
 	if (err != DB_SUCCESS) {
 		if (err == DB_DECRYPTION_FAILED) {
-                        ib::warn() << "Table is encrypted but encryption service or"
+			ib::warn() << "Table is encrypted but encryption service or"
 				" used key_id is not available. "
 				" Can't continue reading table.";
-			//ib_push_warning(thr_get_trx(thr)->mysql_thd,
-				//DB_DECRYPTION_FAILED,
-				//"Table %s is encrypted but encryption service or"
-				//" used key_id is not available. "
-				//" Can't continue reading table.",
-				//index->table->name);
 			index->table->set_file_unreadable();
 		}
 		goto func_exit;
@@ -3230,7 +3224,7 @@ row_ins_sec_index_entry_low(
 		}
 
 		ut_ad(!big_rec);
- }
+	}
 
 func_exit:
 	if (dict_index_is_spatial(index)) {

@@ -7,7 +7,7 @@ the terms of the GNU General Public License as published by the Free Software
 Foundation; version 2 of the License.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS //TODO:Robert this should not be blocked for ROTATED_KEYS
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
@@ -37,8 +37,6 @@ Created 2013-7-26 by Kevin Lewis
 #include "my_sys.h"
 #endif /* UNIV_HOTBACKUP */
 
-
-
 /** Initialize the name, size and order of this datafile
 @param[in]	name	tablespace name, will be copied
 @param[in]	flags	tablespace flags */
@@ -54,9 +52,6 @@ Datafile::init(
 	m_flags = flags;
 	m_encryption_key = NULL;
 	m_encryption_iv = NULL;
-        //if (m_crypt_data != NULL)
-          //fil_space_destroy_crypt_data(&m_crypt_data);
-        //m_crypt_data = NULL;
 }
 
 /** Release the resources. */
@@ -71,12 +66,6 @@ Datafile::shutdown()
 	free_filepath();
 
 	free_first_page();
-        
-        //if (m_crypt_data != NULL)
-        //{
-          //fil_space_destroy_crypt_data(&m_crypt_data);
-          //m_crypt_data = NULL;
-        //}
 
 	if (m_encryption_key != NULL) {
 		ut_free(m_encryption_key);
@@ -479,7 +468,6 @@ m_is_valid is also set true on success, else false. */
 Datafile::ValidateOutput
 Datafile::validate_for_recovery()
 {
-	//dberr_t err;
         ValidateOutput output;
 
 	ut_ad(is_open());
@@ -587,7 +575,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 	char*		prev_name;
 	char*		prev_filepath;
 	const char*	error_txt = NULL;
-        ValidateOutput  output;
+	ValidateOutput  output;
 
 	m_is_valid = true;
 
@@ -605,17 +593,6 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 				m_first_page + FIL_PAGE_FILE_FLUSH_LSN);
 		}
 	}
-
-        //ib::error() << "Validating first page of space_id = " << m_space_id << '\n';
-
-        //if (m_space_id == 24)
-        //{
-          //int x = 1;
-          //x=2;
-          //(void)x;
-        //}
-
-
 
 	/* Check if the whole page is blank. */
 	if (error_txt == NULL
@@ -650,7 +627,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			<< univ_page_size.logical();
 
 		free_first_page();
-                output.error = DB_ERROR;
+		output.error = DB_ERROR;
 
 		return(output);
 
@@ -685,129 +662,78 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 
 	}
 
-                  //crypt_data = first_page
-                          //? fil_space_read_crypt_data(page_size_t(flags),
-                                                      //first_page)
-                          //: NULL;
- 
+	fil_space_crypt_t* crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page);
 
-
-        //ut_ad(m_crypt_data == NULL);
-        //if (m_crypt_data != NULL)
-          //m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
-          //fil_space_destroy_crypt_data(&m_crypt_data);
-        //m_crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page); //TODO:Robert:Tutaj musi zwracać błąd jeżeli crypt_data jest niepoprawna!
-
-        fil_space_crypt_t* crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page);
-
-
-        //if (m_space_id == 24)
-        //{
-          //if (crypt_data)
-            //ib::error() << "Table test/t2 has crypt data in validate first page";
-          //else 
-            //ib::error() << "Table test/t2 has NOT crypt data in validate first page";
-        //}
- 
-        //TODO:Robert: Based on this is_rotated_keys is set - but what about situation if we do not
-        //get here and ValidateOutput::DO_NOT_KNOW is set - will then an error be emited first
-        //and is_rotated_key will not be checked at all ?
-        if(crypt_data)
-        {
-          output.encryption_type = ValidateOutput::ROTATED_KEYS;
-          output.rotated_keys_info.page0_has_crypt_data = true; // TODO: Muszę się zdecydować, albo has_crypt_data, albo ROTATED_KEYS
-          output.rotated_keys_info.rotated_keys_min_key_version = crypt_data->min_key_version;
-          output.rotated_keys_info.type = crypt_data->type;
-        }
-        else if (FSP_FLAGS_GET_ENCRYPTION(m_flags))
-            output.encryption_type = ValidateOutput::MASTER_KEY;
-        else
-          output.encryption_type = ValidateOutput::NONE;
+	if(crypt_data) {
+		output.encryption_type = ValidateOutput::ROTATED_KEYS;
+		output.rotated_keys_info.page0_has_crypt_data = true; // TODO: Muszę się zdecydować, albo has_crypt_data, albo ROTATED_KEYS
+		output.rotated_keys_info.rotated_keys_min_key_version = crypt_data->min_key_version;
+		output.rotated_keys_info.type = crypt_data->type;
+	} else if (FSP_FLAGS_GET_ENCRYPTION(m_flags))
+		output.encryption_type = ValidateOutput::MASTER_KEY;
+	else
+		output.encryption_type = ValidateOutput::NONE;
 
 	/* For encrypted tablespace, check the encryption info in the
 	first page can be decrypt by master key, otherwise, this table
 	can't be open. And for importing, we skip checking it. */
-	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import)
-        { 
-            if(crypt_data == NULL)
-            {
-		m_encryption_key = static_cast<byte*>(
-			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
-		m_encryption_iv = static_cast<byte*>(
-			ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
+	if (FSP_FLAGS_GET_ENCRYPTION(m_flags) && !for_import) { 
+		if(crypt_data == NULL) {
+			m_encryption_key = static_cast<byte*>(
+				ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
+			m_encryption_iv = static_cast<byte*>(
+				ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
 #ifdef	UNIV_ENCRYPT_DEBUG
-                fprintf(stderr, "Got from file %lu:", m_space_id);
+			fprintf(stderr, "Got from file %lu:", m_space_id);
 #endif
-                //TODO:Tutaj jest czytanie m_encryption_key - i tutaj powinieem dodać crypt_data i czytanie m_encryption
-		if (!fsp_header_get_encryption_key(m_flags,
-						   m_encryption_key,
-						   m_encryption_iv,
-						   m_first_page)) {
-			ib::error()
-				<< "Encryption information in"
-				<< " datafile: " << m_filepath
-				<< " can't be decrypted,"
-				<< " please check if a keyring plugin"
-				<< " is loaded and initialized successfully.";
+			if (!fsp_header_get_encryption_key(m_flags,
+							   m_encryption_key,
+							   m_encryption_iv,
+							   m_first_page)) {
+				ib::error()
+					<< "Encryption information in"
+					<< " datafile: " << m_filepath
+					<< " can't be decrypted,"
+					<< " please check if a keyring plugin"
+					<< " is loaded and initialized successfully.";
+
+				m_is_valid = false;
+				free_first_page();
+				ut_free(m_encryption_key);
+				ut_free(m_encryption_iv);
+				m_encryption_key = NULL;
+				m_encryption_iv = NULL;
+				output.error = DB_CORRUPTION;
+				return(output);
+			}
+
+			if (recv_recovery_is_on()
+			    && memcmp(m_encryption_key,
+				      m_encryption_iv,
+				      ENCRYPTION_KEY_LEN) == 0) {
+				ut_free(m_encryption_key);
+				ut_free(m_encryption_iv);
+				m_encryption_key = NULL;
+				m_encryption_iv = NULL;
+			}
+		} else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {
+			ib::error() << "Table " << m_name << " in file " << m_filename << ' '
+				<< "is encrypted but encryption service or "
+				<< "used key_id " << crypt_data->key_id << " is not available. "
+				<< "Can't continue reading table.";
 
 			m_is_valid = false;
 			free_first_page();
-			ut_free(m_encryption_key);
-			ut_free(m_encryption_iv);
-			m_encryption_key = NULL;
-			m_encryption_iv = NULL;
-                        output.error = DB_CORRUPTION;
-			return(output);
+			fil_space_destroy_crypt_data(&crypt_data);
+			output.rotated_keys_info.rk_encryption_key_is_missing = true;
+			output.error = DB_CORRUPTION;
+			return output;
 		}
-
-		if (recv_recovery_is_on()
-		    && memcmp(m_encryption_key,
-			      m_encryption_iv,
-			      ENCRYPTION_KEY_LEN) == 0) {
-			ut_free(m_encryption_key);
-			ut_free(m_encryption_iv);
-			m_encryption_key = NULL;
-			m_encryption_iv = NULL;
-		}
-            }
-
-            // We do not validate if tablespace key exists for ROTATED_KEY here - it will be validated in
-            // ha_innobase::open and appropriate error that key is missing will be produceed
-            
-            else
-            {
-                if (Encryption::tablespace_key_exists(crypt_data->key_id) == false)
-                {
-                   ib::error() << "Table " << m_name << " in file " << m_filename << ' '
-                               << "is encrypted but encryption service or "
-                               << "used key_id " << crypt_data->key_id << " is not available. "
-                               << "Can't continue reading table.";
-                      //"Table %s in file %s is encrypted but encryption service or"
-                      //" used key_id %u is not available. "
-                      //" Can't continue reading table.",
-                      //table_share->table_name.str,
-                      //space()->chain.start->name,
-                      //space()->crypt_data->key_id);
-
-                   //ib::error()
-                     //<< "Cannot find encryption key for tablespace with SPACE ID = " << m_space_id
-                     //<< " please confirm that correct keyring is loaded.";
-
-                   m_is_valid = false;
-                   free_first_page();
-                   fil_space_destroy_crypt_data(&crypt_data);
-                   output.rotated_keys_info.rk_encryption_key_is_missing = true;
-                   output.error = DB_CORRUPTION;
-                   return output;
-                   //return (DB_ROTATED_KEYS_ENCRYPTION_KEY_NOT_FOUND);
-                }
-            }
 	}
 
-        if (crypt_data != NULL)
-        {
-          fil_space_destroy_crypt_data(&crypt_data);
-        }
+	if (crypt_data != NULL) {
+		fil_space_destroy_crypt_data(&crypt_data);
+	}
 
 	if (fil_space_read_name_and_filepath(
 		m_space_id, &prev_name, &prev_filepath)) {

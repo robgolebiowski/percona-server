@@ -2207,25 +2207,22 @@ row_mysql_get_table_status(
 	dberr_t err;
 	if (fil_space_t* space = fil_space_acquire_silent(table->space)) {
 		if (space->crypt_data && space->crypt_data->is_encrypted()) {
-			// maybe we cannot access the table due to failing
-			// to decrypt
 			if (push_warning) {
-                          push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
-                                       HA_ERR_DECRYPTION_FAILED, "Table %s in tablespace %u encrypted."
-                                          "However key management plugin or used key_id is not found or"
-                                          " used encryption algorithm or method does not match.",
-                                          table->name.m_name, table->space);
-                        }
+				push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
+						    HA_ERR_DECRYPTION_FAILED, "Table %s in tablespace %u encrypted."
+						    "However key management plugin or used key_id is not found or"
+						    " used encryption algorithm or method does not match.",
+						    table->name.m_name, table->space);
+			}
 			err = DB_DECRYPTION_FAILED;
 		} else {
 			if (push_warning) {
-                          push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
-                                               HA_ERR_CRASHED, "Table %s in tablespace %u corrupted.",
-                                               table->name.m_name, table->space);
+				push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
+						    HA_ERR_CRASHED, "Table %s in tablespace %u corrupted.",
+						    table->name.m_name, table->space);
 			}
 			err = DB_CORRUPTION;
 		}
-
 		fil_space_release(space);
 	} else {
 		ib::error() << ".ibd file is missing for table "
@@ -2271,7 +2268,7 @@ row_insert_for_mysql_using_ins_graph(
 
 		return(DB_TABLESPACE_DELETED);
 
-        } else if (!prebuilt->table->is_readable()) {
+	} else if (!prebuilt->table->is_readable()) {
 		return(row_mysql_get_table_status(prebuilt->table, trx, true));
 	} else if (srv_force_recovery) {
 
@@ -3506,7 +3503,7 @@ row_mysql_unlock_data_dictionary(
 /*=============================*/
 	trx_t*	trx)	/*!< in/out: transaction */
 {
-        ut_ad(lock_trx_has_sys_table_locks(trx) == NULL);
+	ut_ad(lock_trx_has_sys_table_locks(trx) == NULL);
 
 	ut_a(trx->dict_operation_lock_mode == RW_X_LATCH);
 
@@ -3534,8 +3531,8 @@ row_create_table_for_mysql(
 				can be NULL */
 	trx_t*		trx,	/*!< in/out: transaction */
 	bool		commit, /*!< in: if true, commit the transaction */
-        fil_encryption_t mode,	/*!< in: encryption mode */
-        const CreateInfoEncryptionKeyId &create_info_encryption_key_id) { /*!< in: encryption key_id */
+	fil_encryption_t mode,	/*!< in: encryption mode */
+	const CreateInfoEncryptionKeyId &create_info_encryption_key_id) { /*!< in: encryption key_id */
 
 	tab_node_t*	node;
 	mem_heap_t*	heap;
@@ -3588,7 +3585,7 @@ err_exit:
 		ut_ad(strstr(table->name.m_name, "/FTS_") != NULL);
 	}
 
-        node = tab_create_graph_create(table, heap, mode, create_info_encryption_key_id);
+	node = tab_create_graph_create(table, heap, mode, create_info_encryption_key_id);
 
 	thr = pars_complete_graph_for_exec(node, trx, heap, NULL);
 
@@ -3663,7 +3660,7 @@ err_exit:
 		trx->error_state = DB_SUCCESS;
 		trx_rollback_to_savepoint(trx, NULL);
 
-		ib::warn() << "cannot create table "
+		ib::warn() << "Cannot create table "
 			<< table->name
 			<< " because tablespace full";
 

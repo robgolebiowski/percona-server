@@ -151,7 +151,7 @@ Tablespace::open_or_create(bool is_temp)
 			space = fil_space_create(
 				m_name, m_space_id, flags, is_temp
 				? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE,
-                                NULL);
+				NULL);
 		}
 
 		ut_a(fil_validate());

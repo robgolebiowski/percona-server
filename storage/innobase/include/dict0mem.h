@@ -231,7 +231,7 @@ ROW_FORMAT=REDUNDANT.  InnoDB engines do not check these flags
 for unknown bits in order to protect backward incompatibility. */
 /* @{ */
 /** Total number of bits in table->flags2. */
-#define DICT_TF2_BITS			10
+#define DICT_TF2_BITS			9
 #define DICT_TF2_UNUSED_BIT_MASK	(~0U << DICT_TF2_BITS)
 #define DICT_TF2_BIT_MASK		~DICT_TF2_UNUSED_BIT_MASK
 
@@ -267,10 +267,6 @@ it is not created by user and so not visible to end-user. */
 
 /** Encryption table bit. */
 #define DICT_TF2_ENCRYPTION		256
-
-/** Rotated keys bit, 2^31 */
-//#define DICT_TF2_ROTATED_KEYS           2147483648
-#define DICT_TF2_ROTATED_KEYS           512
 
 /* @} */
 
@@ -1353,20 +1349,18 @@ struct dict_table_t {
 	@retval	false	if this is a single-table tablespace
 			and the .ibd file is missing, or a
 			page cannot be read or decrypted */
-	bool is_readable() const
-	{
+	
+	bool is_readable() const {
 		return(UNIV_LIKELY(!file_unreadable));
 	}
 
-        void set_file_unreadable()
-        {
-                file_unreadable = true;
-        }
+	void set_file_unreadable() {
+		file_unreadable = true;
+	}
 
-        void set_file_readable()
-        {
-                file_unreadable = false;
-        }
+	void set_file_readable() {
+		file_unreadable = false;
+	}
 
 
 	/** Id of the table. */
@@ -1726,7 +1720,6 @@ private:
 	itself check the number of open handles at DROP. */
 	ulint					n_ref_count;
 
-
 public:
 	/** List of locks on the table. Protected by lock_sys->mutex. */
 	table_lock_list_t			locks;
@@ -1748,7 +1741,6 @@ public:
 	/*----------------------*/
 
 	bool		is_corrupt;
-
 #endif /* !UNIV_HOTBACKUP */
 
 #ifdef UNIV_DEBUG
@@ -1762,18 +1754,16 @@ public:
 	columns */
 	dict_vcol_templ_t*			vc_templ;
 
-        //TODO:Robert what with our export/import
 	/** encryption key, it's only for export/import */
 	byte*					encryption_key;
 
 	/** encryption iv, it's only for export/import */
 	byte*					encryption_iv;
 
-        Rotated_keys_info rotated_keys_info;
+	Rotated_keys_info rotated_keys_info;
 };
 
-inline bool dict_index_t::is_readable() const
-{
+inline bool dict_index_t::is_readable() const {
 	return(UNIV_LIKELY(!table->file_unreadable));
 }
 

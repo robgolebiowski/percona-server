@@ -571,7 +571,7 @@ buf_page_get_gen(
 	ulint			line,
 	mtr_t*			mtr,
 	bool			dirty_with_no_latch = false,
-        dberr_t*		err = NULL);
+	dberr_t*		err = NULL);
 
 /** Initializes a page to the buffer buf_pool. The page is usually not read
 from a file even if it cannot be found in the buffer buf_pool. This is one
@@ -805,8 +805,6 @@ buf_page_is_checksum_valid_innodb(
 	const srv_checksum_algorithm_t	curr_algo
 #endif /* UNIV_INNOCHECKSUM */
 );
-
-
 
 /** Checks if a page contains only zeroes.
 @param[in]	read_buf	database page
@@ -1722,7 +1720,7 @@ public:
 					in the buffer pool. Protected by
 					block mutex */
 	bool		is_corrupt;
-	bool            encrypted;	/*!< page is still encrypted */
+	bool		encrypted;	/*!< page is still encrypted */
 # ifdef UNIV_DEBUG
 	ibool		file_page_was_freed;
 					/*!< this is set to TRUE when

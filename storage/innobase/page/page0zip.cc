@@ -4933,7 +4933,6 @@ page_zip_calc_checksum(
 	ulint				size,
 	srv_checksum_algorithm_t	algo,
 	bool				use_legacy_big_endian /* = false */)
-        //bool                            calculate_for_rk [> = false <])
 {
 	uint32_t	adler;
 	const Bytef*	s = static_cast<const byte*>(data);

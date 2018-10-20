@@ -4859,7 +4859,6 @@ i_s_innodb_stats_fill(
 	OK(fields[IDX_BUF_STATS_PAGE_WRITTEN_RATE]->store(
 		   info->pages_written_rate));
 
-        //TODO:Robert:This was changed by MariaDB, but why?
 	if (info->n_page_get_delta) {
 		OK(fields[IDX_BUF_STATS_HIT_RATE]->store(
 			   1000 - (1000 * info->page_read_delta
@@ -9525,7 +9524,7 @@ i_s_dict_fill_tablespaces_encryption(
 		   status.scheme, true));
 	OK(fields[TABLESPACES_ENCRYPTION_KEYSERVER_REQUESTS]->store(
 		   status.keyserver_requests, true));
-        OK(fields[TABLESPACES_ENCRYPTION_MIN_KEY_VERSION]->store(
+	OK(fields[TABLESPACES_ENCRYPTION_MIN_KEY_VERSION]->store(
                    status.min_key_version, true));
 	OK(fields[TABLESPACES_ENCRYPTION_CURRENT_KEY_VERSION]->store(
 		   status.current_key_version, true));

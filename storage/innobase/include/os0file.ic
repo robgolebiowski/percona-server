@@ -276,7 +276,6 @@ pfs_os_aio_func(
 	ulint		space_id,
 	trx_t*		trx,
 	bool		should_buffer,
-        //bool            *was_page_read_encrypted,
 	const char*	src_file,
 	ulint		src_line)
 {
@@ -293,7 +292,7 @@ pfs_os_aio_func(
 
 	dberr_t	result = os_aio_func(
 		type, mode, name, file, buf, offset, n, read_only, m1, m2,
-		space_id, trx, should_buffer); //, was_page_read_encrypted);
+		space_id, trx, should_buffer);
 
 	register_pfs_file_io_end(locker, n);
 
@@ -321,7 +320,6 @@ pfs_os_file_read_func(
 	os_offset_t	offset,
 	ulint		n,
 	trx_t*		trx,
-        //bool*           was_read_page_encrypted,
 	const char*	src_file,
 	ulint		src_line)
 {
@@ -331,12 +329,10 @@ pfs_os_file_read_func(
 	ut_ad(type.validate());
 
 	register_pfs_file_io_begin(
-		&state, locker, file, n, PSI_FILE_READ, 
-                src_file, src_line);
+		&state, locker, file, n, PSI_FILE_READ, src_file, src_line);
 
 	dberr_t		result;
 
-	//result = os_file_read_func(type, file.m_file, buf, offset, n, trx, was_read_page_encrypted);
 	result = os_file_read_func(type, file.m_file, buf, offset, n, trx);
 
 	register_pfs_file_io_end(locker, n);
@@ -367,7 +363,6 @@ pfs_os_file_read_no_error_handling_func(
 	os_offset_t	offset,
 	ulint		n,
 	ulint*		o,
-        //bool*           was_read_page_encrypted,
 	const char*	src_file,
 	ulint		src_line)
 {
@@ -378,7 +373,7 @@ pfs_os_file_read_no_error_handling_func(
 		&state, locker, file, n, PSI_FILE_READ, src_file, src_line);
 
 	dberr_t	result = os_file_read_no_error_handling_func(
-		type, file.m_file, buf, offset, n, o); //, was_read_page_encrypted);
+		type, file.m_file, buf, offset, n, o);
 
 	register_pfs_file_io_end(locker, n);
 
@@ -409,7 +404,6 @@ pfs_os_file_read_no_error_handling_int_fd_func(
         os_offset_t     offset,
         ulint           n,
         ulint*          o,
-        //bool*           was_read_page_encrypted,
         const char*     src_file,
         ulint           src_line)
 {
@@ -424,7 +418,7 @@ pfs_os_file_read_no_error_handling_int_fd_func(
 				__FILE__, __LINE__);
 		}
 	dberr_t result = os_file_read_no_error_handling_func(
-				type, OS_FILE_FROM_FD(file), buf, offset, n, o); //, was_read_page_encrypted);
+				type, OS_FILE_FROM_FD(file), buf, offset, n, o);
 
 	if (locker != NULL) {
                 PSI_FILE_CALL(end_file_wait)(locker, n);

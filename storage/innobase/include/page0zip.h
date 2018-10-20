@@ -506,7 +506,6 @@ page_zip_calc_checksum(
 	ulint				size,
 	srv_checksum_algorithm_t	algo,
 	bool				use_legacy_big_endian = false);
-        //bool                            calculate_for_rk = false);
 
 /**********************************************************************//**
 Verify a compressed page's checksum.

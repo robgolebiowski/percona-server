@@ -4434,21 +4434,15 @@ row_search_no_mvcc(
 				mode == PAGE_CUR_G, index, BTR_SEARCH_LEAF,
 				pcur, false, 0, mtr);
 
-                        if (err != DB_SUCCESS) {
-                                if (err == DB_DECRYPTION_FAILED) {
-                                        ib::warn() << "Table is encrypted but encryption service or"
-                                                " used key_id is not available. "
-                                                " Can't continue reading table.";
-                                        //ib_push_warning(trx->mysql_thd,
-                                                //DB_DECRYPTION_FAILED,
-                                                //"Table %s is encrypted but encryption service or"
-                                                //" used key_id is not available. "
-                                                //" Can't continue reading table.",
-                                                //prebuilt->table->name);
-                                        index->table->set_file_unreadable();
-                                }
-                                return (err);
-                        }
+			if (err != DB_SUCCESS) {
+				if (err == DB_DECRYPTION_FAILED) {
+					ib::warn() << "Table is encrypted but encryption service or"
+						      " used key_id is not available. "
+						      " Can't continue reading table.";
+					index->table->set_file_unreadable();
+				}
+				return (err);
+			}
 		}
 	}
 
@@ -4742,7 +4736,7 @@ row_search_mvcc(
 		DBUG_RETURN(fil_space_get(prebuilt->table->space)
 			    ? DB_DECRYPTION_FAILED
 			    : DB_TABLESPACE_NOT_FOUND);
-        } else if (prebuilt->table->file_unreadable) {
+	} else if (prebuilt->table->file_unreadable) {
 
 		DBUG_RETURN(DB_TABLESPACE_NOT_FOUND);
 
@@ -5192,7 +5186,7 @@ wait_table_again:
 
 		err = btr_pcur_open_with_no_init(index, search_tuple, mode,
 		                 		 BTR_SEARCH_LEAF,
-					         pcur, 0, &mtr);
+						 pcur, 0, &mtr);
 
 		if (err != DB_SUCCESS) {
 			rec = NULL;
@@ -5238,23 +5232,14 @@ wait_table_again:
 
 		if (err != DB_SUCCESS) {
 			if (err == DB_DECRYPTION_FAILED) {
-                                ib::warn() << "Table is encrypted but encryption service or"
-					" used key_id is not available. "
-					" Can't continue reading table.";
-
-				//ib_push_warning(trx->mysql_thd,
-					//DB_DECRYPTION_FAILED,
-					//"Table %s is encrypted but encryption service or"
-					//" used key_id is not available. "
-					//" Can't continue reading table.",
-					//prebuilt->table->name);
+				ib::warn() << "Table is encrypted but encryption service or"
+					      " used key_id is not available. "
+					      " Can't continue reading table.";
 				index->table->set_file_unreadable();
 			}
 			rec = NULL;
 			goto lock_wait_or_error;
 		}
-
-
 	}
 
 rec_loop:
@@ -6347,9 +6332,9 @@ lock_wait_or_error:
 
 	/*-------------------------------------------------------------*/
 	if (!dict_index_is_spatial(index)) {
-                if (rec) {
-		        btr_pcur_store_position(pcur, &mtr);
-                }
+		if (rec) {
+			btr_pcur_store_position(pcur, &mtr);
+		}
 	}
 
 lock_table_wait:
@@ -6763,8 +6748,8 @@ row_search_get_max_rec(
 	dberr_t err = btr_pcur_open_at_index_side(
 		false, index, BTR_SEARCH_LEAF, &pcur, true, 0, mtr);
 
-        if (err != DB_SUCCESS)
-          return NULL;
+	if (err != DB_SUCCESS)
+		return NULL;
 
 	do {
 		const page_t*	page;

@@ -44,7 +44,6 @@ Created 10/21/1995 Heikki Tuuri
 #endif /* !_WIN32 */
 #include "page0types.h"
 
-
 /** File node of a tablespace or the log data space */
 struct fil_node_t;
 
@@ -312,7 +311,7 @@ struct Compression {
 		MY_ATTRIBUTE((warn_unused_result));
 
 
-        static bool is_no(const char* algorithm)
+	static bool is_no(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
 	/** Decompress the page data contents. Page type must be

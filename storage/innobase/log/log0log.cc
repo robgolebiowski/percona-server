@@ -48,7 +48,7 @@ Created 12/9/1995 Heikki Tuuri
 #include "log0recv.h"
 #include "lock0lock.h"
 #include "fil0fil.h"
-#include "fil0crypt.h" //TODO:Robert this should be removed once include fil0crypt.h will be moved to fil0fil.h
+#include "fil0crypt.h"
 #include "dict0boot.h"
 #include "dict0stats_bg.h"
 #include "srv0srv.h"
@@ -2166,7 +2166,6 @@ logs_empty_and_mark_files_at_shutdown(void)
 	ulint			count = 0;
 	ulint			total_trx;
 	ulint			pending_io;
-	//enum srv_thread_type	active_thd;
 	const char*		thread_name;
 
 	ib::info() << "Starting shutdown...";
@@ -2191,7 +2190,7 @@ loop:
 		os_event_set(srv_error_event);
 		os_event_set(srv_monitor_event);
 		os_event_set(srv_buf_dump_event);
-                os_event_set(srv_buf_resize_event);
+		os_event_set(srv_buf_resize_event);
 		if (lock_sys) {
 			os_event_set(lock_sys->timeout_event);
 		}
@@ -2216,22 +2215,6 @@ loop:
 	/* We need the monitor threads to stop before we proceed with
 	a shutdown. */
 
-        //TODO:Robert:This was removed in MariaDB
-	//thread_name = srv_any_background_threads_are_active();
-
-	//if (thread_name != NULL) {
-		//[> Print a message every 60 seconds if we are waiting
-		//for the monitor thread to exit. Master and worker
-		//threads check will be done later. */
-
-		//if (srv_print_verbose_log && count > 600) {
-			//ib::info() << "Waiting for " << thread_name
-				//<< " to exit";
-			//count = 0;
-		//}
-
-		//goto loop;
-	//}
 
 	/* Check that there are no longer transactions, except for
 	PREPARED ones. We need this wait even for the 'very fast'
@@ -2301,8 +2284,6 @@ wait_suspend_loop:
 		goto wait_suspend_loop;
 	case SRV_PURGE:
 	case SRV_WORKER:
-                //TODO:Robert: Remove by me - in Oracle - calling srv_purge_wakeup jest okej
-		//ut_ad(!"purge was not shut down");
 		srv_purge_wakeup();
 		thread_name = "purge thread";
 		goto wait_suspend_loop;
@@ -2380,17 +2361,6 @@ wait_suspend_loop:
 
 			log_buffer_flush_to_disk();
 
-                        //TODO:Robert commented out in MariaDB - I am not sure
-                        //TODO:Robert why
-			/* Check that the background threads stay suspended */
-			//thread_name = srv_any_background_threads_are_active();
-
-			//if (thread_name != NULL) {
-				//ib::warn() << "Background thread "
-					//<< thread_name << " woke up during"
-					//" shutdown";
-				//goto loop;
-			//}
 		}
 
 		srv_shutdown_state = SRV_SHUTDOWN_LAST_PHASE;
@@ -2404,10 +2374,6 @@ wait_suspend_loop:
 
 		fil_close_all_files();
 
-                //TODO:Robert:Those two lines were removed in MariaDB, but why
-		//thread_name = srv_any_background_threads_are_active();
-
-		//ut_a(!thread_name);
 
 		return;
 	}
@@ -2415,63 +2381,51 @@ wait_suspend_loop:
 	if (!srv_read_only_mode) {
 		log_make_checkpoint_at(LSN_MAX, TRUE);
         }
-          	log_mutex_enter();
 
-	        tracked_lsn = log_get_tracked_lsn();
+	log_mutex_enter();
 
-         	lsn = log_sys->lsn;
+	tracked_lsn = log_get_tracked_lsn();
 
-          /** If innodb_force_recovery is set to 6 then log_sys doesn't
-          have recent checkpoint information. So last checkpoint lsn
-          will never be equal to current lsn. */
-          const bool      is_last =
-                  ((srv_force_recovery == SRV_FORCE_NO_LOG_REDO
-                    && lsn == log_sys->last_checkpoint_lsn
-                    + LOG_BLOCK_HDR_SIZE)
-                   || lsn == log_sys->last_checkpoint_lsn)
-                  && (!srv_track_changed_pages
-                      || tracked_lsn == log_sys->last_checkpoint_lsn);
+	lsn = log_sys->lsn;
 
-          ut_ad(lsn >= log_sys->last_checkpoint_lsn);
+	/** If innodb_force_recovery is set to 6 then log_sys doesn't
+	have recent checkpoint information. So last checkpoint lsn
+	will never be equal to current lsn. */
+	const bool	is_last =
+		((srv_force_recovery == SRV_FORCE_NO_LOG_REDO
+		 && lsn == log_sys->last_checkpoint_lsn
+		 + LOG_BLOCK_HDR_SIZE)
+		|| lsn == log_sys->last_checkpoint_lsn)
+		&& (!srv_track_changed_pages
+		    || tracked_lsn == log_sys->last_checkpoint_lsn);
 
-          log_mutex_exit();
+	ut_ad(lsn >= log_sys->last_checkpoint_lsn);
 
-          if (!is_last) {
-                  goto loop;
-          }
+	log_mutex_exit();
 
-	/* Check that the background threads stay suspended */
-	//thread_name = srv_any_background_threads_are_active();
-	//if (thread_name != NULL) {
-		//ib::warn() << "Background thread " << thread_name << " woke up"
-			//" during shutdown";
+	if (!is_last) {
+		goto loop;
+	}
 
-		//goto loop;
-	//}
+	fil_flush_file_spaces(FIL_TYPE_TABLESPACE);
+	fil_flush_file_spaces(FIL_TYPE_LOG);
 
-	//if (!srv_read_only_mode) {
-		fil_flush_file_spaces(FIL_TYPE_TABLESPACE);
-		fil_flush_file_spaces(FIL_TYPE_LOG);
-	//}
 
 	/* The call fil_write_flushed_lsn() will bypass the buffer
 	pool: therefore it is essential that the buffer pool has been
 	completely flushed to disk! (We do not call fil_write... if the
 	'very fast' shutdown is enabled.) */
 
-          if (!buf_all_freed()) {
+	if (!buf_all_freed()) {
 
-                  if (srv_print_verbose_log && count > 600) {
-                          ib::info() << "Waiting for dirty buffer pages to be"
-                                  " flushed";
-                          count = 0;
-                  }
+		if (srv_print_verbose_log && count > 600) {
+			ib::info() << "Waiting for dirty buffer pages to be"
+				" flushed";
+			count = 0;
+		}
 
-                  goto loop;
-          }
-        //} else {
-           //lsn = srv_start_lsn; 
-        //}
+		goto loop;
+	}
 
 	srv_shutdown_state = SRV_SHUTDOWN_LAST_PHASE;
 

@@ -222,7 +222,7 @@ struct row_import {
 	bool		m_cfp_missing;		/*!< true if a .cfp file was
 						found and was readable */
 
-        bool            m_is_rotated_keys_encrypted;
+	bool		m_is_rotated_keys_encrypted;
 };
 
 /** Use the page cursor to iterate over records in a block. */
@@ -3779,10 +3779,10 @@ row_import_for_mysql(
 
 
 		if (err != DB_DECRYPTION_FAILED) {
-                  ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
-                          ER_INTERNAL_ERROR,
-                          "Cannot reset LSNs in table %s : %s",
-                          table_name, ut_strerr(err));
+			ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
+				ER_INTERNAL_ERROR,
+				"Cannot reset LSNs in table %s : %s",
+				table_name, ut_strerr(err));
                 }
 
 		return(row_import_cleanup(prebuilt, trx, err));
@@ -3826,28 +3826,26 @@ row_import_for_mysql(
 	ulint	fsp_flags = dict_tf_to_fsp_flags(table->flags, false);
 	if (table->encryption_key != NULL || cfg.m_is_rotated_keys_encrypted) {
 		fsp_flags |= FSP_FLAGS_MASK_ENCRYPTION;
-                //ib::error() << "Setting encryptiong flag for " << table->name << '\n';
 	}
 
-        Rotated_keys_info rotated_keys_info;
+	Rotated_keys_info rotated_keys_info;
 
 	err = fil_ibd_open(
 		true, true, FIL_TYPE_IMPORT, table->space,
 		fsp_flags, table->name.m_name, filepath, rotated_keys_info);
 
-        if (err == DB_SUCCESS && cfg.m_is_rotated_keys_encrypted &&
-            (!rotated_keys_info.page0_has_crypt_data || !FSP_FLAGS_GET_ENCRYPTION(fsp_flags)))
-        {
-              ut_ad(!rotated_keys_info.is_encryption_in_progress()); // it should not be possible to FLUSH FOR EXPORT when encryption
-                                                                     // is in progress
-              ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
-              ER_TABLE_SCHEMA_MISMATCH,
-              "Table is marked as encrypted with ROTATED_KEYS in cfg file, but there"
-              " is no ROTATED_KEYS encryption information in tablespace header"
-              " Please make sure that ibd and cfg files are match");
-              
-              err = DB_ERROR;
-        } 
+	if (err == DB_SUCCESS && cfg.m_is_rotated_keys_encrypted &&
+		(!rotated_keys_info.page0_has_crypt_data || !FSP_FLAGS_GET_ENCRYPTION(fsp_flags))) {
+		ut_ad(!rotated_keys_info.is_encryption_in_progress());	// it should not be possible to FLUSH FOR EXPORT when encryption
+									// is in progress
+		ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
+		ER_TABLE_SCHEMA_MISMATCH,
+		"Table is marked as encrypted with ROTATED_KEYS in cfg file, but there"
+		" is no ROTATED_KEYS encryption information in tablespace header"
+		" Please make sure that ibd and cfg files are match");
+
+		err = DB_ERROR;
+	} 
 
 	DBUG_EXECUTE_IF("ib_import_open_tablespace_failure",
 			err = DB_TABLESPACE_NOT_FOUND;);
@@ -3866,13 +3864,9 @@ row_import_for_mysql(
 
 	/* For encrypted table, set encryption information. */
 	if (dict_table_is_encrypted(table)) {
-                ut_ad(dict_table_is_rotated_keys(table) == false); //TODO: dict_table_is_rotated_keys to be removed
-
 		err = fil_set_encryption(table->space,
-					 //dict_table_is_rotated_keys(table) ? Encryption::ROTATED_KEYS 
-                                                                           //: Encryption::AES,
 					 cfg.m_is_rotated_keys_encrypted ? Encryption::ROTATED_KEYS 
-                                                                         : Encryption::AES,
+									 : Encryption::AES,
 					 table->encryption_key,
 					 table->encryption_iv);
 	}

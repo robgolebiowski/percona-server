@@ -70,7 +70,7 @@ bool	recv_replay_file_ops	= true;
 #endif /* !UNIV_HOTBACKUP */
 
 
-#include "fil0crypt.h" //TODO:Robert - just for now
+#include "fil0crypt.h"
 
 /** Log records are stored in the hash table in chunks at most of this size;
 this must be less than UNIV_PAGE_SIZE as it is stored in the buffer pool */
@@ -270,7 +270,7 @@ fil_name_process(
 			if (FSP_FLAGS_GET_ENCRYPTION(space->flags)
 			    && recv_sys->encryption_list != NULL) {
 
-                                ut_ad(space->crypt_data == NULL);
+				ut_ad(space->crypt_data == NULL);
 				dberr_t				err;
 				encryption_list_t::iterator	it;
 
@@ -280,10 +280,7 @@ fil_name_process(
 					if (it->space_id == space->id) {
 						err = fil_set_encryption(
 							space->id,
-							/*FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
-                                                          ? Encryption::ROTATED_KEYS
-                                                          : Encryption::AES,*/
-                                                        Encryption::AES,
+							Encryption::AES,
 							it->key,
 							it->iv);
 						if (err != DB_SUCCESS) {
@@ -714,8 +711,8 @@ fil_name_parse(
 					space_id, tablespace_name.c_str(),
 					abs_file_path.c_str(),
 					flags, FIL_IBD_FILE_INITIAL_SIZE,
-                                        FIL_ENCRYPTION_DEFAULT,
-                                        0);
+					FIL_ENCRYPTION_DEFAULT,
+					0);
 
 				if (ret != DB_SUCCESS) {
 					ib::fatal() << "Could not create the"
@@ -1522,7 +1519,7 @@ fil_write_encryption_parse(
 	byte*		ptr,
 	const byte*	end,
 	ulint		space_id,
-        ulint           len)
+	ulint           len)
 {
 	fil_space_t*	space;
 	//ulint		offset;

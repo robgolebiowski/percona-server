@@ -4571,16 +4571,9 @@ row_merge_build_indexes(
 	if (!old_table->is_readable() ||
 	    !new_table->is_readable()) {
 		error = DB_DECRYPTION_FAILED;
-                ib::warn() << "Table %s is encrypted but encryption service or"
+		ib::warn() << "Table %s is encrypted but encryption service or"
 			" used key_id is not available. "
 			" Can't continue reading table.";
-
-		//ib_push_warning(trx->mysql_thd, DB_DECRYPTION_FAILED,
-			//"Table %s is encrypted but encryption service or"
-			//" used key_id is not available. "
-			//" Can't continue reading table.",
-			//!old_table->is_readable() ? old_table->name.m_name :
-				//new_table->name.m_name);
 		goto func_exit;
 	}
 
