@@ -22,13 +22,13 @@ insert into t6 values (1, 'secredmessagecompressedaaaaaaaaabbbbbbbbbbbbbbccccccc
 insert into t7 values (1, 'publicmessage');
 insert into t8 values (1, 'publicmessage');
 insert into t9 values (1, 'pugliccompressedaaaaaaaaabbbbbbbbbbbbbbccccccccccccccc');
-# should list tables t1-t6
+# should list tables t7-t9
 SELECT NAME,ENCRYPTION_SCHEME,CURRENT_KEY_ID FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'enctests%';
 NAME	ENCRYPTION_SCHEME	CURRENT_KEY_ID
 enctests/t7	0	0
 enctests/t8	0	0
 enctests/t9	0	0
-# should list tables t7-t9
+# should list tables t1-t6
 SELECT NAME,ENCRYPTION_SCHEME,CURRENT_KEY_ID FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 and NAME LIKE 'enctests%';
 NAME	ENCRYPTION_SCHEME	CURRENT_KEY_ID
 enctests/t1	1	0

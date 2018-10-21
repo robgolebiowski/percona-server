@@ -390,29 +390,25 @@ innobase_need_rebuild(
 	Alter_inplace_info::HA_ALTER_FLAGS alter_inplace_flags =
 		ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE);
 
-        if ((
-              Encryption::is_no(ha_alter_info->create_info->encrypt_type.str) &&
-              (Encryption::is_rotated_keys(old_table->s->encrypt_type.str) || Encryption::is_empty(old_table->s->encrypt_type.str))
-            ) ||
-            (
-              Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
-              !Encryption::is_rotated_keys(old_table->s->encrypt_type.str)
-            ) ||
-            //(
-              //Encryption::is_rotated_keys(old_table->s->encrypt_type.str) &&
-              //Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
-              ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
-            //)
-            )
-          return true;
+	if ((
+		Encryption::is_no(ha_alter_info->create_info->encrypt_type.str) &&
+		(Encryption::is_rotated_keys(old_table->s->encrypt_type.str) || Encryption::is_empty(old_table->s->encrypt_type.str))
+	    ) ||
+	    (
+		Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
+		!Encryption::is_rotated_keys(old_table->s->encrypt_type.str)
+	    ) ||
+		ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
+
+	)
+		return true;
 
 	if (alter_inplace_flags
 	    == Alter_inplace_info::CHANGE_CREATE_OPTION
 	    && !(ha_alter_info->create_info->used_fields
 		 & (HA_CREATE_USED_ROW_FORMAT
 		    | HA_CREATE_USED_KEY_BLOCK_SIZE
-		    | HA_CREATE_USED_TABLESPACE)))
-        {
+		    | HA_CREATE_USED_TABLESPACE))) {
 		/* Any other CHANGE_CREATE_OPTION than changing
 		ROW_FORMAT, KEY_BLOCK_SIZE or TABLESPACE can be done
 		without rebuilding the table. */
@@ -584,14 +580,7 @@ ha_innobase::check_if_supported_inplace_alter(
 	char*	new_encryption = altered_table->s->encrypt_type.str;
 
         if (Encryption::is_master_key_encryption(old_encryption) !=
-            Encryption::is_master_key_encryption(new_encryption))
-
-            //Encryption::is_none(new_encryption))
-	//if ((Encryption::is_none(old_encryption) != Encryption::is_none(new_encryption)) ||
-            //(Encryption::is_master_key_encryption(old_encryption) && Encryption::is_rotated_keys(new_encryption)) ||
-            //(Encryption::is_rotated_keys(old_encryption) && Encryption::is_master_key_encryption(new_encryption))
-           //)
-        {
+            Encryption::is_master_key_encryption(new_encryption)) {
 		ha_alter_info->unsupported_reason =
 			innobase_get_err_msg(
 				ER_UNSUPPORTED_ALTER_ENCRYPTION_INPLACE);
@@ -4249,7 +4238,7 @@ prepare_inplace_alter_table_dict(
 	dict_add_v_col_t*	add_v = NULL;
 	ha_innobase_inplace_ctx*ctx;
 	zip_dict_id_container_t	zip_dict_ids;
-        CreateInfoEncryptionKeyId create_info_encryption_key_id;
+	CreateInfoEncryptionKeyId create_info_encryption_key_id;
 
 	DBUG_ENTER("prepare_inplace_alter_table_dict");
 
@@ -4646,106 +4635,80 @@ prepare_inplace_alter_table_dict(
 		const char* encrypt;
 		encrypt	= ha_alter_info->create_info->encrypt_type.str;
 
-                //TODO:Wydaje się być niepotrzebne skoro informacje o enkrypcji są w alter
-		//if (fil_space_t* space
-		    //= fil_space_acquire(ctx->prebuilt->table->space)) {
-			//if (const fil_space_crypt_t* crypt_data
-			    //= space->crypt_data) {
-				//key_id = crypt_data->key_id;
-				//mode = crypt_data->encryption;
-			//}
+		key_id= ha_alter_info->create_info->encryption_key_id;
 
-			//fil_space_release(space);
-		//}
+		// re-encrypting, check that key used to encrypt table is present
+		if (DICT_TF2_FLAG_SET(ctx->old_table, DICT_TF2_ENCRYPTION)) {
+			if (Encryption::is_master_key_encryption(old_table->s->encrypt_type.str)) {
+				// re-encrypting from master key encryption
+				/* Check if keyring is ready. */
+				byte*			master_key = NULL;
+				ulint			master_key_id;
+				Encryption::Version	version;
 
-                key_id= ha_alter_info->create_info->encryption_key_id;
-                //ut_ad(key_id == 0 || ha_alter_info->create_info->was_encryption_key_id_set);
+				Encryption::get_master_key(&master_key_id,
+							   &master_key,
+							   &version);
 
-                // re-encrypting, check that key used to encrypt table is present
-                if (DICT_TF2_FLAG_SET(ctx->old_table, DICT_TF2_ENCRYPTION))
-                {
-                   if (Encryption::is_master_key_encryption(old_table->s->encrypt_type.str))
-                   {
-                     // re-encrypting from master key encryption
-                     /* Check if keyring is ready. */
-                      byte*			master_key = NULL;
-                      ulint			master_key_id;
-                      Encryption::Version	version;
+				if (master_key == NULL) {
+					dict_mem_table_free(ctx->new_table);
+					my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+					MYF(0));
+						goto new_clustered_failed;
+				} else {
+					my_free(master_key);
+				}
+			} else if (Encryption::is_rotated_keys(old_table->s->encrypt_type.str) &&
+				   (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt))) {
+				// it is ROTATED_KEYS encryption - check if old's table encryption key is available 
+				if (Encryption::tablespace_key_exists(old_table->s->encryption_key_id) == false) {
+					my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+							"Cannot find key to decrypt table to ALTER. Please make sure that keyring is installed "
+							" and key used to encrypt table is available.", MYF(0));
+					goto new_clustered_failed;
+				}
+			}
+		}
 
-         	      Encryption::get_master_key(&master_key_id,
-		                                 &master_key,
-						 &version);
+		if (Encryption::is_no(encrypt))
+			mode= FIL_ENCRYPTION_OFF;
+		else if (Encryption::is_rotated_keys(encrypt) || 
+			((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+			  srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) 
+			 && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
+			 && !Encryption::is_master_key_encryption(encrypt)) ||
+			ha_alter_info->create_info->was_encryption_key_id_set) {
+		mode= Encryption::is_rotated_keys(encrypt) ? FIL_ENCRYPTION_ON
+							   : FIL_ENCRYPTION_DEFAULT;
+		uint tablespace_key_version;
+		byte *tablespace_key; 
 
-                      if (master_key == NULL) {
-                              dict_mem_table_free(ctx->new_table);
-                              my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
-                                       MYF(0));
-                              goto new_clustered_failed;
-                      } else {
-                              my_free(master_key);
-                      }
-                   }
-                   else if (Encryption::is_rotated_keys(old_table->s->encrypt_type.str) &&
-                            (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt)))
-                   {
-                      // it is ROTATED_KEYS encryption - check if old's table encryption key is available 
-                      if (Encryption::tablespace_key_exists(old_table->s->encryption_key_id) == false)
-                      {
-                          my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                                          "Cannot find key to decrypt table to ALTER. Please make sure that keyring is installed "
-                                          " and key used to encrypt table is available.", MYF(0));
-                          goto new_clustered_failed;
-                      }
-                   }
-                }
+		//TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
+		Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
+		if (tablespace_key == NULL) {
+			dict_mem_table_free(ctx->new_table);
+			my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+					"Seems that keyring is down. It is not possible to encrypt table"
+					" without keyring. Please install a keyring and try again.", MYF(0));
+			goto new_clustered_failed;
+		} else
+			my_free(tablespace_key);
 
-                if (Encryption::is_no(encrypt))
-                  mode= FIL_ENCRYPTION_OFF;
-                else if (Encryption::is_rotated_keys(encrypt) || 
-                        ((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-                          srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) 
-                          && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
-                         && !Encryption::is_master_key_encryption(encrypt)) ||
-                        ha_alter_info->create_info->was_encryption_key_id_set)
-                {
-                  mode= Encryption::is_rotated_keys(encrypt) ? FIL_ENCRYPTION_ON
-                                                             : FIL_ENCRYPTION_DEFAULT;
-                  uint tablespace_key_version;
-                  byte *tablespace_key; 
+		if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
+						  (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+						   srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)))
+			DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_ENCRYPTION);
 
-                  //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
-                  Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
-                  if (tablespace_key == NULL)
-                  {
-                     dict_mem_table_free(ctx->new_table);
-                     my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                                     "Seems that keyring is down. It is not possible to encrypt table"
-                                     " without keyring. Please install a keyring and try again.", MYF(0));
-		     goto new_clustered_failed;
-                  }
-                  else
-                    my_free(tablespace_key);
-
-                  if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
-                                                    (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-                                                     srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)))
-         	    DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_ENCRYPTION);
-
-                }
-		else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE) // TODO:Robert: USE_FILE_PER_TABLE needs to be checked for ROTATED_KEYS too
+		} else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE)
 		    && ha_alter_info->create_info->encrypt_type.length > 0
 		    && Encryption::is_master_key_encryption(encrypt)
 		    && !DICT_TF2_FLAG_SET(ctx->old_table,
 					  DICT_TF2_ENCRYPTION)) {
 
-                  //TODO:Robert to jest inplace rotation - jest niemożliwe, jeżeli obecnie tablica nie jest zaszyfrowana i zmieniamy
-                  //na szyfrowaną, powrócić do tego później.
-
 			dict_mem_table_free( ctx->new_table);
 			my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
 			goto new_clustered_failed;
 		} else if (Encryption::is_master_key_encryption(encrypt)) {
-                           //(srv_encrypt_tables && !Encryption::is_no(encrypt))) {
 			/* Set the encryption flag. */
 			byte*			master_key = NULL;
 			ulint			master_key_id;
@@ -4765,17 +4728,13 @@ prepare_inplace_alter_table_dict(
 				my_free(master_key);
 				DICT_TF2_FLAG_SET(ctx->new_table,
 						  DICT_TF2_ENCRYPTION);
-				//DICT_TF2_FLAG_SET(ctx->new_table,
-						   //DICT_TF2_ROTATED_KEYS);
 			}
 		}
 
+		create_info_encryption_key_id.was_encryption_key_id_set =
+			ha_alter_info->create_info->was_encryption_key_id_set;
+		create_info_encryption_key_id.encryption_key_id = key_id;
 
-                create_info_encryption_key_id.was_encryption_key_id_set =
-                  ha_alter_info->create_info->was_encryption_key_id_set;
-                create_info_encryption_key_id.encryption_key_id = key_id;
-
-                //TODO:Robert - to musisz zmienic na pobieranie poprawnych informacji z alter table
 		error = row_create_table_for_mysql(
 			ctx->new_table, compression, ctx->trx, false, mode, create_info_encryption_key_id);
 
@@ -5130,8 +5089,6 @@ error_handling:
 	case DB_UNSUPPORTED:
 		my_error(ER_TABLE_CANT_HANDLE_SPKEYS, MYF(0), "SYS_COLUMNS");
 		break;
-
-
 	default:
 		my_error_innodb(error, table_name, user_table->flags);
 	}
@@ -5813,8 +5770,8 @@ check_if_ok_to_rename:
 					   &version);
 
 		if (master_key == NULL) {
-                        my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
-                                 MYF(0));
+			my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+				 MYF(0));
 			goto err_exit_no_heap;
 		} else {
 			my_free(master_key);

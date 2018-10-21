@@ -38,9 +38,9 @@ insert into t7 values (1, 'publicmessage');
 insert into t8 values (1, 'publicmessage');
 insert into t9 values (1, 'pugliccompressedaaaaaaaaabbbbbbbbbbbbbbccccccccccccccc');
 
---echo # should list tables t1-t6
-SELECT NAME,ENCRYPTION_SCHEME,CURRENT_KEY_ID FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'enctests%';
 --echo # should list tables t7-t9
+SELECT NAME,ENCRYPTION_SCHEME,CURRENT_KEY_ID FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME LIKE 'enctests%';
+--echo # should list tables t1-t6
 SELECT NAME,ENCRYPTION_SCHEME,CURRENT_KEY_ID FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 and NAME LIKE 'enctests%';
 
 # Check if changing encrypt variable is still possible even though key rotation is disabled

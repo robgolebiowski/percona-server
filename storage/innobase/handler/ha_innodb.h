@@ -67,7 +67,6 @@ typedef struct st_innobase_share {
 /** Prebuilt structures in an InnoDB table handle used within MySQL */
 struct row_prebuilt_t;
 
-
 /** The class defining a handle to an InnoDB table */
 class ha_innobase: public handler
 {
@@ -825,8 +824,8 @@ public:
 	/** If keyring encryption is requested, check for tablespace's key availability
 	and set the encryption flag in table flags
 	@param[in,out]	table	table object
-        @param[in,out]  rotated_keys_encryption_option  contains appropriate
-                        FIL_ENCRYPTION_(ON/DEFAULT/OFF)
+	@param[in,out]  rotated_keys_encryption_option  contains appropriate
+			FIL_ENCRYPTION_(ON/DEFAULT/OFF)
 	@return on success DB_SUCCESS else DB_UNSPPORTED on failure */
 
         dberr_t enable_keyring_encryption(dict_table_t *   table,fil_encryption_t &rotated_keys_encryption_option);
