@@ -1,12 +1,12 @@
---skip
 --source include/have_innodb.inc
 --source include/have_debug.inc
 --source include/have_debug_sync.inc
 --source include/not_valgrind.inc
 --source include/not_embedded.inc
 
---let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
+--let $error_log=$MYSQL_TMP_DIR/my_restart.err
 --let $restart_parameters=restart:--innodb-encryption-threads=0 --log-error=$error_log
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/restart_mysqld.inc
 
 CREATE TABLE t1 (a VARCHAR(255)) ENGINE=InnoDB;
@@ -29,7 +29,7 @@ SET GLOBAL debug="+d,fail_encryption_flag_update_on_t3";
 --echo # Enable encryption
 SET GLOBAL innodb_encryption_rotate_key_age=15;
 SET GLOBAL innodb_encryption_threads = 4;
-SET GLOBAL innodb_encrypt_tables = ON;
+SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 
 --echo # Wait for all tables to get encrypted
 --let $tables_count= `select count(*) from information_schema.tables where engine = 'InnoDB' and table_schema <> 'information_schema'`
@@ -79,7 +79,7 @@ SELECT * FROM t4;
 
 --remove_file $error_log
 
---let $restart_parameters=restart:--innodb-encryption-threads=4 --innodb-encrypt-tables=ON
+--let $restart_parameters=restart:--innodb-encryption-threads=4 --innodb-encrypt-tables=ONLINE_TO_KEYRING
 --source include/start_mysqld.inc
 
 --echo # Wait for all tables to get encrypted
@@ -95,9 +95,9 @@ SELECT * FROM t4;
 --source include/assert.inc
 
 
---let $error_log2=$MYSQLTEST_VARDIR/tmp/my_restart2.err
-
---let $restart_parameters=restart:--innodb-encryption-threads=0 --innodb-encrypt-tables=OFF --log-error=$error_log2
+--let $error_log2=$MYSQL_TMP_DIR/my_restart2.err
+--let $restart_parameters=restart:--innodb-encryption-threads=0 --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --log-error=$error_log2
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/restart_mysqld.inc
 
 DROP TABLE t1,t2,t3,t4;
@@ -132,7 +132,7 @@ SET GLOBAL debug="+d,fail_encryption_flag_update_on_t3";
 --echo # Enable encryption
 SET GLOBAL innodb_encryption_rotate_key_age=15;
 SET GLOBAL innodb_encryption_threads = 1;
-SET GLOBAL innodb_encrypt_tables = ON;
+SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 
 --echo # Wait for all tables to get encrypted (apart from ts_1)
 --let $tablespaces_count= `select count(*) from information_schema.innodb_sys_tablespaces`
@@ -164,6 +164,7 @@ SET GLOBAL debug="-d,fail_encryption_flag_update_on_t3";
 --echo # no error related to encryption flag mismatch between DD and ibd file.
 
 --let $restart_parameters=restart:--innodb-encryption-threads=0 --log-error=$error_log
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/start_mysqld.inc
 
 SELECT * FROM t1;
@@ -183,7 +184,7 @@ SELECT * FROM t4;
 
 --echo # Turn ON encryption and check that ts_1 gets successfully encrypted after the restart.
 
---let $restart_parameters=restart:--innodb-encryption-threads=4 --innodb-encrypt-tables=ON
+--let $restart_parameters=restart:--innodb-encryption-threads=4 --innodb-encrypt-tables=ONLINE_TO_KEYRING
 --source include/start_mysqld.inc
 
 --echo # Wait for all tables to get encrypted
