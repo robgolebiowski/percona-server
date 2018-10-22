@@ -26,10 +26,10 @@ SET GLOBAL innodb_file_per_table = ON;
 SET GLOBAL innodb_file_format = `Barracuda`;
 --enable_warnings
 
-create table t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+create table t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 create table t2 (a varchar(255)) engine=innodb encryption_key_id=5;
 create table t3 (a varchar(255)) engine=innodb;
-create table t4 (a varchar(255)) engine=innodb encryption='Y'; # MK encryption - should get re-encrypted to ROTATED_KEYS
+create table t4 (a varchar(255)) engine=innodb encryption='Y'; # MK encryption - should get re-encrypted to KEYRING
 create table t5 (a varchar(255)) engine=innodb;
 create table t6 (a varchar(255)) engine=innodb encryption='N';
 
@@ -152,7 +152,7 @@ SET GLOBAL innodb_encryption_rotate_key_age = 0;
 
 --echo # Now let's alter t6 so it become encrypted
 
-alter table t6 encryption='ROTATED_KEYS';
+alter table t6 encryption='KEYRING';
 
 --echo # t6 should get rebuilt with latest version of percona_innodb-0, i.e. version 5
 

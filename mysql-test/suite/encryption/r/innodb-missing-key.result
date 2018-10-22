@@ -2,8 +2,8 @@ call mtr.add_suppression("InnoDB: The page \\[page id: space=[1-9][0-9]*, page n
 call mtr.add_suppression("failed to read or decrypt \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\]");
 call mtr.add_suppression("\\[Error\\] InnoDB: Page is still encrypted");
 call mtr.add_suppression("\\[Warning\\] InnoDB: Table is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
-CREATE TABLE t1(a int not null primary key, b varchar(128)) engine=innodb ENCRYPTION='ROTATED_KEYS' ENCRYPTION_KEY_ID=7;
-CREATE TABLE t2(a int not null primary key, b varchar(128)) engine=innodb ENCRYPTION='ROTATED_KEYS' ENCRYPTION_KEY_ID=6;
+CREATE TABLE t1(a int not null primary key, b varchar(128)) engine=innodb ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=7;
+CREATE TABLE t2(a int not null primary key, b varchar(128)) engine=innodb ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=6;
 CREATE TABLE t3(a int not null primary key, b varchar(128)) engine=innodb ENCRYPTION='N';
 insert into t1 values (500, 'thisissecretmessage');
 insert into t1 values (499, 'thisissecretmessage');
@@ -512,7 +512,7 @@ INSERT INTO t3 SELECT * FROM t1;
 # restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys3.txt
 set global innodb_encryption_rotate_key_age = 1;
 use test;
-CREATE TABLE t4(a int not null primary key, b varchar(128)) engine=innodb ENCRYPTION='ROTATED_KEYS' ENCRYPTION_KEY_ID=6;
+CREATE TABLE t4(a int not null primary key, b varchar(128)) engine=innodb ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=6;
 SELECT SLEEP(5);
 SLEEP(5)
 0

@@ -37,7 +37,7 @@ insert t1 values (repeat('foobarsecret', 12));
 select * from t1;
 
 --echo # 1. Alter from unencrypted to RK
-ALTER TABLE t1 encryption='ROTATED_KEYS';
+ALTER TABLE t1 encryption='KEYRING';
 SELECT * FROM t1;
 
 --let $assert_text= Table t1 should be the only one appearing in INNODB_TABLESPACES_ENCRYPTION
@@ -52,7 +52,7 @@ insert t2 values (repeat('foobarsecret', 12));
 --source include/assert.inc
 
 --echo # 2. Alter from MK encryption to RK
-ALTER TABLE t2 encryption='ROTATED_KEYS';
+ALTER TABLE t2 encryption='KEYRING';
 SELECT * FROM t2;
 
 --let $assert_text= Table t2 should be included in INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERION 0 (encrypted)
@@ -79,7 +79,7 @@ ALTER TABLE t1 encryption='n';
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION;
 
 --echo # 5. Alter from unencrypted to RK
-ALTER TABLE t1 encryption='ROTATED_KEYS';
+ALTER TABLE t1 encryption='KEYRING';
 
 --let $assert_text= Table t1 should be included in INNODB_TABLESPACES_ENCRYPTION
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME = \\"test/t1\\"]" = 1

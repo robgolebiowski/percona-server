@@ -392,11 +392,11 @@ innobase_need_rebuild(
 
 	if ((
 		Encryption::is_no(ha_alter_info->create_info->encrypt_type.str) &&
-		(Encryption::is_rotated_keys(old_table->s->encrypt_type.str) || Encryption::is_empty(old_table->s->encrypt_type.str))
+		(Encryption::is_keyring(old_table->s->encrypt_type.str) || Encryption::is_empty(old_table->s->encrypt_type.str))
 	    ) ||
 	    (
-		Encryption::is_rotated_keys(ha_alter_info->create_info->encrypt_type.str) &&
-		!Encryption::is_rotated_keys(old_table->s->encrypt_type.str)
+		Encryption::is_keyring(ha_alter_info->create_info->encrypt_type.str) &&
+		!Encryption::is_keyring(old_table->s->encrypt_type.str)
 	    ) ||
 		ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
 
@@ -4658,9 +4658,9 @@ prepare_inplace_alter_table_dict(
 				} else {
 					my_free(master_key);
 				}
-			} else if (Encryption::is_rotated_keys(old_table->s->encrypt_type.str) &&
+			} else if (Encryption::is_keyring(old_table->s->encrypt_type.str) &&
 				   (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt))) {
-				// it is ROTATED_KEYS encryption - check if old's table encryption key is available 
+				// it is KEYRING encryption - check if old's table encryption key is available 
 				if (Encryption::tablespace_key_exists(old_table->s->encryption_key_id) == false) {
 					my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
 							"Cannot find key to decrypt table to ALTER. Please make sure that keyring is installed "
@@ -4672,14 +4672,14 @@ prepare_inplace_alter_table_dict(
 
 		if (Encryption::is_no(encrypt))
 			mode= FIL_ENCRYPTION_OFF;
-		else if (Encryption::is_rotated_keys(encrypt) || 
+		else if (Encryption::is_keyring(encrypt) || 
 			((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
 			  srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) 
 			 && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
 			 && !Encryption::is_master_key_encryption(encrypt)) ||
 			ha_alter_info->create_info->was_encryption_key_id_set) {
-		mode= Encryption::is_rotated_keys(encrypt) ? FIL_ENCRYPTION_ON
-							   : FIL_ENCRYPTION_DEFAULT;
+		mode= Encryption::is_keyring(encrypt) ? FIL_ENCRYPTION_ON
+						      : FIL_ENCRYPTION_DEFAULT;
 		uint tablespace_key_version;
 		byte *tablespace_key; 
 

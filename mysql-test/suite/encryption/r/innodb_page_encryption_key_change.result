@@ -3,16 +3,16 @@
 create table innodb_normal(c1 bigint not null, b char(200)) engine=innodb;
 show warnings;
 Level	Code	Message
-create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='ROTATED_KEYS' encryption_key_id=2;
+create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='KEYRING' encryption_key_id=2;
 show warnings;
 Level	Code	Message
-create table innodb_compressed(c1 bigint not null, b char(200)) engine=innodb row_format=compressed ENCRYPTION='ROTATED_KEYS' encryption_key_id=3;
+create table innodb_compressed(c1 bigint not null, b char(200)) engine=innodb row_format=compressed ENCRYPTION='KEYRING' encryption_key_id=3;
 show warnings;
 Level	Code	Message
-create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='ROTATED_KEYS' encryption_key_id=4;
+create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='KEYRING' encryption_key_id=4;
 show warnings;
 Level	Code	Message
-create table innodb_redundant(c1 bigint not null, b char(200))  engine=innodb row_format=redundant ENCRYPTION='ROTATED_KEYS' encryption_key_id=5;
+create table innodb_redundant(c1 bigint not null, b char(200))  engine=innodb row_format=redundant ENCRYPTION='KEYRING' encryption_key_id=5;
 show warnings;
 Level	Code	Message
 insert into innodb_normal values (1,'test1'),(2,'foo'),(3,'bar'),(4,'mariadb');

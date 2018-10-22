@@ -1760,7 +1760,7 @@ public:
 	/** encryption iv, it's only for export/import */
 	byte*					encryption_iv;
 
-	Rotated_keys_info rotated_keys_info;
+	Keyring_encryption_info keyring_encryption_info;
 };
 
 inline bool dict_index_t::is_readable() const {

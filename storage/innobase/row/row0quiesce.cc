@@ -754,7 +754,7 @@ row_quiesce_table_start(
 		extern	ib_mutex_t	master_key_id_mutex;
 
 		bool was_master_key_id_mutex_locked = false;
-		if (dict_table_is_encrypted(table) && !table->rotated_keys_info.page0_has_crypt_data) {
+		if (dict_table_is_encrypted(table) && !table->keyring_encryption_info.page0_has_crypt_data) {
 			/* Require the mutex to block key rotation. */
 			was_master_key_id_mutex_locked = true;
 			mutex_enter(&master_key_id_mutex);

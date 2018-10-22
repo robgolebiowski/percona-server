@@ -6,9 +6,9 @@
 #--source include/have_file_key_management_plugin.inc
 
 create table innodb_normal(c1 bigint not null, b char(200)) engine=innodb;
-create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='ROTATED_KEYS' encryption_key_id=1;
-create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='ROTATED_KEYS' encryption_key_id=33;
-create table innodb_redundant(c1 bigint not null, b char(200))  engine=innodb row_format=redundant ENCRYPTION='ROTATED_KEYS' encryption_key_id=4;
+create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='KEYRING' encryption_key_id=1;
+create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='KEYRING' encryption_key_id=33;
+create table innodb_redundant(c1 bigint not null, b char(200))  engine=innodb row_format=redundant ENCRYPTION='KEYRING' encryption_key_id=4;
 
 show create table innodb_compact;
 show create table innodb_dynamic;
@@ -59,15 +59,15 @@ set innodb_default_encryption_key_id = DEFAULT;
 
 #show warnings;
 
-#alter table innodb_compact engine=innodb encryption='ROTATED_KEYS' encryption_key_id=DEFAULT;
-alter table innodb_compact engine=innodb encryption='ROTATED_KEYS';
+#alter table innodb_compact engine=innodb encryption='KEYRING' encryption_key_id=DEFAULT;
+alter table innodb_compact engine=innodb encryption='KEYRING';
 show create table innodb_compact;
 #alter table innodb_dynamic engine=innodb encrypted=DEFAULT encryption_key_id=DEFAULT;
-#alter table innodb_dynamic engine=innodb encryption='ROTATED_KEYS' encryption_key_id=DEFAULT;
-alter table innodb_dynamic engine=innodb encryption='ROTATED_KEYS';
+#alter table innodb_dynamic engine=innodb encryption='KEYRING' encryption_key_id=DEFAULT;
+alter table innodb_dynamic engine=innodb encryption='KEYRING';
 show create table innodb_dynamic;
-#alter table innodb_redundant engine=innodb encryption='ROTATED_KEYS' encryption_key_id=DEFAULT;
-alter table innodb_redundant engine=innodb encryption='ROTATED_KEYS';
+#alter table innodb_redundant engine=innodb encryption='KEYRING' encryption_key_id=DEFAULT;
+alter table innodb_redundant engine=innodb encryption='KEYRING';
 show create table innodb_redundant;
 
 --source include/restart_mysqld.inc

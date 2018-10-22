@@ -6,22 +6,22 @@
 #define CRYPT_SCHEME_UNENCRYPTED 0
 #define CRYPT_SCHEME_1 1
 
-struct Rotated_keys_info
+struct Keyring_encryption_info
 {
-   Rotated_keys_info()
-     : rk_encryption_key_is_missing(false)
+   Keyring_encryption_info()
+     : keyring_encryption_key_is_missing(false)
      , page0_has_crypt_data(false)
-     , rotated_keys_min_key_version(0)
+     , keyring_encryption_min_key_version(0)
      , type(CRYPT_SCHEME_UNENCRYPTED)
    {}
-   bool rk_encryption_key_is_missing; // initlialized in dict_mem_table_create
+   bool keyring_encryption_key_is_missing; // initlialized in dict_mem_table_create
    bool page0_has_crypt_data;
-   uint rotated_keys_min_key_version;
+   uint keyring_encryption_min_key_version;
    uint type;
 
    bool is_encryption_in_progress()
    {
-     return rotated_keys_min_key_version == 0 && type != CRYPT_SCHEME_UNENCRYPTED;
+     return keyring_encryption_min_key_version == 0 && type != CRYPT_SCHEME_UNENCRYPTED;
    }
 };
 

@@ -29,17 +29,17 @@ SET GLOBAL innodb_file_per_table = ON;
 SET GLOBAL innodb_file_format = `Barracuda`;
 --enable_warnings
 
-create table t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+create table t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 create table t2 (a varchar(255)) engine=innodb;
 show warnings;
 create table t3 (a varchar(255)) engine=innodb encryption='N';
-create table t4 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS' encryption_key_id=5;
+create table t4 (a varchar(255)) engine=innodb encryption='KEYRING' encryption_key_id=5;
 
 CREATE TABLESPACE ts_encrypted ADD DATAFILE 'ts_encrypted.ibd' ENCRYPTION="Y" ENGINE="InnoDB";
 CREATE TABLE t5 (a varchar(255)) TABLESPACE ts_encrypted ENCRYPTION="Y" ENGINE="InnoDB";
 
 --error ER_INVALID_ENCRYPTION_OPTION
-CREATE TABLESPACE ts_rk_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='ROTATED_KEYS' ENGINE="InnoDB";
+CREATE TABLESPACE ts_rk_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='KEYRING' ENGINE="InnoDB";
 
 create table t6 (a varchar(255)) engine=innodb;
 #create table t5 (a varchar(255)) engine=innodb encryption='Y';
@@ -64,7 +64,7 @@ ALTER TABLE t4 ENCRYPTION='N', ALGORITHM=INPLACE;
 --let SEARCH_FILE=$t4_IBD
 --source include/search_pattern_in_file.inc
 
-ALTER TABLE t4 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
+ALTER TABLE t4 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 --echo # ibdata1 expecting NOT_FOUND
 --let ABORT_ON=FOUND
 --let SEARCH_PATTERN=verysecret
@@ -75,7 +75,7 @@ ALTER TABLE t4 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
 --echo # is currently not encrypted
 ALTER TABLE t6 ENCRYPTION='N', ALGORITHM=INPLACE;
 
-ALTER TABLE t6 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
+ALTER TABLE t6 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 
 
 

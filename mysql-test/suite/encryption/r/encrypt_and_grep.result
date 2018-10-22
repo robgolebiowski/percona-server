@@ -55,15 +55,15 @@ partition	ACTIVE	STORAGE ENGINE	NULL	GPL
 ngram	ACTIVE	FTPARSER	NULL	GPL
 SET GLOBAL innodb_file_per_table = ON;
 SET GLOBAL innodb_file_format = `Barracuda`;
-create table t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+create table t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 create table t2 (a varchar(255)) engine=innodb;
 show warnings;
 Level	Code	Message
 create table t3 (a varchar(255)) engine=innodb encryption='N';
-create table t4 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS' encryption_key_id=5;
+create table t4 (a varchar(255)) engine=innodb encryption='KEYRING' encryption_key_id=5;
 CREATE TABLESPACE ts_encrypted ADD DATAFILE 'ts_encrypted.ibd' ENCRYPTION="Y" ENGINE="InnoDB";
 CREATE TABLE t5 (a varchar(255)) TABLESPACE ts_encrypted ENCRYPTION="Y" ENGINE="InnoDB";
-CREATE TABLESPACE ts_rk_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='ROTATED_KEYS' ENGINE="InnoDB";
+CREATE TABLESPACE ts_rk_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='KEYRING' ENGINE="InnoDB";
 ERROR HY000: Invalid encryption option.
 create table t6 (a varchar(255)) engine=innodb;
 insert t1 values (repeat('foobarsecret', 12));
@@ -91,12 +91,12 @@ select * from t6;
 a
 sooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecret
 ALTER TABLE t4 ENCRYPTION='N', ALGORITHM=INPLACE;
-ALTER TABLE t4 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
+ALTER TABLE t4 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 # ibdata1 expecting NOT_FOUND
 # It should be possible to mark table as not encrypted with INPLACE algorithm, given table is
 # is currently not encrypted
 ALTER TABLE t6 ENCRYPTION='N', ALGORITHM=INPLACE;
-ALTER TABLE t6 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
+ALTER TABLE t6 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 # Wait max 10 min for key encryption threads to encrypt all spaces
 
 include/assert.inc [All encrypted tables should have encrypted flag set, apart from t3]

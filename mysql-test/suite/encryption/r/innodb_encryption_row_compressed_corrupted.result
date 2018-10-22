@@ -1,7 +1,7 @@
-create table innodb_compressed1(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed ENCRYPTION='ROTATED_KEYS';
-create table innodb_compressed2(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed key_block_size=1 ENCRYPTION='ROTATED_KEYS';
-create table innodb_compressed3(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed key_block_size=2 ENCRYPTION='ROTATED_KEYS';
-create table innodb_compressed4(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed key_block_size=4 ENCRYPTION='ROTATED_KEYS';
+create table innodb_compressed1(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed ENCRYPTION='KEYRING';
+create table innodb_compressed2(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed key_block_size=1 ENCRYPTION='KEYRING';
+create table innodb_compressed3(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed key_block_size=2 ENCRYPTION='KEYRING';
+create table innodb_compressed4(c1 bigint not null primary key, d int, a varchar(20), b char(200)) engine=innodb row_format=compressed key_block_size=4 ENCRYPTION='KEYRING';
 insert into innodb_compressed1 values (1, 20, 'private', 'evenmoreprivate');
 insert into innodb_compressed1 values (2, 20, 'private', 'evenmoreprivate');
 insert into innodb_compressed1 values (3, 30, 'private', 'evenmoreprivate');

@@ -1946,8 +1946,8 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
 
     if (share->was_encryption_key_id_set)
     {
-      DBUG_ASSERT(share->encrypt_type.length == 0 || my_strcasecmp(system_charset_info, share->encrypt_type.str, "ROTATED_KEYS") != 0
-                  || share->encrypt_type.length == strlen("ROTATED_KEYS"));
+      DBUG_ASSERT(share->encrypt_type.length == 0 || my_strcasecmp(system_charset_info, share->encrypt_type.str, "KEYRING") != 0
+                  || share->encrypt_type.length == strlen("KEYRING"));
 
       char *end;
       packet->append(STRING_WITH_LEN(" ENCRYPTION_KEY_ID=")); 
@@ -5633,17 +5633,12 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
     {
       /* In the .frm file this option has a max length of 2K. Currently,
       InnoDB uses only the first 1 bytes and the only supported values
-      are (Y | N). */
+      are (Y | N | KEYRING). */
       ptr= my_stpcpy(ptr, " ENCRYPTION=\"");
-      if (strncmp(share->encrypt_type.str, "ROTATED_KEYS", strlen("ROTATED_KEYS")) == 0)
-      {
-        DBUG_ASSERT(share->encrypt_type.length == 12);
+      if (strncmp(share->encrypt_type.str, "KEYRING", strlen("KEYRING")) == 0)
         ptr= strxnmov(ptr, 14, share->encrypt_type.str, NullS);
-      }
       else
         ptr= strxnmov(ptr, 3, share->encrypt_type.str, NullS);
-
-
       ptr= my_stpcpy(ptr, "\"");
     }
 

@@ -6,9 +6,9 @@ call mtr.add_suppression("\\[ERROR\\] InnoDB: Encryption can't find tablespace k
 call mtr.add_suppression("\\[Warning\\] InnoDB: Table is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
 SET GLOBAL innodb_file_per_table = ON;
 # Create and populate tables to be corrupted
-CREATE TABLE t1 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT,c char(200)) ENGINE=InnoDB ENCRYPTION='ROTATED_KEYS' ;
-CREATE TABLE t2 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT,c char(200)) ENGINE=InnoDB row_format=compressed ENCRYPTION='ROTATED_KEYS';
-CREATE TABLE t3 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT, c char(200)) ENGINE=InnoDB COMPRESSION="zlib" ENCRYPTION='ROTATED_KEYS';
+CREATE TABLE t1 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT,c char(200)) ENGINE=InnoDB ENCRYPTION='KEYRING' ;
+CREATE TABLE t2 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT,c char(200)) ENGINE=InnoDB row_format=compressed ENCRYPTION='KEYRING';
+CREATE TABLE t3 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT, c char(200)) ENGINE=InnoDB COMPRESSION="zlib" ENCRYPTION='KEYRING';
 BEGIN;
 INSERT INTO t1 (b,c) VALUES ('corrupt me','secret');
 INSERT INTO t1 (b,c) VALUES ('corrupt me','moresecretmoresecret');

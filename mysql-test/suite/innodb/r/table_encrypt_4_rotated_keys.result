@@ -5,13 +5,13 @@ SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
 # Create a table with encryption
-CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `c1` int(11) DEFAULT NULL,
   `c2` char(20) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 INSERT INTO t1 VALUES(0, "aaaaa");
 INSERT INTO t1 VALUES(1, "bbbbb");
 INSERT INTO t1 VALUES(2, "ccccc");
@@ -53,7 +53,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `c1` int(11) DEFAULT NULL,
   `c2` char(20) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 SELECT * FROM test.t1 LIMIT 10;
 c1	c2
 0	aaaaa
@@ -144,7 +144,7 @@ ALTER TABLE test.t1 IMPORT TABLESPACE;
 ERROR HY000: Schema mismatch (Encryption attribute is no matched)
 # Import got expected error.
 DROP TABLE t1;
-CREATE TABLE test.t1(c1 INT, c2 char(20)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE test.t1(c1 INT, c2 char(20)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 ALTER TABLE test.t1 DISCARD TABLESPACE;
 SET SESSION DEBUG="+d, fsp_header_rotate_encryption_failure";
 ALTER TABLE test.t1 IMPORT TABLESPACE;

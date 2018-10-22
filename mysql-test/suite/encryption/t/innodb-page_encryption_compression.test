@@ -9,9 +9,9 @@
 
 create table innodb_normal(c1 bigint not null, b char(200)) engine=innodb COMPRESSION="zlib";
 show warnings;
-create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='ROTATED_KEYS' encryption_key_id=1 COMPRESSION="zlib";
+create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='KEYRING' encryption_key_id=1 COMPRESSION="zlib";
 #show warnings;
-create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='ROTATED_KEYS' encryption_key_id=2 COMPRESSION="zlib";
+create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='KEYRING' encryption_key_id=2 COMPRESSION="zlib";
 #show warnings;
 
 show create table innodb_normal;
@@ -52,9 +52,9 @@ set innodb_default_encryption_key_id = DEFAULT;
 
 alter table innodb_normal engine=innodb COMPRESSION="zlib";
 show create table innodb_normal;
-alter table innodb_compact engine=innodb encryption='ROTATED_KEYS' COMPRESSION="zlib";
+alter table innodb_compact engine=innodb encryption='KEYRING' COMPRESSION="zlib";
 show create table innodb_compact;
-alter table innodb_dynamic engine=innodb encryption='ROTATED_KEYS' COMPRESSION="zlib";
+alter table innodb_dynamic engine=innodb encryption='KEYRING' COMPRESSION="zlib";
 show create table innodb_dynamic;
 #let $wait_condition= select variable_value > 0 from information_schema.global_status where variable_name = 'INNODB_NUM_PAGES_PAGE_DECOMPRESSED';
 #--source include/wait_condition.inc

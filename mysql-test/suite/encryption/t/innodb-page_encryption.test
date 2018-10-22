@@ -2,13 +2,13 @@
 #-- source include/have_file_key_management_plugin.inc
 
 create table innodb_normal(c1 bigint not null, b char(200)) engine=innodb;
-create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='ROTATED_KEYS' encryption_key_id=1;
-create table innodb_compressed(c1 bigint not null, b char(200)) engine=innodb row_format=compressed ENCRYPTION='ROTATED_KEYS' encryption_key_id=2;
-create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='ROTATED_KEYS' encryption_key_id=33;
-create table innodb_redundant(c1 bigint not null, b char(200))  engine=innodb row_format=redundant ENCRYPTION='ROTATED_KEYS' encryption_key_id=4;
+create table innodb_compact(c1 bigint not null, b char(200)) engine=innodb row_format=compact ENCRYPTION='KEYRING' encryption_key_id=1;
+create table innodb_compressed(c1 bigint not null, b char(200)) engine=innodb row_format=compressed ENCRYPTION='KEYRING' encryption_key_id=2;
+create table innodb_dynamic(c1 bigint not null, b char(200)) engine=innodb row_format=dynamic ENCRYPTION='KEYRING' encryption_key_id=33;
+create table innodb_redundant(c1 bigint not null, b char(200))  engine=innodb row_format=redundant ENCRYPTION='KEYRING' encryption_key_id=4;
 
 set innodb_default_encryption_key_id = 5;
-create table innodb_defkey(c1  bigint not null, b char(200))  engine=innodb ENCRYPTION='ROTATED_KEYS';
+create table innodb_defkey(c1  bigint not null, b char(200))  engine=innodb ENCRYPTION='KEYRING';
 show create table innodb_defkey;
 
 show create table innodb_compact;
@@ -95,14 +95,14 @@ set innodb_default_encryption_key_id = DEFAULT;
 SELECT variable_value >= 0 FROM information_schema.global_status WHERE variable_name = 'innodb_num_pages_encrypted';
 SELECT variable_value >= 0 FROM information_schema.global_status WHERE variable_name = 'innodb_num_pages_decrypted';
 
-alter table innodb_compact engine=innodb encryption='ROTATED_KEYS';
+alter table innodb_compact engine=innodb encryption='KEYRING';
 #encryption_key_id=DEFAULT;
 show create table innodb_compact;
-alter table innodb_compressed engine=innodb encryption='ROTATED_KEYS';
+alter table innodb_compressed engine=innodb encryption='KEYRING';
 show create table innodb_compressed;
-alter table innodb_dynamic engine=innodb encryption='ROTATED_KEYS';
+alter table innodb_dynamic engine=innodb encryption='KEYRING';
 show create table innodb_dynamic;
-alter table innodb_redundant engine=innodb encryption='ROTATED_KEYS';
+alter table innodb_redundant engine=innodb encryption='KEYRING';
 show create table innodb_redundant;
 
 --source include/restart_mysqld.inc

@@ -393,8 +393,6 @@ Datafile::validate_to_dd(
 	ulint		flags,
 	bool		for_import)
 {
-        //ib::error() << "Validating to dd space_id = " << space_id << '\n';
-	//dberr_t err;
         ValidateOutput output;
 
 	if (!is_open()) {
@@ -410,19 +408,19 @@ Datafile::validate_to_dd(
 		return(output);
 	}
 
-        // in case or RK it can so happen that there will be a crash after all pages of tablespace is rotated
+        // in case of keyring encryption it can be so happen that there will be a crash after all pages of tablespace is rotated
         // and DD is updated, but page0 of the tablespace has not been yet update. We handle this here.
 
-        if (output.encryption_type == ValidateOutput::ROTATED_KEYS &&
+        if (output.encryption_type == ValidateOutput::KEYRING &&
               (
-                (FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_info.rotated_keys_min_key_version == 0) ||
-                (!FSP_FLAGS_GET_ENCRYPTION(flags) && output.rotated_keys_info.rotated_keys_min_key_version != 0)
-              ) && FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags) 
+                (FSP_FLAGS_GET_ENCRYPTION(flags) && output.keyring_encryption_info.keyring_encryption_min_key_version == 0) ||
+                (!FSP_FLAGS_GET_ENCRYPTION(flags) && output.keyring_encryption_info.keyring_encryption_min_key_version != 0)
+              ) && FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags)
            )
         {
              ib::warn() << "In file '" << m_filepath << "' (tablespace id = " << m_space_id
                         << ") encryption flag is " << (FSP_FLAGS_GET_ENCRYPTION(m_flags) ? "ON" : "OFF")
-                        << ". However the encryption flag in the data dictionary is " 
+                        << ". However the encryption flag in the data dictionary is "
                         << (FSP_FLAGS_GET_ENCRYPTION(flags) ? "ON" : "OFF")
                         << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
                         << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
@@ -657,7 +655,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 
 		free_first_page();
 
-                output.error = DB_CORRUPTION;
+		output.error = DB_CORRUPTION;
 		return(output);
 
 	}
@@ -665,10 +663,10 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 	fil_space_crypt_t* crypt_data = fil_space_read_crypt_data(page_size_t(m_flags), m_first_page);
 
 	if(crypt_data) {
-		output.encryption_type = ValidateOutput::ROTATED_KEYS;
-		output.rotated_keys_info.page0_has_crypt_data = true; // TODO: Muszę się zdecydować, albo has_crypt_data, albo ROTATED_KEYS
-		output.rotated_keys_info.rotated_keys_min_key_version = crypt_data->min_key_version;
-		output.rotated_keys_info.type = crypt_data->type;
+		output.encryption_type = ValidateOutput::KEYRING;
+		output.keyring_encryption_info.page0_has_crypt_data = true;
+		output.keyring_encryption_info.keyring_encryption_min_key_version = crypt_data->min_key_version;
+		output.keyring_encryption_info.type = crypt_data->type;
 	} else if (FSP_FLAGS_GET_ENCRYPTION(m_flags))
 		output.encryption_type = ValidateOutput::MASTER_KEY;
 	else
@@ -725,7 +723,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 			m_is_valid = false;
 			free_first_page();
 			fil_space_destroy_crypt_data(&crypt_data);
-			output.rotated_keys_info.rk_encryption_key_is_missing = true;
+			output.keyring_encryption_info.keyring_encryption_key_is_missing = true;
 			output.error = DB_CORRUPTION;
 			return output;
 		}
@@ -761,16 +759,12 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 		free_first_page();
 
                 output.error = is_predefined_tablespace(m_space_id)
-		       ? DB_CORRUPTION
-		       : DB_TABLESPACE_EXISTS;
-
-		//return(is_predefined_tablespace(m_space_id)
-		       //? DB_CORRUPTION
-		       //: DB_TABLESPACE_EXISTS);
+			? DB_CORRUPTION
+			: DB_TABLESPACE_EXISTS;
                 return output;
 	}
 
-        output.error = DB_SUCCESS;
+	output.error = DB_SUCCESS;
 	return(output);
 }
 

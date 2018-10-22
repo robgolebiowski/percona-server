@@ -29,15 +29,15 @@ CREATE table t_mk (a varchar(255)) engine=innodb;
 SET GLOBAL innodb_encryption_threads=0;
 SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 UNINSTALL PLUGIN keyring_file;
-CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 ERROR HY000: Seems that keyring is down. It is not possible to create encrypted tables  without keyring. Please install a keyring and try again.
 CREATE TABLE t2 (a varchar(255)) engine=innodb;
-ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t2 ENCRYPTION='KEYRING';
 ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
-ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t_mk ENCRYPTION='KEYRING';
 ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
 # Decrypt all tables. The restart without keyring plugin functional should work as there should not be
-# any system tables left encrypted with ROTATED_KEYS
+# any system tables left encrypted with KEYRING
 INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 SET GLOBAL innodb_encryption_threads=4;
 SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
@@ -50,22 +50,22 @@ UNINSTALL PLUGIN keyring_file;
 # Check that keyring_file was not properly intialized by checking error log
 # We should get error in error log as that it is not possible to start encryption threads
 # when keyring is not properly initialized.
-# Start with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with ROTATED_KEYS.
+# Start with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with KEYRING.
 # restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/homeless/root/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=MYSQL_TMP_DIR/my_restart.err --innodb-encrypt-tables=OFF
 SET GLOBAL innodb_encryption_threads=1;
 ERROR HY000: InnoDB: keyring plugin is installed but it seems it was not properly initialized. Cannot enable encryption threads.
-CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 ERROR HY000: Seems that keyring is down. It is not possible to create encrypted tables  without keyring. Please install a keyring and try again.
-ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t2 ENCRYPTION='KEYRING';
 ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
-ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t_mk ENCRYPTION='KEYRING';
 ERROR HY000: Seems that keyring is down. It is not possible to encrypt table without keyring. Please install a keyring and try again.
 # Set valid keyring file path and try above operations
 SET @@global.keyring_file_data= 'MYSQL_TMP_DIR/mysecret_keyring';
 SET GLOBAL innodb_encryption_threads=1;
-CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
-ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
-ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
+ALTER TABLE t2 ENCRYPTION='KEYRING';
+ALTER TABLE t_mk ENCRYPTION='KEYRING';
 INSERT t2 VALUES (repeat('foobarsecret', 12));
 SET GLOBAL innodb_encryption_threads=0;
 UNINSTALL PLUGIN keyring_file;

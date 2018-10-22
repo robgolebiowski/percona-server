@@ -22,7 +22,7 @@ let MYSQLD_DATADIR = `SELECT @@datadir`;
 --let $id = `SELECT RAND()`
 --let t1_IBD = $MYSQLD_DATADIR/test/t1.ibd
 
-eval CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB $t1_table_type ENCRYPTION='ROTATED_KEYS';
+eval CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB $t1_table_type ENCRYPTION='KEYRING';
 
 delimiter //;
 create procedure innodb_insert_proc (repeat_count int)

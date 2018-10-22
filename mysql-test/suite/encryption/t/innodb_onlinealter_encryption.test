@@ -3,13 +3,13 @@
 # test uses restart
 -- source include/not_embedded.inc
 
-CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB encryption='ROTATED_KEYS';
+CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB encryption='KEYRING';
 CREATE TABLE t2 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB;
-CREATE TABLE t3 (id INT, a VARCHAR(255)) ENGINE=InnoDB encryption='ROTATED_KEYS';
+CREATE TABLE t3 (id INT, a VARCHAR(255)) ENGINE=InnoDB encryption='KEYRING';
 CREATE TABLE t4 (id INT, a VARCHAR(255)) engine=InnoDB;
-CREATE TABLE t5 (id INT NOT NULL PRIMARY KEY, a TEXT(500), b VARCHAR(255), FULLTEXT(b)) ENGINE=InnoDB encryption='ROTATED_KEYS';
+CREATE TABLE t5 (id INT NOT NULL PRIMARY KEY, a TEXT(500), b VARCHAR(255), FULLTEXT(b)) ENGINE=InnoDB encryption='KEYRING';
 CREATE TABLE t6 (id INT, a TEXT(500), b VARCHAR(255), FULLTEXT(b)) ENGINE=InnoDB;
-CREATE TABLE t7 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB row_format=compressed encryption='ROTATED_KEYS';
+CREATE TABLE t7 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB row_format=compressed encryption='KEYRING';
 
 delimiter //;
 create procedure innodb_insert_proc (repeat_count int)

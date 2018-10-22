@@ -45,15 +45,15 @@ SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 UNINSTALL PLUGIN keyring_file;
 
 --error ER_ILLEGAL_HA_CREATE_OPTION
-CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 CREATE TABLE t2 (a varchar(255)) engine=innodb;
 --error ER_ILLEGAL_HA_CREATE_OPTION
-ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t2 ENCRYPTION='KEYRING';
 --error ER_ILLEGAL_HA_CREATE_OPTION
-ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t_mk ENCRYPTION='KEYRING';
 
 --echo # Decrypt all tables. The restart without keyring plugin functional should work as there should not be
---echo # any system tables left encrypted with ROTATED_KEYS
+--echo # any system tables left encrypted with KEYRING
 INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 SET GLOBAL innodb_encryption_threads=4;
 SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
@@ -102,7 +102,7 @@ UNINSTALL PLUGIN keyring_file;
 
 --remove_file $error_log
 
---echo # Start with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with ROTATED_KEYS.
+--echo # Start with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with KEYRING.
 
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=/homeless/root/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=$error_log --innodb-encrypt-tables=OFF
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
@@ -118,11 +118,11 @@ UNINSTALL PLUGIN keyring_file;
 --error ER_WRONG_ARGUMENTS
 SET GLOBAL innodb_encryption_threads=1;
 --error ER_ILLEGAL_HA_CREATE_OPTION
-CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 --error ER_ILLEGAL_HA_CREATE_OPTION
-ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t2 ENCRYPTION='KEYRING';
 --error ER_ILLEGAL_HA_CREATE_OPTION
-ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t_mk ENCRYPTION='KEYRING';
 
 --echo # Set valid keyring file path and try above operations
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
@@ -131,9 +131,9 @@ eval SET @@global.keyring_file_data= '$MYSQL_TMP_DIR/mysecret_keyring';
 # Keyring plugin should now be functional
 
 SET GLOBAL innodb_encryption_threads=1;
-CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
-ALTER TABLE t2 ENCRYPTION='ROTATED_KEYS';
-ALTER TABLE t_mk ENCRYPTION='ROTATED_KEYS';
+CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
+ALTER TABLE t2 ENCRYPTION='KEYRING';
+ALTER TABLE t_mk ENCRYPTION='KEYRING';
 
 INSERT t2 VALUES (repeat('foobarsecret', 12));
 

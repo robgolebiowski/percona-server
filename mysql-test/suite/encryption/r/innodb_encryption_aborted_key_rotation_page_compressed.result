@@ -1,5 +1,5 @@
 SET GLOBAL innodb_encryption_threads=4;
-CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB COMPRESSION="zlib" ENCRYPTION='ROTATED_KEYS';
+CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB COMPRESSION="zlib" ENCRYPTION='KEYRING';
 create procedure innodb_insert_proc (repeat_count int)
 begin
 declare current_num int;

@@ -8814,10 +8814,10 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
     create_info->encrypt_type.length= table->s->encrypt_type.length;
   }
 
-  // Encryption was changed to not ROTATED_KEYS and ALTER does not contain encryption_key_id
+  // Encryption was changed to not KEYRING and ALTER does not contain encryption_key_id
   // mark encryption_key_id as not set then
   if (used_fields & HA_CREATE_USED_ENCRYPT &&
-      0 != strncmp(create_info->encrypt_type.str, "ROTATED_KEYS", create_info->encrypt_type.length) &&
+      0 != strncmp(create_info->encrypt_type.str, "KEYRING", create_info->encrypt_type.length) &&
       !(used_fields & HA_CREATE_USED_ENCRYPTION_KEY_ID))
   {
     create_info->used_fields&= ~(HA_CREATE_USED_ENCRYPTION_KEY_ID);

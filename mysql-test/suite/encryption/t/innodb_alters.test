@@ -37,7 +37,7 @@ insert t1 values (repeat('foobarsecret', 12));
 select * from t1;
 
 --echo # 1. Alter from unencrypted to RK
-ALTER TABLE t1 encryption='ROTATED_KEYS';
+ALTER TABLE t1 encryption='KEYRING';
 SHOW CREATE TABLE t1;
 SELECT * FROM t1;
 
@@ -54,7 +54,7 @@ INSERT t2 VALUES (repeat('foobarsecret', 12));
 --source include/assert.inc
 
 --echo # 2. Alter from MK encryption to RK
-ALTER TABLE t2 encryption='ROTATED_KEYS';
+ALTER TABLE t2 encryption='KEYRING';
 SHOW CREATE TABLE t2;
 SELECT * FROM t2;
 
@@ -84,7 +84,7 @@ SHOW CREATE TABLE t1;
 SELECT NAME, MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION;
 
 --echo # 5. Alter from unencrypted to RK
-ALTER TABLE t1 ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t1 ENCRYPTION='KEYRING';
 SHOW CREATE TABLE t1;
 
 --let $assert_text= Table t1 should be included in INNODB_TABLESPACES_ENCRYPTION
@@ -100,7 +100,7 @@ SHOW CREATE TABLE t1;
 
 --echo # 7. Alter to RK INPLACE
 
-ALTER TABLE t1 ENCRYPTION='ROTATED_KEYS', ALGORITHM=INPLACE;
+ALTER TABLE t1 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 SHOW CREATE TABLE t1;
 --let $assert_text= Table t1 should appear in INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERSION (1) ENCRYPTED
 --let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME = \\"test/t1\\"]" = 1
@@ -116,7 +116,7 @@ SHOW CREATE TABLE t1;
 
 --echo # 9. Alter ENCRYPTION_KEY_ID
 
-ALTER TABLE t1 ENCRYPTION='ROTATED_KEYS' ENCRYPTION_KEY_ID=5;
+ALTER TABLE t1 ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=5;
 SHOW CREATE TABLE t1;
 --let $assert_text= Table t1 should appear in INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERSION (1) ENCRYPTED KEY_ID =5
 --let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME = \\"test/t1\\" AND CURRENT_KEY_ID = 5]" = 1
@@ -124,7 +124,7 @@ SHOW CREATE TABLE t1;
 
 --echo # 10. Alter ENCRYPTION_KEY_ID INPLACE
 
-ALTER TABLE t1 ENCRYPTION='ROTATED_KEYS' ENCRYPTION_KEY_ID=6, ALGORITHM=INPLACE;
+ALTER TABLE t1 ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=6, ALGORITHM=INPLACE;
 SHOW CREATE TABLE t1;
 --let $assert_text= Table t1 should appear in INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERSION (1) ENCRYPTED KEY_ID =6
 --let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME = \\"test/t1\\" AND CURRENT_KEY_ID = 6]" = 1
@@ -161,10 +161,10 @@ CREATE TABLE t3 (a varchar(255)) engine=innodb;
 SHOW CREATE TABLE t3;
 INSERT t3 VALUES (repeat('foobarsecret', 12));
 
-CREATE TABLE t_rk_with_encryption_key_id (a varchar(255)) engine=innodb ENCRYPTION='ROTATED_KEYS' ENCRYPTION_KEY_ID=5;
+CREATE TABLE t_rk_with_encryption_key_id (a varchar(255)) engine=innodb ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=5;
 CREATE TABLE t_alter_encryption_key_id (a varchar(255)) engine=innodb;
 CREATE TABLE t_alter_to_rk (a varchar(255)) engine=innodb;
-ALTER TABLE t_alter_to_rk ENCRYPTION='ROTATED_KEYS';
+ALTER TABLE t_alter_to_rk ENCRYPTION='KEYRING';
 ALTER TABLE t_alter_encryption_key_id ENCRYPTION_KEY_ID = 6;
 
 SHOW CREATE TABLE t_alter_encryption_key_id;
@@ -237,7 +237,7 @@ SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 
 SHOW CREATE TABLE t3;
 
---echo # Testing if alter encryption_encryption_key_id works on tables which was not previously encrypted with ROTATED_KEYS
+--echo # Testing if alter encryption_encryption_key_id works on tables which was not previously encrypted with KEYRING
 --echo # i.e. on plain innodb tables.
 
 --echo # Turn off encryption threads and encryption

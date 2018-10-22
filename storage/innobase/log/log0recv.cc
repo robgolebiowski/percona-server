@@ -1561,17 +1561,6 @@ fil_write_encryption_parse(
 		iv = space->encryption_iv;
 	}
 
-	//offset = mach_read_from_2(ptr);
-	//ptr += 2;
-	//len = mach_read_from_2(ptr);
-
-	//ptr += 2;
-	//if (end < ptr + len) {
-		//return(NULL);
-	//}
-
-	//if (offset >= UNIV_PAGE_SIZE
-	    //|| len + offset > UNIV_PAGE_SIZE
 	if  ((len != ENCRYPTION_INFO_SIZE_V1
 		&& len != ENCRYPTION_INFO_SIZE_V2)) {
 		recv_sys->set_corrupt_log();
@@ -1613,10 +1602,7 @@ fil_write_encryption_parse(
 	} else {
 		ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
 
-/*		space->encryption_type = FSP_FLAGS_GET_ROTATED_KEYS(space->flags)
-                                         ? Encryption::ROTATED_KEYS
-                                         : Encryption::AES;*/
-                space->encryption_type = Encryption::AES;
+		space->encryption_type = Encryption::AES;
 		space->encryption_klen = ENCRYPTION_KEY_LEN;
 	}
 

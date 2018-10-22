@@ -9,7 +9,7 @@ SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
 DROP TABLE IF EXISTS t_encrypt;
-CREATE TABLE t_encrypt(c1 INT, c2 char(20)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t_encrypt(c1 INT, c2 char(20)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 ERROR HY000: Can't find master key from keyring, please check keyring plugin is loaded.
 UNINSTALL PLUGIN keyring_file;
 ERROR 42000: PLUGIN keyring_file does not exist
@@ -29,7 +29,7 @@ c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
 c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
 c7 POINT NOT NULL,
 spatial INDEX idx2 (c7)
-)  ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+)  ENCRYPTION="KEYRING" ENGINE = InnoDB;
 SHOW CREATE TABLE tde_db.t_encrypt;
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
@@ -38,7 +38,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c6` int(11) GENERATED ALWAYS AS (json_extract(`c4`,'$.key_b')) VIRTUAL,
   `c7` point NOT NULL,
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 INSERT INTO tde_db.t_encrypt(c4,c7) VALUES('{ "key_a": 1, "key_b": 2, "key_c": 3 }',ST_GeomFromText('POINT(383293632 1754448)'));
 INSERT INTO tde_db.t_encrypt(c4,c7) select c4,c7 from tde_db.t_encrypt;
 SELECT c4,c5,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
@@ -57,7 +57,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c6` int(11) GENERATED ALWAYS AS (json_extract(`c4`,'$.key_b')) VIRTUAL,
   `c7` point NOT NULL,
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 # In connection 1
 LOCK TABLES tde_db.t_encrypt WRITE;
 # In connection default
@@ -97,7 +97,7 @@ SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
-CREATE TABLE tde_db.t_encrypt(c1 INT, c2 char(20), c3 BLOB) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE tde_db.t_encrypt(c1 INT, c2 char(20), c3 BLOB) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 CREATE TABLE tde_db.t_encrypt_1(c1 INT, c2 char(20)) ENCRYPTION="Yes" ENGINE = InnoDB;
 ERROR HY000: Invalid encryption option.
 CREATE TABLE tde_db.t_encrypt_1(c1 INT, c2 char(20)) ENCRYPTION="y" ENGINE = InnoDB;
@@ -109,7 +109,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c1` int(11) DEFAULT NULL,
   `c2` char(20) DEFAULT NULL,
   `c3` blob
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 INSERT INTO tde_db.t_encrypt VALUES(0, "aaaaa",repeat('A', 20000));
 INSERT INTO tde_db.t_encrypt select * from tde_db.t_encrypt;
 INSERT INTO tde_db.t_encrypt select * from tde_db.t_encrypt;
@@ -196,19 +196,19 @@ c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
 c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
 c7 POINT NOT NULL,
 spatial INDEX idx2 (c7)
-)  ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+)  ENCRYPTION="KEYRING" ENGINE = InnoDB;
 ERROR HY000: InnoDB: Tablespace `innodb_system` cannot contain an ENCRYPTED table.
 SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
 CREATE TABLESPACE s_alt1 ADD DATAFILE 's_alt1.ibd';
-CREATE TABLE tde_db.t_encrypt (a int, b text) ENCRYPTION="ROTATED_KEYS" TABLESPACE=`s_alt1` ENGINE=InnoDB;
+CREATE TABLE tde_db.t_encrypt (a int, b text) ENCRYPTION="KEYRING" TABLESPACE=`s_alt1` ENGINE=InnoDB;
 ERROR HY000: InnoDB: Tablespace `s_alt1` cannot contain an ENCRYPTED table.
 DROP TABLESPACE s_alt1;
-CREATE TEMPORARY TABLE tde_db.t_encrypt (a int, b text) ENCRYPTION="ROTATED_KEYS" ENGINE=InnoDB;
+CREATE TEMPORARY TABLE tde_db.t_encrypt (a int, b text) ENCRYPTION="KEYRING" ENGINE=InnoDB;
 ERROR HY000: InnoDB: Unsupported encryption option for temporary tables.
-CREATE TABLE tde_db.t_encrypt_myisam (a int, b text) ENCRYPTION="ROTATED_KEYS" ENGINE=MyISAM;
+CREATE TABLE tde_db.t_encrypt_myisam (a int, b text) ENCRYPTION="KEYRING" ENGINE=MyISAM;
 ERROR HY000: Table storage engine for 't_encrypt_myisam' doesn't have this option
 CREATE PROCEDURE tde_db.row_format_t_encrypt(row_form VARCHAR(1000), encryption_type VARCHAR(20))
 begin
@@ -236,7 +236,7 @@ SELECT c2,c4,c5,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
 SELECT c2,c4,c5,c6,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
 SHOW CREATE TABLE tde_db.t_encrypt;
 end|
-call tde_db.row_format_t_encrypt(" ROW_FORMAT=DYNAMIC ", "ROTATED_KEYS");
+call tde_db.row_format_t_encrypt(" ROW_FORMAT=DYNAMIC ", "KEYRING");
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
   `c2` int(11) NOT NULL AUTO_INCREMENT,
@@ -247,7 +247,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=DYNAMIC ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=DYNAMIC ENCRYPTION='KEYRING'
 COUNT(*)
 32
 c2	c4	c5	ST_AsText(c7)
@@ -300,7 +300,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=DYNAMIC ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=DYNAMIC ENCRYPTION='KEYRING'
 # restart with keying
 # restart:<hidden args>
 SELECT c2,c4,c5,c6,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
@@ -320,7 +320,7 @@ INSERT INTO tde_db.t_encrypt(c3,c4,c7) SELECT c3,c4,c7 FROM tde_db.t_encrypt;
 SELECT COUNT(*) FROM tde_db.t_encrypt;
 COUNT(*)
 16
-call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPACT ", "ROTATED_KEYS");
+call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPACT ", "KEYRING");
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
   `c2` int(11) NOT NULL AUTO_INCREMENT,
@@ -331,7 +331,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPACT ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPACT ENCRYPTION='KEYRING'
 COUNT(*)
 32
 c2	c4	c5	ST_AsText(c7)
@@ -384,7 +384,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=COMPACT ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=COMPACT ENCRYPTION='KEYRING'
 # restart with keying
 # restart:<hidden args>
 SELECT c2,c4,c5,c6,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
@@ -404,7 +404,7 @@ INSERT INTO tde_db.t_encrypt(c3,c4,c7) SELECT c3,c4,c7 FROM tde_db.t_encrypt;
 SELECT COUNT(*) FROM tde_db.t_encrypt;
 COUNT(*)
 16
-call tde_db.row_format_t_encrypt(" ROW_FORMAT=REDUNDANT ", "ROTATED_KEYS");
+call tde_db.row_format_t_encrypt(" ROW_FORMAT=REDUNDANT ", "KEYRING");
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
   `c2` int(11) NOT NULL AUTO_INCREMENT,
@@ -415,7 +415,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=REDUNDANT ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=REDUNDANT ENCRYPTION='KEYRING'
 COUNT(*)
 32
 c2	c4	c5	ST_AsText(c7)
@@ -468,7 +468,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=REDUNDANT ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=REDUNDANT ENCRYPTION='KEYRING'
 # restart with keying
 # restart:<hidden args>
 SELECT c2,c4,c5,c6,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
@@ -488,7 +488,7 @@ INSERT INTO tde_db.t_encrypt(c3,c4,c7) SELECT c3,c4,c7 FROM tde_db.t_encrypt;
 SELECT COUNT(*) FROM tde_db.t_encrypt;
 COUNT(*)
 16
-call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPRESSED ", "ROTATED_KEYS");
+call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPRESSED ", "KEYRING");
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
   `c2` int(11) NOT NULL AUTO_INCREMENT,
@@ -499,7 +499,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED ENCRYPTION='KEYRING'
 COUNT(*)
 32
 c2	c4	c5	ST_AsText(c7)
@@ -552,7 +552,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED ENCRYPTION='KEYRING'
 # restart with keying
 # restart:<hidden args>
 SELECT c2,c4,c5,c6,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
@@ -572,7 +572,7 @@ INSERT INTO tde_db.t_encrypt(c3,c4,c7) SELECT c3,c4,c7 FROM tde_db.t_encrypt;
 SELECT COUNT(*) FROM tde_db.t_encrypt;
 COUNT(*)
 16
-call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPRESSED  KEY_BLOCK_SIZE=4 ", "ROTATED_KEYS");
+call tde_db.row_format_t_encrypt(" ROW_FORMAT=COMPRESSED  KEY_BLOCK_SIZE=4 ", "KEYRING");
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
   `c2` int(11) NOT NULL AUTO_INCREMENT,
@@ -583,7 +583,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=4 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=4 ENCRYPTION='KEYRING'
 COUNT(*)
 32
 c2	c4	c5	ST_AsText(c7)
@@ -636,7 +636,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=4 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=4 ENCRYPTION='KEYRING'
 # restart with keying
 # restart:<hidden args>
 SELECT c2,c4,c5,c6,ST_AsText(c7) FROM tde_db.t_encrypt LIMIT 10;
@@ -658,7 +658,7 @@ COUNT(*)
 16
 # Create partition table
 DROP TABLE tde_db.t_encrypt;
-CREATE TABLE tde_db.t_encrypt  (c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,c3 VARCHAR(255), c4 JSON ,c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL ) ENCRYPTION="ROTATED_KEYS"  ENGINE=InnoDB PARTITION BY RANGE (c2) (PARTITION p1 VALUES LESS THAN (4),PARTITION p2 VALUES LESS THAN (8),PARTITION p3 VALUES LESS THAN (1000))  ;
+CREATE TABLE tde_db.t_encrypt  (c2 INT NOT NULL AUTO_INCREMENT PRIMARY KEY,c3 VARCHAR(255), c4 JSON ,c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL ) ENCRYPTION="KEYRING"  ENGINE=InnoDB PARTITION BY RANGE (c2) (PARTITION p1 VALUES LESS THAN (4),PARTITION p2 VALUES LESS THAN (8),PARTITION p3 VALUES LESS THAN (1000))  ;
 SHOW CREATE TABLE tde_db.t_encrypt;
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
@@ -668,7 +668,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c5` int(11) GENERATED ALWAYS AS (json_extract(`c4`,'$.key_a')) STORED,
   `c6` int(11) GENERATED ALWAYS AS (json_extract(`c4`,'$.key_b')) VIRTUAL,
   PRIMARY KEY (`c2`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 /*!50100 PARTITION BY RANGE (c2)
 (PARTITION p1 VALUES LESS THAN (4) ENGINE = InnoDB,
  PARTITION p2 VALUES LESS THAN (8) ENGINE = InnoDB,
@@ -755,7 +755,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c5` int(11) GENERATED ALWAYS AS (json_extract(`c4`,'$.key_a')) STORED,
   `c6` int(11) GENERATED ALWAYS AS (json_extract(`c4`,'$.key_b')) VIRTUAL,
   PRIMARY KEY (`c2`)
-) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 /*!50100 PARTITION BY RANGE (c2)
 (PARTITION p1 VALUES LESS THAN (4) ENGINE = InnoDB,
  PARTITION p2 VALUES LESS THAN (8) ENGINE = InnoDB,
@@ -788,7 +788,7 @@ c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,
 c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,
 c7 POINT NOT NULL,
 spatial INDEX idx2 (c7)
-) ENCRYPTION="ROTATED_KEYS"  ENGINE = InnoDB;
+) ENCRYPTION="KEYRING"  ENGINE = InnoDB;
 CREATE PROCEDURE tde_db.populate_t_encrypt()
 begin
 declare i int default 1;
@@ -849,7 +849,7 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c7` point NOT NULL,
   PRIMARY KEY (`c2`),
   SPATIAL KEY `idx2` (`c7`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 # In connection con1 - Running insert
 call tde_db.populate_t_encrypt();
 # In connection con2 - Running insert
@@ -863,7 +863,7 @@ call tde_db.rotate_master_key();
 # In connection con6 - Running "alter instance"
 call tde_db.rotate_master_key();
 # In connection con7 - Running "create table"
-call tde_db.create_encrypt_table("ROTATED_KEYS");
+call tde_db.create_encrypt_table("KEYRING");
 # In connection con8 - Running "create table"
 call tde_db.create_encrypt_table("N");
 # In connection con1
@@ -1049,14 +1049,14 @@ SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
-CREATE TABLE tde_db.t_encrypt(c1 INT, c2 char(20), c3 BLOB) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE tde_db.t_encrypt(c1 INT, c2 char(20), c3 BLOB) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 SHOW CREATE TABLE tde_db.t_encrypt;
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
   `c1` int(11) DEFAULT NULL,
   `c2` char(20) DEFAULT NULL,
   `c3` blob
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 INSERT INTO tde_db.t_encrypt VALUES(0, "aaaaa",repeat('A', 20000));
 INSERT INTO tde_db.t_encrypt select * from tde_db.t_encrypt;
 INSERT INTO tde_db.t_encrypt select * from tde_db.t_encrypt;
@@ -1141,7 +1141,7 @@ c1	c2	right(c3, 20)
 0	aaaaa	AAAAAAAAAAAAAAAAAAAA
 ALTER INSTANCE ROTATE INNODB MASTER KEY;
 ERROR 42000: Access denied; you need (at least one of) the SUPER privilege(s) for this operation
-CREATE TABLE tde_db.t_encrypt_np(c1 INT, c2 char(20), c3 BLOB) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE tde_db.t_encrypt_np(c1 INT, c2 char(20), c3 BLOB) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 ERROR 42000: CREATE command denied to user 'encryptnonprivuser'@'localhost' for table 't_encrypt_np'
 SELECT c1,c2,right(c3, 20) FROM tde_db.t_encrypt LIMIT 10;
 c1	c2	right(c3, 20)
@@ -1182,8 +1182,8 @@ SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
-CREATE TABLE tde_db.t_encrypt(c1 INT NOT NULL AUTO_INCREMENT PRIMARY KEY, c2 char(100), c3 BLOB , FULLTEXT INDEX `idx1` (c2)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
-CREATE TABLE tde_db.t_encrypt1(c11 INT , c22 char(100), c33 BLOB , FULLTEXT INDEX `idx1` (c22)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE tde_db.t_encrypt(c1 INT NOT NULL AUTO_INCREMENT PRIMARY KEY, c2 char(100), c3 BLOB , FULLTEXT INDEX `idx1` (c2)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
+CREATE TABLE tde_db.t_encrypt1(c11 INT , c22 char(100), c33 BLOB , FULLTEXT INDEX `idx1` (c22)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 SHOW CREATE TABLE tde_db.t_encrypt;
 Table	Create Table
 t_encrypt	CREATE TABLE `t_encrypt` (
@@ -1192,9 +1192,9 @@ t_encrypt	CREATE TABLE `t_encrypt` (
   `c3` blob,
   PRIMARY KEY (`c1`),
   FULLTEXT KEY `idx1` (`c2`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 CREATE TABLE tde_db.t_encrypt2 (f1 INT PRIMARY KEY, f2 CHAR(100),
-FOREIGN KEY (f1) REFERENCES tde_db.t_encrypt(c1) ON UPDATE CASCADE) ENCRYPTION="ROTATED_KEYS" ENGINE=InnoDB;
+FOREIGN KEY (f1) REFERENCES tde_db.t_encrypt(c1) ON UPDATE CASCADE) ENCRYPTION="KEYRING" ENGINE=InnoDB;
 CREATE TRIGGER tde_db.trigger_encrypt_table AFTER INSERT ON tde_db.t_encrypt
 FOR EACH ROW
 begin
@@ -1273,7 +1273,7 @@ SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
-CREATE TABLE tde_db.t_encrypt  (c2 INT NOT NULL AUTO_INCREMENT ,c3 VARCHAR(255), c4 JSON ,c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,c7 POINT NOT NULL,spatial INDEX idx2 (c7) , PRIMARY KEY (c2,c3(100))) ENCRYPTION="ROTATED_KEYS" ENGINE=InnoDB;
+CREATE TABLE tde_db.t_encrypt  (c2 INT NOT NULL AUTO_INCREMENT ,c3 VARCHAR(255), c4 JSON ,c5 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_a')) STORED,c6 INT GENERATED ALWAYS AS (JSON_EXTRACT(c4,'$.key_b')) VIRTUAL,c7 POINT NOT NULL,spatial INDEX idx2 (c7) , PRIMARY KEY (c2,c3(100))) ENCRYPTION="KEYRING" ENGINE=InnoDB;
 CREATE PROCEDURE tde_db.txn_t_encrypt()
 BEGIN
 declare i int default 0;

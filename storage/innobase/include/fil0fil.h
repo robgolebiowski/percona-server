@@ -534,11 +534,8 @@ static const ulint FIL_PAGE_ORIGINAL_SIZE_V1 = FIL_PAGE_ORIGINAL_TYPE_V1 + 2;
 static const ulint FIL_PAGE_COMPRESS_SIZE_V1 = FIL_PAGE_ORIGINAL_SIZE_V1 + 2;
 
 static const ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_ORIGINAL_SIZE_V1;
-//static const ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_FILE_FLUSH_LSN;
 
-//static const ulint FIL_PAGE_ENCRYPTION_ENCRYPTED_CHECKSUM = FIL_PAGE_LSN + 4;
-//
-static const ulint FIL_PAGE_ZIP_ROTATED_KEYS_MAGIC = FIL_PAGE_VERSION;
+static const ulint FIL_PAGE_ZIP_KEYRING_ENCRYPTION_MAGIC = FIL_PAGE_VERSION;
 
 /** This overloads FIL_PAGE_FILE_FLUSH_LSN for RTREE Split Sequence Number */
 #define	FIL_RTREE_SPLIT_SEQ_NUM	FIL_PAGE_FILE_FLUSH_LSN
@@ -1266,7 +1263,7 @@ fil_ibd_open(
 	ulint		flags,
 	const char*	tablename,
 	const char*	path_in,
-        Rotated_keys_info &rotated_keys_info)
+        Keyring_encryption_info &keyring_encryption_info)
 	MY_ATTRIBUTE((warn_unused_result));
 
 enum fil_load_status {

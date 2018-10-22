@@ -363,9 +363,9 @@ static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
 /** Encryption master key prifix size */
 static const ulint ENCRYPTION_MASTER_KEY_PRIFIX_LEN = 9;
 
-static const char ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC[] = "RK";
+static const char ENCRYPTION_ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC[] = "RK";
 
-static const ulint ENCRYPTION_ZIP_PAGE_ROTATED_KEYS_MAGIC_LEN = 2;
+static const ulint ENCRYPTION_ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC_LEN = 2;
 
 /** Encryption master key prifix */
 //TODO: Change this to percona_innodb_idb
@@ -408,13 +408,13 @@ struct Encryption {
 		/** Use AES */
 		AES = 1,
 
-                ROTATED_KEYS = 2
+		KEYRING = 2
 	};
 
         enum Encryption_rotation
         {
            NO_ROTATION,
-           MASTER_KEY_TO_ROTATED_KEY
+           MASTER_KEY_TO_KEYRING
         };
 
 
@@ -441,7 +441,6 @@ struct Encryption {
 		m_key_id(0),
 		m_checksum(0),
 		m_encryption_rotation(NO_ROTATION)
-		//m_was_page_encrypted_when_read(false)
 	{}
 
 	/** Specific constructor
@@ -458,7 +457,6 @@ struct Encryption {
 		m_key_id(0),
 		m_checksum(0),
 		m_encryption_rotation(NO_ROTATION)
-		//m_was_page_encrypted_when_read(false)
 	{
 #ifdef UNIV_DEBUG
 		switch (m_type) {
@@ -484,20 +482,19 @@ struct Encryption {
 		m_key_id(other.m_key_id),
 		m_checksum(other.m_checksum),
 		m_encryption_rotation(other.m_encryption_rotation)
-		//m_was_page_encrypted_when_read(false)
 	{
 		if (other.m_key_allocated && other.m_key != NULL)
 			m_key = static_cast<byte *>(
 				my_memdup(PSI_NOT_INSTRUMENTED,
 					other.m_key, other.m_klen, MYF(0)));
 	}
-	
+
 	Encryption& operator = (const Encryption& other) {
 		Encryption tmp(other);
 		swap(tmp);
 		return *this;
 	}
-	
+
 	void swap(Encryption& other) {
 		std::swap(m_type, other.m_type);
 		std::swap(m_key, other.m_key);
@@ -511,7 +508,7 @@ struct Encryption {
 		std::swap(m_checksum, other.m_checksum);
 		std::swap(m_encryption_rotation, other.m_encryption_rotation);
 	}
-	
+
 	~Encryption() {
 		if (m_key_allocated && m_key != NULL)
 			my_free(m_key);
@@ -565,10 +562,8 @@ struct Encryption {
         static bool is_empty(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
-        static bool is_rotated_keys(const char *algoritm)
+        static bool is_keyring(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
-//TODO:Robert, to nie jest obecnie używane!
-        static Type string_to_encryption_type(const char *algoritm);
 
         /** Generate random encryption value for key and iv.
         @param[in,out]	value	Encryption value */

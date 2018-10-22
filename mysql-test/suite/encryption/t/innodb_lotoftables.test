@@ -64,7 +64,7 @@ let $tables = 100;
 while ($tables)
 {
   eval create table t_$tables (a int not null primary key, b varchar(200)) engine=innodb
-  stats_persistent=0 ENCRYPTION='ROTATED_KEYS';
+  stats_persistent=0 ENCRYPTION='KEYRING';
   commit;
   let $rows = 100;
   while($rows)

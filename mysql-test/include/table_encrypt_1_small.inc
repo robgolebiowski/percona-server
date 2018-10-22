@@ -33,7 +33,7 @@ eval CREATE TABLE t1 (id int unsigned NOT NULL auto_increment PRIMARY KEY, val v
 
 INSERT INTO t1 (val) VALUES ('Sydney'), ('Melbourne'), ('Brisbane'), ('Perth'), ('Adelaide');
 
-#ALTER TABLE t1 ENCRYPTION = "ROTATED_KEYS";
+#ALTER TABLE t1 ENCRYPTION = "KEYRING";
 #ALTER TABLE t1 ENCRYPTION = 'Y';
 
 #ALTER TABLE t1 ADD COLUMN is_capital char(1) NOT NULL DEFAULT 'N' AFTER val;

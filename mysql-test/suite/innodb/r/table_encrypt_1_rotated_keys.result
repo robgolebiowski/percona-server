@@ -6,10 +6,10 @@ call mtr.add_suppression("\\[ERROR\\] InnoDB: Could not find a valid tablespace 
 call mtr.add_suppression("ibd can't be decrypted , please confirm the keyfile is match and keyring plugin is loaded.");
 call mtr.add_suppression("\\[Warning\\] InnoDB: Ignoring tablespace .* because it could not be opened");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: If you are installing InnoDB, remember that you must create directories yourself, InnoDB does not create them.");
-CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 ERROR HY000: Can't find master key from keyring, please check keyring plugin is loaded.
 CREATE TABLE t1(c1 INT, c2 char(20)) ENGINE = InnoDB;
-ALTER TABLE t1 ENCRYPTION="ROTATED_KEYS", algorithm=copy;
+ALTER TABLE t1 ENCRYPTION="KEYRING", algorithm=copy;
 ERROR HY000: Can't find master key from keyring, please check keyring plugin is loaded.
 # restart:<hidden args>
 DROP TABLE IF EXISTS t1;
@@ -17,29 +17,29 @@ SET GLOBAL innodb_file_per_table = 0;
 SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 0
-CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 ERROR HY000: InnoDB: Tablespace `innodb_system` cannot contain an ENCRYPTED table.
 SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
 @@innodb_file_per_table
 1
-CREATE TABLE t1(c int) ENCRYPTION="ROTATED_KEYS" tablespace innodb_system;
+CREATE TABLE t1(c int) ENCRYPTION="KEYRING" tablespace innodb_system;
 ERROR HY000: InnoDB: Tablespace `innodb_system` cannot contain an ENCRYPTED table.
 CREATE TABLE t1(c int) ENCRYPTION="N" tablespace innodb_system;
 DROP TABLE t1;
-CREATE TEMPORARY TABLE t1(c int) ENCRYPTION="ROTATED_KEYS";
+CREATE TEMPORARY TABLE t1(c int) ENCRYPTION="KEYRING";
 ERROR HY000: InnoDB: Unsupported encryption option for temporary tables.
 CREATE TEMPORARY TABLE t1(c int) ENCRYPTION="N";
 DROP TABLE t1;
 CREATE TABLE t1(c int) ENCRYPTION="R" ENGINE = InnoDB;
 ERROR HY000: Invalid encryption option.
-CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `c1` int(11) DEFAULT NULL,
   `c2` char(20) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 INSERT INTO t1 VALUES(0, "aaaaa");
 INSERT INTO t1 VALUES(1, "bbbbb");
 INSERT INTO t1 VALUES(2, "ccccc");
@@ -85,7 +85,7 @@ c1	c2
 0	aaaaa
 0	aaaaa
 DROP TABLE t1;
-CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="KEYRING" ENGINE = InnoDB;
 INSERT INTO t1 VALUES(0, "aaaaa");
 INSERT INTO t1 VALUES(1, "bbbbb");
 INSERT INTO t1 VALUES(2, "ccccc");
@@ -134,14 +134,14 @@ ALTER TABLE t1 ADD KEY k1 (c1) ,algorithm=inplace;
 ALTER TABLE t1 ENCRYPTION='Y',algorithm=inplace;
 ERROR 0A000: ALGORITHM=INPLACE is not supported. Reason: Cannot alter encryption attribute by inplace algorithm.. Try ALGORITHM=COPY.
 drop table t1;
-CREATE TABLE t1(c1 INT PRIMARY KEY) COMPRESSION = "ZLIB" ENCRYPTION = "ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t1(c1 INT PRIMARY KEY) COMPRESSION = "ZLIB" ENCRYPTION = "KEYRING" ENGINE = InnoDB;
 INSERT INTO t1 VALUES(0), (1), (2), (3), (4), (5), (6), (7), (8), (9);
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `c1` int(11) NOT NULL,
   PRIMARY KEY (`c1`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COMPRESSION='ZLIB' ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COMPRESSION='ZLIB' ENCRYPTION='KEYRING'
 FLUSH TABLES t1 WITH READ LOCK;
 UNLOCK TABLES;
 SELECT * FROM t1 ORDER BY c1 LIMIT 10;
@@ -170,13 +170,13 @@ c1
 8
 9
 DROP TABLE t1;
-CREATE TABLE t1(c1 int null)  ENCRYPTION='ROTATED_KEYS' ROW_FORMAT=compressed;
+CREATE TABLE t1(c1 int null)  ENCRYPTION='KEYRING' ROW_FORMAT=compressed;
 INSERT INTO t1 VALUES(0), (1), (2), (3), (4), (5), (6), (7), (8), (9);
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `c1` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED ENCRYPTION='KEYRING'
 FLUSH TABLES t1 WITH READ LOCK;
 UNLOCK TABLES;
 SELECT * FROM t1 ORDER BY c1 LIMIT 10;
@@ -205,7 +205,7 @@ c1
 8
 9
 DROP TABLE t1;
-CREATE TABLE t1(c1 INT PRIMARY KEY, g geometry not null, spatial index(g)) ENCRYPTION = "ROTATED_KEYS" ENGINE = InnoDB;
+CREATE TABLE t1(c1 INT PRIMARY KEY, g geometry not null, spatial index(g)) ENCRYPTION = "KEYRING" ENGINE = InnoDB;
 INSERT INTO t1 VALUES(0, POINT(0, 0));
 INSERT INTO t1 VALUES(1, POINT(1, 1));
 INSERT INTO t1 VALUES(2, POINT(2, 2));
@@ -223,7 +223,7 @@ t1	CREATE TABLE `t1` (
   `g` geometry NOT NULL,
   PRIMARY KEY (`c1`),
   SPATIAL KEY `g` (`g`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='ROTATED_KEYS'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='KEYRING'
 FLUSH TABLES t1 WITH READ LOCK;
 UNLOCK TABLES;
 SELECT c1, ST_AsText(g) FROM t1 ORDER BY c1 LIMIT 10;

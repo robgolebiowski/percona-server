@@ -985,7 +985,7 @@ fil_crypt_start_encrypting_space(
 	crypt_data->rotate_state.active_threads = 1;
 
 	if (space->encryption_type == Encryption::AES) {// We are re-encrypting space from MK encryption to RK encryption
-		crypt_data->encryption_rotation = Encryption::MASTER_KEY_TO_ROTATED_KEY;
+		crypt_data->encryption_rotation = Encryption::MASTER_KEY_TO_KEYRING;
 		ut_ad(space->encryption_key != NULL && space->encryption_iv != NULL);
 		crypt_data->set_tablespace_key(space->encryption_key);
 		crypt_data->set_tablespace_iv(space->encryption_iv); //space key and encryption are always initalized for MK encrypted tables
@@ -1008,7 +1008,7 @@ fil_crypt_start_encrypting_space(
 	crypt_data = fil_space_set_crypt_data(space, crypt_data);
 	mutex_exit(&crypt_data->mutex);
 
-	space->encryption_type= Encryption::ROTATED_KEYS; // This works like this - if Encryption::ROTATED_KEYS is set - it means that
+	space->encryption_type= Encryption::KEYRING; // This works like this - if Encryption::KEYRING is set - it means that
 	fil_crypt_start_converting = true;
 	mutex_exit(&fil_crypt_threads_mutex);
 
@@ -1717,7 +1717,7 @@ fil_crypt_rotate_page(
 		// This is now also true for all the other encryption rotations
 		//
 		// We will rotate the pages from the begining if there was a crash
-		uint kv= space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_ROTATED_KEY
+		uint kv= space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_KEYRING
 			? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
 			: mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
 

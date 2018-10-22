@@ -5346,7 +5346,7 @@ row_drop_table_for_mysql(
 			}
 		}
 
-		if (is_encrypted && !table->rotated_keys_info.page0_has_crypt_data) {
+		if (is_encrypted && !table->keyring_encryption_info.page0_has_crypt_data) {
 			/* Require the mutex to block key rotation. */
 			was_master_key_id_mutex_locked = true;
 			mutex_enter(&master_key_id_mutex);

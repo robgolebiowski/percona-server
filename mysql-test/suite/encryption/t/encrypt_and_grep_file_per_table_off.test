@@ -23,19 +23,19 @@ SET GLOBAL innodb_file_format = `Barracuda`;
 
 # It is not possible to create table with explicit encryption when file-per-table is OFF
 --error ER_ILLEGAL_HA_CREATE_OPTION
-CREATE TABLE t0 (a varchar(255)) engine=innodb encryption='ROTATED_KEYS';
+CREATE TABLE t0 (a varchar(255)) engine=innodb encryption='KEYRING';
 
 --error ER_INVALID_ENCRYPTION_OPTION
-CREATE TABLESPACE ts_rk_encrypted_impossible ADD DATAFILE 'ts_rk_encrypted_impossible.ibd' ENCRYPTION='ROTATED_KEYS';
+CREATE TABLESPACE ts_rk_encrypted_impossible ADD DATAFILE 'ts_rk_encrypted_impossible.ibd' ENCRYPTION='KEYRING';
 
 --error ER_ILLEGAL_HA_CREATE_OPTION
-CREATE TABLE p2 (a TEXT) TABLESPACE=innodb_system ENCRYPTION="ROTATED_KEYS" ENGINE="InnoDB";
+CREATE TABLE p2 (a TEXT) TABLESPACE=innodb_system ENCRYPTION="KEYRING" ENGINE="InnoDB";
 
 # Temporarily turning on innodb_file_per_table
 # As it should not be possible to create table as a part of tablespace
 SET GLOBAL innodb_file_per_table=ON;
 --error ER_ILLEGAL_HA_CREATE_OPTION
-CREATE TABLE p2 (a TEXT) TABLESPACE=innodb_system ENCRYPTION="ROTATED_KEYS" ENGINE="InnoDB";
+CREATE TABLE p2 (a TEXT) TABLESPACE=innodb_system ENCRYPTION="KEYRING" ENGINE="InnoDB";
 SET GLOBAL innodb_file_per_table=OFF;
 
 create table t1 (a varchar(255)) engine=innodb;

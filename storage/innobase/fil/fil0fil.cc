@@ -745,12 +745,12 @@ retry:
 
 
 			if (space->crypt_data && fil_set_encryption(space->id,
-				Encryption::ROTATED_KEYS,
+				Encryption::KEYRING,
 				NULL,
 				space->crypt_data->iv,
 				false) != DB_SUCCESS)
                         ut_ad(0);
-                }                                                     
+                }
 
 
 		os_file_close(node->handle);
@@ -792,7 +792,7 @@ retry:
 		unsigned relevant_flags
 			= flags & ~FSP_FLAGS_MASK_DATA_DIR;
 
-                // in case or RK it can so happen that there will be a crash after all pages of tablespace is rotated
+                // in case of Keyring encryption it can so happen that there will be a crash after all pages of tablespace is rotated
                 // and DD is updated, but page0 of the tablespace has not been yet update. We handle this here.
                 if (space->crypt_data != NULL &&
                     (
@@ -3994,7 +3994,6 @@ fil_ibd_create(
 
 	/* Create crypt data if the tablespace is either encrypted or user has
 	requested it to remain unencrypted. */
-        // TODO:Robert: FIL_ENCRYPTION_ON jest tylko ustawione dla rotated_keys
 	if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF
 	    || (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING || create_info_encryption_key_id.was_encryption_key_id_set)) {
 		crypt_data = fil_space_create_crypt_data(mode,
@@ -4022,7 +4021,7 @@ fil_ibd_create(
 	if (FSP_FLAGS_GET_ENCRYPTION(space->flags) || crypt_data) {
 		err = fil_set_encryption(space->id,
 					 crypt_data != NULL
-						? Encryption::ROTATED_KEYS
+						? Encryption::KEYRING
 						: Encryption::AES,
 					 NULL,
 					 crypt_data != NULL
@@ -4101,7 +4100,7 @@ fil_ibd_open(
 	ulint		flags,
 	const char*	space_name,
 	const char*	path_in,
-        Rotated_keys_info &rotated_keys_info)
+        Keyring_encryption_info &keyring_encryption_info)
 {
 	dberr_t		err = DB_SUCCESS;
 	bool		dict_filepath_same_as_default = false;
@@ -4245,24 +4244,24 @@ fil_ibd_open(
 		(validate_output = df_remote.validate_to_dd(id, flags, for_import)).error
 			== DB_SUCCESS ? 1 : 0;
 
-	if (validate_output.rotated_keys_info.page0_has_crypt_data)
-		rotated_keys_info = validate_output.rotated_keys_info;
+	if (validate_output.keyring_encryption_info.page0_has_crypt_data)
+		keyring_encryption_info = validate_output.keyring_encryption_info;
 
 	valid_tablespaces_found +=
 		(validate_output = df_default.validate_to_dd(id, flags, for_import)).error
 		== DB_SUCCESS ? 1 : 0;
 
 	if (validate_output.error == DB_SUCCESS ||
-		(valid_tablespaces_found == 0 && validate_output.rotated_keys_info.page0_has_crypt_data))
-			rotated_keys_info = validate_output.rotated_keys_info;
+		(valid_tablespaces_found == 0 && validate_output.keyring_encryption_info.page0_has_crypt_data))
+			keyring_encryption_info = validate_output.keyring_encryption_info;
 
 	valid_tablespaces_found +=
 		(validate_output = df_dict.validate_to_dd(id, flags, for_import)).error
 		== DB_SUCCESS ? 1 : 0;
 
 	if (validate_output.error == DB_SUCCESS ||
-		(valid_tablespaces_found == 0 && validate_output.rotated_keys_info.page0_has_crypt_data))
-		rotated_keys_info = validate_output.rotated_keys_info;
+		(valid_tablespaces_found == 0 && validate_output.keyring_encryption_info.page0_has_crypt_data))
+		keyring_encryption_info = validate_output.keyring_encryption_info;
 
 	/* Make sense of these three possible locations.
 	First, bail out if no tablespace files were found. */
@@ -4479,7 +4478,7 @@ skip_validate:
 			ut_ad(err == DB_SUCCESS);
 		} else if (space->crypt_data) {
 				err = fil_set_encryption(space->id,
-						 Encryption::ROTATED_KEYS,
+						 Encryption::KEYRING,
 						 NULL,
 						 space->crypt_data->iv);
 
@@ -4944,7 +4943,7 @@ fil_ibd_load(
 
 	fil_space_crypt_t *crypt_data = first_page
 		? fil_space_read_crypt_data(page_size_t(file.flags()), first_page)
-		: NULL;   
+		: NULL;
 
 	bool is_temp = FSP_FLAGS_GET_TEMPORARY(file.flags());
 	space = fil_space_create(
@@ -4973,7 +4972,7 @@ fil_ibd_load(
             || crypt_data) {
 		dberr_t err = fil_set_encryption(space->id,
 						 crypt_data
-							? Encryption::ROTATED_KEYS
+							? Encryption::KEYRING
 							: Encryption::AES,
 						 file.m_encryption_key,
 						 crypt_data
@@ -5819,12 +5818,12 @@ fil_io_set_keyring_encryption(IORequest& req_type,
 	if (req_type.is_read()) {
 		tablespace_iv = space->crypt_data->tablespace_iv;
 		tablespace_key = space->crypt_data->tablespace_key;
-		ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_ROTATED_KEY ||
+		ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_KEYRING ||
 		      space->crypt_data->tablespace_key != NULL);
 		// retrieve key with min_key_version from local cache. In normal situation this is the key needed for
 		// decryption. In rare cases when re-encryption was aborted - due to server crash or shutdown there
 		// can be one more key version needed to decrypt tablespace - we will find this version in decrypt and
-		// retrieve needed version. 
+		// retrieve needed version.
 		if (space->crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 			key= space->crypt_data->get_min_key_version_key();
 			memcpy(key_min, key, 32);
@@ -5910,7 +5909,7 @@ fil_io_set_encryption(
 	   don't encrypt TRX_SYS_SPACE.TRX_SYS_PAGE_NO as it contains address to dblwr buffer */
 	if (!req_type.is_log() && page_id.page_no() > 0 && (TRX_SYS_SPACE != page_id.space() || TRX_SYS_PAGE_NO != page_id.page_no())
 	    && space->encryption_type != Encryption::NONE) {
-		if (space->encryption_type == Encryption::ROTATED_KEYS)  {
+		if (space->encryption_type == Encryption::KEYRING)  {
 			ut_ad(space->crypt_data != NULL);
 
 			fil_io_set_keyring_encryption(req_type, space, page_id);
@@ -6305,10 +6304,8 @@ _fil_io(
 		fil_no_punch_hole(node);
 	}
 
-	/* We an try to recover the page from the double write buffer if the decompression fails or the page is corrupt. */ 
+	/* We can try to recover the page from the double write buffer if the decompression fails or the page is corrupt. */ 
         
-        //ut_a(req_type.is_dblwr_recover() || err == DB_SUCCESS);
-       
         if (sync) { /* The i/o operation is already completed when we return from os_aio: */ mutex_enter(&fil_system->mutex); 
 		fil_node_complete_io(node, fil_system, req_type);
 
@@ -6903,23 +6900,23 @@ fil_iterate(
 		ut_ad(n_bytes > 0);
 		ut_ad(!(n_bytes % iter.page_size));
 
-		const bool	encrypted_with_rotated_keys = iter.crypt_data != NULL
-							      && iter.crypt_data->type != CRYPT_SCHEME_UNENCRYPTED;
+		const bool	encrypted_with_keyring = iter.crypt_data != NULL
+							 && iter.crypt_data->type != CRYPT_SCHEME_UNENCRYPTED;
 
 		dberr_t		err;
 
 		/* For encrypted table, set encryption information. */
-		if ((iter.encryption_key != NULL || encrypted_with_rotated_keys) && offset != 0) {
-			read_request.encryption_key(encrypted_with_rotated_keys ? iter.crypt_data->tablespace_key : iter.encryption_key,
+		if ((iter.encryption_key != NULL || encrypted_with_keyring) && offset != 0) {
+			read_request.encryption_key(encrypted_with_keyring ? iter.crypt_data->tablespace_key : iter.encryption_key,
 						    ENCRYPTION_KEY_LEN,
 						    false,
-						    encrypted_with_rotated_keys ? iter.crypt_data->iv : iter.encryption_iv,
+						    encrypted_with_keyring ? iter.crypt_data->iv : iter.encryption_iv,
 						    0,
 						    iter.encryption_key_id,
-						    encrypted_with_rotated_keys ? iter.crypt_data->tablespace_iv : NULL,
-						    encrypted_with_rotated_keys ? iter.crypt_data->tablespace_key : NULL);
+						    encrypted_with_keyring ? iter.crypt_data->tablespace_iv : NULL,
+						    encrypted_with_keyring ? iter.crypt_data->tablespace_key : NULL);
 
-			read_request.encryption_algorithm(iter.crypt_data ? Encryption::ROTATED_KEYS
+			read_request.encryption_algorithm(iter.crypt_data ? Encryption::KEYRING
 									  : Encryption::AES);
 			if (iter.crypt_data) {
 				read_request.encryption_rotation(iter.crypt_data->encryption_rotation);
@@ -6975,7 +6972,7 @@ fil_iterate(
 						     iter.encryption_key_id,
 						     NULL,
 						     NULL);
-			write_request.encryption_algorithm(iter.crypt_data ? Encryption::ROTATED_KEYS
+			write_request.encryption_algorithm(iter.crypt_data ? Encryption::KEYRING
                                                                            : Encryption::AES);
 		} else if (offset != 0 && iter.crypt_data) {
 			write_request.encryption_key(iter.encryption_key,
@@ -6987,7 +6984,7 @@ fil_iterate(
 						     NULL,
 						     NULL);
 
-			write_request.encryption_algorithm(Encryption::ROTATED_KEYS);
+			write_request.encryption_algorithm(Encryption::KEYRING);
 
 			if (callback.get_page_size().is_compressed()) {
 				write_request.mark_page_zip_compressed();

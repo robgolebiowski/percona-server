@@ -239,12 +239,12 @@ public:
 		, encryption_type(DO_NOT_KNOW)
 		{}
 
-		Rotated_keys_info rotated_keys_info;
+		Keyring_encryption_info keyring_encryption_info;
 
 		enum EncryptionType {
 			DO_NOT_KNOW, /*error occured before we were able to read encryption type from first page*/
 			NONE,
-			ROTATED_KEYS,
+			KEYRING,
 			MASTER_KEY
 		};
 		dberr_t error;

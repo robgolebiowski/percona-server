@@ -272,14 +272,8 @@ bool mysql_create_frm(THD *thd, const char *file_name,
 
   create_info->extra_size+= 2 + create_info->encrypt_type.length;
 
-  //if ((create_info->encrypt_type.length == 0 && create_info->was_encryption_key_id_set) ||
-  //    (create_info->encrypt_type.length != 0 &&
-  //     my_strcasecmp(system_charset_info, create_info->encrypt_type.str, "ROTATED_KEYS") == 0))
   if (create_info->was_encryption_key_id_set)
-  {
     create_info->extra_size += strlen("ENCRYPTION_KEY_ID") + 4;
-  }
-
 
   if ((file=create_frm(thd, file_name, db, table, reclength, fileinfo,
 		       create_info, keys, key_info)) < 0)

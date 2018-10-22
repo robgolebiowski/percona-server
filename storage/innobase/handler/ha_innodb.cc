@@ -2817,10 +2817,10 @@ Encryption::is_no(const char* algorithm)
 }
 
 bool
-Encryption::is_rotated_keys(const char *algoritm)
+Encryption::is_keyring(const char *algoritm)
 {
 	return (algoritm != NULL &&
-		innobase_strcasecmp(algoritm, "rotated_keys") == 0);
+		innobase_strcasecmp(algoritm, "keyring") == 0);
 }
 
 /** Check the encryption option and set it
@@ -2840,9 +2840,9 @@ Encryption::set_algorithm(
 
 		encryption->m_type = AES;
 
-	} else if (innobase_strcasecmp(option, "ROTATED_KEYS") == 0) {
+	} else if (innobase_strcasecmp(option, "KEYRING") == 0) {
 
-		encryption->m_type = ROTATED_KEYS;
+		encryption->m_type = KEYRING;
 
 	} else  {
 		return(DB_UNSUPPORTED);
@@ -2851,7 +2851,7 @@ Encryption::set_algorithm(
 	return(DB_SUCCESS);
 }
 
-/** Check for supported ENCRYPT := (Y | N | ROTATED_KEYS) supported values
+/** Check for supported ENCRYPT := (Y | N | KEYRING) supported values
 @param[in]	option		Encryption option
 @param[out]	encryption	The encryption algorithm
 @return DB_SUCCESS or DB_UNSUPPORTED */
@@ -6894,9 +6894,9 @@ ha_innobase::open(
 	file can't be retrieved properly, mark it as corrupted. */
 	if (ib_table != NULL
 	    && (dict_table_is_encrypted(ib_table) ||
-		( 
-			ib_table->rotated_keys_info.page0_has_crypt_data &&
-			ib_table->rotated_keys_info.is_encryption_in_progress()
+		(
+			ib_table->keyring_encryption_info.page0_has_crypt_data &&
+			ib_table->keyring_encryption_info.is_encryption_in_progress()
 		)
 	       )
 		&& ib_table->file_unreadable
@@ -6906,13 +6906,13 @@ ha_innobase::open(
 		or force recovery can still use it, but not others. */
 		if (space() == NULL) {
 			int ret_err= HA_ERR_TABLE_CORRUPT;
-			if (ib_table->rotated_keys_info.rk_encryption_key_is_missing ||
-			    ib_table->rotated_keys_info.page0_has_crypt_data) {
+			if (ib_table->keyring_encryption_info.keyring_encryption_key_is_missing ||
+			    ib_table->keyring_encryption_info.page0_has_crypt_data) {
 				/* Proper error message has been already printed by Datafile::validate_first_page,
 				* thus we do not print anything here */
 				ret_err= HA_ERR_DECRYPTION_FAILED;
 			}
-			else 
+			else
 				my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
 
 			dict_table_close(ib_table, FALSE, FALSE);
@@ -11039,21 +11039,21 @@ create_table_info_t::enable_master_key_encryption(dict_table_t* table) {
 }
 
 dberr_t
-create_table_info_t::enable_keyring_encryption(dict_table_t *table, fil_encryption_t &rotated_keys_encryption_option) {
+create_table_info_t::enable_keyring_encryption(dict_table_t *table, fil_encryption_t &keyring_encryption_option) {
 
 	if (Encryption::is_no(m_create_info->encrypt_type.str))
-		rotated_keys_encryption_option= FIL_ENCRYPTION_OFF;
-	else if(Encryption::is_rotated_keys(m_create_info->encrypt_type.str) ||
+		keyring_encryption_option= FIL_ENCRYPTION_OFF;
+	else if(Encryption::is_keyring(m_create_info->encrypt_type.str) ||
 		(srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)) {
 
 		// Check if keyring is up and the key exists in keyring was already done in encryption option validation
-		rotated_keys_encryption_option= Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
+		keyring_encryption_option= Encryption::is_keyring(m_create_info->encrypt_type.str)
 						? FIL_ENCRYPTION_ON
 						: FIL_ENCRYPTION_DEFAULT;
 		DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
 
 		uint tablespace_key_version;
-		byte *tablespace_key; 
+		byte *tablespace_key;
 		Encryption::get_latest_tablespace_key_or_create_new_one(m_create_info->encryption_key_id, &tablespace_key_version, &tablespace_key);
 		if (tablespace_key == NULL) {
 			my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
@@ -11091,7 +11091,7 @@ create_table_info_t::create_table_def()
 	ulint		num_v = 0;
 	ulint		space_id = 0;
 	ulint		actual_n_cols;
-	fil_encryption_t rotated_keys_encryption_option= FIL_ENCRYPTION_DEFAULT;
+	fil_encryption_t keyring_encryption_option= FIL_ENCRYPTION_DEFAULT;
 
 	DBUG_ENTER("create_table_def");
 	DBUG_PRINT("enter", ("table_name: %s", m_table_name));
@@ -11396,7 +11396,7 @@ err_col:
 
 	err = (Encryption::is_master_key_encryption(m_create_info->encrypt_type.str))
 		? enable_master_key_encryption(table)
-		: enable_keyring_encryption(table, rotated_keys_encryption_option);
+		: enable_keyring_encryption(table, keyring_encryption_option);
 
 	if (err != DB_SUCCESS) {
 		dict_mem_table_free(table);
@@ -11493,7 +11493,7 @@ err_col:
 
 			err = row_create_table_for_mysql(
 				table, algorithm, m_trx, false,
-				rotated_keys_encryption_option,
+				keyring_encryption_option,
 				create_info_encryption_key_id);
 		}
 
@@ -12141,12 +12141,12 @@ create_table_info_t::create_option_encryption_is_valid() const
 		}
 	}
 
-	bool table_is_rotated_keys = Encryption::is_rotated_keys(m_create_info->encrypt_type.str);
+	bool table_is_keyring = Encryption::is_keyring(m_create_info->encrypt_type.str);
 
-	if (table_is_rotated_keys) {
+	if (table_is_keyring) {
 		if (!m_allow_file_per_table) {
 			my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-					"InnoDB: ROTATED_KEYS requires innodb_file_per_table.", MYF(0));
+					"InnoDB: KEYRING requires innodb_file_per_table.", MYF(0));
 			return (false);
 		}
 
@@ -12158,7 +12158,7 @@ create_table_info_t::create_option_encryption_is_valid() const
 			const KEY* key = m_form->key_info + i;
 			if (key->flags & HA_SPATIAL) {
 				my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-						"InnoDB: ENCRYPTED='ROTATED_KEYS' not supported for table because "
+						"InnoDB: ENCRYPTED='KEYRING' not supported for table because "
 						"it contains spatial index.", MYF(0));
 				return(false);
 			}
@@ -12169,7 +12169,7 @@ create_table_info_t::create_option_encryption_is_valid() const
 
 	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE
 	  && (Encryption::is_no(m_create_info->encrypt_type.str) ||
-              Encryption::is_rotated_keys(m_create_info->encrypt_type.str))) {
+              Encryption::is_keyring(m_create_info->encrypt_type.str))) {
 		my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
 			"InnoDB: Only Master Key encrypted tables (ENCRYPTION=\'Y\') can be created with "
 			"innodb_encrypt_tables=FORCE.", MYF(0));
@@ -12177,7 +12177,7 @@ create_table_info_t::create_option_encryption_is_valid() const
 	}
 
 	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE
-	    && (!Encryption::is_rotated_keys(m_create_info->encrypt_type.str)
+	    && (!Encryption::is_keyring(m_create_info->encrypt_type.str)
 	    &&  !(Encryption::is_master_key_encryption(m_create_info->encrypt_type.str) &&
 	    m_create_info->options & HA_LEX_CREATE_TMP_TABLE))
 	    &&  !(m_create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE)) {
@@ -12416,7 +12416,7 @@ create_table_info_t::create_options_are_invalid()
 }
 
 static const LEX_STRING yes_string = { C_STRING_WITH_LEN("Y") };
-static const LEX_STRING rotated_keys_string = { C_STRING_WITH_LEN("ROTATED_KEYS") };
+static const LEX_STRING keyring_string = { C_STRING_WITH_LEN("KEYRING") };
 void
 ha_innobase::adjust_create_info_for_frm(
 	HA_CREATE_INFO*	create_info)
@@ -12440,32 +12440,32 @@ ha_innobase::adjust_create_info_for_frm(
 					srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE))))
 		     ||
 		     (is_intrinsic && srv_tmp_space.is_encrypted())
-		    ) {		
+		    ) {
 			create_info->encrypt_type = yes_string;
 		      } else if (!is_intrinsic &&
 				 (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
 				  srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
 				  srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)) {
-				create_info->encrypt_type = rotated_keys_string;
+				create_info->encrypt_type = keyring_string;
 		      }
 	}
 
 	LEX_STRING*	encrypt_type = &create_info->encrypt_type;
 
 	if (false == create_info->was_encryption_key_id_set) {
-		if (Encryption::is_rotated_keys(encrypt_type->str) ||
+		if (Encryption::is_keyring(encrypt_type->str) ||
 		    (encrypt_type->length == 0 && srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)) {
 			create_info->encryption_key_id = THDVAR(current_thd, default_encryption_key_id);
 			create_info->was_encryption_key_id_set = true;
 		}
 	} else if (Encryption::is_master_key_encryption(encrypt_type->str) || Encryption::is_no(encrypt_type->str)) {
 		// if it is encrypted table with Master key encryption or marked as not to be encrypted and alter table
-		// does not have ENCRYPTION_KEY_ID - mark encryption key id as not set. 
+		// does not have ENCRYPTION_KEY_ID - mark encryption key id as not set.
 
 		push_warning_printf(
 			current_thd, Sql_condition::SL_WARNING,
 			HA_WRONG_CREATE_OPTION,
-			Encryption::is_no(encrypt_type->str)  
+			Encryption::is_no(encrypt_type->str)
 				? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled."
 				: "InnoDB: Ignored ENCRYPTION_KEY_ID %u when Master Key encryption is enabled.",
 				create_info->encryption_key_id
@@ -12661,7 +12661,7 @@ create_table_info_t::innobase_table_flags()
 
 		if (m_use_shared_space && !m_use_file_per_table) {
 			/* Can't encrypt shared tablespace with keyring encryption */
-			if (Encryption::is_rotated_keys(encryption)) {
+			if (Encryption::is_keyring(encryption)) {
 				my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
 			DBUG_RETURN(false);
 			}
@@ -14109,7 +14109,7 @@ validate_create_tablespace_info(
 		err = Encryption::validate(alter_info->encrypt_type.str);
 
 		if (err == DB_UNSUPPORTED ||
-		    Encryption::is_rotated_keys(alter_info->encrypt_type.str)) {
+		    Encryption::is_keyring(alter_info->encrypt_type.str)) {
 			my_error(ER_INVALID_ENCRYPTION_OPTION, MYF(0));
 			return(HA_WRONG_CREATE_OPTION);
 		}

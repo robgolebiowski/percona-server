@@ -1371,7 +1371,7 @@ dict_check_sys_tablespaces(
 		opened. */
 		char*	filepath = dict_get_first_path(space_id);
 
-		Rotated_keys_info rotated_keys_info;
+		Keyring_encryption_info keyring_encryption_info;
 
 		/* Check that the .ibd file exists. */
 		dberr_t	err = fil_ibd_open(
@@ -1382,7 +1382,7 @@ dict_check_sys_tablespaces(
 			fsp_flags,
 			space_name,
 			filepath,
-                        rotated_keys_info);
+                        keyring_encryption_info);
 
 		if (err != DB_SUCCESS) {
 			ib::warn() << "Ignoring tablespace "
@@ -1615,7 +1615,7 @@ dict_check_sys_tables(
 							 is_temp,
 							 is_encrypted);
 
-		Rotated_keys_info rotated_keys_info;
+		Keyring_encryption_info keyring_encryption_info;
 
 		dberr_t	err = fil_ibd_open(
 			validate,
@@ -1625,7 +1625,7 @@ dict_check_sys_tables(
 			fsp_flags,
 			space_name,
 			filepath,
-			rotated_keys_info);
+			keyring_encryption_info);
 
 		if (err != DB_SUCCESS) {
 			ib::warn() << "Ignoring tablespace "
@@ -3151,18 +3151,18 @@ dict_load_tablespace(
 					       false,
 					       dict_table_is_encrypted(table));
 
-	Rotated_keys_info rotated_keys_info;
+	Keyring_encryption_info keyring_encryption_info;
 
 	dberr_t err = fil_ibd_open(
 		true, false, FIL_TYPE_TABLESPACE, table->space,
-		fsp_flags, space_name, filepath, rotated_keys_info);
+		fsp_flags, space_name, filepath, keyring_encryption_info);
 
 	if (err != DB_SUCCESS) {
 		/* We failed to find a sensible tablespace file */
 		table->set_file_unreadable();
 	}
 
-	table->rotated_keys_info = rotated_keys_info;
+	table->keyring_encryption_info = keyring_encryption_info;
 
 	ut_free(shared_space_name);
 	ut_free(filepath);
