@@ -1,3 +1,4 @@
+--skip
 #
 # MDEV-11759: Encryption code in MariaDB 10.1/10.2 causes compatibility problems
 #

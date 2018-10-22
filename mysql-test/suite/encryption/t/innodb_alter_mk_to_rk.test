@@ -1,3 +1,4 @@
+--skip
 -- source include/have_innodb.inc
 # embedded does not support restart
 -- source include/not_embedded.inc

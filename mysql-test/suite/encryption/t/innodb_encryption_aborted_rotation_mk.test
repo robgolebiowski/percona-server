@@ -1,3 +1,4 @@
+--skip
 # Testing basic table's type 
 let $t1_table_type=ENCRYPTION='Y';
 let $is_t1_compressed=0;
