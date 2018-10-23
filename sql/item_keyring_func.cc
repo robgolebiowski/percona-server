@@ -51,19 +51,9 @@ longlong Item_func_rotate_system_key::val_int()
 
 bool Item_func_rotate_system_key::calc_value(const String *arg)
 {
-  bool is_valid_key= false;
-
-  // Check if requested key for rotation starts with any valid prefix from
-  // valid_percona_system_keys
-  for(uint i= 0; i < valid_percona_system_keys_size; ++i)
-  {
-    if (strstr(arg->ptr(), valid_percona_system_keys[i]) == arg->ptr())
-    {
-      is_valid_key= true;
-      break;
-    } 
-  }
-  return is_valid_key && !(my_key_generate(arg->ptr(), "AES", NULL, 32)); // TODO:For binlog I need 16
+  size_t key_length = 0;
+  return is_valid_percona_system_key(arg->ptr(), &key_length) &&
+         !(my_key_generate(arg->ptr(), "AES", NULL, key_length));
 }
 
 bool Item_func_rotate_system_key::fix_fields(THD *thd, Item **ref)

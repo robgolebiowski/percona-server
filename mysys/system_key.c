@@ -18,13 +18,35 @@
 #include <stdlib.h>
 #include "my_sys.h"
 
+struct Valid_percona_system_key
+{
+  const char *key_name;
+  size_t key_length;
+  my_bool is_prefix; // If set valid percona key must start with prefix key_name. If is_prefix is not set
+                     // valid key must match exactly the name from key_name
+};
+
 /** 
    System keys cannot have ':' in their name. We use ':' as a separator between
    system key's name and system key's version.
 */
-const char* valid_percona_system_keys[] = {PERCONA_BINLOG_KEY_NAME,
-                                           PERCONA_INNODB_KEY_NAME};
+struct Valid_percona_system_key valid_percona_system_keys[] = { {PERCONA_BINLOG_KEY_NAME, 16, FALSE},
+                                                                {PERCONA_INNODB_KEY_NAME, 32, TRUE} };
 const size_t valid_percona_system_keys_size = array_elements(valid_percona_system_keys);
+
+my_bool is_valid_percona_system_key(const char *key_name, size_t *key_length)
+{
+  for(uint i= 0; i < valid_percona_system_keys_size; ++i)
+  {
+    if ((valid_percona_system_keys[i].is_prefix && strstr(key_name, valid_percona_system_keys[i].key_name) == key_name) ||
+        (!valid_percona_system_keys[i].is_prefix && strcmp(valid_percona_system_keys[i].key_name, key_name) == 0))
+    {
+      *key_length = valid_percona_system_keys[i].key_length;
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
 
 // Only parse the latest key - from system_keys_container - do not parse keys from keys_container
 uchar* parse_system_key(const uchar *key, const size_t key_length, uint *key_version,
