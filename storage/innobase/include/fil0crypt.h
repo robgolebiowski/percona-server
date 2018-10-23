@@ -126,51 +126,17 @@ struct Cached_key
   }
 };
 
-// Merge it with fil_crypt_data
-struct st_encryption_scheme {
-	st_encryption_scheme() {
-	}
-
-	~st_encryption_scheme();
-
-  unsigned char iv[16];
-  struct st_encryption_scheme_key key[3]; //TODO : Why do I need this ?
-
-  uchar* get_key_or_create_one(uint *version, bool create_if_not_exists);
-  uchar* get_key(uint version);
-  //uchar* get_key_currently_used_for_encryption();
-
-
-  uint encrypting_with_key_version;
-  unsigned int keyserver_requests;
-  //unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
-  unsigned int key_id;
-  unsigned int type; 
-
-  //void (*locker)(struct st_encryption_scheme *self, int release);
-private:
-	st_encryption_scheme(const st_encryption_scheme&);
-	st_encryption_scheme& operator = (const st_encryption_scheme &);
-};
 
 /** is encryption enabled */
 extern ulong	srv_encrypt_tables;
 
-/** Mutex helper for crypt_data->scheme
-@param[in, out]	schme	encryption scheme
-@param[in]	exit	should we exit or enter mutex ? */
-void
-crypt_data_scheme_locker(
-	st_encryption_scheme*	scheme,
-	int			exit);
-
 struct fil_space_rotate_state_t
 {
 
-        fil_space_rotate_state_t()
-          : trx(NULL),
-            flush_observer(NULL)
-        {}
+	fil_space_rotate_state_t()
+	  : trx(NULL),
+	    flush_observer(NULL)
+	{}
 
 	time_t start_time;	/*!< time when rotation started */
 	ulint active_threads;	/*!< active threads in space */
@@ -188,39 +154,19 @@ struct fil_space_rotate_state_t
 					     completed */
 	} scrubbing;
 
-        trx_t *trx;
-        FlushObserver *flush_observer;
+	trx_t *trx;
+	FlushObserver *flush_observer;
 
-        void create_flush_observer(uint space_id);
-        //{
-          //ut_ad(flush_observer == NULL && trx == NULL);
-          //trx = trx_allocate_for_background();
-          //flush_observer = UT_NEW_NOKEY(FlushObserver(space_id,
-                                                      //trx, 
-                                                      //NULL));
-        //}
+	void create_flush_observer(uint space_id);
 
-        void destroy_flush_observer();
-        //{
-          //ut_ad(flush_observer != NULL && trx != NULL);
-          //UT_DELETE(flush_observer);
-          //flush_observer = NULL;
-          //trx_free_for_background(trx);
-          //trx = NULL;
-        //}
-
-		//flush_observer = UT_NEW_NOKEY(
-			//FlushObserver(new_table->space, trx, stage));
-
-		//trx_set_flush_observer(trx, flush_observer);
-
+	void destroy_flush_observer();
 };
 
 
 #ifndef UNIV_INNOCHECKSUM
 
 
-struct fil_space_crypt_t : st_encryption_scheme
+struct fil_space_crypt_t
 {
  public:
 	/** Constructor. Does not initialize the members!
@@ -356,6 +302,14 @@ struct fil_space_crypt_t : st_encryption_scheme
         //nevertheless we need ENCRYPTION_KEY_LEN tablespace_iv 
         //to be able to store this IV.
         uchar *tablespace_iv;
+
+	unsigned char iv[16];
+
+	uint encrypting_with_key_version;
+	unsigned int keyserver_requests;
+	unsigned int key_id;
+	unsigned int type; 
+
 };
 
 /** Status info about encryption */

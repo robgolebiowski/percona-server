@@ -148,80 +148,10 @@ uchar * fil_space_crypt_t::get_cached_key(Cached_key &cached_key, uint key_versi
 }
 
 bool fil_space_crypt_t::load_needed_keys_into_local_cache() {
-	if (encrypting_with_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-		// used in encryption 
-		uchar *key = get_key(encrypting_with_key_version);
-		if (key == NULL)
-			return false;
-	}
-
-	if (min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-		// We need this key to decrypt table 
-		uchar *key = get_key(min_key_version);
-		if (key == NULL)
-			return false;
-	}
-	return true;
-}
-
-st_encryption_scheme::~st_encryption_scheme() {
-	for (size_t i = 0; i < array_elements(key); ++i) {
-		if (key[i].key != NULL)
-			my_free(key[i].key);
-	}
-}
-
-uchar* st_encryption_scheme::get_key(uint version) {
-	return get_key_or_create_one(&version, false);
-}
-
-uchar* st_encryption_scheme::get_key_or_create_one(uint *version, bool create_if_not_exists) {
-	ut_ad(*version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
-	      || create_if_not_exists);
-
-	if (*version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
-  {
-    for (uint i = 0; i < array_elements(key); ++i)
-    {
-      if(key[i].version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) // no more keys
-        break;
-
-      if (key[i].version == *version)
-        return key[i].key;
-    }
-  }
-
-  // key not found
-  uchar *tablespace_key = NULL;
-  //uint tablespace_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-  //if (create_if_not_exists)
-    //Encryption::get_latest_tablespace_key_or_create_new_one(this->key_id, &tablespace_key_version, &tablespace_key);
-  //else
-  size_t key_len;
-  Encryption::get_tablespace_key(this->key_id, *version, &tablespace_key, &key_len);
-    
-  if (tablespace_key == NULL)
-    return NULL;
-
-  // Rotate keys to make room for a new one
-  if (key[array_elements(key) - 1].key != NULL)
-  {
-    memset_s(key[array_elements(key)-1].key, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
-    my_free(key[array_elements(key)-1].key);
-    key[array_elements(key)-1].key = NULL;
-    key[array_elements(key)-1].version = 0;
-  }
-
-  for (uint i = array_elements(key) - 1; i; i--)
-  {
-    key[i] = key[i - 1];
-  }
-  key[0].key= tablespace_key;
-  key[0].version = *version;
-
-  //*version = *vers;
-
-  return tablespace_key;
+	return (encrypting_with_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ||
+		get_key_currently_used_for_encryption() != NULL) &&
+		(min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ||
+		get_min_key_version_key() != NULL);
 }
 
 /** Statistics variables */
@@ -272,8 +202,7 @@ fil_space_crypt_t::fil_space_crypt_t(
 		fil_encryption_t new_encryption,
 		bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
 		Encryption::Encryption_rotation encryption_rotation)
-		: st_encryption_scheme(),
-		min_key_version(new_min_key_version),
+		: min_key_version(new_min_key_version),
 		page0_offset(0),
 		encryption(new_encryption),
 		key_found(false),
@@ -356,23 +285,6 @@ fil_crypt_get_latest_key_version(
 	}
 
 	return key_version;
-}
-
-/******************************************************************
-Mutex helper for crypt_data->scheme */
-void
-crypt_data_scheme_locker(
-/*=====================*/
-	st_encryption_scheme*	scheme,
-	int			exit) {
-	fil_space_crypt_t* crypt_data =
-		static_cast<fil_space_crypt_t*>(scheme);
-
-	if (exit) {
-		mutex_exit(&crypt_data->mutex);
-	} else {
-		mutex_enter(&crypt_data->mutex);
-	}
 }
 
 /******************************************************************
