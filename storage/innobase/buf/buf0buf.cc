@@ -5689,14 +5689,18 @@ buf_mark_space_corrupt(
 	space id, and mark it corrupted. Encrypted tables
 	are marked unusable later e.g. in ::open(). */
 	if (!bpage->encrypted) {
-		dict_set_corrupted_by_space(space);
+		if (dict_set_corrupted_by_space(space)) {
+			buf_LRU_free_one_page(bpage);
+		} else {
+			rw_lock_x_unlock(hash_lock);
+			mutex_exit(buf_page_get_mutex(bpage));
+			ret = FALSE;
+		}
 	} else {
 		dict_set_encrypted_by_space(space);
-	}
-
-	/* After this point bpage can't be referenced. */
-	buf_LRU_free_one_page(bpage);
-	
+		/* After this point bpage can't be referenced. */
+		buf_LRU_free_one_page(bpage);
+	}	
 	mutex_exit(&buf_pool->LRU_list_mutex);
 
 	ut_ad(buf_pool->n_pend_reads > 0);

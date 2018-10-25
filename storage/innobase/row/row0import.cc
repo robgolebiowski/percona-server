@@ -873,7 +873,8 @@ private:
 	enum import_page_status_t {
 		IMPORT_PAGE_STATUS_OK,		/*!< Page is OK */
 		IMPORT_PAGE_STATUS_ALL_ZERO,	/*!< Page is all zeros */
-		IMPORT_PAGE_STATUS_CORRUPTED	/*!< Page is corrupted */
+		IMPORT_PAGE_STATUS_CORRUPTED,	/*!< Page is corrupted */
+                IMPORT_PAGE_STATUS_DECRYPTION_FAILED /*< Page decryption failed */
 	};
 
 	/** Update the page, set the space id, max trx id and index id.
@@ -2020,21 +2021,31 @@ PageConverter::validate(
 	the file. Flag as corrupt if it doesn't. Disable the check
 	for LSN in buf_page_is_corrupted() */
 
+	ulint page_type = mach_read_from_2(page + FIL_PAGE_TYPE);
+	ulint original_page_type = mach_read_from_2(page + FIL_PAGE_ORIGINAL_TYPE_V1);
+	bool was_page_read_encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
+	block->page.encrypted = block->page.encrypted || was_page_read_encrypted || page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED_RTREE ||
+			   page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED;
+
 	if (buf_page_is_corrupted(
 		false, page, get_page_size(),
 		fsp_is_checksum_disabled(block->page.id.space()))
-	    || (page_get_page_no(page) != offset / m_page_size.physical()
+		|| (page_get_page_no(page) != offset / m_page_size.physical()
 		&& page_get_page_no(page) != 0)) {
 
-		return(IMPORT_PAGE_STATUS_CORRUPTED);
+		return block->page.encrypted
+                  ? IMPORT_PAGE_STATUS_DECRYPTION_FAILED
+                  : IMPORT_PAGE_STATUS_CORRUPTED;
 
 	} else if (offset > 0 && page_get_page_no(page) == 0) {
 
 		/* The page is all zero: do nothing. We already checked
 		for all NULs in buf_page_is_corrupted() */
+		block->page.encrypted= false;
 		return(IMPORT_PAGE_STATUS_ALL_ZERO);
 	}
 
+	block->page.encrypted= false;
 	return(IMPORT_PAGE_STATUS_OK);
 }
 
@@ -2102,6 +2113,14 @@ PageConverter::operator() (
 	case IMPORT_PAGE_STATUS_ALL_ZERO:
 		/* The page is all zero: leave it as is. */
 		break;
+
+        case IMPORT_PAGE_STATUS_DECRYPTION_FAILED:
+                ib::warn() << "Page " << (offset / m_page_size.physical())
+                        << " at offet " << offset
+                        << " in file " << m_filepath << " cannot be decrypted. "
+                        << "Are you using correct keyring that contain the key used to "
+                        << "encrypt the tablespace before it was discared ?";
+                return (DB_DECRYPTION_FAILED);
 
 	case IMPORT_PAGE_STATUS_CORRUPTED:
 

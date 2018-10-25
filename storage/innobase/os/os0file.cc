@@ -1932,7 +1932,7 @@ os_file_io_complete(
 		return(os_file_punch_hole(fh, offset, src_len - len));
 	}
 #ifdef UNIV_DEBUG
-	if (type.is_write()) {
+	if (type.is_write() && type.encryption_algorithm().m_type == Encryption::KEYRING) {
 		Encryption	encryption(type.encryption_algorithm());
 		bool was_page_encrypted= encryption.is_encrypted_page(buf);
 
