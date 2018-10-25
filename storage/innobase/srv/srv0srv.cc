@@ -2135,6 +2135,48 @@ srv_get_active_thread_type(void)
 	return(ret);
 }
 
+/**********************************************************************//**
+Check whether any background thread are active. If so print which thread
+is active. Send the threads wakeup signal.
+@return name of thread that is active or NULL */
+const char*
+srv_any_background_threads_are_active(void)
+/*=======================================*/
+{
+	const char*	thread_active = NULL;
+
+	if (srv_read_only_mode) {
+		if (srv_buf_resize_thread_active) {
+			thread_active = "buf_resize_thread";
+		}
+		os_event_set(srv_buf_resize_event);
+		return(thread_active);
+	} else if (srv_error_monitor_active) {
+		thread_active = "srv_error_monitor_thread";
+	} else if (lock_sys->timeout_thread_active) {
+		thread_active = "srv_lock_timeout thread";
+	} else if (srv_monitor_active) {
+		thread_active = "srv_monitor_thread";
+	} else if (srv_buf_dump_thread_active) {
+		thread_active = "buf_dump_thread";
+	} else if (srv_buf_resize_thread_active) {
+		thread_active = "buf_resize_thread";
+	} else if (srv_dict_stats_thread_active) {
+		thread_active = "dict_stats_thread";
+	} else if (srv_n_fil_crypt_threads_started) {
+		thread_active = "fil_crypt_thread";
+	}
+
+	os_event_set(srv_error_event);
+	os_event_set(srv_monitor_event);
+	os_event_set(srv_buf_dump_event);
+	os_event_set(lock_sys->timeout_event);
+	os_event_set(dict_stats_event);
+	os_event_set(srv_buf_resize_event);
+	os_event_set(fil_crypt_threads_event);
+
+	return(thread_active);
+}
 
 /******************************************************************//**
 A thread which follows the redo log and outputs the changed page bitmap.
