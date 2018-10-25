@@ -1785,7 +1785,7 @@ srv_export_innodb_status(void)
 
 	export_vars.innodb_available_undo_logs = srv_available_undo_logs;
 
-        export_vars.innodb_pages_decrypted = srv_stats.pages_decrypted;
+	export_vars.innodb_pages_decrypted = srv_stats.pages_decrypted;
 	export_vars.innodb_pages_encrypted = srv_stats.pages_encrypted;
 
 	export_vars.innodb_n_merge_blocks_encrypted =
@@ -1896,6 +1896,7 @@ DECLARE_THREAD(srv_monitor_thread)(
 #ifdef UNIV_PFS_THREAD
 	pfs_register_thread(srv_monitor_thread_key);
 #endif /* UNIV_PFS_THREAD */
+	srv_monitor_active = TRUE;
 
 	UT_NOT_USED(arg);
 	srv_last_monitor_time = last_monitor_time = ut_time();
@@ -2016,6 +2017,7 @@ DECLARE_THREAD(srv_error_monitor_thread)(
 #ifdef UNIV_PFS_THREAD
 	pfs_register_thread(srv_error_monitor_thread_key);
 #endif /* UNIV_PFS_THREAD */
+	srv_error_monitor_active = TRUE;
 
 loop:
 	/* Try to track a strange bug reported by Harald Fuchs and others,

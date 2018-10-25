@@ -2386,7 +2386,6 @@ files_checked:
 		{
 			/* Create the thread which prints InnoDB monitor
 			info */
-			srv_monitor_active = true;
 			os_thread_create(
 				srv_monitor_thread,
 				NULL, thread_ids + 4 + SRV_MAX_N_IO_THREADS);
@@ -2726,10 +2725,8 @@ files_checked:
 		os_thread_create(
 			lock_wait_timeout_thread,
 			NULL, thread_ids + 2 + SRV_MAX_N_IO_THREADS);
-		lock_sys->timeout_thread_active = true;
 
 		/* Create the thread which warns of long semaphore waits */
-		srv_error_monitor_active = true;
 		os_thread_create(
 			srv_error_monitor_thread,
 			NULL, thread_ids + 3 + SRV_MAX_N_IO_THREADS);
@@ -2912,11 +2909,9 @@ files_checked:
 		}
 
 		/* Create the buffer pool dump/load thread */
-		srv_buf_dump_thread_active = true;
 		os_thread_create(buf_dump_thread, NULL, NULL);
 
 		/* Create the dict stats gathering thread */
-		srv_dict_stats_thread_active = true;
 		os_thread_create(dict_stats_thread, NULL, NULL);
 
 		/* Create the thread that will optimize the FTS sub-system. */
@@ -2930,7 +2925,6 @@ files_checked:
 	}
 
 	/* Create the buffer pool resize thread */
-	srv_buf_resize_thread_active = true;
 	os_thread_create(buf_resize_thread, NULL, NULL);
 
 	srv_was_started = TRUE;
