@@ -1522,11 +1522,8 @@ fil_write_encryption_parse(
 	ulint           len)
 {
 	fil_space_t*	space;
-	//ulint		offset;
-	//ulint		len;
 	byte*		key = NULL;
 	byte*		iv = NULL;
-//        ulint           key_version = 0;
 	bool		is_new = false;
 
 	space = fil_space_get(space_id);
@@ -1544,7 +1541,6 @@ fil_write_encryption_parse(
 			if (it->space_id == space_id) {
 				key = it->key;
 				iv = it->iv;
-//                                key_version = it->key_version;
 			}
 		}
 
@@ -1553,7 +1549,6 @@ fil_write_encryption_parse(
 					ENCRYPTION_KEY_LEN));
 			iv = static_cast<byte*>(ut_malloc_nokey(
 					ENCRYPTION_KEY_LEN));
-//                        key_version = 0;
 			is_new = true;
 		}
 	} else {
@@ -1574,7 +1569,6 @@ fil_write_encryption_parse(
 #endif
 	if (!fsp_header_decode_encryption_info(key,
 					       iv,
-//                                               &key_version,
 					       ptr)) {
 		recv_sys->set_corrupt_log();
 		ib::warn() << "Encryption information"
@@ -1595,7 +1589,6 @@ fil_write_encryption_parse(
 			info.space_id = space_id;
 			info.key = key;
 			info.iv = iv;
-//                        info.key_version = key_version;
 
 			recv_sys->encryption_list->push_back(info);
 		}
@@ -1714,56 +1707,43 @@ recv_parse_or_apply_log_rec_body(
 		return(ptr + 8);
 	case MLOG_TRUNCATE:
 		return(truncate_t::parse_redo_entry(ptr, end_ptr, space_id));
-        case MLOG_WRITE_STRING: //TODO:Robert: This was added by Harin, it is reusing MLOG_WRITE_STRING, I am not sure how it is known
-                // that space is encrypted
+        case MLOG_WRITE_STRING:
 		/* For encrypted tablespace, we need to get the
 		encryption key information before the page 0 is recovered.
 	        Otherwise, redo will not find the key to decrypt
 		the data pages. */
-		//if (page_no == 0 && !is_system_tablespace(space_id)
-		    //&& !apply) {
-
                 if (page_no == 0 && !apply) {
+			byte* ptr_copy = ptr;
+			ulint offset = mach_read_from_2(ptr_copy);
+			ptr_copy += 2;
+			ulint len = mach_read_from_2(ptr_copy);
+			ptr_copy += 2;
+			if (end_ptr < ptr_copy + len)
+				return NULL;
 
-                   ulint offset = mach_read_from_2(ptr);
-		   ptr += 2;
-	           ulint len = mach_read_from_2(ptr);
-                   ptr += 2;
-                   if (end_ptr < ptr + len)
-                     return NULL;
+			if (memcmp(ptr_copy, ENCRYPTION_KEY_MAGIC_V1,
+				ENCRYPTION_MAGIC_SIZE) == 0 ||
+			    memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2,
+				ENCRYPTION_MAGIC_SIZE) == 0) {
 
-                   if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_V1,
-		              ENCRYPTION_MAGIC_SIZE) == 0 ||
-                       memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2,
-		              ENCRYPTION_MAGIC_SIZE) == 0) {
- 
-                        ut_ad(!is_system_tablespace(space_id));
-                        if (is_system_tablespace(space_id))
-                        {
-                          recv_sys->set_corrupt_log();
-                          return NULL;
-                        }
+				if (offset >= UNIV_PAGE_SIZE
+				    || len + offset > UNIV_PAGE_SIZE) {
+					recv_sys->set_corrupt_log();
+					return NULL;
+				}
 
-                        // TODO:Move it back to fil_write_encryption_parser?
-                        if (offset >= UNIV_PAGE_SIZE
-                             || len + offset > UNIV_PAGE_SIZE)
-                        {
-                          recv_sys->set_corrupt_log();
-                          return NULL;
-                        }
-
-			return(fil_write_encryption_parse(ptr,
-							  end_ptr,
-							  space_id,
-                                                          len));
-                   } else if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_PS_V1,
-                                    ENCRYPTION_MAGIC_SIZE) == 0)
-                   {
-                        //dberr_t err;
-                        ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, len));
-                        return ptr;
-                  }
-                }
+				return(fil_write_encryption_parse(ptr_copy,
+								  end_ptr,
+								  space_id,
+								  len));
+			} else if (memcmp(ptr_copy, ENCRYPTION_KEY_MAGIC_PS_V1,
+				   ENCRYPTION_MAGIC_SIZE) == 0) {
+				return(fil_parse_write_crypt_data(ptr_copy,
+								  end_ptr,
+								  block,
+								  len));
+			}	
+		}
 		break;
 
 	default:
@@ -2116,15 +2096,6 @@ recv_parse_or_apply_log_rec_body(
 				ptr, end_ptr, page, page_zip, index);
 		}
 		break;
-        //case MLOG_FILE_WRITE_CRYPT_DATA: // TODO:Robert I need to try to merge it with how Oracle is reusing MLOG_WRITE_STRING
-                                         //// TODO:It is added after create table
-		//dberr_t err;
-		//ptr = const_cast<byte*>(fil_parse_write_crypt_data(ptr, end_ptr, block, &err));
-
-		//if (err != DB_SUCCESS) {
-			//recv_sys->set_corrupt_log();
-		//}
-		//break;
 	default:
 		ptr = NULL;
 		recv_sys->set_corrupt_log();
@@ -4826,9 +4797,6 @@ get_mlog_string(mlog_id_t type)
 
 	case MLOG_TRUNCATE:
 		return("MLOG_TRUNCATE");
-
-        //case MLOG_FILE_WRITE_CRYPT_DATA:
-		//return("MLOG_FILE_WRITE_CRYPT_DATA");
 	}
 	DBUG_ASSERT(0);
 	return(NULL);
