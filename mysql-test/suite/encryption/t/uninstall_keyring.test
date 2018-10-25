@@ -105,7 +105,7 @@ UNINSTALL PLUGIN keyring_file;
 --echo # Start with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with KEYRING.
 
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=/homeless/root/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=$error_log --innodb-encrypt-tables=OFF
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 --source include/start_mysqld.inc
 #--source include/restart_mysqld.inc
 
@@ -147,6 +147,7 @@ INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 eval SET @@global.keyring_file_data= '$MYSQL_TMP_DIR/mysecret_keyring';
 
+--replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=/homeless/root/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0
 --source include/restart_mysqld.inc
 

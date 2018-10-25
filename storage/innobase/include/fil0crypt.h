@@ -188,6 +188,15 @@ struct fil_space_crypt_t
                   ut_free(tablespace_key);
                 if (tablespace_iv != NULL)
                   ut_free(tablespace_iv);
+
+		for (std::list<byte*>::iterator iter = fetched_keys.begin();
+		     iter != fetched_keys.end();
+		     iter++)
+		{
+			memset_s(*iter, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
+			my_free(*iter);
+		}
+
 	}
 
 	/** Get latest key version from encryption plugin
@@ -308,7 +317,9 @@ struct fil_space_crypt_t
 	uint encrypting_with_key_version;
 	unsigned int keyserver_requests;
 	unsigned int key_id;
-	unsigned int type; 
+	unsigned int type;
+
+        std::list<byte*> fetched_keys; // TODO: temp for test
 
 };
 

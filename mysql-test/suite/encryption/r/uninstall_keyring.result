@@ -51,7 +51,7 @@ UNINSTALL PLUGIN keyring_file;
 # We should get error in error log as that it is not possible to start encryption threads
 # when keyring is not properly initialized.
 # Start with keyring plugin installed but not functional (impossible keyring file path). Enabling encryption threads should not be possible as well as creating tables encrypted with KEYRING.
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/homeless/root/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=MYSQL_TMP_DIR/my_restart.err --innodb-encrypt-tables=OFF
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/homeless/root/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=MYSQL_TMP_DIR/my_restart.err --innodb-encrypt-tables=OFF
 SET GLOBAL innodb_encryption_threads=1;
 ERROR HY000: InnoDB: keyring plugin is installed but it seems it was not properly initialized. Cannot enable encryption threads.
 CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
@@ -75,7 +75,7 @@ INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 Warnings:
 Warning	29	File '/homeless/root/mysecret_keyring' not found (Errcode: 2 - No such file or directory)
 SET @@global.keyring_file_data= 'MYSQL_TMP_DIR/mysecret_keyring';
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/homeless/root/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=/homeless/root/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0
 ALTER TABLE t2 ENCRYPTION='N';
 ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
 DROP TABLE t1,t2,t_mk;

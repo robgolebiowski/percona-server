@@ -122,6 +122,6 @@ t7	CREATE TABLE `t7` (
 # t5 ... on expecting NOT FOUND
 # t6 ... on expecting NOT FOUND
 # t7 ... on expecting NOT FOUND
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring --plugin-dir=/home/rob/git/5.7_rotated_tablespaces_bld/plugin/keyring --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+# restart:--early-plugin-load=keyring_file=KEYRING_PLUGIN --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 DROP PROCEDURE innodb_insert_proc;
 DROP TABLE t1, t2, t3, t4, t5, t6, t7;

@@ -1797,7 +1797,8 @@ load_key_needed_for_decryption(
 			key_version_read_from_page= mach_read_from_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION);
 		}
 
-		ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID);
+		ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID &&
+		      key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
 
 		// in rare cases - when (re-)encryption was aborted there can be pages encrypted with
 		// different key versions in a given tablespace - retrieve needed key here
@@ -1822,8 +1823,6 @@ load_key_needed_for_decryption(
                 //encryption.m_key = key_read;
 		//******
 
-		ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID &&
-		      key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
 		//encryption.m_klen = static_cast<ulint>(key_len);
 		encryption.m_key_version = key_version_read_from_page;
 		//encryption.m_free_key_on_delete= true; // we own the key

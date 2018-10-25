@@ -54,6 +54,8 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 
 #include "os0file.h"
 
+#include <list>
+
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
 static int number_of_t1_pages_rotated = 0; //TODO:Robert - Can this be moved to some DEBUG ifdef together with DBUG_EXECUTE_IF ?
@@ -134,7 +136,8 @@ uchar * fil_space_crypt_t::get_cached_key(Cached_key &cached_key, uint key_versi
 		return cached_key.key;
 
 	if (cached_key.key != NULL) {
-		my_free(cached_key.key);
+                fetched_keys.push_back(cached_key.key); 
+		//my_free(cached_key.key);
 		cached_key.key= NULL;
 	}
 	cached_key.key_version = ENCRYPTION_KEY_VERSION_INVALID;
