@@ -2246,6 +2246,7 @@ loop:
 			case SRV_NONE:
 				ut_ad(srv_n_fil_crypt_threads_started);
 				thread_type = "encryption thread";
+				break;
 			case SRV_WORKER:
 				thread_type = "worker threads";
 				break;
