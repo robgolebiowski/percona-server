@@ -26,7 +26,10 @@ create table t5(a int not null primary key, b char(200)) engine=innodb encryptio
 create table t6(a int not null primary key, b char(200)) engine=innodb encryption='KEYRING' COMPRESSION="zlib";
 create table t7(a int not null primary key, b char(200)) engine=innodb encryption='N';
 create table t8(a int not null primary key, b char(200)) engine=innodb encryption='N' row_format=compressed;
+--disable_warnings # Disabling warnings as punch hole get generate ones when compression is enabled and
+                   # filesystem is not supporting them
 create table t9(a int not null primary key, b char(200)) engine=innodb encryption='N' COMPRESSION="zlib";
+--enable_warnings
 
 insert into t1 values (1, 'secredmessage');
 insert into t2 values (1, 'secredmessage');

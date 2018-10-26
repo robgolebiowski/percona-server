@@ -22,7 +22,7 @@ SET GLOBAL debug="-d,fail_encryption_flag_update_on_t3";
 # Check that error message about t3 being removed from encryption rotation is present in error log
 # On restart all tables with encrypted flag set should get validated against Data Dictionary. Let's check there is
 # no error related to encryption flag mismatch between DD and ibd file.
-# restart:--innodb-encryption-threads=0 --log-error=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/tmp/my_restart.err
+# restart:--innodb-encryption-threads=0 --log-error=MYSQL_TMP_DIR/my_restart.err
 SELECT * FROM t1;
 a
 foobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecret

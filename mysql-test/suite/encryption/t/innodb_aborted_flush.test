@@ -60,6 +60,7 @@ SET GLOBAL debug="-d,fail_encryption_flag_update_on_t3";
 --echo # On restart all tables with encrypted flag set should get validated against Data Dictionary. Let's check there is
 --echo # no error related to encryption flag mismatch between DD and ibd file.
 --let $restart_parameters=restart:--innodb-encryption-threads=0 --log-error=$error_log
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/start_mysqld.inc
 
 SELECT * FROM t1;

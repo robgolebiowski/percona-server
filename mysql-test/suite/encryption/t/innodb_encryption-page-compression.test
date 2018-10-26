@@ -2,6 +2,7 @@
 #-- source include/have_example_key_management_plugin.inc
 -- source include/not_embedded.inc
 
+call mtr.add_suppression(".*");
 --disable_query_log
 let $innodb_encrypt_tables_orig = `SELECT @@innodb_encrypt_tables`;
 let $innodb_encryption_threads_orig = `SELECT @@innodb_encryption_threads`;
@@ -9,41 +10,31 @@ let $innodb_encryption_threads_orig = `SELECT @@innodb_encryption_threads`;
 
 --disable_warnings
 SET GLOBAL innodb_encryption_threads = 4;
---enable_warnings
 
 # zlib
 #set global innodb_compression_algorithm = 1;
 
 create table innodb_normal (c1 int, b char(20)) engine=innodb;
-show warnings;
 create table innodb_page_compressed1 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed1;
 create table innodb_page_compressed2 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed2;
 create table innodb_page_compressed3 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed3;
 create table innodb_page_compressed4 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed4;
 create table innodb_page_compressed5 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed5;
 create table innodb_page_compressed6 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed6;
 create table innodb_page_compressed7 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed7;
 create table innodb_page_compressed8 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed8;
 create table innodb_page_compressed9 (c1 int, b char(20)) engine=innodb COMPRESSION="zlib";
-show warnings;
 show create table innodb_page_compressed9;
 
+--enable_warnings
 #create table innodb_normal (c1 int, b char(20)) engine=innodb;
 #show warnings;
 #create table innodb_page_compressed1 (c1 int, b char(20)) engine=innodb;

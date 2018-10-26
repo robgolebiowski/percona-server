@@ -10,7 +10,6 @@
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 
-SHOW PLUGINS;
 #
 # MDEV-8138: strange results from encrypt-and-grep test
 #

@@ -17,7 +17,7 @@ FLUSH TABLE t1 FOR EXPORT;
 --echo # List before copying files
 --list_files $MYSQLD_DATADIR/test
 perl;
-do "$ENV{MYSQL_TEST_DIR}/suite/encryption/include/innodb-util.pl";
+do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
 ib_backup_tablespaces("test", "t1");
 EOF
 UNLOCK TABLES;
@@ -25,7 +25,7 @@ UNLOCK TABLES;
 ALTER TABLE t1 DISCARD TABLESPACE;
 
 perl;
-do "$ENV{MYSQL_TEST_DIR}/suite/encryption/include/innodb-util.pl";
+do "$ENV{MYSQL_TEST_DIR}/include/innodb-util.inc";
 ib_discard_tablespaces("test", "t1");
 ib_restore_tablespaces("test", "t1");
 EOF
