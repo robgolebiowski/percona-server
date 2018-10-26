@@ -36,7 +36,8 @@ const size_t valid_percona_system_keys_size = array_elements(valid_percona_syste
 
 my_bool is_valid_percona_system_key(const char *key_name, size_t *key_length)
 {
-  for(uint i= 0; i < valid_percona_system_keys_size; ++i)
+  uint i= 0;
+  for(; i < valid_percona_system_keys_size; ++i)
   {
     if ((valid_percona_system_keys[i].is_prefix && strstr(key_name, valid_percona_system_keys[i].key_name) == key_name) ||
         (!valid_percona_system_keys[i].is_prefix && strcmp(valid_percona_system_keys[i].key_name, key_name) == 0))
