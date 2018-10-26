@@ -206,6 +206,8 @@ struct fil_space_t {
 				Dropping of the tablespace is forbidden
 				if this is positive.
 				Protected by fil_system->mutex. */
+	ulint 		n_pending_ops_from_space_list;
+
         ulint		n_pending_ios;
 	hash_node_t	hash;	/*!< hash chain node */
 	hash_node_t	name_hash;/*!< hash chain the name_hash table */

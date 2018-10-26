@@ -2143,6 +2143,7 @@ fil_space_next(fil_space_t* prev_space)
 		/* We can trust that space is not NULL because at least the
 		system tablespace is always present and loaded first. */
 		space->n_pending_ops++;
+		space->n_pending_ops_from_space_list++;
 	}
 
 	if (prev_space != NULL ) {
@@ -2150,6 +2151,7 @@ fil_space_next(fil_space_t* prev_space)
 
 		/* Move on to the next fil_space_t */
 		space->n_pending_ops--;
+		space->n_pending_ops_from_space_list--;
 		space = UT_LIST_GET_NEXT(space_list, space);
 
 		/* Skip spaces that are being created by
@@ -2164,6 +2166,7 @@ fil_space_next(fil_space_t* prev_space)
 
 		if (space != NULL) {
 			space->n_pending_ops++;
+			space->n_pending_ops_from_space_list++;
 		}
 	}
 
@@ -2785,7 +2788,7 @@ fil_check_pending_ops(
 			ib::warn() << "Trying to close/delete/truncate"
 				" tablespace '" << space->name
 				<< "' but there are " << n_pending_ops
-				<< " pending operations on it.";
+				<< " pending operations on it." << " n_pending_ops_from_space_list= " << space->n_pending_ops_from_space_list;
 		}
 
 		return(count + 1);
