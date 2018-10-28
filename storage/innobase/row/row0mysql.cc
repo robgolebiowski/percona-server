@@ -4824,7 +4824,8 @@ row_drop_table_for_mysql(
 	pars_info_t*	info			= NULL;
 	mem_heap_t*	heap			= NULL;
 	bool		is_intrinsic_temp_table	= false;
-	bool was_master_key_id_mutex_locked	= false;
+	bool		was_master_key_id_mutex_locked	= false;
+	bool		page0_has_crypt_data = false;
 
 	DBUG_ENTER("row_drop_table_for_mysql");
 	DBUG_PRINT("row_drop_table_for_mysql", ("table: '%s'", name));
@@ -5327,6 +5328,9 @@ row_drop_table_for_mysql(
 				NULL, table->name.m_name, IBD, false);
 		}
 
+		page0_has_crypt_data =
+			table->keyring_encryption_info.page0_has_crypt_data;
+
 		/* Free the dict_table_t object. */
 		err = row_drop_table_from_cache(tablename, table, trx);
 		if (err != DB_SUCCESS) {
@@ -5346,7 +5350,7 @@ row_drop_table_for_mysql(
 			}
 		}
 
-		if (is_encrypted && !table->keyring_encryption_info.page0_has_crypt_data) {
+		if (is_encrypted && !page0_has_crypt_data) {
 			/* Require the mutex to block key rotation. */
 			was_master_key_id_mutex_locked = true;
 			mutex_enter(&master_key_id_mutex);
