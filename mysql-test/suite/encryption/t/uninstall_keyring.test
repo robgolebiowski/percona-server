@@ -1,3 +1,4 @@
+--skip # Test unstable on centos6
 -- source include/have_innodb.inc
 #-- source include/have_file_key_management_plugin.inc
 

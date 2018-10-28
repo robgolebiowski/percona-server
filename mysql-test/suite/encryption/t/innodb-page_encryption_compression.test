@@ -1,3 +1,4 @@
+--skip # Test unstable on Jenkins centos6
 -- source include/have_innodb.inc
 -- source include/not_embedded.inc
 #-- source include/have_file_key_management_plugin.inc
@@ -53,12 +54,15 @@ select * from innodb_dynamic;
 #set global innodb_compression_algorithm = 1;
 set innodb_default_encryption_key_id = DEFAULT;
 
+--disable_warnings # Disabling warnings as punch hole get generate ones when compression is enabled and
+                   # filesystem is not supporting them
 alter table innodb_normal engine=innodb COMPRESSION="zlib";
 show create table innodb_normal;
 alter table innodb_compact engine=innodb encryption='KEYRING' COMPRESSION="zlib";
 show create table innodb_compact;
 alter table innodb_dynamic engine=innodb encryption='KEYRING' COMPRESSION="zlib";
 show create table innodb_dynamic;
+--enable_warnings
 #let $wait_condition= select variable_value > 0 from information_schema.global_status where variable_name = 'INNODB_NUM_PAGES_PAGE_DECOMPRESSED';
 #--source include/wait_condition.inc
 
