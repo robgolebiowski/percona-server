@@ -132,7 +132,6 @@ extern ulong	srv_encrypt_tables;
 
 struct fil_space_rotate_state_t
 {
-
 	fil_space_rotate_state_t()
 	  : trx(NULL),
 	    flush_observer(NULL)
@@ -184,6 +183,7 @@ struct fil_space_crypt_t
 	~fil_space_crypt_t()
 	{
                 mutex_free(&mutex);
+                mutex_free(&start_rotate_mutex);
                 if (tablespace_key != NULL)
                   ut_free(tablespace_key);
                 if (tablespace_iv != NULL)
@@ -290,6 +290,7 @@ struct fil_space_crypt_t
 
         uchar * get_cached_key(Cached_key &cached_key, uint key_version);
 
+        ib_mutex_t start_rotate_mutex; // mutex protecting starting of rotation of the space
 	ib_mutex_t mutex;   // mutex protecting following variables
 
 	/** Return code from encryption_key_get_latest_version.

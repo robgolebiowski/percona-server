@@ -6380,7 +6380,7 @@ fil_aio_wait(
 			}
 
 			ulint offset = bpage->id.page_no();
-			dberr_t err = buf_page_io_complete(static_cast<buf_page_t*>(message));
+			dberr_t err = buf_page_io_complete(bpage);
 			if (err == DB_SUCCESS) {
 				return;
 		        }
@@ -6400,9 +6400,8 @@ fil_aio_wait(
 
 				fil_space_release_for_io(space);
 			}
-			return;
 		}
-		// fallthrough
+		return;
 	case FIL_TYPE_LOG:
 		srv_set_io_thread_op_info(segment, "complete io for log");
 		log_io_complete(static_cast<log_group_t*>(message));

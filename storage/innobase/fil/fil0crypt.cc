@@ -216,6 +216,7 @@ fil_space_crypt_t::fil_space_crypt_t(
 		key_id = new_key_id;
 		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
 			type = 0; //TODO:Robert: This is temporary to get rid of unused variable problem
+		mutex_create(LATCH_ID_FIL_CRYPT_START_ROTATE_MUTEX, &start_rotate_mutex);
 		mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
 		//locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
 		type = new_type;
@@ -1405,6 +1406,14 @@ fil_crypt_start_rotate_space(
 	fil_space_crypt_t *crypt_data = state->space->crypt_data;
 
 	ut_ad(crypt_data);
+
+	mutex_enter(&crypt_data->start_rotate_mutex);
+	// flush observer needs to be created outside crypt_data->mutex;
+	// active threads is increased only in this function - thus once it's 0 under
+	// start_rotate_mutex it will stay 0.
+	if (crypt_data->rotate_state.active_threads == 0)
+		crypt_data->rotate_state.create_flush_observer(state->space->id);
+
 	mutex_enter(&crypt_data->mutex);
 	ut_ad(key_state->key_id == crypt_data->key_id);
 
@@ -1416,6 +1425,7 @@ fil_crypt_start_rotate_space(
 				    << " . Removing space from encrypting. Please make sure keyring is functional and try restarting the server";
 			state->space->exclude_from_rotation = true;
 			mutex_exit(&crypt_data->mutex);
+			mutex_exit(&crypt_data->start_rotate_mutex);
 			return false;
 		}
 		/* only first thread needs to init */
@@ -1448,6 +1458,7 @@ fil_crypt_start_rotate_space(
 		crypt_data->rotate_state.min_key_version_found;
 
 	mutex_exit(&crypt_data->mutex);
+	mutex_exit(&crypt_data->start_rotate_mutex);
 	return true;
 }
 

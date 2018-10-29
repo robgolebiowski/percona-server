@@ -506,7 +506,6 @@ is the global server default. */
 /* Number of different errors */
 #define HA_ERR_ERRORS            (HA_ERR_LAST - HA_ERR_FIRST + 1)
 
-//TODO: Robert added by me
 #define HA_ERR_DECRYPTION_FAILED 500 /* Table encrypted but decypt failed */
 
 
