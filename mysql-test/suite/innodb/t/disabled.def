@@ -9,3 +9,4 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+innodb_background : 2018-10-28 Zsolt Parragi Tied to encrypted tables / not sure if really works
