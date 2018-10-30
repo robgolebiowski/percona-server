@@ -5823,7 +5823,7 @@ buf_page_io_complete(
 			return DB_TABLESPACE_DELETED;
 		}
 
-		dberr_t	err;
+		dberr_t	err = DB_SUCCESS;
 
 		if (bpage->size.is_compressed()) {
 			frame = bpage->zip.data;

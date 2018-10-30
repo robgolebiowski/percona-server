@@ -209,9 +209,7 @@ btr_block_get_func(
 	ulint			mode,
 	const char*		file,
 	ulint			line,
-# ifdef UNIV_DEBUG
 	const dict_index_t*	index,
-# endif /* UNIV_DEBUG */
 	mtr_t*		mtr);
 
 # ifdef UNIV_DEBUG

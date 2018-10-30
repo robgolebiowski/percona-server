@@ -748,8 +748,9 @@ retry:
 				Encryption::KEYRING,
 				NULL,
 				space->crypt_data->iv,
-				false) != DB_SUCCESS)
-                        ut_ad(0);
+				false) != DB_SUCCESS) {
+				ut_ad(0);
+			}
                 }
 
 

@@ -1815,8 +1815,9 @@ load_key_needed_for_decryption(
 		}
 
 		//For test
-		if (key_version_read_from_page == encryption.m_key_version)
+		if (key_version_read_from_page == encryption.m_key_version) {
 				ut_ad(memcmp(key_read, encryption.m_key, key_len) == 0);
+		}
 
 		// TODO: Allocated or not depends on whether key was taken from cache or keyring
                 encryption.set_key(key_read, static_cast<ulint>(key_len), true);

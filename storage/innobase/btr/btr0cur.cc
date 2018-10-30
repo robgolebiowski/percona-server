@@ -5871,7 +5871,7 @@ btr_estimate_n_rows_in_range_low(
 
 	cursor.path_arr = path1;
 
-	bool	should_count_the_left_border;
+	bool	should_count_the_left_border = false;
 
 	if (dtuple_get_n_fields(tuple1) > 0) {
 
