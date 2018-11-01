@@ -1,4 +1,4 @@
---skip # Test unstable on Jenkins
+#--skip # Test unstable on Jenkins
 -- source include/have_innodb.inc
 #-- source include/have_file_key_management_plugin.inc
 
@@ -147,7 +147,7 @@ SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
---let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 -- source include/start_mysqld.inc
 
 --echo # Now turn off encryption and wait for threads to decrypt everything

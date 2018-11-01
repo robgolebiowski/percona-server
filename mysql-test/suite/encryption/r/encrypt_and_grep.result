@@ -80,7 +80,7 @@ INNODB_SYS_TABLES	CREATE TEMPORARY TABLE `INNODB_SYS_TABLES` (
 # t4 no  on expecting NOT FOUND
 # ibdata1 expecting NOT FOUND
 # ts_encrypted expecting NOT FOUND
-# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
+# restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 # Now turn off encryption and wait for threads to decrypt everything
 SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 # Only three tables should stayed encrypted - the ones with explicite encryption

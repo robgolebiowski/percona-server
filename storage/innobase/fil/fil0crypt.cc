@@ -1049,15 +1049,17 @@ fil_crypt_space_needs_rotation(
 		* space has no crypt data
 		*   start encrypting it...
 		*/
-		key_state->key_id= get_global_default_encryption_key_id_value();
+		//key_state->key_id= get_global_default_encryption_key_id_value();
 
 		*recheck = fil_crypt_start_encrypting_space(space);
 		crypt_data = space->crypt_data;
 
 		if (crypt_data == NULL) {
+			//key_state->key_id = (~0);                  
 			return false;
 		}
 
+		key_state->key_id = crypt_data->key_id;
 		key_state->key_version = crypt_data->encrypting_with_key_version;
 	}
 
@@ -1092,6 +1094,8 @@ fil_crypt_space_needs_rotation(
 		if (crypt_data->not_encrypted()) {
 			break;
 		}
+
+                ut_ad(crypt_data->key_id != static_cast<unsigned int>(~0));
 
 		if (crypt_data->key_id != key_state->key_id) {
 			key_state->key_id= crypt_data->key_id;
@@ -1689,6 +1693,19 @@ fil_crypt_rotate_page(
 		uint kv= space->crypt_data->encryption_rotation == Encryption::MASTER_KEY_TO_KEYRING
 			? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
 			: mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+/*
+                if (strcmp(space->name, "ts_encrypted") == 0)
+                {
+                  ib::error() << "Trying to write to " << space->name << '\n';
+                  ib::error() << "Space id = " << space->id << '\n';
+                  ib::error() << "Encryption: " << crypt_data->encryption << '\n';
+                  ib::error() << "kv: " << kv << '\n';
+                  ib::error() << "key_state->key_version: " << key_state->key_version << '\n';
+                  ib::error() << "for offset = " << offset << '\n';
+                  ib::error() << "rotation = " << space->crypt_data->encryption_rotation << '\n';
+                }*/
+
+
 
 		if (space->is_stopping()) {
 			/* The tablespace is closing (in DROP TABLE or
@@ -1711,6 +1728,10 @@ fil_crypt_rotate_page(
 				kv, crypt_data->encrypting_with_key_version,
 				key_state->rotate_key_age)
 			  ) {
+
+
+//                        if (strcmp(space->name, "ts_encrypted") == 0)
+//                          ib::error() << "Write to  " << space->name << " for offset = " << offset << '\n';
 
 			mtr.set_named_space(space);
 			mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);

@@ -9405,6 +9405,7 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 
 	if (parse_system_key(system_tablespace_key, key_len, &tablespace_key_version,
 			     tablespace_key, &tablespace_key_data_length) == NULL) {
+		*tablespace_key = NULL;
 		my_free(system_tablespace_key);
 		return;
 	}

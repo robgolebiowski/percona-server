@@ -11100,8 +11100,8 @@ create_table_info_t::enable_keyring_encryption(dict_table_t *table, fil_encrypti
 						: FIL_ENCRYPTION_DEFAULT;
 		DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
 
-		uint tablespace_key_version;
-		byte *tablespace_key;
+		uint tablespace_key_version = 0;
+		byte *tablespace_key = NULL;
 		Encryption::get_latest_tablespace_key_or_create_new_one(m_create_info->encryption_key_id, &tablespace_key_version, &tablespace_key);
 		if (tablespace_key == NULL) {
 			my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,

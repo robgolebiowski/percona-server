@@ -75,7 +75,7 @@ namespace keyring
     if (key_data)
     {
       DBUG_ASSERT(key_data_size <= 512);
-      memset_s(key_data, 512, 0, key_data_size);
+      memset_s(key_data, key_data_size, 0, key_data_size);
       delete[] key_data;
       key_data = NULL;
       key_data_size = 0;
