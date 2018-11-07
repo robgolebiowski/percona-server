@@ -1,6 +1,6 @@
 call mtr.add_suppression('Attempting backtrace');
 # First we try rotation unencrypted => encrypted
-CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB row_format=compressed;
+CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB row_format=compressed ENCRYPTION='Y';
 create procedure innodb_insert_proc (repeat_count int)
 begin
 declare current_num int;
@@ -16,7 +16,7 @@ call innodb_insert_proc(30000);
 commit;
 set autocommit=1;
 include/assert.inc [Make sure encryption is disabled]
-include/assert.inc [Make sure t1 is unencrypted]
+include/assert.inc [Make sure t1 is encrypted]
 # We want only first 100 pages to be rotated
 SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
 # Start rotation unnencrypted => encrypted (tables do not have crypt data stored in page 0)

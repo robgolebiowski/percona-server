@@ -3,3 +3,4 @@ $KEYRING_PLUGIN_OPT
 --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring
 --innodb-encrypt-tables=OFF
 --innodb-encryption-threads=0
+--skip-core-file

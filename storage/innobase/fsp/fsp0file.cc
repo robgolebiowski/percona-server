@@ -411,24 +411,25 @@ Datafile::validate_to_dd(
         // in case of keyring encryption it can be so happen that there will be a crash after all pages of tablespace is rotated
         // and DD is updated, but page0 of the tablespace has not been yet update. We handle this here.
 
-        if (output.encryption_type == ValidateOutput::KEYRING &&
-              (
-                (FSP_FLAGS_GET_ENCRYPTION(flags) && output.keyring_encryption_info.keyring_encryption_min_key_version == 0) ||
-                (!FSP_FLAGS_GET_ENCRYPTION(flags) && output.keyring_encryption_info.keyring_encryption_min_key_version != 0)
-              ) && FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags)
-           )
-        {
-             ib::warn() << "In file '" << m_filepath << "' (tablespace id = " << m_space_id
-                        << ") encryption flag is " << (FSP_FLAGS_GET_ENCRYPTION(m_flags) ? "ON" : "OFF")
-                        << ". However the encryption flag in the data dictionary is "
-                        << (FSP_FLAGS_GET_ENCRYPTION(flags) ? "ON" : "OFF")
-                        << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
-                        << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
-                        << " could finish up the rotation.";
-              // exclude encryption flag from validation
-              m_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
-              flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
-        }
+	if (output.encryption_type == ValidateOutput::KEYRING &&
+		(
+			(FSP_FLAGS_GET_ENCRYPTION(flags) && output.keyring_encryption_info.keyring_encryption_min_key_version == 0) ||
+			(!FSP_FLAGS_GET_ENCRYPTION(flags) && output.keyring_encryption_info.keyring_encryption_min_key_version != 0)
+		) && FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags)
+	   ) {
+		if (srv_n_fil_crypt_threads == 0) {
+			ib::warn() << "In file '" << m_filepath << "' (tablespace id = " << m_space_id
+			<< ") encryption flag is " << (FSP_FLAGS_GET_ENCRYPTION(m_flags) ? "ON" : "OFF")
+			<< ". However the encryption flag in the data dictionary is "
+			<< (FSP_FLAGS_GET_ENCRYPTION(flags) ? "ON" : "OFF")
+			<< ". This indicates that the rotation of the table was interrupted before space's flags were updated."
+			<< " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
+			<< " could finish up the rotation.";
+		}
+		// exclude encryption flag from validation
+		m_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+		flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+	}
 
 	/* Make sure the datafile we found matched the space ID.
 	If the datafile is a file-per-table tablespace then also match

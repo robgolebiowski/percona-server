@@ -2511,7 +2511,7 @@ fil_crypt_flush_space(
 		DBUG_EXECUTE_IF(
 		"crash_on_t1_flush_after_dd_update",
 		if (strcmp(state->space->name, "test/t1") == 0)
-		DBUG_ABORT();
+			DBUG_ABORT();
 		);
 
 		mutex_enter(&fil_system->mutex);
