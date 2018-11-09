@@ -5658,7 +5658,7 @@ Also remove the bpage from LRU list.
 @return TRUE if successful */
 static
 ibool
-buf_mark_space_corrupt(
+buf_mark_space_corrupt_or_encrypted(
 /*===================*/
 	buf_page_t*	bpage)	/*!< in: pointer to the block in question */
 {
@@ -5711,7 +5711,7 @@ buf_mark_space_corrupt(
 
 static
 dberr_t 
-buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
+buf_page_check_corrupt_or_encrypted(buf_page_t* bpage, fil_space_t* space)
 {
 	ut_ad(space->n_pending_ios > 0);
 	byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
@@ -5721,7 +5721,6 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 #else
 
 	dberr_t err = DB_SUCCESS;
-	fil_space_crypt_t* crypt_data = space->crypt_data;
 	ulint page_type = mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
 	ulint original_page_type = mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
 	bool was_page_read_encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
@@ -5744,29 +5743,7 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 		/* An error will be reported by
 		buf_page_io_complete(). */
 	} else if (bpage->encrypted && corrupted) {
-		bpage->encrypted = true;
 		err = DB_DECRYPTION_FAILED; 
-		ib::error()
-			<< "The page " << bpage->id << " in file '"
-			<< space->chain.start->name
-			<< "' cannot be decrypted.";
-
-		if (crypt_data) {
-			ib::info()
-				<< "However key management plugin or used key_version "
-				<< mach_read_from_4(dst_frame
-				   + FIL_PAGE_FILE_FLUSH_LSN)
-				<< " is not found or"
-				" used encryption algorithm or method does not match.";
-		}
-
-		if (bpage->id.space() != TRX_SYS_SPACE) {
-			ib::info()
-				<< "Marking tablespace as missing."
-				" You may drop this table or"
-				" install correct key management plugin"
-				" and key file.";
-		}
 	}
 	return err;
 
@@ -5813,7 +5790,6 @@ buf_page_io_complete(
 	if (io_type == BUF_IO_READ) {
 		ulint	read_page_no;
 		ulint	read_space_id;
-		uint	key_version = 0;
 		byte*	frame;
 		bool	compressed_page;
 
@@ -5851,8 +5827,6 @@ buf_page_io_complete(
 		read_page_no = mach_read_from_4(frame + FIL_PAGE_OFFSET);
 		read_space_id = mach_read_from_4(
 			frame + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-		key_version = mach_read_from_4(
-			frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
 
 
 		if (bpage->id.space() == TRX_SYS_SPACE
@@ -5901,15 +5875,7 @@ buf_page_io_complete(
 		/* From version 3.23.38 up we store the page checksum
 		to the 4 first bytes of the page end lsn field */
 		if (compressed_page
-		    || (err = buf_page_check_corrupt(bpage, space)) != DB_SUCCESS) {
-
-			// Here bpage should not be encrypted. If it is still encrypted it means
-			// that decryption failed and whole space is not readable
-			if (bpage->encrypted) {
-				ib::error() << "Page is still encrypted - which means decryption failed. "
-					       "Marking whole space as encrypted";
-				fil_space_set_encrypted(bpage->id.space());
-                        }
+		    || (err = buf_page_check_corrupt_or_encrypted(bpage, space)) != DB_SUCCESS) {
 
 			/* Not a real corruption if it was triggered by
 			error injection */
@@ -5918,7 +5884,7 @@ buf_page_io_complete(
 				if (bpage->id.space() > TRX_SYS_SPACE
 				    && !Tablespace::is_undo_tablespace(
 					    bpage->id.space())
-				    && buf_mark_space_corrupt(bpage)) {
+				    && buf_mark_space_corrupt_or_encrypted(bpage)) {
 					ib::info() << "Simulated IMPORT "
 						"corruption";
 					fil_space_release_for_io(space);
@@ -5957,6 +5923,27 @@ corrupt:
 					<< FORCE_RECOVERY_MSG;
 			}
 
+			// Here bpage should not be encrypted. If it is still encrypted it means
+			// that decryption failed and whole space is not readable
+			if (bpage->encrypted) {
+				ib::error() << "Decryption failed for page " << bpage->id.space() << ':' << bpage->id.page_no()
+					    << " in tablespace " << space->name 
+					    << " .Please check if you are using correct keyring. "
+					       "Marking whole space as encrypted.";
+
+				if (bpage->id.space() > TRX_SYS_SPACE
+				    && buf_mark_space_corrupt_or_encrypted(bpage)) {
+					fil_space_set_encrypted(bpage->id.space());
+				        fil_space_release_for_io(space);
+					return(err);
+				} else {
+					ib::fatal()
+						<< "Aborting because"
+						" ENCRYPTED database page in"
+						" the system tablespace could"
+						" not have been decrypted.";
+				}
+			} else
 			if (srv_pass_corrupt_table && bpage->id.space() != 0
 			    && bpage->id.space() < SRV_LOG_SPACE_FIRST_ID) {
 				trx_t*	trx;
@@ -5982,7 +5969,7 @@ corrupt:
 				table as corrupted instead of crashing server */
 
 				if (bpage->id.space() > TRX_SYS_SPACE
-				    && buf_mark_space_corrupt(bpage)) {
+				    && buf_mark_space_corrupt_or_encrypted(bpage)) {
 				        fil_space_release_for_io(space);
 					return(err);
 				} else {
@@ -6020,16 +6007,6 @@ corrupt:
 		    && page_is_leaf(frame)) {
 
 			if (bpage->encrypted) {
-				ib::warn()
-					<< "Table in tablespace "
-					<< bpage->id.space()
-					<< " encrypted. However key "
-					"management plugin or used "
-					<< "key_version " << key_version
-					<< "is not found or"
-					" used encryption algorithm or method does not match."
-					" Can't continue opening the table.";
-
 				buf_block_t* block = (buf_block_t *) bpage;
 
 				ibuf_merge_or_delete_for_page(

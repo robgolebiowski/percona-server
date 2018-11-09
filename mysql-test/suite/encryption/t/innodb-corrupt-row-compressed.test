@@ -1,4 +1,3 @@
---skip
 #
 # MDEV-11759: Encryption code in MariaDB 10.1/10.2 causes compatibility problems
 #
@@ -8,8 +7,10 @@
 # Don't test under embedded
 -- source include/not_embedded.inc
 
-call mtr.add_suppression("InnoDB: The page \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\] in file '.*test.t[123]\\.ibd' cannot be decrypted\\.");
-call mtr.add_suppression("failed to read or decrypt \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\]");
+call mtr.add_suppression("InnoDB: Decryption failed for page");
+call mtr.add_suppression("Encryption can't find tablespace key");
+call mtr.add_suppression("Post - encryption checksum verification failed");
+call mtr.add_suppression("InnoDB: Table is encrypted but encryption service or used key_id is not available\\.  Can't continue reading table\\.");
 
 SET GLOBAL innodb_file_per_table = ON;
 #set global innodb_compression_algorithm = 1;
@@ -80,6 +81,7 @@ SELECT * FROM t3;
 --move_file $MYSQLD_DATADIR/test/t2.ibd.backup $MYSQLD_DATADIR/test/t2.ibd
 --move_file $MYSQLD_DATADIR/test/t3.ibd.backup $MYSQLD_DATADIR/test/t3.ibd
 
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR;
 --source include/start_mysqld.inc
 
 DROP TABLE t1,t2,t3;

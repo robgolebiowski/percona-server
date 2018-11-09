@@ -1,0 +1,65 @@
+SET @@global.keyring_file_data="MYSQL_TMP_DIR/mysecret_keyring";
+SET GLOBAL innodb_file_per_table = ON;
+SET GLOBAL innodb_file_format = `Barracuda`;
+create table t1 (a varchar(255)) engine=innodb encryption='KEYRING';
+create table t2 (a varchar(255)) engine=innodb encryption_key_id=5;
+create table t3 (a varchar(255)) engine=innodb;
+create table t4 (a varchar(255)) engine=innodb encryption='Y';
+create table t5 (a varchar(255)) engine=innodb;
+create table t6 (a varchar(255)) engine=innodb encryption='N';
+insert t1 values (repeat('foobarsecret', 12));
+insert t2 values (repeat('tempsecret', 12));
+insert t3 values (repeat('dummysecret', 12));
+insert t4 values (repeat('verysecret', 12));
+insert t5 values (repeat('sooosecret', 12));
+insert t6 values (repeat('nosecret', 12));
+include/assert.inc [Successful rotation of percona_innodb-0 to version 2]
+# Just make sure that none of the table started re-encrypting
+SET GLOBAL debug="+d,wait_for_encryption_treads_to_iterate_all_tables";
+include/assert.inc [None of the tables should get re-encrypted with version 2]
+include/assert.inc [Successful rotation of percona_innodb-0 to version 3]
+include/assert.inc [table t2 should not get re-encrypted as key 5 is still in version 1]
+include/assert.inc [table t6 should stay unencrypted]
+# Now, let's rotate key 5 twice
+include/assert.inc [Successful rotation of percona_innodb-5 to version 2]
+include/assert.inc [Successful rotation of percona_innodb-5 to version 3]
+# Setting innodb_encryption_rotate_key_age to 1. Now each key rotation should result
+# in re-encryption of the table
+SET GLOBAL innodb_encryption_rotate_key_age = 1;
+include/assert.inc [Successful rotation of percona_innodb-0 to version 4]
+include/assert.inc [table t2 should not get re-encrypted as key 5 is still in version 3]
+# Rotate key 5 to version 4 => this should trigger table t2 re-encryption
+include/assert.inc [Successful rotation of percona_innodb-5 to version 4]
+# Now turn the re-encryption off by setting innodb_encryption_rotate_key_age to 0
+SET GLOBAL innodb_encryption_rotate_key_age = 0;
+# Rotating key should not cause any re-encryption
+include/assert.inc [Successful rotation of percona_innodb-0 to version 5]
+# Rotate key 5 to version 5 => this should trigger table t2 re-encryption
+include/assert.inc [Successful rotation of percona_innodb-5 to version 5]
+include/assert.inc [All tables should be still encrypted with key version 4 at most.]
+#Make sure t6 is still unencrypted
+include/assert.inc [table t6 should stay unencrypted]
+# Now let's alter t6 so it become encrypted
+alter table t6 encryption='KEYRING';
+# t6 should get rebuilt with latest version of percona_innodb-0, i.e. version 5
+include/assert.inc [table t6 should get rebuilt with latest version of percona_innodb-0, i.e. version 5]
+# Now change t6's encryption key to a new one 6 - it should have version 1
+alter table t6 encryption_key_id = 6;
+include/assert.inc [table t6 should get rebuilt with latest version of percona_innodb-6, i.e. version 1]
+# Now change t6's encryption key to an existing key 5. It should have its latest
+# key_version assigned, i.e. 5
+alter table t6 encryption_key_id = 5;
+include/assert.inc [table t6 should get rebuilt with latest version of percona_innodb-5, i.e. version 5]
+# Turn off encryption for t6
+alter table t6 encryption='N';
+include/assert.inc [table t6 should be marked as unencrypted]
+# Make sure t1,t2,t3,t4,t5 are encrypted
+# Make sure t6 is unencrypted
+# restart
+# Now turn off the encryption. Only one table should remain encrypted - the one with explicite encryption
+# ie. t1
+SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+include/assert.inc [table t1 should stay encrypted with version 4 of key 0]
+SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
+include/assert.inc [table t6 should be marked as unencrypted]
+drop table t1, t2, t3, t4, t5, t6;

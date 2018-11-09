@@ -7,12 +7,9 @@
 # Don't test under embedded
 -- source include/not_embedded.inc
 
-call mtr.add_suppression("InnoDB: The page \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\] in file '.*test.t[123]\\.ibd' cannot be decrypted\\.");
-call mtr.add_suppression("failed to read or decrypt \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\]");
-
-call mtr.add_suppression("\\[Error\\] InnoDB: Page is still encrypted");
+call mtr.add_suppression("InnoDB: Decryption failed for page");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Post - encryption checksum verification failed - decryption failed for space id");
-call mtr.add_suppression("\\[ERROR\\] InnoDB: Encryption can't find tablespace key, please check the keyring plugin is loaded\.");
+call mtr.add_suppression("\\[ERROR\\] InnoDB: Encryption can't find tablespace key");
 call mtr.add_suppression("\\[Warning\\] InnoDB: Table is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
 
 SET GLOBAL innodb_file_per_table = ON;
@@ -119,9 +116,9 @@ let SEARCH_FILE= $server_log;
 
 --echo # Check that after restoring tables can be read
 
-SELECT * FROM t1;
-SELECT * FROM t2;
-SELECT * FROM t3;
+SELECT COUNT(*) FROM t1;
+SELECT COUNT(*) FROM t2;
+SELECT COUNT(*) FROM t3;
 
 --source include/shutdown_mysqld.inc
 

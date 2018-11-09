@@ -1,17 +1,15 @@
---skip
 -- source include/have_innodb.inc
 #-- source include/have_file_key_management_plugin.inc
 # embedded does not support restart
 -- source include/not_embedded.inc
 --source include/have_64bit.inc
 
+call mtr.add_suppression("InnoDB: Decryption failed for page");
 call mtr.add_suppression("mysqld: File .*");
 call mtr.add_suppression("Plugin 'file_key_management' .*");
 call mtr.add_suppression("InnoDB: cannot enable encryption, encryption plugin is not available");
 call mtr.add_suppression("Plugin 'InnoDB' init function returned error.");
 call mtr.add_suppression("Plugin 'InnoDB' registration as a STORAGE ENGINE failed.");
-call mtr.add_suppression("InnoDB: The page \\[page id: space=[0-9]+, page number=[0-9]+\\] in file '.*test.t[1-4]\\.ibd' cannot be decrypted\\.");
-call mtr.add_suppression("failed to read or decrypt \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\]");
 
 --echo # Restart mysqld --file-key-management-filename=keys2.txt
 #-- let $restart_parameters=--file-key-management-filename=$MYSQL_TEST_DIR/std_data/keys2.txt
@@ -77,7 +75,7 @@ let $cleanup= drop table t1,t2,t3,t4;
 --echo # Robert: After no_checkpoint_end
 --echo # restart
 
---let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
+--let $error_log=$MYSQL_TMP_DIR/my_restart.err
 
 --error 1
 #--exec xterm -e gdb $MYSQLD_CMD --log-error=$error_log
@@ -101,6 +99,7 @@ let $cleanup= drop table t1,t2,t3,t4;
 # thus we need to restart server with correct key file
 #
 --echo # Restart mysqld
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 --source include/start_mysqld.inc
 

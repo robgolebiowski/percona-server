@@ -1828,8 +1828,10 @@ load_key_needed_for_decryption(
 						   key_version_read_from_page,
 						   &key_read, &key_len) == false)
 		{
+			ib::error() << "Encryption can't find tablespace key " << encryption.m_key_id
+				    << " in version " << key_version_read_from_page << ", please check"
+				    << " that correct keyring plugin is loaded.";
 			return false;
-			ut_ad(0);
 		}
 
 		//For test
@@ -9499,8 +9501,6 @@ Encryption::get_tablespace_key(uint key_id,
 	Encryption::get_keyring_key(key_name, tablespace_key, key_len);
 
 	if (*tablespace_key == NULL) {
-		ib::error() << "Encryption can't find tablespace key, please check"
-				" the keyring plugin is loaded.";
 		 result = false;
 	}
 

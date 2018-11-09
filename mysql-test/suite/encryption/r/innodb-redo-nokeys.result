@@ -32,5 +32,5 @@ COMMIT;
 # restart
 # Robert: After start_mysqld.inc
 # Restart mysqld
-# restart:--early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/home/rob/git/5.7_rotated_tablespaces_bld/mysql-test/var/std_data/keys2.txt
+# restart:--early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=MYSQLTEST_VARDIR/std_data/keys2.txt
 drop table t1, t2,t3,t4;

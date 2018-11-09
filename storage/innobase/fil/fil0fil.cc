@@ -2149,6 +2149,15 @@ fil_space_next(fil_space_t* prev_space)
 	if (prev_space == NULL) {
 		space = UT_LIST_GET_FIRST(fil_system->space_list);
 
+		DBUG_EXECUTE_IF("wait_for_encryption_treads_to_iterate_all_tables",
+			static bool one_iteration_loop_started= false;
+			if (one_iteration_loop_started) {
+				DBUG_SET_INITIAL("-d,wait_for_encryption_treads_to_iterate_all_tables");
+				one_iteration_loop_started=false;
+			}
+			one_iteration_loop_started= true;
+			);
+
 		/* We can trust that space is not NULL because at least the
 		system tablespace is always present and loaded first. */
 		space->n_pending_ops++;
