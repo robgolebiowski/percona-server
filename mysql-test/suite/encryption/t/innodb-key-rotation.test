@@ -1,5 +1,6 @@
--- source include/have_innodb.inc
--- source include/not_embedded.inc
+--source include/have_innodb.inc
+--source include/not_embedded.inc
+--source include/have_debug.inc
 
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
