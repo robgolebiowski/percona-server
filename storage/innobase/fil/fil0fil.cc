@@ -739,8 +739,8 @@ retry:
 		/* Try to read crypt_data from page 0 if it is not yet
 		read. */
 		if (!space->crypt_data) {
-			space->crypt_data = fil_space_read_crypt_data(
-				page_size_t(space->flags), page);
+			space->set_crypt_data(fil_space_read_crypt_data(
+				page_size_t(space->flags), page));
 
 
 			if (space->crypt_data && fil_set_encryption(space->id,
@@ -1410,7 +1410,8 @@ fil_space_create(
 
 	space->magic_n = FIL_SPACE_MAGIC_N;
 
-	space->crypt_data = crypt_data;
+	space->set_crypt_data(crypt_data);
+	//space->crypt_data = crypt_data;
 
 	space->encryption_type = Encryption::NONE;
 

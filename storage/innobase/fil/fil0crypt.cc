@@ -604,6 +604,7 @@ fil_space_set_crypt_data(
 	fil_space_t*		space,
 	fil_space_crypt_t*	crypt_data) {
 
+	ut_ad(crypt_data != NULL);
 	fil_space_crypt_t* free_crypt_data = NULL;
 	fil_space_crypt_t* ret_crypt_data = NULL;
 
@@ -617,7 +618,7 @@ fil_space_set_crypt_data(
 		ret_crypt_data = space->crypt_data;
 		free_crypt_data = crypt_data;
 	} else {
-		space->crypt_data = crypt_data;
+		space->set_crypt_data(crypt_data);
 		ret_crypt_data = space->crypt_data;
 	}
 

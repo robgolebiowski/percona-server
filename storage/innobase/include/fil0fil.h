@@ -275,6 +275,13 @@ struct fil_space_t {
 	{
 		return stop_new_ops || is_being_truncated;
 	}
+
+	void set_crypt_data(fil_space_crypt_t *crypt_data)
+	{
+		// crypt_data cannot be overritten with NULL
+		ut_ad(this->crypt_data == NULL || crypt_data != NULL);
+		this->crypt_data = crypt_data;
+	}
 };
 
 /** Value of fil_space_t::magic_n */
