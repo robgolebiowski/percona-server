@@ -5650,6 +5650,7 @@ ha_innobase::prepare_inplace_alter_table(
 					table_share->table_name.str,
 					space()->chain.start->name);
 
+				get_error_message(HA_ERR_DECRYPTION_FAILED, &str);
 				my_error(ER_GET_ERRMSG, MYF(0), HA_ERR_DECRYPTION_FAILED, str.c_ptr(), engine);
 				DBUG_RETURN(true);
 			}
