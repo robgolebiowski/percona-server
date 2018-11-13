@@ -5,13 +5,8 @@
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 
-SHOW PLUGINS;
-#
-# MDEV-8138: strange results from encrypt-and-grep test
-#
+
 --let $MYSQLD_DATADIR=`select @@datadir`
-#TODO: Robert - dlaczego tu jest ibdata1
---let ib1_IBD = $MYSQLD_DATADIR/ibdata1
 --let t1_IBD = $MYSQLD_DATADIR/test/t1.ibd
 --let SEARCH_RANGE = 10000000
 
