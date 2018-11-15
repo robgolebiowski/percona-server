@@ -182,6 +182,8 @@ struct fil_space_crypt_t
 	/** Destructor */
 	~fil_space_crypt_t()
 	{
+		ut_ad(is_in_use_in_start_enc == false);
+
                 mutex_free(&mutex);
                 mutex_free(&start_rotate_mutex);
                 if (tablespace_key != NULL)
@@ -321,6 +323,8 @@ struct fil_space_crypt_t
 	unsigned int type;
 
         std::list<byte*> fetched_keys; // TODO: temp for test
+
+	bool is_in_use_in_start_enc;
 
 };
 

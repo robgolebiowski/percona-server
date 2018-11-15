@@ -12189,6 +12189,20 @@ create_table_info_t::create_option_encryption_is_valid() const
 		}
 	}
 
+	LEX_STRING*	encrypt_type = &m_create_info->encrypt_type;
+
+	if (m_create_info->was_encryption_key_id_set && (Encryption::is_master_key_encryption(encrypt_type->str) || Encryption::is_no(encrypt_type->str))) {
+		// if it is encrypted table with Master key encryption or marked as not to be encrypted and alter table
+		// has ENCRYPTION_KEY_ID - generate an error
+		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+				Encryption::is_no(encrypt_type->str)
+				? "InnoDB: ENCRYPTION_KEY_ID cannot be assigned to tables that have encryption explcitily disabled ENCRYPTION='N'. If you want to "
+				  "assign ENCRYPTION_KEY_ID to this table change its encryption type explicitly to 'KEYRING'"
+				: "InnoDB: ENCRYPTION_KEY_ID cannot be assigned to tables that were originaly created with Master Key encryption. If you want to "
+				  "assign ENCRYPTION_KEY_ID to this table change its encryption type explicitly to 'KEYRING'", MYF(0));
+		return false;
+	}
+
 	bool table_is_keyring = Encryption::is_keyring(m_create_info->encrypt_type.str);
 
 	if (table_is_keyring) {
@@ -12506,20 +12520,6 @@ ha_innobase::adjust_create_info_for_frm(
 			create_info->encryption_key_id = THDVAR(current_thd, default_encryption_key_id);
 			create_info->was_encryption_key_id_set = true;
 		}
-	} else if (Encryption::is_master_key_encryption(encrypt_type->str) || Encryption::is_no(encrypt_type->str)) {
-		// if it is encrypted table with Master key encryption or marked as not to be encrypted and alter table
-		// does not have ENCRYPTION_KEY_ID - mark encryption key id as not set.
-
-		push_warning_printf(
-			current_thd, Sql_condition::SL_WARNING,
-			HA_WRONG_CREATE_OPTION,
-			Encryption::is_no(encrypt_type->str)
-				? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when encryption is disabled."
-				: "InnoDB: Ignored ENCRYPTION_KEY_ID %u when Master Key encryption is enabled.",
-				create_info->encryption_key_id
-		);
-		create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-		create_info->was_encryption_key_id_set = false;
 	}
 }
 

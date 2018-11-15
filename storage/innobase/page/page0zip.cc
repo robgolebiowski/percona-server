@@ -5025,12 +5025,7 @@ page_zip_verify_checksum(
 		+ FIL_PAGE_LSN) == 0) {
 		/* make sure that the page is really empty */
 #ifdef UNIV_INNOCHECKSUM
-		ulint i;
-		for (i = 0; i < size; i++) {
-			if (*((const char*) data + i) != 0)
-				break;
-		}
-		if (i >= size) {
+		if (buf_page_is_zeroes_or_contains_keyring_encryption_info(static_cast<const byte*>(data), size)) {
 			if (is_log_enabled) {
 				fprintf(log_file, "Page::%" PRIuMAX " is empty and"
 					" uncorrupted\n", page_no);
@@ -5039,11 +5034,8 @@ page_zip_verify_checksum(
 			return(TRUE);
 		}
 #else
-		for (ulint i = 0; i < size; i++) {
-			if (*((const char*) data + i) != 0) {
-				return(FALSE);
-			}
-		}
+		if (!buf_page_is_zeroes_or_contains_keyring_encryption_info(static_cast<const byte*>(data), size))
+			return(FALSE);
 		/* Empty page */
 		return(TRUE);
 #endif /* UNIV_INNOCHECKSUM */

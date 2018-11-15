@@ -3796,8 +3796,17 @@ row_import_for_mysql(
 			table_name, sizeof(table_name),
 			table->name.m_name);
 
-
-		if (err != DB_DECRYPTION_FAILED) {
+		if ((dict_table_is_encrypted(table) ||
+		     (space_flags != 0
+		      && FSP_FLAGS_GET_ENCRYPTION(space_flags)
+		     )
+		    ) && err == DB_IO_DECOMPRESS_FAIL) {
+			ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
+			ER_INTERNAL_ERROR,
+			"The table %s is encrypted and compressed. Either decryption or decompression failed. "
+			"Please make sure that correct keyring is used and that keyring contains key that "
+			"was used to encrypt the table.", table_name);
+		} else if (err != DB_DECRYPTION_FAILED) {
 			ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
 				ER_INTERNAL_ERROR,
 				"Cannot reset LSNs in table %s : %s",

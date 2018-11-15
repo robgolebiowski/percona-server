@@ -1,5 +1,5 @@
 call mtr.add_suppression("\\[Warning\\] InnoDB: Tablespace for table `[^`]+`.`[^`]+` is set as discarded\\.");
-call mtr.add_suppression("\\[Warning\\] InnoDB: Page [[:digit:]]+ at offset [[:digit:]]+ looks corrupted in file");
+call mtr.add_suppression("\\[Warning\\] InnoDB: Page [0-9]+ at offet [0-9]+ in file .* cannot be decrypted.");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: os_file_read\\(\\) failed");
 CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB ENCRYPTION='KEYRING';
 CREATE TABLE t2 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB ENCRYPTION='Y';
@@ -270,7 +270,7 @@ restore: t7 .ibd and .cfg files
 restore: t8 .ibd and .cfg files
 # Disable rotation threads
 SET GLOBAL innodb_encryption_threads = 0;
-SET GLOBAL innodb_encrypt_tables = OFF;
+SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 ALTER TABLE t1 IMPORT TABLESPACE;
 include/assert.inc [Make sure t1 has encrypted flag set after importing]
 include/assert.inc [Make sure t1 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 1]
@@ -331,15 +331,17 @@ include/assert.inc [Make sure t8 does not have encrypted flag set]
 include/assert.inc [Make sure t8 is visible in INNODB_SYS_TABLESPACES with MIN_KEY_VERSION = 0]
 include/assert.inc [Make sure t8 is readable]
 # tablespaces should not be encrypted, apart from t1,t3 and t5
-# Now let's backup keyring file, change encryption key id of encrypt-able tables (all but t7) 
+# Now let's backup keyring file, change encryption key id of encrypt-able tables (all but t7)
 # export and dicard them. Next restart the server with backuped keyring file and make sure that
 # server starts, but tables cannot be imported gracefully
 SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 # Wait max 2 min for key encryption threads to encrypt all spaces
 ALTER TABLE t1 encryption_key_id = 5;
+# This should generate error that tables that was originaly encrypted with Master Key need
+# to have encryption type set to KEYRING so encryption_key_id could be used in ALTER statement
 ALTER TABLE t2 encryption_key_id = 5;
-Warnings:
-Warning	140	InnoDB: Ignored ENCRYPTION_KEY_ID 5 when Master Key encryption is enabled.
+ERROR HY000: InnoDB: ENCRYPTION_KEY_ID cannot be assigned to tables that were originaly created with Master Key encryption. If you want to assign ENCRYPTION_KEY_ID to this table change its encryption type explicitly to 'KEYRING'
+ALTER TABLE t2 ENCRYPTION='KEYRING' encryption_key_id = 5;
 ALTER TABLE t3 encryption_key_id = 5;
 ALTER TABLE t4 encryption_key_id = 5;
 ALTER TABLE t5 encryption_key_id = 5;
@@ -416,22 +418,21 @@ restore: t4 .ibd and .cfg files
 restore: t5 .ibd and .cfg files
 restore: t6 .ibd and .cfg files
 restore: t8 .ibd and .cfg files
-# restart:--loose-keyring_file_data=/home/yura/addon/percona-build-5.7-debug_min/mysql-test/var/tmp/mysecret_keyring_backup
+# restart:--loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring_backup
 ALTER TABLE t1 IMPORT TABLESPACE;
-ERROR HY000: Internal error: Cannot reset LSNs in table `test`.`t1` : Data structure corruption
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
 ALTER TABLE t2 IMPORT TABLESPACE;
-Warnings:
-Warning	1814	InnoDB: Tablespace has been discarded for table 't2'
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
 ALTER TABLE t3 IMPORT TABLESPACE;
-ERROR HY000: Internal error: Cannot reset LSNs in table `test`.`t3` : Page decompress failed after reading from disk
+ERROR HY000: Internal error: The table `test`.`t3` is encrypted and compressed. Either decryption or decompression failed. Please make sure that correct keyring is used and that keyring contains key that was used to encrypt the table.
 ALTER TABLE t4 IMPORT TABLESPACE;
-ERROR HY000: Internal error: Cannot reset LSNs in table `test`.`t4` : Page decompress failed after reading from disk
+ERROR HY000: Internal error: The table `test`.`t4` is encrypted and compressed. Either decryption or decompression failed. Please make sure that correct keyring is used and that keyring contains key that was used to encrypt the table.
 ALTER TABLE t5 IMPORT TABLESPACE;
-ERROR HY000: Internal error: Cannot reset LSNs in table `test`.`t5` : Data structure corruption
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
 ALTER TABLE t6 IMPORT TABLESPACE;
-ERROR HY000: Internal error: Cannot reset LSNs in table `test`.`t6` : Data structure corruption
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
 ALTER TABLE t8 IMPORT TABLESPACE;
-ERROR HY000: Internal error: Cannot reset LSNs in table `test`.`t8` : Data structure corruption
-# restart:--loose-keyring_file_data=/home/yura/addon/percona-build-5.7-debug_min/mysql-test/var/tmp/mysecret_keyring
+ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+# restart:--loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring
 DROP PROCEDURE innodb_insert_proc;
 DROP TABLE t1, t2, t3, t4, t5, t6, t7, t8;

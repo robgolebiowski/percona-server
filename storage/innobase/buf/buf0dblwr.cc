@@ -881,8 +881,8 @@ buf_dblwr_process(void)
 						" recover the database with"
 						" innodb_force_recovery=6";
 				}
-			} else if (buf_page_is_zeroes(read_buf, page_size)
-				   && !buf_page_is_zeroes(page, page_size)
+			} else if (buf_page_is_zeroes_or_contains_keyring_encryption_info(read_buf, page_size)
+				   && !buf_page_is_zeroes_or_contains_keyring_encryption_info(page, page_size)
 				   && !buf_page_is_corrupted(
 					true, page, page_size,
 					fsp_is_checksum_disabled(space_id))) {
@@ -892,10 +892,10 @@ buf_dblwr_process(void)
 
 			} else {
 
-				bool t1 = buf_page_is_zeroes(
+				bool t1 = buf_page_is_zeroes_or_contains_keyring_encryption_info(
                                         read_buf, page_size);
 
-				bool t2 = buf_page_is_zeroes(page, page_size);
+				bool t2 = buf_page_is_zeroes_or_contains_keyring_encryption_info(page, page_size);
 
 				bool t3 = buf_page_is_corrupted(
 					true, page, page_size,

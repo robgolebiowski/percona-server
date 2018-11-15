@@ -5805,7 +5805,8 @@ inline
 void
 fil_io_set_keyring_encryption(IORequest& req_type,
 			      fil_space_crypt_t *crypt_data,
-			      const page_id_t& page_id)
+			      const page_id_t& page_id,
+			      bool force_encryption = false)
 {
 	set_min_key_version= false;
 	ut_ad(crypt_data != NULL);
@@ -5824,7 +5825,8 @@ fil_io_set_keyring_encryption(IORequest& req_type,
 	key_id= crypt_data->key_id;
 
 	if (req_type.is_write()) {
-		if (crypt_data->should_encrypt() && crypt_data->encrypting_with_key_version != 0) {
+		if ((crypt_data->should_encrypt() && crypt_data->encrypting_with_key_version != 0) ||
+		    force_encryption) {
 			key = crypt_data->get_key_currently_used_for_encryption();
 			key_version = crypt_data->encrypting_with_key_version;
 			key_len = 32;
@@ -6995,7 +6997,12 @@ fil_iterate(
 		/* For encrypted table, set encryption information. */
 		if (offset != 0) {
 			if (iter.crypt_data != NULL) {
-				fil_io_set_keyring_encryption(write_request, iter.crypt_data, page_id);
+				// We set force_encryption here to true if exported table was encrypted.
+				// We are always encrypting tables that were exported encrypted
+				// even if innodb_encrypt_tables=ONLINE_FROM_KEYRING_UNENCRYPTED and encrypt threads > 0. This table
+				// should get decrypted by encryption threads in such case. 
+				fil_io_set_keyring_encryption(write_request, iter.crypt_data, page_id,
+							      encrypted_with_keyring);
 				write_request.encryption_algorithm(Encryption::KEYRING);
 			}
 			else if (iter.encryption_key != NULL) {

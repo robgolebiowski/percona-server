@@ -1,10 +1,9 @@
---skip
 --source include/have_innodb.inc
 --source include/not_valgrind.inc
 --source include/not_embedded.inc
 
 call mtr.add_suppression("\\[Warning\\] InnoDB: Tablespace for table `[^`]+`.`[^`]+` is set as discarded\\.");
-call mtr.add_suppression("\\[Warning\\] InnoDB: Page [[:digit:]]+ at offset [[:digit:]]+ looks corrupted in file");
+call mtr.add_suppression("\\[Warning\\] InnoDB: Page [0-9]+ at offet [0-9]+ in file .* cannot be decrypted.");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: os_file_read\\(\\) failed");
 
 --let $number_of_records = 10000
@@ -211,6 +210,7 @@ ALTER TABLE t8 ENGINE InnoDB;
 SHOW CREATE TABLE t8;
 
 --echo # Restarting server
+--replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/restart_mysqld.inc
 --echo # Done restarting server
 
@@ -301,7 +301,7 @@ EOF
 
 --echo # Disable rotation threads
 SET GLOBAL innodb_encryption_threads = 0;
-SET GLOBAL innodb_encrypt_tables = OFF;
+SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 
 ALTER TABLE t1 IMPORT TABLESPACE;
 --let $assert_text = Make sure t1 has encrypted flag set after importing
@@ -538,7 +538,7 @@ SET GLOBAL innodb_encryption_threads = 4;
 --let SEARCH_FILE = $t8_ibd
 --source include/search_pattern_in_file.inc
 
---echo # Now let's backup keyring file, change encryption key id of encrypt-able tables (all but t7) 
+--echo # Now let's backup keyring file, change encryption key id of encrypt-able tables (all but t7)
 --echo # export and dicard them. Next restart the server with backuped keyring file and make sure that
 --echo # server starts, but tables cannot be imported gracefully
 
@@ -552,10 +552,14 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 --let $wait_condition = SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
---copy_file $MYSQLTEST_VARDIR/tmp/mysecret_keyring $MYSQLTEST_VARDIR/tmp/mysecret_keyring_backup
+--copy_file $MYSQL_TMP_DIR/mysecret_keyring $MYSQL_TMP_DIR/mysecret_keyring_backup
 
 ALTER TABLE t1 encryption_key_id = 5;
+--echo # This should generate error that tables that was originaly encrypted with Master Key need
+--echo # to have encryption type set to KEYRING so encryption_key_id could be used in ALTER statement
+--error ER_ILLEGAL_HA_CREATE_OPTION
 ALTER TABLE t2 encryption_key_id = 5;
+ALTER TABLE t2 ENCRYPTION='KEYRING' encryption_key_id = 5;
 ALTER TABLE t3 encryption_key_id = 5;
 ALTER TABLE t4 encryption_key_id = 5;
 ALTER TABLE t5 encryption_key_id = 5;
@@ -587,23 +591,25 @@ ib_restore_tablespaces("$ENV{DB_NAME}", "t1", "t2", "t3", "t4", "t5", "t6", "t8"
 EOF
 
 --let $restart_parameters = restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring_backup
+--replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/restart_mysqld.inc
 
---error ER_INTERNAL_ERROR
+--error ER_GET_ERRMSG
 ALTER TABLE t1 IMPORT TABLESPACE;
-#--error ER_INTERNAL_ERROR
+--error ER_GET_ERRMSG
 ALTER TABLE t2 IMPORT TABLESPACE;
 --error ER_INTERNAL_ERROR
 ALTER TABLE t3 IMPORT TABLESPACE;
 --error ER_INTERNAL_ERROR
 ALTER TABLE t4 IMPORT TABLESPACE;
---error ER_INTERNAL_ERROR
+--error ER_GET_ERRMSG
 ALTER TABLE t5 IMPORT TABLESPACE;
---error ER_INTERNAL_ERROR
+--error ER_GET_ERRMSG
 ALTER TABLE t6 IMPORT TABLESPACE;
---error ER_INTERNAL_ERROR
+--error ER_GET_ERRMSG
 ALTER TABLE t8 IMPORT TABLESPACE;
 
+--replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --let $restart_parameters = restart:--loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring
 --source include/restart_mysqld.inc
 

@@ -5016,7 +5016,7 @@ ibuf_check_bitmap_on_import(
 		if (err != DB_SUCCESS)
 			return err;
 
-		if (buf_page_is_zeroes(bitmap_page, page_size)) {
+		if (buf_page_is_zeroes_or_contains_keyring_encryption_info(bitmap_page, page_size)) {
 			/* This means we got all-zero page instead of
 			ibuf bitmap page. The subsequent page should be
 			all-zero pages. */
@@ -5029,7 +5029,7 @@ ibuf_check_bitmap_on_import(
 						page_size,
 						RW_S_LATCH, &mtr);
 	                        page_t*	page = buf_block_get_frame(block);
-				ut_ad(buf_page_is_zeroes(page, page_size));
+				ut_ad(buf_page_is_zeroes_or_contains_keyring_encryption_info(page, page_size));
 			}
 #endif /* UNIV_DEBUG */
 			ibuf_exit(&mtr);

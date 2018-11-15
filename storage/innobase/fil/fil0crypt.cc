@@ -219,7 +219,8 @@ fil_space_crypt_t::fil_space_crypt_t(
 		key_found(false),
 		rotate_state(),
 		encryption_rotation(encryption_rotation),
-		tablespace_key(NULL)
+		tablespace_key(NULL),
+		is_in_use_in_start_enc(false)
 	{
 		key_id = new_key_id;
 		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
@@ -913,9 +914,11 @@ fil_crypt_start_encrypting_space(
 	}
 	mutex_enter(&crypt_data->mutex);
 	crypt_data = fil_space_set_crypt_data(space, crypt_data);
+	crypt_data->is_in_use_in_start_enc = true;
 	mutex_exit(&crypt_data->mutex);
+	ut_ad(space->crypt_data != NULL);
 
-	space->encryption_type= Encryption::KEYRING; // This works like this - if Encryption::KEYRING is set - it means that
+	space->encryption_type= Encryption::KEYRING; // This works like this - if Encryption::KEYRING is set - it means that //TODO:is it needed here?
 	fil_crypt_start_converting = true;
 	mutex_exit(&fil_crypt_threads_mutex);
 
@@ -937,7 +940,7 @@ fil_crypt_start_encrypting_space(
 		byte* frame = buf_block_get_frame(block);
 		crypt_data->type = CRYPT_SCHEME_1;
 		crypt_data->write_page0(space, frame, &mtr, crypt_data->min_key_version, crypt_data->type, crypt_data->encryption_rotation);
-
+		crypt_data->is_in_use_in_start_enc= false;
 		mtr.commit();
 
 		/* 4 - sync tablespace before publishing crypt data */

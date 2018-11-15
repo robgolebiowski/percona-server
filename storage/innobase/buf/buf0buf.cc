@@ -519,17 +519,38 @@ buf_block_alloc(
 }
 #endif /* !UNIV_HOTBACKUP && !UNIV_INNOCHECKSUM */
 
-/** Checks if a page contains only zeroes.
+static
+bool
+is_byte_offset_in_keyring_encryption_info(
+		const ulint offset)
+{
+	return (offset >= FIL_PAGE_ORIGINAL_TYPE_V1 &&
+		offset <= FIL_PAGE_ORIGINAL_TYPE_V1 + 1) || 
+	       (offset >= FIL_PAGE_ENCRYPTION_KEY_VERSION &&
+		offset <= FIL_PAGE_ENCRYPTION_KEY_VERSION + 3);
+}
+
+/** Checks if a page contains only zeroes or just
+ * keyring encryption information (KEY_VERSION or original page type)
 @param[in]	read_buf	database page
 @param[in]	page_size	page size
 @return true if page is filled with zeroes */
 bool
-buf_page_is_zeroes(
+buf_page_is_zeroes_or_contains_keyring_encryption_info(
 	const byte*		read_buf,
 	const page_size_t&	page_size)
 {
-	for (ulint i = 0; i < page_size.logical(); i++) {
-		if (read_buf[i] != 0) {
+	return buf_page_is_zeroes_or_contains_keyring_encryption_info(read_buf, page_size.logical());
+}
+
+bool
+buf_page_is_zeroes_or_contains_keyring_encryption_info(
+	const byte*		read_buf,
+	const ulint		page_size)
+{
+	for (ulint i = 0; i < page_size; i++) {
+		if (read_buf[i] != 0 &&
+		    !is_byte_offset_in_keyring_encryption_info(i)) {
 			return(false);
 		}
 	}
@@ -826,10 +847,8 @@ buf_page_is_corrupted(
 
 			if ((i < FIL_PAGE_FILE_FLUSH_LSN
 			     || i >= FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID)
-			    && read_buf[i] != 0) {
-				if (i >= FIL_PAGE_ENCRYPTION_KEY_VERSION &&
-				    i <= FIL_PAGE_ENCRYPTION_KEY_VERSION + 3) //those four bytes might not be 0 for keyring encryption
-					continue;
+			    && read_buf[i] != 0
+			    && !is_byte_offset_in_keyring_encryption_info(i)) {
 				break;
 			}
 		}

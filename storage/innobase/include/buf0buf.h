@@ -806,14 +806,20 @@ buf_page_is_checksum_valid_innodb(
 #endif /* UNIV_INNOCHECKSUM */
 );
 
-/** Checks if a page contains only zeroes.
+/** Checks if a page contains only zeroes or just
+ * keyring encryption information (KEY_VERSION or original page type)
 @param[in]	read_buf	database page
 @param[in]	page_size	page size
 @return true if page is filled with zeroes */
 bool
-buf_page_is_zeroes(
+buf_page_is_zeroes_or_contains_keyring_encryption_info(
 	const byte*		read_buf,
 	const page_size_t&	page_size);
+
+bool
+buf_page_is_zeroes_or_contains_keyring_encryption_info(
+	const byte*		read_buf,
+	const ulint		page_size);
 
 /** Checks if a page is corrupt.
 @param[in]	check_lsn	true if we need to check and complain about
