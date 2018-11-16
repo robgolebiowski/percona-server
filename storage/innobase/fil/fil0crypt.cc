@@ -496,6 +496,7 @@ void
 fil_space_destroy_crypt_data(
 	fil_space_crypt_t **crypt_data) {
 
+	ut_ad(*crypt_data == NULL || (*crypt_data)->is_in_use_in_start_enc == false);
 	if (crypt_data != NULL && (*crypt_data) != NULL) {
 		fil_space_crypt_t* c;
 		if (UNIV_LIKELY(fil_crypt_threads_inited)) {
@@ -913,8 +914,8 @@ fil_crypt_start_encrypting_space(
 		return false;
 	}
 	mutex_enter(&crypt_data->mutex);
-	crypt_data = fil_space_set_crypt_data(space, crypt_data);
 	crypt_data->is_in_use_in_start_enc = true;
+	crypt_data = fil_space_set_crypt_data(space, crypt_data);
 	mutex_exit(&crypt_data->mutex);
 	ut_ad(space->crypt_data != NULL);
 
