@@ -835,8 +835,8 @@ fil_crypt_read_crypt_data(fil_space_t* space) {
 					      page_size, RW_S_LATCH, &mtr)) {
 		mutex_enter(&fil_system->mutex);
 		if (!space->crypt_data) {
-			space->crypt_data = fil_space_read_crypt_data(
-				page_size, block->frame);
+			space->set_crypt_data(fil_space_read_crypt_data(
+				page_size, block->frame));
 		}
 		mutex_exit(&fil_system->mutex);
 	}
@@ -922,7 +922,7 @@ fil_crypt_start_encrypting_space(
 	space->encryption_type= Encryption::KEYRING; // This works like this - if Encryption::KEYRING is set - it means that //TODO:is it needed here?
 	fil_crypt_start_converting = true;
 	mutex_exit(&fil_crypt_threads_mutex);
-
+	os_thread_sleep(3);
 	do
 	{
 		mtr_t mtr;
