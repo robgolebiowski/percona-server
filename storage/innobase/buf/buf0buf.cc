@@ -80,6 +80,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0trx.h"
 #include "ut0new.h"
 #include "fil0crypt.h"
+#endif /* !UNIV_HOTBACKUP */
 
 #ifdef HAVE_LIBNUMA
 #include <numa.h>
@@ -4126,7 +4127,7 @@ void buf_page_init_low(buf_page_t *bpage) /*!< in: block to init */
   bpage->oldest_modification = 0;
   HASH_INVALIDATE(bpage, hash);
   bpage->is_corrupt = false;
-	bpage->encrypted = false;
+  bpage->encrypted = false;
 
   ut_d(bpage->file_page_was_freed = FALSE);
 }
@@ -4706,12 +4707,69 @@ void buf_read_page_handle_error(buf_page_t *bpage) {
   os_atomic_decrement_ulint(&buf_pool->n_pend_reads, 1);
 }
 
+dberr_t buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space) {
+  ut_ad(space->n_pending_ios > 0);
+  byte* dst_frame = (bpage->zip.data) ? bpage->zip.data :
+    ((buf_block_t*) bpage)->frame;
+  
+  dberr_t err = DB_SUCCESS;
+  fil_space_crypt_t* crypt_data = space->crypt_data;
+  ulint page_type = mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
+  ulint original_page_type = mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
+  bool was_page_read_encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
+  bpage->encrypted = bpage->encrypted || was_page_read_encrypted || page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED_RTREE ||
+                     page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED;
+  
+  ut_ad(bpage->id.page_no() != 0 ||
+        (original_page_type != FIL_PAGE_ENCRYPTED && page_type != FIL_PAGE_ENCRYPTED));
+  
+  BlockReporter reporter(true, dst_frame, bpage->size, fsp_is_checksum_disabled(bpage->id.space()));
+  
+  bool corrupted = bpage->is_corrupt || reporter.is_corrupted();
+  
+  if (!corrupted) {
+    bpage->encrypted = false;
+  } else {
+    err = DB_PAGE_CORRUPTED;
+  }
+  
+  if (corrupted && !bpage->encrypted) {
+    /* An error will be reported by
+    buf_page_io_complete(). */
+  } else if (bpage->encrypted && corrupted) {
+    bpage->encrypted = true;
+    err = DB_DECRYPTION_FAILED; 
+    ib::error()
+      << "The page " << bpage->id << " in file '"
+      << space->files.begin()->name
+      << "' cannot be decrypted.";
+    
+    if (crypt_data) {
+      ib::info()
+        << "However key management plugin or used key_version "
+        << mach_read_from_4(dst_frame
+           + FIL_PAGE_FILE_FLUSH_LSN)
+        << " is not found or"
+        " used encryption algorithm or method does not match.";
+    }
+    
+    if (bpage->id.space() != TRX_SYS_SPACE) {
+      ib::info()
+        << "Marking tablespace as missing."
+        " You may drop this table or"
+        " install correct key management plugin"
+        " and key file.";
+    }
+  }
+  return err;
+}
+
 /** Completes an asynchronous read or write request of a file page to or from
 the buffer pool.
 @param[in]	bpage	pointer to the block in question
 @param[in]	evict	whether or not to evict the page from LRU list
 @return true if successful */
-bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
+dberr_t buf_page_io_complete(buf_page_t *bpage, bool evict) {
   enum buf_io_fix io_type;
   buf_pool_t *buf_pool = buf_pool_from_bpage(bpage);
   const ibool uncompressed = (buf_page_get_state(bpage) == BUF_BLOCK_FILE_PAGE);
@@ -4735,13 +4793,12 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
     byte *frame;
     bool compressed_page;
 
-    fil_space_t* space = fil_space_acquire_for_io(
-      bpage->id.space());
+    fil_space_t* space = fil_space_acquire_for_io(bpage->id.space());
     if (!space) {
       return DB_TABLESPACE_DELETED;
     }
 
-    dberr_t>err = DB_SUCCESS;
+    dberr_t err = DB_SUCCESS;
 
     if (bpage->size.is_compressed()) {
       frame = bpage->zip.data;
@@ -4806,12 +4863,8 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
 
       /* From version 3.23.38 up we store the page checksum
       to the 4 first bytes of the page end lsn field */
-      {
-        BlockReporter reporter =
-            BlockReporter(true, frame, bpage->size,
-                          fsp_is_checksum_disabled(bpage->id.space()));
-        err = reporter.is_corrupted_or_encrypted();
-      }
+
+      err = buf_page_check_corrupt(bpage, space);
 
       if (compressed_page || err != DB_SUCCESS) {
         // Here bpage should not be encrypted. If it is still encrypted it means
@@ -4820,6 +4873,14 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict) {
           ib::error() << "Page is still encrypted - which means decryption failed. "
                          "Marking whole space as encrypted";
           fil_space_set_encrypted(bpage->id.space());
+
+          trx_t *trx;
+          trx = innobase_get_trx();
+          if (trx && trx->dict_operation_lock_mode == RW_X_LATCH) {
+            dict_table_set_encrypted_by_space(bpage->id.space(), false);
+          } else {
+            dict_table_set_encrypted_by_space(bpage->id.space(), true);
+          }
         }
 
         /* Not a real corruption if it was triggered by

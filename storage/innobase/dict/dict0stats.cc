@@ -673,6 +673,7 @@ static void dict_stats_update_transient_for_index(
       only when some thread is dropping the table and we don't
       have to empty the statistics of the to be dropped index */
       btr_estimate_number_of_different_key_vals(index);
+    }
   }
 }
 
@@ -2061,7 +2062,7 @@ static dberr_t dict_stats_save_index_stat(dict_index_t *index, lint last_update,
 @retval DB_CORRUPTION if table is marked as corrupted */
 dberr_t
 dict_stats_report_error(dict_table_t* table) {
-  dberr_t		err;
+  dberr_t err;
 
   uint32_t space_id = table->space;
 
@@ -2080,11 +2081,11 @@ dict_stats_report_error(dict_table_t* table) {
   } else {
     ib::warn() << "Cannot save statistics for table "
                << table->name
-               << " because file " << space()->chain.start->name
-               << (table->corrupted
+               << " because file " << space()->files.begin()->name
+               << (table->is_corrupt
                  ? " is corrupted."
                  : " cannot be decrypted.");
-    err = table->corrupted ? DB_CORRUPTION : DB_DECRYPTION_FAILED;
+    err = table->is_corrupt ? DB_CORRUPTION : DB_DECRYPTION_FAILED;
   }
 
   dict_stats_empty_table(table);

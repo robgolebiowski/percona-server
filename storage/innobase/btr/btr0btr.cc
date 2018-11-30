@@ -175,7 +175,7 @@ buf_block_t *btr_root_block_get(
     ib::warn() << "Table in tablespace is encrypted but encryption service or"
                   " used key_id is not available. "
                   " Can't continue reading table.";
-                  return NULL;
+                  return nullptr;
   }
 
   SRV_CORRUPT_TABLE_CHECK(block, return (nullptr););
@@ -217,10 +217,10 @@ page_t *btr_root_get(const dict_index_t *index, /*!< in: index tree */
   buf_block_t* root = btr_root_block_get(index, RW_SX_LATCH, mtr);
 
   if (root && root->page.encrypted == true) {
-    root = NULL;
+    root = nullptr;
   }
 
-  return(root ? buf_block_get_frame(root) : NULL);
+  return(root ? buf_block_get_frame(root) : nullptr);
 }
 
 /** Gets the height of the B-tree (the level of the root, when the leaf
@@ -230,8 +230,8 @@ page_t *btr_root_get(const dict_index_t *index, /*!< in: index tree */
 ulint btr_height_get(dict_index_t *index, /*!< in: index tree */
                      mtr_t *mtr)          /*!< in/out: mini-transaction */
 {
-	ulint		height=0;
-	buf_block_t*	root_block;
+  ulint height=0;
+  buf_block_t *root_block;
 
   ut_ad(srv_read_only_mode ||
         mtr_memo_contains_flagged(
@@ -245,11 +245,11 @@ ulint btr_height_get(dict_index_t *index, /*!< in: index tree */
   if (root_block) {
     height = btr_page_get_level(buf_block_get_frame(root_block), mtr);
 
-  /* Release the S latch on the root page. */
-  mtr->memo_release(root_block, MTR_MEMO_PAGE_S_FIX);
+    /* Release the S latch on the root page. */
+    mtr->memo_release(root_block, MTR_MEMO_PAGE_S_FIX);
 
-  ut_d(sync_check_unlock(&root_block->lock));
-
+    ut_d(sync_check_unlock(&root_block->lock));
+  }
   return (height);
 }
 
@@ -896,8 +896,7 @@ static MY_ATTRIBUTE((warn_unused_result)) buf_block_t *btr_free_root_check(
           block = NULL;
         }
   }
-
-	return(block);
+  return(block);
 }
 
 /** Create the root node for a new index tree.
@@ -4624,19 +4623,22 @@ static bool btr_validate_spatial_index(
 
 /** Checks the consistency of an index tree.
  @return true if ok */
-bool btr_validate_index(
+dberr_t btr_validate_index(
     dict_index_t *index, /*!< in: index */
     const trx_t *trx,    /*!< in: transaction or NULL */
     bool lockout)        /*!< in: true if X-latch index is intended */
 {
+  dberr_t err = DB_SUCCESS;
   /* Full Text index are implemented by auxiliary tables,
   not the B-tree */
   if (dict_index_is_online_ddl(index) || (index->type & DICT_FTS)) {
-    return (true);
+    return (err);
   }
 
   if (dict_index_is_spatial(index)) {
-    return (btr_validate_spatial_index(index, trx));
+    if (!btr_validate_spatial_index(index, trx)) {
+      err = DB_ERROR;
+    }
   }
 
   mtr_t mtr;
@@ -4651,26 +4653,31 @@ bool btr_validate_index(
     }
   }
 
-  bool ok = true;
   page_t *root = btr_root_get(index, &mtr);
+
+  if (root == NULL && !index->is_readable()) {
+    err = DB_DECRYPTION_FAILED;
+    mtr_commit(&mtr);
+    return err;
+  }
 
   SRV_CORRUPT_TABLE_CHECK(root, {
     mtr_commit(&mtr);
-    return (false);
+    return DB_CORRUPTION;
   });
 
   ulint n = btr_page_get_level(root, &mtr);
 
   for (ulint i = 0; i <= n; ++i) {
     if (!btr_validate_level(index, trx, n - i, lockout)) {
-      ok = false;
+      err = DB_CORRUPTION;
       break;
     }
   }
 
   mtr_commit(&mtr);
 
-  return (ok);
+  return (err);
 }
 
 /** Checks if the page in the cursor can be merged with given page.

@@ -3144,12 +3144,12 @@ kept in non-LRU list while on failure the 'table' object will be freed.
                                 DB_SUCCESS added to the data dictionary cache)
 @param[in]	compression	compression algorithm to use, can be nullptr
 @param[in,out]	trx		transaction
-@param[in]      fil_encryption_t mode, /*!< in: encryption mode */
-@param[in]      const CreateInfoEncryptionKeyId &create_info_encryption_key_id) /*!< in: encryption key_id */
+@param[in]      fil_encryption_t mode,  in: encryption mode
+@param[in]      const CreateInfoEncryptionKeyId &create_info_encryption_key_id in: encryption key_id
 @return error code or DB_SUCCESS */
 dberr_t row_create_table_for_mysql(dict_table_t *table, const char *compression,
                                    trx_t *trx, fil_encryption_t mode, 
-                                   const CreateInfoEncryptionKeyId &create_info_encryption_key_id)) {
+                                   const CreateInfoEncryptionKeyId &create_info_encryption_key_id) {
   mem_heap_t *heap;
   dberr_t err;
 
@@ -3178,7 +3178,7 @@ dberr_t row_create_table_for_mysql(dict_table_t *table, const char *compression,
   }
 
   /* Assign table id and build table space. */
-  err = dict_build_table_def(table, trx);
+  err = dict_build_table_def(table, trx, mode, create_info_encryption_key_id);
   if (err != DB_SUCCESS) {
     trx->error_state = err;
     goto error_handling;
@@ -4233,8 +4233,6 @@ dberr_t row_drop_table_for_mysql(const char *name, trx_t *trx, bool nonatomic,
   dd::Table *table_def = nullptr;
   bool file_per_table = false;
   aux_name_vec_t aux_vec;
-	bool		was_master_key_id_mutex_locked	= false;
-	bool		page0_has_crypt_data = false;
 
   DBUG_ENTER("row_drop_table_for_mysql");
   DBUG_PRINT("row_drop_table_for_mysql", ("table: '%s'", name));

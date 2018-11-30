@@ -56,6 +56,8 @@ The tablespace memory cache */
 #include "page0zip.h"
 #include "srv0start.h"
 
+#include "fil0crypt.h"
+
 #ifndef UNIV_HOTBACKUP
 #include "buf0lru.h"
 #include "ibuf0ibuf.h"
@@ -257,7 +259,7 @@ ulint fil_n_pending_tablespace_flushes = 0;
 /** Number of files currently open */
 ulint fil_n_file_opened = 0;
 
-+/** At this age or older a space/page will be rotated */
+/** At this age or older a space/page will be rotated */
 extern uint srv_fil_crypt_rotate_key_age;
 extern ib_mutex_t fil_crypt_threads_mutex;
 extern ib_mutex_t fil_crypt_list_mutex;
@@ -896,7 +898,8 @@ class Fil_shard {
   @return pointer to created tablespace
   @retval nullptr on failure (such as when the same tablespace exists) */
   fil_space_t *space_create(const char *name, space_id_t space_id, ulint flags,
-                            fil_type_t purpose)
+                            fil_type_t purpose, fil_space_crypt_t* crypt_data,
+                            fil_encryption_t mode = FIL_ENCRYPTION_DEFAULT)
       MY_ATTRIBUTE((warn_unused_result));
 
   /** Returns true if a matching tablespace exists in the InnoDB
@@ -1042,6 +1045,7 @@ class Fil_shard {
 
   // list of spaces kept in this shard
   Space_list m_space_list;
+  Space_list m_rotation_list;
 
  private:
   /** We keep log files and system tablespace files always open; this is
@@ -1532,13 +1536,13 @@ class Fil_system {
   @param[in]	deleted		true if MLOG_FILE_DELETE */
   void meb_name_process(char *name, space_id_t space_id, bool deleted);
 
-  fil_space_t *get_next_space(fil_space_t *space, Fil_shard *shard) {
-    space = UT_LIST_GET_NEXT(space_list, space);
-    if (space == NULL) {
-      shard->mutex_release();
-      auto next_shard = fil_system->get_next_shard(shard);
-      if (next_shard != NULL)
-    }
+  //fil_space_t *get_next_space(fil_space_t *space, Fil_shard *shard) {
+    //space = UT_LIST_GET_NEXT(m_space_list, space);
+    //if (space == NULL) {
+      //shard->mutex_release();
+      //auto next_shard = fil_system->get_next_shard(shard);
+      //if (next_shard != NULL)
+    //}
   
   
   }
@@ -1564,14 +1568,14 @@ class Fil_system {
       MY_ATTRIBUTE((warn_unused_result));
 
   //TODO: refactor this
-  Fil_shard * get_next_shard(Fil_shard *shard) {
-    if (shard == nullptr)
-      return *(std::begin(m_shards));
-    auto it = std::find(std::begin(m_shards), std::end(m_shards), shard);
-    return (it != std::end(m_shards) && std::next(it) != std::end(m_shards)
-           ? std::next(it);
-           : nullptr;
-  }
+  //Fil_shard * get_next_shard(Fil_shard *shard) {
+    //if (shard == nullptr)
+      //return *(std::begin(m_shards));
+    //auto it = std::find(std::begin(m_shards), std::end(m_shards), shard);
+    //return (it != std::end(m_shards) && std::next(it) != std::end(m_shards)
+           //? std::next(it)
+           //: nullptr;
+  //}
 
  private:
   /** Fil_shards managed */
@@ -2388,7 +2392,7 @@ dberr_t Fil_shard::get_file_size(fil_node_t *file, bool read_only_mode) {
      ) {
          if (srv_n_fil_crypt_threads == 0) {
            ib::warn() << "Table encryption flag is " <<  (FSP_FLAGS_GET_ENCRYPTION(relevant_space_flags) ? "ON" : "OFF")
-                      << " in the data dictionary but the encryption flag in file " << node->name << " is " 
+                      << " in the data dictionary but the encryption flag in file " << file->name << " is " 
                       << (FSP_FLAGS_GET_ENCRYPTION(relevant_flags) ? "ON" : "OFF")
                       << ". This indicates that the rotation of the table was interrupted before space's flags were updated."
                       << " Please have encryption_thread variable (innodb-encryption-threads) set to value > 0. So the encryption"
@@ -2442,7 +2446,7 @@ dberr_t Fil_shard::get_file_size(fil_node_t *file, bool read_only_mode) {
       Encryption::tablespace_key_exists(space->crypt_data->key_id) == false &&
       !recv_recovery_is_on()) {
         ib::error() << "There is no key for tablespace " << space->name;
-        return (false);
+        return (DB_DECRYPTION_FAILED);
   }
 
   if (file->size == 0) {
@@ -3065,7 +3069,7 @@ fil_space_t *Fil_shard::space_create(const char *name, space_id_t space_id,
   }
 #endif /* !UNIV_HOTBACKUP */
 
-  space_add(space,fil_encryption_t mode);
+  space_add(space, mode);
 
   return (space);
 }
@@ -3738,8 +3742,7 @@ when it could be dropped concurrently.
 @param[in]	id	tablespace ID
 @return	the tablespace
 @retval	NULL if missing */
-fil_space_t*
-fil_space_acquire_for_io(ulint space_id) {
+fil_space_t* fil_space_acquire_for_io(ulint space_id) {
   auto shard = fil_system->shard_by_id(space_id);
 
   shard->mutex_acquire();
@@ -3754,20 +3757,6 @@ fil_space_acquire_for_io(ulint space_id) {
 
   return (space);
 }
-
-void fil_space_release(fil_space_t *space) {
-  auto shard = fil_system->shard_by_id(space->id);
-
-  shard->mutex_acquire();
-
-  ut_ad(space->magic_n == FIL_SPACE_MAGIC_N);
-  ut_ad(space->n_pending_ops > 0);
-
-  --space->n_pending_ops;
-
-  shard->mutex_release();
-}
-
 
 /** Release a tablespace acquired with fil_space_acquire_for_io().
 @param[in,out]	space	tablespace to release  */
@@ -3807,8 +3796,8 @@ fil_space_next(fil_space_t* prev_space) //TODO: To powinno być częścią Fil_s
     shard = fil_system->shard_by_index(0);
 
     shard->mutex_acquire();
-    space = UT_LIST_GET_FIRST(shard->space_list);
-    next_shard = 1;
+    space = UT_LIST_GET_FIRST(shard->m_space_list);
+    next_shard_index = 1;
   }
 
   if (prev_space != nullptr ) {
@@ -3819,7 +3808,7 @@ fil_space_next(fil_space_t* prev_space) //TODO: To powinno być częścią Fil_s
 
     /* Move on to the next fil_space_t */
     space->n_pending_ops--;
-    space = UT_LIST_GET_NEXT(shard->m_space_list, space);
+    space = UT_LIST_GET_NEXT(space_list, space);
     if (space == nullptr)
       next_shard_index = (next_shard_index + 1) % fil_system->get_number_of_shards();
   }
@@ -3829,7 +3818,7 @@ fil_space_next(fil_space_t* prev_space) //TODO: To powinno być częścią Fil_s
     auto shard = fil_system->shard_by_index(next_shard_index);
     ut_ad(shard != nullptr);
     shard->mutex_acquire();
-    space = UT_LIST_GET_FIRST(shard->space_list, space);
+    space = UT_LIST_GET_FIRST(shard->m_space_list);
     next_shard_index = (next_shard_index + 1) % fil_system->get_number_of_shards();
     /* Skip spaces that are being created by
     fil_ibd_create(), or dropped, or !tablespace. */
@@ -3837,7 +3826,7 @@ fil_space_next(fil_space_t* prev_space) //TODO: To powinno być częścią Fil_s
            (space->files.empty() ||
             space->is_stopping() ||
             space->purpose != FIL_TYPE_TABLESPACE)) {
-             space = UT_LIST_GET_NEXT(shard->space_list, space);
+             space = UT_LIST_GET_NEXT(space_list, space);
     }
   }
     
@@ -3865,8 +3854,8 @@ fil_space_remove_from_keyrotation(Fil_shard *shard, fil_space_t* space) {
 
   if (space->n_pending_ops == 0 && space->is_in_rotation_list) {
     space->is_in_rotation_list = false;
-    ut_a(UT_LIST_GET_LEN(shard->rotation_list) > 0);
-    UT_LIST_REMOVE(shard->rotation_list, space);
+    ut_a(UT_LIST_GET_LEN(shard->m_rotation_list) > 0);
+    UT_LIST_REMOVE(shard->m_rotation_list, space);
   }
 }
 
@@ -3888,22 +3877,24 @@ fil_space_keyrotate_next(fil_space_t* prev_space) {  //TODO: To powinno być cz�
 
   static uint next_shard_index = 1;
 
+  Fil_shard* shard = nullptr;
+
   if (prev_space == NULL) {
-    auto shard = fil_system->shard_by_index(0);
+    shard = fil_system->shard_by_index(0);
     shard->mutex_acquire();
-    space = UT_LIST_GET_FIRST(shard->rotation_list);
+    space = UT_LIST_GET_FIRST(shard->m_rotation_list);
     next_shard_index = 1;
   }
   
   if (prev_space != NULL ) {
     ut_ad(space->n_pending_ops > 0); // we are sure that space exists as space
                                      // with n_pending_ops > 0 cannot be removed
-    auto shard = fil_system->shard_by_id(space_id);
+    shard = fil_system->shard_by_id(space->id);
     shard->mutex_acquire();
     /* Move on to the next fil_space_t */
     space->n_pending_ops--;
     old = space;
-    space = UT_LIST_GET_NEXT(shard->m_space_list, space);
+    space = UT_LIST_GET_NEXT(rotation_list, space);
     fil_space_remove_from_keyrotation(shard, old); //TODO: to powinna być funkcja sharda
     if (space == NULL)
       next_shard_index = (next_shard_index + 1) % fil_system->get_number_of_shards();
@@ -3911,18 +3902,18 @@ fil_space_keyrotate_next(fil_space_t* prev_space) {  //TODO: To powinno być cz�
 
   while (space == NULL && next_shard_index != 0) {
     shard->mutex_release();
-    auto shard = fil_system->shard_by_index(next_shard);
+    shard = fil_system->shard_by_index(next_shard_index);
     ut_ad(shard != NULL);
     shard->mutex_acquire();
-    space = UT_LIST_GET_FIRST(shard->m_space_list, space);
-    next_shard = (next_shard + 1) % fil_system->get_number_of_shards();
+    space = UT_LIST_GET_FIRST(shard->m_rotation_list);
+    next_shard_index = (next_shard_index + 1) % fil_system->get_number_of_shards();
     /* Skip spaces that are being created by
     fil_ibd_create(), or dropped, or !tablespace. */
     while (space != NULL && 
            (space->files.empty() || space->is_stopping() ||
             space->purpose != FIL_TYPE_TABLESPACE)) {
       old = space;
-      space = UT_LIST_GET_NEXT(space_list, space);
+      space = UT_LIST_GET_NEXT(rotation_list, space);
       fil_space_remove_from_keyrotation(shard, old); //TODO: to powinna być funkcja sharda
     }
   }
@@ -5360,7 +5351,7 @@ dberr_t fil_ibd_create(space_id_t space_id, const char *name, const char *path,
   if (space == nullptr) {
     os_file_close(file);
     os_file_delete(innodb_data_file_key, path);
-    fil_space_destroy_crypt_data(crypt_data);
+    fil_space_destroy_crypt_data(&crypt_data);
 
     return (DB_ERROR);
   }
@@ -5497,7 +5488,6 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
   const bool atomic_write = false;
 #endif /* !NO_FALLOCATE && UNIV_LINUX */
 
-  dberr_t err;
   Datafile::ValidateOutput validate_output;
 
   if ((validate || is_encrypted) &&
@@ -5506,7 +5496,7 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
     Therefore we can get a space ID mismatch when validating
     the files during bootstrap. */
 
-    if (!is_encrypted && err != DB_WRONG_FILE_NAME) {
+    if (!is_encrypted && validate_output.error != DB_WRONG_FILE_NAME) {
       /* The following call prints an error message.
       For encrypted tablespace we skip print, since it should
       be keyring plugin issues. */
@@ -5515,7 +5505,7 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
       ib::error(ER_IB_MSG_306, space_name, TROUBLESHOOT_DATADICT_MSG);
     }
 
-    return (err);
+    return (validate_output.error);
   }
 
   if (validate_output.keyring_encryption_info.page0_has_crypt_data)
@@ -5574,8 +5564,8 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
       return (DB_ERROR);
     }
   } else if (crypt_data) {
-    err = fil_set_encryption(space->id, Encryption::KEYRING, nullptr,
-                             crypt_data->iv);
+    dberr_t err = fil_set_encryption(space->id, Encryption::KEYRING, nullptr,
+                                     crypt_data->iv);
     if (err != DB_SUCCESS) {
       return (DB_ERROR);
     }
@@ -5868,7 +5858,7 @@ fil_load_status Fil_shard::ibd_open_for_recovery(space_id_t space_id,
 #endif /* !UNIV_HOTBACKUP */
 
   const byte* first_page = df.get_first_page();
-  fil_space_crypt_t *crypt_data = first_page ? fil_space_read_crypt_data(page_size_t(file.flags()), first_page)
+  fil_space_crypt_t *crypt_data = first_page ? fil_space_read_crypt_data(page_size_t(df.flags()), first_page)
                                              : NULL;
 
   fil_system->mutex_acquire_all();
@@ -7190,6 +7180,76 @@ static void fil_report_invalid_page_access_low(page_no_t block_offset,
 #define fil_report_invalid_page_access(b, s, n, o, l, t) \
   fil_report_invalid_page_access_low((b), (s), (n), (o), (l), (t), __LINE__)
 
+static bool set_min_key_version;
+static byte key_min[32];
+
+inline void fil_io_set_keyring_encryption(IORequest& req_type,
+                                          fil_space_t *space,
+                                          const page_id_t& page_id) {
+  ut_ad(space->crypt_data != NULL);
+
+  byte* key = NULL;
+  ulint key_len = 32; //32*8=256
+  byte* iv = NULL;
+  byte *tablespace_iv = NULL;
+  byte *tablespace_key = NULL;
+  uint key_version = 0;
+  uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+
+  mutex_enter(&space->crypt_data->mutex);
+
+  iv = space->crypt_data->iv;
+  key_id= space->crypt_data->key_id;
+  
+  if (req_type.is_write()) {
+    if (space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0) {
+      key = space->crypt_data->get_key_currently_used_for_encryption();
+      key_version = space->crypt_data->encrypting_with_key_version;
+      key_len = 32;
+    }
+    else {
+      key = NULL;
+      key_len = 0;
+      iv = NULL;
+      key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+    }
+  }
+  
+  if (req_type.is_read()) {
+    tablespace_iv = space->crypt_data->tablespace_iv;
+    tablespace_key = space->crypt_data->tablespace_key;
+    ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_KEYRING ||
+          space->crypt_data->tablespace_key != NULL);
+    // retrieve key with min_key_version from local cache. In normal situation this is the key needed for
+    // decryption. In rare cases when re-encryption was aborted - due to server crash or shutdown there
+    // can be one more key version needed to decrypt tablespace - we will find this version in decrypt and
+    // retrieve needed version.
+    if (space->crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+      key= space->crypt_data->get_min_key_version_key();
+      memcpy(key_min, key, 32);
+      set_min_key_version = true;
+      char testblock[32];
+      memset(testblock,0,32);
+      ut_ad(memcmp(key,testblock, 32) != 0); 
+      ut_ad(key != NULL);
+      key_version = key == NULL ? ENCRYPTION_KEY_VERSION_INVALID
+                                : space->crypt_data->min_key_version;
+    } else {
+      key= NULL;
+      key_version= ENCRYPTION_KEY_VERSION_INVALID;
+    }
+  }
+  
+  req_type.encryption_key(key, key_len, false, iv, key_version,
+                          key_id, tablespace_iv, tablespace_key);
+  
+  req_type.encryption_rotation(space->crypt_data->encryption_rotation);
+
+  req_type.encryption_algorithm(Encryption::KEYRING);
+  
+  mutex_exit(&space->crypt_data->mutex);
+}
+
 /** Set encryption information for IORequest.
 @param[in,out]	req_type	IO request
 @param[in]	page_id		page id
@@ -7252,7 +7312,7 @@ void fil_io_set_encryption(IORequest &req_type, const page_id_t &page_id,
     ut_ad(space->crypt_data != NULL);
     /* Don't encrypt the log, page 0 of all tablespaces, all pages
     don't encrypt TRX_SYS_SPACE.TRX_SYS_PAGE_NO as it contains address to dblwr buffer in keyring encryption */
-    if (!req_type.is_log() && page_id.page_no() > 0 && (TRX_SYS_SPACE != page_id.space() || TRX_SYS_PAGE_NO != page_id.page_no()) {
+    if (!req_type.is_log() && page_id.page_no() > 0 && (TRX_SYS_SPACE != page_id.space() || TRX_SYS_PAGE_NO != page_id.page_no())) {
       fil_io_set_keyring_encryption(req_type, space, page_id);
     } else {
       req_type.clear_encrypted();
@@ -8340,7 +8400,7 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
       ut_ad(iter.m_page_size == callback.get_page_size().physical());
 
       read_request.mark_page_zip_compressed();
-      read_request.set_zip_page_physical_size(iter.page_size);
+      read_request.set_zip_page_physical_size(iter.m_page_size);
 
       /* Zip IO is done in the compressed page buffer. */
       io_buffer = block->page.zip.data;
@@ -8357,23 +8417,23 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
     ut_ad(n_bytes > 0);
     ut_ad(!(n_bytes % iter.m_page_size));
 
-    const bool encrypted_with_keyring = iter.crypt_data != NULL &&
-                                        iter.crypt_data->type != CRYPT_SCHEME_UNENCRYPTED;
+    const bool encrypted_with_keyring = iter.m_crypt_data != NULL &&
+                                        iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED;
     dberr_t err;
 
     /* For encrypted table, set encryption information. */
 
-    if ((iter.encryption_key != NULL || encrypted_with_keyring) && offset != 0) {
-      read_request.encryption_key(encrypted_with_keyring ? iter.crypt_data->tablespace_key : iter.encryption_key,
+    if ((iter.m_encryption_key != NULL || encrypted_with_keyring) && offset != 0) {
+      read_request.encryption_key(encrypted_with_keyring ? iter.m_crypt_data->tablespace_key : iter.m_encryption_key,
                                   ENCRYPTION_KEY_LEN, false,
-                                  encrypted_with_keyring ? iter.crypt_data->iv : iter.encryption_iv,
-                                  0, iter.encryption_key_id,
-                                  encrypted_with_keyring ? iter.crypt_data->tablespace_iv : NULL,
-                                  encrypted_with_keyring ? iter.crypt_data->tablespace_key : NULL);
+                                  encrypted_with_keyring ? iter.m_crypt_data->iv : iter.m_encryption_iv,
+                                  0, iter.m_encryption_key_id,
+                                  encrypted_with_keyring ? iter.m_crypt_data->tablespace_iv : NULL,
+                                  encrypted_with_keyring ? iter.m_crypt_data->tablespace_key : NULL);
     
-      read_request.encryption_algorithm(iter.crypt_data ? Encryption::KEYRING : Encryption::AES);
-      if (iter.crypt_data) {
-        read_request.encryption_rotation(iter.crypt_data->encryption_rotation);
+      read_request.encryption_algorithm(iter.m_crypt_data ? Encryption::KEYRING : Encryption::AES);
+      if (iter.m_crypt_data) {
+        read_request.encryption_rotation(iter.m_crypt_data->encryption_rotation);
       } else
         read_request.encryption_rotation(Encryption::NO_ROTATION);
     }
@@ -8413,21 +8473,21 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
     IORequest write_request(write_type);
 
     /* For encrypted table, set encryption information. */
-    if (iter.encryption_key != NULL && offset != 0 && iter.crypt_data == NULL) {
-      write_request.encryption_key(iter.encryption_key, ENCRYPTION_KEY_LEN, false,
-                                   iter.encryption_iv, iter.encryption_key_version,
-                                   iter.encryption_key_id, NULL, NULL);
+    if (iter.m_encryption_key != NULL && offset != 0 && iter.m_crypt_data == NULL) {
+      write_request.encryption_key(iter.m_encryption_key, ENCRYPTION_KEY_LEN, false,
+                                   iter.m_encryption_iv, iter.m_encryption_key_version,
+                                   iter.m_encryption_key_id, NULL, NULL);
       write_request.encryption_algorithm(Encryption::AES);
-    } else if (offset != 0 && iter.crypt_data) {
-      write_request.encryption_key(iter.encryption_key, ENCRYPTION_KEY_LEN, false,
-                                   iter.encryption_iv, iter.encryption_key_version,
-                                   iter.crypt_data->key_id, NULL, NULL);
+    } else if (offset != 0 && iter.m_crypt_data) {
+      write_request.encryption_key(iter.m_encryption_key, ENCRYPTION_KEY_LEN, false,
+                                   iter.m_encryption_iv, iter.m_encryption_key_version,
+                                   iter.m_crypt_data->key_id, NULL, NULL);
     
       write_request.encryption_algorithm(Encryption::KEYRING);
       
       if (callback.get_page_size().is_compressed()) {
         write_request.mark_page_zip_compressed();
-        write_request.set_zip_page_physical_size(iter.page_size);
+        write_request.set_zip_page_physical_size(iter.m_page_size);
       }
     }
 
@@ -8556,21 +8616,21 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
 
     /* Set encryption info. */
     ulint space_flags = callback.get_space_flags();
-    iter.crypt_data = fil_space_read_crypt_data(callback.get_page_size(), page);
+    iter.m_crypt_data = fil_space_read_crypt_data(callback.get_page_size(), page);
     
     /* read (optional) crypt data */
-    if(iter.crypt_data && iter.crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
+    if(iter.m_crypt_data && iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
       ut_ad(FSP_FLAGS_GET_ENCRYPTION(space_flags));
-      iter.encryption_key_id = iter.crypt_data->key_id;
+      iter.m_encryption_key_id = iter.m_crypt_data->key_id;
       
-      Encryption::get_latest_tablespace_key(iter.crypt_data->key_id, &iter.encryption_key_version, &iter.encryption_key);
-      if (iter.encryption_key == NULL)
+      Encryption::get_latest_tablespace_key(iter.m_crypt_data->key_id, &iter.m_encryption_key_version, &iter.m_encryption_key);
+      if (iter.m_encryption_key == NULL)
         err = DB_DECRYPTION_FAILED;
     } else {
       /* Set encryption info. */
-      iter.encryption_key = table->encryption_key;
-      iter.encryption_iv = table->encryption_iv;
-      iter.encryption_key_version = ~0; //TODO:Robert:flipping bits so to make this a marker that tablespace key id used
+      iter.m_encryption_key = table->encryption_key;
+      iter.m_encryption_iv = table->encryption_iv;
+      iter.m_encryption_key_version = ~0; //TODO:Robert:flipping bits so to make this a marker that tablespace key id used
     }
 
     /* Check encryption is matched or not. */
@@ -8608,10 +8668,10 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
       ut_free(io_buffer);
     }
 
-    if (iter.crypt_data) {
-      fil_space_destroy_crypt_data(&iter.crypt_data);
-      if (iter.encryption_key != NULL)
-        my_free(iter.encryption_key);
+    if (iter.m_crypt_data) {
+      fil_space_destroy_crypt_data(&iter.m_crypt_data);
+      if (iter.m_encryption_key != NULL)
+        my_free(iter.m_encryption_key);
     }
   }
 
@@ -8837,73 +8897,6 @@ Compression::Type fil_get_compression(space_id_t space_id) {
   return (space == nullptr ? Compression::NONE : space->compression_type);
 }
 
-inline void fil_io_set_keyring_encryption(IORequest& req_type,
-                                          fil_space_t *space,
-                                          const page_id_t& page_id) {
-  ut_ad(space->crypt_data != NULL);
-
-  byte* key = NULL;
-  ulint key_len = 32; //32*8=256
-  byte* iv = NULL;
-  byte *tablespace_iv = NULL;
-  byte *tablespace_key = NULL;
-  uint key_version = 0;
-  uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-
-  mutex_enter(&space->crypt_data->mutex);
-
-  iv = space->crypt_data->iv;
-  key_id= space->crypt_data->key_id;
-  
-  if (req_type.is_write()) {
-    if (space->crypt_data->should_encrypt() && space->crypt_data->encrypting_with_key_version != 0) {
-      key = space->crypt_data->get_key_currently_used_for_encryption();
-      key_version = space->crypt_data->encrypting_with_key_version;
-      key_len = 32;
-    }
-    else {
-      key = NULL;
-      key_len = 0;
-      iv = NULL;
-      key_version=ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-    }
-  }
-  
-  if (req_type.is_read()) {
-    tablespace_iv = space->crypt_data->tablespace_iv;
-    tablespace_key = space->crypt_data->tablespace_key;
-    ut_ad(space->crypt_data->encryption_rotation != Encryption::MASTER_KEY_TO_KEYRING ||
-          space->crypt_data->tablespace_key != NULL);
-    // retrieve key with min_key_version from local cache. In normal situation this is the key needed for
-    // decryption. In rare cases when re-encryption was aborted - due to server crash or shutdown there
-    // can be one more key version needed to decrypt tablespace - we will find this version in decrypt and
-    // retrieve needed version.
-    if (space->crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-      key= space->crypt_data->get_min_key_version_key();
-      memcpy(key_min, key, 32);
-      set_min_key_version = true;
-      char testblock[32];
-      memset(testblock,0,32);
-      ut_ad(memcmp(key,testblock, 32) != 0); 
-      ut_ad(key != NULL);
-      key_version = key == NULL ? ENCRYPTION_KEY_VERSION_INVALID
-                                : space->crypt_data->min_key_version;
-    } else {
-      key= NULL;
-      key_version= ENCRYPTION_KEY_VERSION_INVALID;
-    }
-  }
-  
-  req_type.encryption_key(key, key_len, false, iv, key_version,
-                          key_id, tablespace_iv, tablespace_key);
-  
-  req_type.encryption_rotation(space->crypt_data->encryption_rotation);
-
-  req_type.encryption_algorithm(Encryption::KEYRING);
-  
-  mutex_exit(&space->crypt_data->mutex);
-}
-
 /** Set the encryption type for the tablespace
 @param[in] space_id		Space ID of tablespace for which to set
 @param[in] algorithm		Encryption algorithm
@@ -8911,10 +8904,10 @@ inline void fil_io_set_keyring_encryption(IORequest& req_type,
 @param[in] iv			Encryption iv
 @return DB_SUCCESS or error code */
 dberr_t fil_set_encryption(space_id_t space_id, Encryption::Type algorithm,
-                           byte *key, byte *iv, bool aquire_mutex) {
+                           byte *key, byte *iv, bool acquire_mutex) {
   auto shard = fil_system->shard_by_id(space_id);
 
-  if (aquire_mutex)
+  if (acquire_mutex)
     shard->mutex_acquire();
 
   fil_space_t *space = shard->get_space_by_id(space_id);
@@ -10308,7 +10301,7 @@ void Tablespace_dirs::tokenize_paths(const std::string &str,
 @return DB_SUCCESS if all OK */
 static dberr_t fil_rename_validate(fil_space_t *space, const std::string &name,
                                    Datafile &df) {
-  dberr_t err = df.validate_for_recovery(space->id);
+  dberr_t err = df.validate_for_recovery(space->id).error;
 
   if (err == DB_TABLESPACE_NOT_FOUND) {
     /* Tablespace header doesn't contain the expected
@@ -11047,6 +11040,18 @@ void fil_system_acquire() {
 void fil_system_release() {
   ut_ad(fil_system);
   fil_system->mutex_release_all();
+}
+
+void fil_lock_shard_by_id(ulint space_id) {
+  auto *const shard = fil_system->shard_by_id(space_id);
+  ut_ad(shard);
+  shard->mutex_acquire();
+}
+
+void fil_unlock_shard_by_id(ulint space_id) {
+  auto *const shard = fil_system->shard_by_id(space_id);
+  ut_ad(shard);
+  shard->mutex_release();
 }
 
 

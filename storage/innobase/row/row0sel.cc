@@ -4813,7 +4813,7 @@ rec_loop:
 
   rec = btr_pcur_get_rec(pcur);
 
-  if (!index->table->is_readable() && !index->table->corrupted) {
+  if (!index->table->is_readable() && !index->table->is_corrupt) {
     err = DB_DECRYPTION_FAILED;
     goto lock_wait_or_error;
   }
@@ -6029,10 +6029,8 @@ dberr_t row_count_rtree_recs(
       dfield->type.mtype = DATA_GEOMETRY;
       dfield->type.prtype |= DATA_GIS_MBR;
 
-	/*-------------------------------------------------------------*/
-	if (!dict_index_is_spatial(index)) {
-		btr_pcur_store_position(pcur, &mtr);
-	}
+      /* Allocate memory for mbr field */
+      mbr = static_cast<double *>(mem_heap_alloc(heap, DATA_MBR_LEN));
 
       /* Set mbr field data. */
       dfield_set_data(dfield, mbr, DATA_MBR_LEN);
@@ -6149,7 +6147,8 @@ func_exit:
 @param[in,out]	mtr	mini-transaction (may be committed and restarted)
 @return maximum record, page s-latched in mtr
 @retval NULL if there are no records, or if all of them are delete-marked */
-static const rec_t *row_search_get_max_rec(dict_index_t *index, mtr_t *mtr) {
+static const rec_t *row_search_get_max_rec(dict_index_t *index, mtr_t *mtr,
+                                           dberr_t &error) {
   btr_pcur_t pcur;
   const rec_t *rec;
 
@@ -6368,25 +6367,10 @@ bool row_search_index_stats(const char *db_name, const char *tbl_name,
       continue;
     }
 
-/** Get the maximum and non-delete-marked record in an index.
-@param[in]	index	index tree
-@param[in,out]	mtr	mini-transaction (may be committed and restarted)
-@return maximum record, page s-latched in mtr
-@retval NULL if there are no records, or if all of them are delete-marked */
-static
-const rec_t*
-row_search_get_max_rec(
-	dict_index_t*	index,
-	mtr_t*		mtr)
-{
-	btr_pcur_t	pcur;
-	const rec_t*	rec;
-	/* Open at the high/right end (false), and init cursor */
-	btr_pcur_open_at_index_side(
-		false, index, BTR_SEARCH_LEAF, &pcur, true, 0, mtr);
-
-	if (err != DB_SUCCESS)
-		return NULL;
+    if (n_recs == col_offset) {
+      const byte *data;
+      ulint len;
+      data = rec_get_nth_field(rec, offsets, cardinality_index_offset, &len);
 
       *cardinality = static_cast<ulonglong>(round(mach_read_from_8(data)));
       mtr_commit(&mtr);
@@ -6397,55 +6381,7 @@ row_search_get_max_rec(
     n_recs++;
   }
 
-		if (page_rec_is_user_rec(rec)) {
-			break;
-		} else {
-			rec = NULL;
-		}
-		btr_pcur_move_before_first_on_page(&pcur);
-	} while (btr_pcur_move_to_prev(&pcur, mtr));
-
-	btr_pcur_close(&pcur);
-
-	return(rec);
-}
-
-/*******************************************************************//**
-Read the max AUTOINC value from an index.
-@return DB_SUCCESS if all OK else error code, DB_RECORD_NOT_FOUND if
-column name can't be found in index */
-dberr_t
-row_search_max_autoinc(
-/*===================*/
-	dict_index_t*	index,		/*!< in: index to search */
-	const char*	col_name,	/*!< in: name of autoinc column */
-	ib_uint64_t*	value)		/*!< out: AUTOINC value read */
-{
-	dict_field_t*	dfield = dict_index_get_nth_field(index, 0);
-	dberr_t		error = DB_SUCCESS;
-	*value = 0;
-
-	if (strcmp(col_name, dfield->name) != 0) {
-		error = DB_RECORD_NOT_FOUND;
-	} else {
-		mtr_t		mtr;
-		const rec_t*	rec;
-
-		mtr_start(&mtr);
-
-		rec = row_search_get_max_rec(index, &mtr);
-
-		if (rec != NULL) {
-			ibool unsigned_type = (
-				dfield->col->prtype & DATA_UNSIGNED);
-
-			*value = row_search_autoinc_read_column(
-				index, rec, 0,
-				dfield->col->mtype, unsigned_type);
-		}
-
-		mtr_commit(&mtr);
-	}
-
-	return(error);
+  mtr_commit(&mtr);
+  mem_heap_free(heap);
+  return (false);
 }

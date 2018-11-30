@@ -1564,8 +1564,7 @@ static byte *recv_parse_or_apply_log_rec_body(mlog_id_t type, byte *ptr,
 
         if (page_no == 0) {
           byte* ptr_copy = ptr;
-          ulint offset = mach_read_from_2(ptr_copy);
-          ptr_copy += 2;
+          ptr_copy += 2; //skip offset
           ulint len = mach_read_from_2(ptr_copy);
           ptr_copy += 2;
           if (end_ptr < ptr_copy + len)

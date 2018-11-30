@@ -412,9 +412,7 @@ InnoDB extended statistics should be collected.
 @return transaction object if statistics should be collected, or NULL. */
 MY_NODISCARD
 trx_t*
-innobase_get_trx_for_slow_log(void);
-
-extern bool innodb_inited;
+innobase_get_trx_for_slow_log(void) noexcept;
 
 enum srv_encrypt_tables_values {
   SRV_ENCRYPT_TABLES_OFF = 0,
@@ -426,7 +424,6 @@ enum srv_encrypt_tables_values {
   SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE = 6,
   SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED = 7
 };
-#endif /* !UNIV_HOTBACKUP && !UNIV_INNOCHECKSUM */
 
 extern bool innodb_inited;
 #endif /* HA_INNODB_PROTOTYPES_H */

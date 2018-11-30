@@ -7442,7 +7442,6 @@ static int i_s_tablespaces_encryption_fill_table(THD* thd,
   bool found_space_0 = false;
   
   DBUG_ENTER("i_s_tablespaces_encryption_fill_table");
-  RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
   
   /* deny access to user without PROCESS_ACL privilege */
   if (check_global_access(thd, SUPER_ACL)) {
@@ -7457,7 +7456,7 @@ static int i_s_tablespaces_encryption_fill_table(THD* thd,
   
   while (rec) {
     const char* err_msg;
-    ulint space_id;
+    space_id_t space_id;
     const char* name;
     ulint flags;
     
@@ -7558,6 +7557,10 @@ struct st_mysql_plugin	i_s_innodb_tablespaces_encryption =
   /* the function to invoke when plugin is loaded */
   /* int (*)(void*); */
   STRUCT_FLD(init, innodb_tablespaces_encryption_init),
+
+  /* the function to invoke when plugin is un installed */
+  /* int (*)(void*); */
+  NULL,
   
   /* the function to invoke when plugin is unloaded */
   /* int (*)(void*); */
@@ -7565,7 +7568,7 @@ struct st_mysql_plugin	i_s_innodb_tablespaces_encryption =
   
   /* plugin version (for SHOW PLUGINS) */
   /* unsigned int */
-  STRUCT_FLD(version, INNODB_VERSION_SHORT),
+  STRUCT_FLD(version, i_s_innodb_plugin_version),
   
   /* struct st_mysql_show_var* */
   STRUCT_FLD(status_vars, NULL),

@@ -285,7 +285,7 @@ class Datafile {
   @param[in]	space_id	Expected space ID
   @retval DB_SUCCESS on success
   m_is_valid is also set true on success, else false. */
-  dberr_t validate_for_recovery(space_id_t space_id)
+ ValidateOutput validate_for_recovery(space_id_t space_id)
       MY_ATTRIBUTE((warn_unused_result));
 
   /** Checks the consistency of the first page of a datafile when the
@@ -303,8 +303,8 @@ class Datafile {
   @retval DB_INVALID_ENCRYPTION_META if the encrypption meta data
           is not readable
   @retval DB_TABLESPACE_EXISTS if there is a duplicate space_id */
-  dberr_t validate_first_page(space_id_t space_id, lsn_t *flush_lsn,
-                              bool for_import)
+  ValidateOutput validate_first_page(space_id_t space_id, lsn_t *flush_lsn,
+                                     bool for_import)
       MY_ATTRIBUTE((warn_unused_result));
 
   /** Get Datafile::m_name.

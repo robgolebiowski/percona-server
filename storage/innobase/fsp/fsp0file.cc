@@ -42,6 +42,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "page0page.h"
 #include "srv0start.h"
 #include "ut0new.h"
+#include "fil0crypt.h"
 
 #ifdef UNIV_HOTBACKUP
 #include "my_sys.h"
@@ -383,20 +384,21 @@ in order for this function to validate it.
 @param[in]	for_import	if it is for importing
 @retval DB_SUCCESS if tablespace is valid, DB_ERROR if not.
 m_is_valid is also set true on success, else false. */
-dberr_t Datafile::validate_to_dd(space_id_t space_id, ulint flags,
-                                 bool for_import) {
+Datafile::ValidateOutput Datafile::validate_to_dd(space_id_t space_id, ulint flags,
+                                                  bool for_import) {
   ValidateOutput output;
 
   if (!is_open()) {
-    return (DB_ERROR);
+    output.error = DB_ERROR;
+    return output;
   }
 
   /* Validate this single-table-tablespace with the data dictionary,
   but do not compare the DATA_DIR flag, in case the tablespace was
   remotely located. */
   output = validate_first_page(space_id, 0, for_import);
-  if (err != DB_SUCCESS) {
-    return (err);
+  if (output.error != DB_SUCCESS) {
+    return (output);
   }
 
   // in case of keyring encryption it can be so happen that there will be a crash after all pages of tablespace is rotated
@@ -464,7 +466,6 @@ reopen it in write mode and ry to restore that page.
 @retval DB_SUCCESS  on success
 m_is_valid is also set true on success, else false. */
 Datafile::ValidateOutput Datafile::validate_for_recovery(space_id_t space_id) {
-  dberr_t err;
   ValidateOutput output;
 
   ut_ad(!srv_read_only_mode);
@@ -472,7 +473,7 @@ Datafile::ValidateOutput Datafile::validate_for_recovery(space_id_t space_id) {
 
   output = validate_first_page(space_id, 0, false);
 
-  switch (err) {
+  switch (output.error) {
     case DB_SUCCESS:
     case DB_TABLESPACE_EXISTS:
     case DB_TABLESPACE_NOT_FOUND:
@@ -516,7 +517,7 @@ Datafile::ValidateOutput Datafile::validate_for_recovery(space_id_t space_id) {
 
       /* Free the previously read first page and then re-validate. */
       free_first_page();
-      output.error = validate_first_page(space_id, 0, false);
+      output = validate_first_page(space_id, 0, false);
   }
 
   if (output.error == DB_SUCCESS || output.error == DB_INVALID_ENCRYPTION_META) {
@@ -616,7 +617,8 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id, lsn_
                   << ", expected " << space_id << " but found " << m_space_id;
 #endif /* !UNIV_HOTBACKUP */
 
-    return (DB_WRONG_FILE_NAME);
+    output.error = DB_WRONG_FILE_NAME;
+    return (output);
 
   } else {
     BlockReporter reporter(false, m_first_page, page_size,

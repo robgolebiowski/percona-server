@@ -1771,6 +1771,8 @@ void fil_space_update_name(fil_space_t *space, const char *name);
 @param space_id	space id */
 void fil_space_set_corrupt(space_id_t space_id);
 
+void fil_space_set_encrypted(ulint space_id);
+
 using space_id_vec = std::vector<space_id_t>;
 
 /** Rotate tablespace keys of global tablespaces like system, temporary, etc.
@@ -1782,4 +1784,8 @@ bool fil_encryption_rotate_global(const space_id_vec &space_ids);
 // TODO: Check if can get encryption threads start without this
 void fil_system_acquire();
 void fil_system_release();
+
+void fil_lock_shard_by_id(ulint space_id);
+void fil_unlock_shard_by_id(ulint space_id);
+
 #endif /* fil0fil_h */

@@ -33,7 +33,7 @@ Created 04/01/2015 Jan Lindström
 #include "log0types.h"
 // TODO: Robert: This is temporary for fil_encryption_t
 #include "fil0fil.h"
-
+#include "ha_prototypes.h"
 
 #endif /*! UNIV_INNOCHECKSUM */
 

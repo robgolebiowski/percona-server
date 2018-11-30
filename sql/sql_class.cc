@@ -3028,7 +3028,7 @@ bool THD::sql_parser() {
   return false;
 }
 
-static my_bool lock_keyring(THD *thd, plugin_ref plugin, void *arg);
+static bool lock_keyring(THD *thd, plugin_ref plugin, void *arg);
 
 class KeyringsLocker {
 public:
@@ -3084,12 +3084,12 @@ private:
   mysql_mutex_t mutex;
 };
 
-static my_bool lock_keyring(THD *thd, plugin_ref plugin, void *arg) {
+static bool lock_keyring(THD *thd, plugin_ref plugin, void *arg) {
   KeyringsLocker *keyrings_locker= reinterpret_cast<KeyringsLocker*>(arg);
   plugin= plugin_lock(thd, &plugin);
   if (plugin)
     keyrings_locker->locked_keyring_plugins.push_back(plugin);
-  return FALSE;
+  return false;
 }
 
 int lock_keyrings(THD *thd) {

@@ -821,7 +821,7 @@ class PageConverter : public AbstractCallback {
   enum import_page_status_t {
     IMPORT_PAGE_STATUS_OK,       /*!< Page is OK */
     IMPORT_PAGE_STATUS_ALL_ZERO, /*!< Page is all zeros */
-    IMPORT_PAGE_STATUS_CORRUPTED /*!< Page is corrupted */
+    IMPORT_PAGE_STATUS_CORRUPTED, /*!< Page is corrupted */
     IMPORT_PAGE_STATUS_DECRYPTION_FAILED /*< Page decryption failed */
   };
 
@@ -2107,6 +2107,9 @@ PageConverter::import_page_status_t PageConverter::validate(
   bool was_page_read_encrypted = original_page_type == FIL_PAGE_ENCRYPTED;
   block->page.encrypted = block->page.encrypted || was_page_read_encrypted || page_type == FIL_PAGE_ENCRYPTED || page_type == FIL_PAGE_ENCRYPTED_RTREE ||
                           page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED;
+
+  BlockReporter reporter(false, page, get_page_size(),
+                         fsp_is_checksum_disabled(block->page.id.space()));
 
   if (reporter.is_corrupted() ||
       (page_get_page_no(page) != offset / m_page_size.physical() &&
@@ -3602,7 +3605,7 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
     /* If table is set to encrypted, but can't find
     cfp file, then return error. */
-    if (cfg.m_cfp_missing == true && !cfg.m_is_keyring_encrypted
+    if (cfg.m_cfp_missing == true && !cfg.m_is_keyring_encrypted &&
         ((space_flags != 0 && FSP_FLAGS_GET_ENCRYPTION(space_flags)) ||
          dict_table_is_encrypted(table))) {
       ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_TABLE_SCHEMA_MISMATCH,
@@ -3881,7 +3884,7 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
           (space_flags_from_disk & ~FSP_FLAGS_MASK_DATA_DIR));
   }
 
-  if (dict_table_is_encrypted(table)  && !cfg.m_is_keyring_encrypted)) {
+  if (dict_table_is_encrypted(table)  && !cfg.m_is_keyring_encrypted) {
     mtr_t mtr;
     byte encrypt_info[ENCRYPTION_INFO_SIZE];
 

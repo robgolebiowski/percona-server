@@ -19,11 +19,10 @@
 
 #include "my_inttypes.h"
 
-C_MODE_START
 #define PERCONA_BINLOG_KEY_NAME "percona_binlog"
 #define PERCONA_INNODB_KEY_NAME "percona_innodb"
 
-my_bool is_valid_percona_system_key(const char *key_name, size_t *key_length);
+bool is_valid_percona_system_key(const char *key_name, size_t *key_length);
 
 /**
   A convenience function that extracts key's data and key's version from system
