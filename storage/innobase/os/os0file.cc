@@ -8168,6 +8168,38 @@ Set the file create umask
 @param[in]	umask		The umask to use for file creation. */
 void os_file_set_umask(ulint umask) { os_innodb_umask = umask; }
 
+Encryption::Encryption(const Encryption& other):
+  m_type(other.m_type),
+  m_key(other.m_key),
+  m_klen(other.m_klen),
+  m_key_allocated(other.m_key_allocated),
+  m_iv(other.m_iv),
+  m_tablespace_iv(other.m_tablespace_iv),
+  m_tablespace_key(other.m_tablespace_key),
+  m_key_version(other.m_key_version),
+  m_key_id(other.m_key_id),
+  m_checksum(other.m_checksum),
+  m_encryption_rotation(other.m_encryption_rotation) {
+    if (other.m_key_allocated && other.m_key != NULL)
+      m_key = static_cast<byte *>(my_memdup(PSI_NOT_INSTRUMENTED,
+                                  other.m_key, other.m_klen, MYF(0)));
+}
+
+Encryption::~Encryption() {
+  if (m_key_allocated && m_key != NULL) {
+    my_free(m_key);
+  }
+}
+
+void Encryption::set_key(byte *key, ulint key_len, bool allocated) {
+  if (m_key_allocated && m_key != NULL) {
+    my_free(m_key);
+  }
+  m_key = key;
+  m_klen = key_len;
+  m_key_allocated = allocated;
+}
+
 /**
 @param[in]      type            The encryption type
 @return the string representation */
@@ -8198,7 +8230,7 @@ void Encryption::fill_key_name(char *key_name, uint key_id) {
 #ifndef UNIV_INNOCHECKSUM
   memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
   
-  ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+  snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
               key_id);
 #endif
 }
@@ -8207,14 +8239,14 @@ void Encryption::fill_key_name(char* key_name, uint key_id, uint key_version) {
 #ifndef UNIV_INNOCHECKSUM
   memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
   
-  ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+  snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
               key_id, key_version);
 #endif
 }
 
 void Encryption::create_tablespace_key(byte** tablespace_key, uint key_id) {
 #ifndef UNIV_INNOCHECKSUM
-  char key_type = NULL;
+  char *key_type = nullptr;
   size_t key_len;
   char key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
   int ret;
@@ -8222,20 +8254,20 @@ void Encryption::create_tablespace_key(byte** tablespace_key, uint key_id) {
   fill_key_name(key_name, key_id);
   
   /* We call key ring API to generate tablespace key here. */
-  ret = my_key_generate(key_name, "AES", NULL, ENCRYPTION_KEY_LEN);
+  ret = my_key_generate(key_name, "AES", nullptr, ENCRYPTION_KEY_LEN);
   
   if (ret) {
     ib::error() << "Encryption can't generate tablespace key : " << key_name;
-    *tablespace_key = NULL;
+    *tablespace_key = nullptr;
     return;
   }
   
-  byte *system_tablespace_key = NULL;
+  byte *system_tablespace_key = nullptr;
   /* We call key ring API to get tablespace key here. */
-  ret = my_key_fetch(key_name, &key_type, NULL, reinterpret_cast<void**>(&system_tablespace_key),
+  ret = my_key_fetch(key_name, &key_type, nullptr, reinterpret_cast<void**>(&system_tablespace_key),
                      &key_len);
   
-  if (ret || system_tablespace_key == NULL) {
+  if (ret || system_tablespace_key == nullptr) {
     ib::error() << "Encryption can't find tablespace key " << key_name << " please check"
     		" that the keyring plugin is loaded.";
     *tablespace_key = NULL;

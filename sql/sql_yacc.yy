@@ -587,7 +587,6 @@ void warn_about_deprecated_national(THD *thd)
 %token<keyword> COMPRESSED_SYM
 %token<keyword> COMPRESSION_SYM
 %token<keyword> ENCRYPTION_SYM
-%token<keyword> ENCRYPTION_KEY_ID_SY
 %token<keyword> CONCURRENT
 %token  CONDITION_SYM                 /* SQL-2003-R, SQL-2008-R */
 %token<keyword> CONNECTION_SYM
@@ -1245,6 +1244,7 @@ void warn_about_deprecated_national(THD *thd)
 %token<keyword> TOKU_SMALL_SYM
 %token<keyword> TOKU_DEFAULT_SYM
 %token<keyword> USER_STATS_SYM
+%token<keyword> ENCRYPTION_KEY_ID_SYM
 
 /*
    Tokens from Percona Server 8.0
@@ -5954,7 +5954,7 @@ create_table_option:
         | ENCRYPTION_KEY_ID_SYM opt_equal real_ulong_num
           {
             $$= NEW_PTN PT_create_encryption_key_id_option($3);
-            Lex->create_info.was_encryption_key_id_set= true;
+            Lex->create_info->was_encryption_key_id_set= true;
           }
         | AUTO_INC opt_equal ulonglong_num
           {

@@ -5406,14 +5406,32 @@ void dict_set_corrupted(dict_index_t *index) {
 /** Flags a table with specified space_id encrypted in the data dictionary
 cache
 @param[in] space_id Tablespace id */
-void
-dict_table_set_encrypted_by_space(ulint space_id) {
-  dict_table_t*   table;
+void dict_table_set_encrypted_by_space(space_id_t space_id,
+                                     bool need_mutex) noexcept {
+  ut_a(space_id != 0);
+  ut_a(space_id < dict_sys_t::s_log_space_first_id);
 
-  table = dict_find_single_table_by_space(space_id);
+  if (need_mutex) mutex_enter(&(dict_sys->mutex));
 
-  if (table)
-    table->set_file_unreadable();
+  dict_table_t *table = UT_LIST_GET_FIRST(dict_sys->table_LRU);
+  bool found = false;
+
+  while (table) {
+    if (table->space == space_id) {
+      table->set_file_unreadable();
+      found = true;
+    }
+
+    table = UT_LIST_GET_NEXT(table_LRU, table);
+  }
+
+  if (need_mutex) mutex_exit(&(dict_sys->mutex));
+
+  if (!found) {
+    ib::warn() << "Space to be marked as encrypted was not found "
+                  "for id "
+               << space_id << ".";
+  }
 }
 
 #ifndef UNIV_HOTBACKUP

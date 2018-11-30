@@ -622,7 +622,8 @@ static inline bool is_instant(const Alter_inplace_info *ha_alter_info) {
 @param[in]	ha_alter_info	The DDL operation
 @return whether it is necessary to rebuild the table */
 static MY_ATTRIBUTE((warn_unused_result)) bool innobase_need_rebuild(
-    const Alter_inplace_info *ha_alter_info) {
+    const Alter_inplace_info *ha_alter_info,
+    const TABLE *old_table) {
   if (is_instant(ha_alter_info)) {
     return (false);
   }
@@ -631,7 +632,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool innobase_need_rebuild(
       ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE);
 
   if ((
-        Encryption::is_no(ha_alter_info->create_info->encrypt_type.str) &&
+        Encryption::none_explicitly_specified(ha_alter_info->create_info->encrypt_type.str) &&
         (Encryption::is_keyring(old_table->s->encrypt_type.str) || Encryption::is_empty(old_table->s->encrypt_type.str))
       ) ||
       (
@@ -696,12 +697,11 @@ enum_alter_inplace_result ha_innobase::check_if_supported_inplace_alter(
 
   /* We don't support change Master key encryption attribute with
   inplace algorithm. */
-  const bool currently_encrypted =
-      m_prebuilt->table->flags2 & DICT_TF2_ENCRYPTION;
   char* old_encryption = this->table->s->encrypt_type.str;
   char *new_encryption = altered_table->s->encrypt_type.str;
 
-  if (currently_encrypted == Encryption::is_none(new_encryption)) {
+ if (Encryption::is_master_key_encryption(old_encryption) !=
+     Encryption::is_master_key_encryption(new_encryption)) {
     ha_alter_info->unsupported_reason =
         innobase_get_err_msg(ER_UNSUPPORTED_ALTER_ENCRYPTION_INPLACE);
     DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
@@ -1128,7 +1128,7 @@ bool ha_innobase::prepare_inplace_alter_table(TABLE *altered_table,
   ut_ad(new_dd_tab != NULL);
 
   if (dict_sys_t::is_dd_table_id(m_prebuilt->table->id) &&
-      innobase_need_rebuild(ha_alter_info)) {
+      innobase_need_rebuild(ha_alter_info, table)) {
     ut_ad(!m_prebuilt->table->is_temporary());
     my_error(ER_NOT_ALLOWED_COMMAND, MYF(0));
     DBUG_RETURN(true);
@@ -4119,9 +4119,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
     Alter_inplace_info *ha_alter_info, const TABLE *altered_table,
     const TABLE *old_table, const Table *old_dd_tab, Table *new_dd_tab,
     const char *table_name, ulint flags, ulint flags2, ulint fts_doc_id_col,
-    bool add_fts_doc_id, bool add_fts_doc_id_idx, row_prebuilt_t *prebuilt,
-    
-    ) {
+    bool add_fts_doc_id, bool add_fts_doc_id_idx, row_prebuilt_t *prebuilt) {
   bool dict_locked = false;
   ulint *add_key_nums;     /* MySQL key numbers */
   index_def_t *index_defs; /* index definitions */
@@ -4514,11 +4512,8 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
         /* Check if keyring is ready. */
         byte* master_key = NULL;
         ulint master_key_id;
-        Encryption::Version version;
         
-        Encryption::get_master_key(&master_key_id,
-                                   &master_key,
-                                   &version);
+        Encryption::get_master_key(&master_key_id, &master_key);
         
         if (master_key == NULL) {
           dict_mem_table_free(ctx->new_table);
@@ -4529,7 +4524,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
           my_free(master_key);
         }
       } else if (Encryption::is_keyring(old_table->s->encrypt_type.str) &&
-           (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt))) {
+           (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::none_explicitly_specified(encrypt))) {
         // it is KEYRING encryption - check if old's table encryption key is available 
         if (Encryption::tablespace_key_exists(old_table->s->encryption_key_id) == false) {
           my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
@@ -4540,35 +4535,36 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       }
     }
     
-    if (Encryption::is_none_explicitly_specified(encrypt))
+    if (Encryption::none_explicitly_specified(encrypt))
       mode= FIL_ENCRYPTION_OFF;
     else if (Encryption::is_keyring(encrypt) || 
       ((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) 
-       && !Encryption::is_no(ha_alter_info->create_info->encrypt_type.str)
+       && !Encryption::none_explicitly_specified(ha_alter_info->create_info->encrypt_type.str)
        && !Encryption::is_master_key_encryption(encrypt)) ||
       ha_alter_info->create_info->was_encryption_key_id_set) {
-    mode= Encryption::is_keyring(encrypt) ? FIL_ENCRYPTION_ON
-                                          : FIL_ENCRYPTION_DEFAULT;
-    uint tablespace_key_version;
-    byte *tablespace_key; 
+      mode= Encryption::is_keyring(encrypt) ? FIL_ENCRYPTION_ON
+                                            : FIL_ENCRYPTION_DEFAULT;
+      uint tablespace_key_version;
+      byte *tablespace_key; 
     
-    //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
-    Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
-    if (tablespace_key == NULL) {
-      dict_mem_table_free(ctx->new_table);
-      my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-        "Seems that keyring is down. It is not possible to encrypt table"
-        " without keyring. Please install a keyring and try again.", MYF(0));
-      goto new_clustered_failed;
-    } else {
-      my_free(tablespace_key);
-    }
+      //TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
+      Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
+      if (tablespace_key == NULL) {
+        dict_mem_table_free(ctx->new_table);
+        my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+          "Seems that keyring is down. It is not possible to encrypt table"
+          " without keyring. Please install a keyring and try again.", MYF(0));
+        goto new_clustered_failed;
+      } else {
+        my_free(tablespace_key);
+      }
     
-    if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
-                                      (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-                                       srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE))) {
-      DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_ENCRYPTION);
+      if (mode == FIL_ENCRYPTION_ON || (mode == FIL_ENCRYPTION_DEFAULT &&
+                                        (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+                                         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE))) {
+        DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_ENCRYPTION);
+      }
     } else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE) &&
         ha_alter_info->create_info->encrypt_type.length > 0 &&
         Encryption::is_master_key_encryption(encrypt) &&
@@ -4576,7 +4572,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       dict_mem_table_free(ctx->new_table);
       my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
       goto new_clustered_failed;
-    } else if (!Encryption::is_master_key_encryptio(encrypt)) {
+    } else if (!Encryption::is_master_key_encryption(encrypt)) {
       /* Set the encryption flag. */
       byte *master_key = NULL;
       ulint master_key_id;
@@ -5276,7 +5272,7 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
   }
 
   if (dict_table_is_discarded(indexed_table) &&
-      innobase_need_rebuild(ha_alter_info)) {
+      innobase_need_rebuild(ha_alter_info, table)) {
     my_error(ER_TABLESPACE_DISCARDED, MYF(0), indexed_table->name.m_name);
     DBUG_RETURN(true);
   }
@@ -5322,7 +5318,7 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
 
   if (indexed_table->is_readable()) {
   } else {
-    if (indexed_table->corrupted) {
+    if (indexed_table->is_corrupt) {
       /* Handled below */
     } else {
       FilSpace space(indexed_table->space, true);
@@ -5345,10 +5341,9 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
     }
   }
   
-  if (indexed_table->corrupted
-      || dict_table_get_first_index(indexed_table) == NULL
-      || dict_index_is_corrupted(
-        dict_table_get_first_index(indexed_table))) {
+  if (indexed_table->is_corrupt
+      || UT_LIST_GET_FIRST(indexed_table->indexes) == NULL
+      || UT_LIST_GET_FIRST(indexed_table->indexes)->is_corrupted()) {
     /* The clustered index is corrupted. */
     my_error(ER_CHECK_NO_SUCH_TABLE, MYF(0));
     DBUG_RETURN(true);

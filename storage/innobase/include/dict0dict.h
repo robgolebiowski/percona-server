@@ -1745,8 +1745,8 @@ void dict_table_set_corrupt_by_space(space_id_t space_id,
 /** Flag a table with specified space_id encrypted in the data dictionary
 cache
 @param[in] space_id Tablespace id */
-void dict_table_set_encrypted_by_space(ulint space_id);
-
+void dict_table_set_encrypted_by_space(space_id_t space_id,
+                                     bool need_mutex) noexcept;
 
 // Percona commented out to be removed for the new DD
 #if 0

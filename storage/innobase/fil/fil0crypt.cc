@@ -28,6 +28,7 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "mach0data.h"
 #include "page0size.h"
 #include "page0zip.h"
+#include <algorithm>
 #ifndef UNIV_INNOCHECKSUM
 #include "fil0crypt.h"
 #include "srv0srv.h"
@@ -395,7 +396,7 @@ fil_space_merge_crypt_data(
 
 static
 ulint
-fsp_header_get_encryption_offset(
+fsp_header_get_keyring_encryption_offset(
 	const page_size_t&	page_size) {
 	ulint	offset;
 #ifdef UNIV_DEBUG
@@ -417,7 +418,7 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page) {
 
 	ulint bytes_read = 0;
 
-	const ulint offset = fsp_header_get_encryption_offset(page_size);
+	const ulint offset = fsp_header_get_keyring_encryption_offset(page_size);
 
 	if (memcmp(page + offset, ENCRYPTION_KEY_MAGIC_PS_V1, ENCRYPTION_MAGIC_SIZE) != 0) {
 		/* Crypt data is not stored. */
@@ -551,7 +552,7 @@ fil_space_crypt_t::write_page0(
 {
 	ut_ad(this == space->crypt_data);
 	const uint iv_len = sizeof(iv);
-	const ulint offset = fsp_header_get_encryption_offset(page_size_t(space->flags));
+	const ulint offset = fsp_header_get_keyring_encryption_offset(page_size_t(space->flags));
 	page0_offset = offset;
 
 	const uint encrypt_info_size = fil_get_encrypt_info_size(iv_len);
@@ -847,12 +848,12 @@ fil_crypt_read_crypt_data(fil_space_t* space) {
 	mtr.start();
 	if (buf_block_t* block = buf_page_get(page_id_t(space->id, 0),
 					      page_size, RW_S_LATCH, &mtr)) {
-		mutex_enter(&fil_system->mutex);
+		fil_lock_shard_by_id(space->id);
 		if (!space->crypt_data) {
 			space->crypt_data = fil_space_read_crypt_data(
 				page_size, block->frame);
 		}
-		mutex_exit(&fil_system->mutex);
+		fil_unlock_shard_by_id(space->id);
 	}
 	mtr.commit();
 }
@@ -937,10 +938,15 @@ fil_crypt_start_encrypting_space(
 
 	do
 	{
+                trx_t * trx = trx_allocate_for_background();
+		FlushObserver flush_observer(space->id, trx, nullptr);
+                trx_set_flush_observer(trx, &flush_observer);
+
 		mtr_t mtr;
 		mtr.start();
-		mtr.set_named_space(space);
+		//mtr.set_named_space(space);
 
+                mtr.set_flush_observer(&flush_observer);
 		/* 2 - get page 0 */
 
 		buf_block_t* block = buf_page_get_gen(
@@ -955,11 +961,12 @@ fil_crypt_start_encrypting_space(
 		crypt_data->write_page0(space, frame, &mtr, crypt_data->min_key_version, crypt_data->type, crypt_data->encryption_rotation);
 
 		mtr.commit();
-
 		/* 4 - sync tablespace before publishing crypt data */
-		buf_flush_request_force(LSN_MAX);
-		buf_flush_wait_flushed(LSN_MAX); 
+		//buf_flush_request_force(LSN_MAX);
+		//buf_flush_wait_flushed(LSN_MAX); 
 
+                flush_observer.flush();
+                trx_free_for_background(trx);
 		/* 5 - publish crypt data */
 		mutex_enter(&fil_crypt_threads_mutex);
 		mutex_enter(&crypt_data->mutex);
@@ -1676,7 +1683,7 @@ fil_crypt_rotate_page(
 				key_state->rotate_key_age)
 			  ) {
 
-			mtr.set_named_space(space);
+			//mtr.set_named_space(space);
 			mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);
 
 			/* force rotation by dummy updating page */
@@ -1723,8 +1730,9 @@ fil_crypt_rotate_pages(
 	rotate_thread_t*	state) {
 
 	ulint space = state->space->id;
+	//TODO : Change state->offset and state->batch types to page_no_t
 	ulint end = std::min(state->offset + state->batch,
-			     state->space->free_limit);
+			     static_cast<ulint>(state->space->free_limit));
 
 	ut_ad(state->space->n_pending_ops > 0);
 
@@ -2034,7 +2042,7 @@ get_table_ids_in_space_sql(
 
 	return(err);
 }
-
+/*
 static
 void
 fil_revert_encryption_flag_updates(ib_vector_t* tables_ids_to_revert_if_error, bool set) {
@@ -2055,7 +2063,7 @@ fil_revert_encryption_flag_updates(ib_vector_t* tables_ids_to_revert_if_error, b
 
 		dict_table_close(table, TRUE, FALSE);
 	}
-}
+}*/
 
 class TransactionAndHeapGuard
 {
@@ -2246,103 +2254,99 @@ private:
 };
 
 
-static
-dberr_t
-fil_update_encrypted_flag(fil_space_t *space, bool set){
-	// We are only modifying DD so the lock on DD is enough, we do not need
-	// lock on space
+//static
+//dberr_t
+//fil_update_encrypted_flag(fil_space_t *space, bool set){
+	//// We are only modifying DD so the lock on DD is enough, we do not need
+	//// lock on space
 	
-	//trx_t* trx_set_encrypted = trx_allocate_for_background();
-	//TransactionAndHeapGuard transaction_and_heap_guard(trx_set_encrypted); 
-	//trx_set_encrypted->op_info = "setting encrypted flag";
+	//TransactionAndHeapGuard	guard;
 
-	TransactionAndHeapGuard	guard;
-
-	if (!guard.lock_x_dict_operation_lock(space))
-		return DB_SUCCESS;
+	//if (!guard.lock_x_dict_operation_lock(space))
+		//return DB_SUCCESS;
 
 
-	if(!guard.allocate_trx())
-		return DB_ERROR;
+	//if(!guard.allocate_trx())
+		//return DB_ERROR;
 
-	guard.enter_dict_sys_mutex();
+	//guard.enter_dict_sys_mutex();
 
-	if (space->stop_new_ops) // space is about to be dropped
-		return DB_SUCCESS;
+	//if (space->stop_new_ops) // space is about to be dropped
+		//return DB_SUCCESS;
 
-	if (!guard.create_heap())
-		return DB_OUT_OF_MEMORY;
+	//if (!guard.create_heap())
+		//return DB_OUT_OF_MEMORY;
 
-	if (!guard.create_allocator())
-		return DB_OUT_OF_MEMORY;
+	//if (!guard.create_allocator())
+		//return DB_OUT_OF_MEMORY;
 
-	/* We store the table ids of all the FTS indexes that were found. */
-	if(!guard.create_table_ids_vector())
-		return DB_OUT_OF_MEMORY;
+	//[> We store the table ids of all the FTS indexes that were found. <]
+	//if(!guard.create_table_ids_vector())
+		//return DB_OUT_OF_MEMORY;
 
-	dberr_t	error = get_table_ids_in_space_sql(guard.get_trx(), space,
-				guard.get_table_ids());
-	if (error != DB_SUCCESS)
-		return error;
+	//dberr_t	error = get_table_ids_in_space_sql(guard.get_trx(), space,
+				//guard.get_table_ids());
+	//if (error != DB_SUCCESS)
+		//return error;
 
-	// First update tablespace's encryption flag
-	error = fts_update_encrypted_flag_for_tablespace_sql(guard.get_trx(),
-			space->id, set);
-	if (error != DB_SUCCESS)
-		return error;
+	//// First update tablespace's encryption flag
+	//error = fts_update_encrypted_flag_for_tablespace_sql(guard.get_trx(),
+			//space->id, set);
+	//if (error != DB_SUCCESS)
+		//return error;
 
-	if (!guard.create_table_ids_to_revert_vector())
-		return DB_OUT_OF_MEMORY;
+	//if (!guard.create_table_ids_to_revert_vector())
+		//return DB_OUT_OF_MEMORY;
 
-	while (!guard.is_table_ids_empty())
-	{
-		table_id_t	table_id = guard.pop_from_table_ids();
+	//while (!guard.is_table_ids_empty())
+	//{
+		//table_id_t	table_id = guard.pop_from_table_ids();
 
-		// Update table's encryption flag
-		error = fts_update_encrypted_tables_flag(guard.get_trx(),
-				table_id, set);
+		//// Update table's encryption flag
+		//error = fts_update_encrypted_tables_flag(guard.get_trx(),
+				//table_id, set);
 
-		DBUG_EXECUTE_IF(
-			"fail_encryption_flag_update_on_t3",
-			dict_table_t*	table =
-				dict_table_open_on_id(table_id, TRUE,
-					DICT_TABLE_OP_NORMAL);
+		//DBUG_EXECUTE_IF(
+			//"fail_encryption_flag_update_on_t3",
+			//dict_table_t*	table =
+				//dict_table_open_on_id(table_id, TRUE,
+					//DICT_TABLE_OP_NORMAL);
 
-			if (strcmp(table->name.m_name, "test/t3") == 0)
-				error = DB_ERROR; 
-			dict_table_close(table, TRUE, FALSE);
-		);
+			//if (strcmp(table->name.m_name, "test/t3") == 0)
+				//error = DB_ERROR; 
+			//dict_table_close(table, TRUE, FALSE);
+		//);
 
-		if (error != DB_SUCCESS)
-		{
-			fil_revert_encryption_flag_updates(
-				guard.get_table_ids_to_revert(), !set);
-			return error;
-		}
+		//if (error != DB_SUCCESS)
+		//{
+			//fil_revert_encryption_flag_updates(
+				//guard.get_table_ids_to_revert(), !set);
+			//return error;
+		//}
 
-		dict_table_t*	table = dict_table_open_on_id(table_id, TRUE,
-					DICT_TABLE_OP_NORMAL);
+		//dict_table_t*	table = dict_table_open_on_id(table_id, TRUE,
+					//DICT_TABLE_OP_NORMAL);
 
-		ut_ad(table != NULL);
+		//ut_ad(table != NULL);
 
-		if (set)
-		{
-			//ib::error() << "Setting encryption for table " << table->name.m_name; 
-			DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-		}
-		else
-			DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
+		//if (set)
+		//{
+			////ib::error() << "Setting encryption for table " << table->name.m_name; 
+			//DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
+		//}
+		//else
+			//DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
 
 
-		guard.push_to_table_ids_to_revert(table_id);
+		//guard.push_to_table_ids_to_revert(table_id);
 
-		dict_table_close(table, TRUE, FALSE);
-	}
+		//dict_table_close(table, TRUE, FALSE);
+	//}
 
-	guard.commit();
+	//guard.commit();
 
-	return DB_SUCCESS;
-}
+	//return DB_SUCCESS;
+//}
 
 /***********************************************************************
 Flush rotated pages and then update page 0
@@ -2398,10 +2402,10 @@ fil_crypt_flush_space(
 
 	if (space->id != 0) {
 
-		if (DB_SUCCESS != fil_update_encrypted_flag(space, current_type == CRYPT_SCHEME_UNENCRYPTED ? false : true)) {
-			ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0));
-			return DB_ERROR;
-		}
+		//if (DB_SUCCESS != fil_update_encrypted_flag(space, current_type == CRYPT_SCHEME_UNENCRYPTED ? false : true)) {
+			//ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0));
+			//return DB_ERROR;
+		//}
 
 		DBUG_EXECUTE_IF(
 		"crash_on_t1_flush_after_dd_update",
@@ -2409,14 +2413,12 @@ fil_crypt_flush_space(
 		DBUG_ABORT();
 		);
 
-		mutex_enter(&fil_system->mutex);
+		fil_lock_shard_by_id(space->id);
 		if (current_type == CRYPT_SCHEME_UNENCRYPTED)
 			space->flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
 		else
 			space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
-
-		mutex_exit(&fil_system->mutex); // TODO:Robert - I am not sure if I need this mutex
-
+                fil_unlock_shard_by_id(space->id);
 	}
 
 	/* update page 0 */
@@ -2427,7 +2429,7 @@ fil_crypt_flush_space(
 		page_id_t(space->id, 0), page_size_t(space->flags),
 		RW_X_LATCH, NULL, BUF_GET,
 		__FILE__, __LINE__, &mtr)) {
-			mtr.set_named_space(space);
+			//mtr.set_named_space(space);
 			crypt_data->write_page0(space, block->frame, &mtr, crypt_data->rotate_state.min_key_version_found, current_type,
 					Encryption::NO_ROTATION);
 	}
@@ -2548,14 +2550,7 @@ fil_crypt_complete_rotate_space(
 /*********************************************************************//**
 A thread which monitors global key state and rotates tablespaces accordingly
 @return a dummy parameter */
-extern "C" 
-os_thread_ret_t
-DECLARE_THREAD(fil_crypt_thread)(
-/*=============================*/
-      void*	arg __attribute__((unused))) {	/*!< in: a dummy parameter required
-					      	* by os_thread_create */
-	UT_NOT_USED(arg);
-
+void fil_crypt_thread() {
 	my_thread_init();
 
       /* TODO: Add this later */
@@ -2671,10 +2666,6 @@ DECLARE_THREAD(fil_crypt_thread)(
 	thread should always use that to exit and not use return() to exit. */
 
 	my_thread_end();
-
-	os_thread_exit();
-
-	OS_THREAD_DUMMY_RETURN;
 }
 
 /*********************************************************************
@@ -2695,11 +2686,9 @@ fil_crypt_set_thread_cnt(
 		uint add = new_cnt - srv_n_fil_crypt_threads;
 		srv_n_fil_crypt_threads = new_cnt;
 		for (uint i = 0; i < add; i++) {
-			os_thread_id_t rotation_thread_id;
-			os_thread_create(fil_crypt_thread, NULL, &rotation_thread_id);
+			os_thread_create(PSI_NOT_INSTRUMENTED, fil_crypt_thread);
 			ib::info() << "Creating #"
-				   << i+1 << " encryption thread id "
-				   << os_thread_pf(rotation_thread_id)
+				   << i+1 << " encryption thread"
 				   << " total threads " << new_cnt << ".";
 		}
 	} else if (new_cnt < srv_n_fil_crypt_threads) {
@@ -2925,11 +2914,15 @@ fil_crypt_calculate_checksum(
 	const byte*		page,
 	const bool	is_zip_compressed) {
 
-	/* For encrypted tables we use only crc32 and strict_crc32 */
-	return is_zip_compressed
-		? page_zip_calc_checksum(page, page_size,
-					 SRV_CHECKSUM_ALGORITHM_CRC32) // calculate for checksum
-		: buf_calc_page_crc32_encrypted_with_keyring(page, page_size);
+        /* For encrypted tables we use only crc32 and strict_crc32 */
+        if(is_zip_compressed) {
+          page_size_t page_size_dummy(page_size, page_size, true); // we do not care if those are correct values, as we
+                                                                  // are using calc_zip_checksum directly
+          BlockReporter reporter(false, page, page_size_dummy, false);
+          return reporter.calc_zip_checksum(page, page_size, SRV_CHECKSUM_ALGORITHM_CRC32);
+        } else {
+          return buf_calc_page_crc32_encrypted_with_keyring(page, page_size);
+        }
 }
 
 /**
@@ -2974,15 +2967,15 @@ fil_space_verify_crypt_checksum(
 
 	/* Calculate checksums */
 	if (is_zip_compressed) {
-		cchecksum1 = page_zip_calc_checksum(
-			page, page_size,
-			SRV_CHECKSUM_ALGORITHM_CRC32);
+                 page_size_t page_size_dummy(page_size, page_size, true); // we do not care if those are correct values, as we
+                                                                  // are using calc_zip_checksum directly
+                 BlockReporter reporter(false, page, page_size_dummy, false);
+
+		cchecksum1 = reporter.calc_zip_checksum(page, page_size,SRV_CHECKSUM_ALGORITHM_CRC32);
 
 		cchecksum2 = (cchecksum1 == checksum)
 			? 0
-			: page_zip_calc_checksum(
-				page, page_size,
-				SRV_CHECKSUM_ALGORITHM_INNODB);
+			: reporter.calc_zip_checksum(page, page_size, SRV_CHECKSUM_ALGORITHM_INNODB);
 	} else {
 		cchecksum1 = buf_calc_page_crc32_encrypted_with_keyring(page, page_size);
 		cchecksum2 = (cchecksum1 == checksum)

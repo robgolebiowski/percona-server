@@ -382,22 +382,7 @@ struct Encryption {
   }
 
   /** Copy constructor */
-  Encryption(const Encryption& other):
-    m_type(other.m_type),
-    m_key(other.m_key),
-    m_klen(other.m_klen),
-    m_key_allocated(other.m_key_allocated),
-    m_iv(other.m_iv),
-    m_tablespace_iv(other.m_tablespace_iv),
-    m_tablespace_key(other.m_tablespace_key),
-    m_key_version(other.m_key_version),
-    m_key_id(other.m_key_id),
-    m_checksum(other.m_checksum),
-    m_encryption_rotation(other.m_encryption_rotation) {
-      if (other.m_key_allocated && other.m_key != NULL)
-        m_key = static_cast<byte *>(my_memdup(PSI_NOT_INSTRUMENTED,
-                                    other.m_key, other.m_klen, MYF(0)));
-  }
+  Encryption(const Encryption& other);
   
   Encryption& operator = (const Encryption& other) {
     Encryption tmp(other);
@@ -419,20 +404,9 @@ struct Encryption {
     std::swap(m_encryption_rotation, other.m_encryption_rotation);
   }
   
-  ~Encryption() {
-    if (m_key_allocated && m_key != NULL) {
-      my_free(m_key);
-    }
-  }
-  
-  void set_key(byte *key, ulint key_len, bool allocated) {
-    if (m_key_allocated && m_key != NULL) {
-      my_free(m_key);
-    }
-    m_key = key;
-    m_klen = key_len;
-    m_key_allocated = allocated;
-  }
+  ~Encryption();
+
+  void set_key(byte *key, ulint key_len, bool allocated);
 
   /** Check if page is encrypted page or not
   @param[in]	page	page which need to check

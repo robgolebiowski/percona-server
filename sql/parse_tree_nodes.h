@@ -2840,7 +2840,7 @@ typedef PT_traceable_create_table_option<
 
 typedef PT_traceable_create_table_option<
     TYPE_AND_REF(HA_CREATE_INFO::encryption_key_id), HA_CREATE_USED_ENCRYPTION_KEY_ID>
-    PT_create_create_encryption_key_id_option;
+    PT_create_encryption_key_id_option;
 
 /**
   Node for the @SQL{AUTO_INCREMENT [=] @B{@<integer@>}} table option

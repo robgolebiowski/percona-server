@@ -3504,14 +3504,10 @@ dict_index_t *row_merge_create_index(trx_t *trx, dict_table_t *table,
   index->is_ngram = index_def->is_ngram;
   index->has_new_v_col = has_new_v_col;
 
-	/* Update SYS_TABLESPACES and SYS_DATAFILES if the old table being
-	renamed is a single-table tablespace, which must be implicitly
-	renamed along with the table. */
-	if (err == DB_SUCCESS
-	    && dict_table_is_file_per_table(old_table)
-	    && !old_table->ibd_file_missing) {
-		/* Make pathname to update SYS_DATAFILES. */
-		char* tmp_path = row_make_new_pathname(old_table, tmp_name);
+  /* Note the id of the transaction that created this
+  index, we use it to restrict readers from accessing
+  this index, to ensure read consistency. */
+  ut_ad(index->trx_id == trx->id);
 
   index->table->def_trx_id = trx->id;
 

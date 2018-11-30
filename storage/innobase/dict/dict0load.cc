@@ -1432,6 +1432,11 @@ space_id_t dict_check_sys_tablespaces(bool validate) {
                      space_name, space_name, filepath, true, true,
                      keyring_encryption_info);
 
+    if (err != DB_SUCCESS) {
+      ib::warn(ER_IB_MSG_191) << "Ignoring tablespace " << id_name_t(space_name)
+                              << " because it could not be opened.";
+    }
+
     if (!dict_sys_t::is_reserved(space_id)) {
       max_space_id = ut_max(max_space_id, space_id);
     }
@@ -2388,6 +2393,8 @@ void dict_load_tablespace(dict_table_t *table, mem_heap_t *heap,
     /* We failed to find a sensible tablespace file */
     table->set_file_unreadable();
   }
+
+  table->keyring_encryption_info = keyring_encryption_info;
 
   ut_free(shared_space_name);
   ut_free(filepath);

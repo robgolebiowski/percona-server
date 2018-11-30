@@ -477,6 +477,8 @@ dberr_t btr_pcur_open_at_index_side(
                          (0=leaf) */
     mtr_t *mtr)          /*!< in/out: mini-transaction */
 {
+  dberr_t err = DB_SUCCESS;
+
   pcur->latch_mode = BTR_LATCH_MODE_WITHOUT_FLAGS(latch_mode);
 
   pcur->search_mode = from_left ? PAGE_CUR_G : PAGE_CUR_L;

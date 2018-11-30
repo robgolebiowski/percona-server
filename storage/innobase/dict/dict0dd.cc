@@ -3756,8 +3756,13 @@ void dd_load_tablespace(const Table *dd_table, dict_table_t *table,
   bool is_encrypted = dict_table_is_encrypted(table);
   ulint fsp_flags = dict_tf_to_fsp_flags(table->flags, is_encrypted);
 
+  Keyring_encryption_info keyring_encryption_info;
+
   dberr_t err = fil_ibd_open(true, FIL_TYPE_TABLESPACE, table->space, fsp_flags,
-                             space_name, tbl_name, filepath, true, false);
+                             space_name, tbl_name, filepath, true, false, keyring_encryption_info);
+
+
+  table->keyring_encryption_info = keyring_encryption_info;
 
   if (err == DB_SUCCESS) {
     /* This will set the DATA DIRECTORY for SHOW CREATE TABLE. */
@@ -5791,13 +5796,14 @@ bool dd_tablespace_update_cache(THD *thd) {
 
       const char *filename = f->filename().c_str();
 
+      Keyring_encryption_info keyring_encryption_info;
       /* If the user tablespace is not in cache, load the
       tablespace now, with the name from dictionary */
 
       /* It's safe to pass space_name in tablename charset
       because filename is already in filename charset. */
       dberr_t err = fil_ibd_open(false, purpose, id, flags, space_name, nullptr,
-                                 filename, false, false);
+                                 filename, false, false, keyring_encryption_info);
       switch (err) {
         case DB_SUCCESS:
         case DB_CANNOT_OPEN_FILE:

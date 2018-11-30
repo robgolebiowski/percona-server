@@ -1099,7 +1099,7 @@ retry_page_get:
 
     tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
     block = buf_page_get_gen(page_id, page_size, rw_latch, NULL, buf_mode, file,
-                             line, mtr, &err);
+                             line, mtr, false, &err);
 
     if (err == DB_DECRYPTION_FAILED) {
       ib::warn() << "Table is encrypted but encryption service or"
@@ -1112,7 +1112,7 @@ retry_page_get:
           ULINT_UNDEFINED;
       }
       index->table->set_file_unreadable();
-      goto func_exit
+      goto func_exit;
     }
     tree_blocks[n_blocks] = block;
   }
@@ -1940,7 +1940,7 @@ dberr_t btr_cur_open_at_index_side_func(
   mem_heap_t *heap = NULL;
   ulint offsets_[REC_OFFS_NORMAL_SIZE];
   ulint *offsets = offsets_;
-  dberr_t err = DB_SUCCESS
+  dberr_t err = DB_SUCCESS;
   rec_offs_init(offsets_);
 
   estimate = latch_mode & BTR_ESTIMATE;
@@ -2033,7 +2033,7 @@ dberr_t btr_cur_open_at_index_side_func(
 
     tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
     block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
-                             BUF_GET, file, line, mtr, &err);
+                             BUF_GET, file, line, mtr, false, &err);
     tree_blocks[n_blocks] = block;
 
     if (err == DB_DECRYPTION_FAILED) {
@@ -2251,7 +2251,7 @@ exit_loop:
     mem_heap_free(heap);
   }
 
-	return err;
+  return err;
 }
 
 /** Opens a cursor at either end of an index.
@@ -2456,7 +2456,7 @@ bool btr_cur_open_at_rnd_pos_func(
 
     tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
     block = buf_page_get_gen(page_id, page_size, rw_latch, NULL,
-                             BUF_GET, file, line, mtr);
+                             BUF_GET, file, line, mtr, false, &err);
     tree_blocks[n_blocks] = block;
 
     ut_ad((block != NULL) == (err == DB_SUCCESS));
@@ -5109,7 +5109,7 @@ static int64_t btr_estimate_n_rows_in_range_on_level(
     the B-tree. We pass BUF_GET_POSSIBLY_FREED in order to
     silence a debug assertion about this. */
     block = buf_page_get_gen(page_id, page_size, RW_S_LATCH, NULL,
-                             BUF_GET_POSSIBLY_FREED, __FILE__, __LINE__, &mtr, err);
+                             BUF_GET_POSSIBLY_FREED, __FILE__, __LINE__, &mtr, false, &err);
 
     ut_ad((block != NULL) == (err == DB_SUCCESS));
 
