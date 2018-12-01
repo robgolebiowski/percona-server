@@ -7216,7 +7216,7 @@ int ha_innobase::open(const char *name, int, uint open_flags,
   stats.block_size = UNIV_PAGE_SIZE;
 
   /* Only if the table has an AUTOINC column. */
-  if (m_prebuilt->table != NULL && !m_prebuilt->table->is_readable() &&
+  if (m_prebuilt->table != NULL && m_prebuilt->table->is_readable() &&
       table->found_next_number_field != NULL) {
     dict_table_t *ib_table = m_prebuilt->table;
 

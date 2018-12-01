@@ -520,7 +520,7 @@ fil_space_destroy_crypt_data(
 			*crypt_data = NULL;
 			mutex_exit(&fil_crypt_threads_mutex);
 		} else {
-			ut_ad(srv_read_only_mode || !srv_was_started);
+			ut_ad(srv_read_only_mode || srv_is_being_started);
 			c = *crypt_data;
 			*crypt_data = NULL;
 		}
@@ -1772,276 +1772,276 @@ fil_crypt_rotate_pages(
 Callback that sets a hex formatted FTS table's flags2 in
 SYS_TABLES. The flags is stored in MIX_LEN column.
 @return FALSE if all OK */
-static
-ibool
-fts_set_encrypted_flag_for_table(
-	void*		row,		// in: sel_node_t* 
-	void*		user_arg) {	// in: bool set/unset flag
+//static
+//ibool
+//fts_set_encrypted_flag_for_table(
+	//void*		row,		// in: sel_node_t* 
+	//void*		user_arg) {	// in: bool set/unset flag
 
-	sel_node_t*	node = static_cast<sel_node_t*>(row);
-	dfield_t*	dfield = que_node_get_val(node->select_list);
+	//sel_node_t*	node = static_cast<sel_node_t*>(row);
+	//dfield_t*	dfield = que_node_get_val(node->select_list);
 
-	ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-	ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-	/* There should be at most one matching record. So the value
-	must be the default value. */
-	ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-		== ULINT32_UNDEFINED);
+	//ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+	//ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+	//[> There should be at most one matching record. So the value
+	//must be the default value. */
+	//ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+		//== ULINT32_UNDEFINED);
 
-	ulint flags2 = mach_read_from_4(
-		       static_cast<byte*>(dfield_get_data(dfield)));
+	//ulint flags2 = mach_read_from_4(
+		       //static_cast<byte*>(dfield_get_data(dfield)));
 
-	flags2 |= DICT_TF2_ENCRYPTION;
+	//flags2 |= DICT_TF2_ENCRYPTION;
 
-	mach_write_to_4(static_cast<byte*>(user_arg), flags2);
+	//mach_write_to_4(static_cast<byte*>(user_arg), flags2);
 
-	return(FALSE);
-}
+	//return(FALSE);
+//}
 
-static
-ibool
-fts_unset_encrypted_flag_for_table(
-	void*		row,		// in: sel_node_t* 
-	void*		user_arg) {	// in: bool set/unset flag
+//static
+//ibool
+//fts_unset_encrypted_flag_for_table(
+	//void*		row,		// in: sel_node_t* 
+	//void*		user_arg) {	// in: bool set/unset flag
 
-	sel_node_t*	node = static_cast<sel_node_t*>(row);
-	dfield_t*	dfield = que_node_get_val(node->select_list);
+	//sel_node_t*	node = static_cast<sel_node_t*>(row);
+	//dfield_t*	dfield = que_node_get_val(node->select_list);
 
-	ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+	//ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
 
-	ulint flags = mach_read_from_4(
-			static_cast<byte*>(dfield_get_data(dfield)));
+	//ulint flags = mach_read_from_4(
+			//static_cast<byte*>(dfield_get_data(dfield)));
 
-	flags &= ~DICT_TF2_ENCRYPTION;
-	mach_write_to_4(static_cast<byte*>(user_arg), flags);
+	//flags &= ~DICT_TF2_ENCRYPTION;
+	//mach_write_to_4(static_cast<byte*>(user_arg), flags);
 
-	return(FALSE);
-}
+	//return(FALSE);
+//}
 
-static
-dberr_t
-fts_update_encrypted_tables_flag(
-	trx_t*		trx,		/* in/out: transaction that
-					   covers the update */
-	table_id_t	table_id, 
-	bool	set) {			/* in: Table for which we want
-					   to set the root table->flags2 */
-	pars_info_t*		info;
-	ib_uint32_t		flags2;
+//static
+//dberr_t
+//fts_update_encrypted_tables_flag(
+	//trx_t*		trx,		[> in/out: transaction that
+					   //covers the update */
+	//table_id_t	table_id, 
+	//bool	set) {			[> in: Table for which we want
+					   //to set the root table->flags2 */
+	//pars_info_t*		info;
+	//ib_uint32_t		flags2;
 
-	static const char	sql[] =
-		"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-		"DECLARE FUNCTION my_func;\n"
-		"DECLARE CURSOR c IS\n"
-		" SELECT MIX_LEN"
-		" FROM SYS_TABLES"
-		" WHERE ID = :table_id FOR UPDATE;"
-		"\n"
-		"BEGIN\n"
-		"OPEN c;\n"
-		"WHILE 1 = 1 LOOP\n"
-		"  FETCH c INTO my_func();\n"
-		"  IF c % NOTFOUND THEN\n"
-		"    EXIT;\n"
-		"  END IF;\n"
-		"END LOOP;\n"
-		"UPDATE SYS_TABLES"
-		" SET MIX_LEN = :flags2"
-		" WHERE ID = :table_id;\n"
-		"CLOSE c;\n"
-		"END;\n";
+	//static const char	sql[] =
+		//"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+		//"DECLARE FUNCTION my_func;\n"
+		//"DECLARE CURSOR c IS\n"
+		//" SELECT MIX_LEN"
+		//" FROM SYS_TABLES"
+		//" WHERE ID = :table_id FOR UPDATE;"
+		//"\n"
+		//"BEGIN\n"
+		//"OPEN c;\n"
+		//"WHILE 1 = 1 LOOP\n"
+		//"  FETCH c INTO my_func();\n"
+		//"  IF c % NOTFOUND THEN\n"
+		//"    EXIT;\n"
+		//"  END IF;\n"
+		//"END LOOP;\n"
+		//"UPDATE SYS_TABLES"
+		//" SET MIX_LEN = :flags2"
+		//" WHERE ID = :table_id;\n"
+		//"CLOSE c;\n"
+		//"END;\n";
 
-	flags2 = ULINT32_UNDEFINED;
+	//flags2 = ULINT32_UNDEFINED;
 
-	info = pars_info_create();
+	//info = pars_info_create();
 
-	pars_info_add_ull_literal(info, "table_id", table_id);
-	pars_info_bind_int4_literal(info, "flags2", &flags2);
+	//pars_info_add_ull_literal(info, "table_id", table_id);
+	//pars_info_bind_int4_literal(info, "flags2", &flags2);
 
-	pars_info_bind_function(
-		info, "my_func", set ? fts_set_encrypted_flag_for_table
-				     : fts_unset_encrypted_flag_for_table, &flags2);
+	//pars_info_bind_function(
+		//info, "my_func", set ? fts_set_encrypted_flag_for_table
+				     //: fts_unset_encrypted_flag_for_table, &flags2);
 
-	if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
-		trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
-	}
+	//if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
+		//trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
+	//}
 
-	dberr_t err = que_eval_sql(info, sql, false, trx);
+	//dberr_t err = que_eval_sql(info, sql, false, trx);
 
-	ut_a(flags2 != ULINT32_UNDEFINED);
+	//ut_a(flags2 != ULINT32_UNDEFINED);
 
-	return(err);
-}
+	//return(err);
+//}
 
-static
-ibool
-fts_unset_encrypted_flag_for_tablespace(
-	void*		row,		// in: sel_node_t* 
-	void*		user_arg) {	// in: bool set/unset flag
+//static
+//ibool
+//fts_unset_encrypted_flag_for_tablespace(
+	//void*		row,		// in: sel_node_t* 
+	//void*		user_arg) {	// in: bool set/unset flag
 
-	sel_node_t*	node = static_cast<sel_node_t*>(row);
-	dfield_t*	dfield = que_node_get_val(node->select_list);
+	//sel_node_t*	node = static_cast<sel_node_t*>(row);
+	//dfield_t*	dfield = que_node_get_val(node->select_list);
 
-	ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-	ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-	// There should be at most one matching record. So the value
-	// must be the default value.
-	ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-		== ULINT32_UNDEFINED);
+	//ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+	//ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+	//// There should be at most one matching record. So the value
+	//// must be the default value.
+	//ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+		//== ULINT32_UNDEFINED);
 
-	ulint  flags = mach_read_from_4(
-	static_cast<byte*>(dfield_get_data(dfield)));
+	//ulint  flags = mach_read_from_4(
+	//static_cast<byte*>(dfield_get_data(dfield)));
 
-	flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+	//flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
 
-	mach_write_to_4(static_cast<byte*>(user_arg), flags);
+	//mach_write_to_4(static_cast<byte*>(user_arg), flags);
 
-	return(FALSE);
-}
+	//return(FALSE);
+//}
 
-static
-ibool
-fts_set_encrypted_flag_for_tablespace(
-	void*		row,		// in: sel_node_t* 
-	void*		user_arg) {	// in: bool set/unset flag
+//static
+//ibool
+//fts_set_encrypted_flag_for_tablespace(
+	//void*		row,		// in: sel_node_t* 
+	//void*		user_arg) {	// in: bool set/unset flag
 
-	sel_node_t*	node = static_cast<sel_node_t*>(row);
-	dfield_t*	dfield = que_node_get_val(node->select_list);
+	//sel_node_t*	node = static_cast<sel_node_t*>(row);
+	//dfield_t*	dfield = que_node_get_val(node->select_list);
 
-	ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-	ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-	// There should be at most one matching record. So the value
-	// must be the default value.
-	ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-		== ULINT32_UNDEFINED);
+	//ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
+	//ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
+	//// There should be at most one matching record. So the value
+	//// must be the default value.
+	//ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
+		//== ULINT32_UNDEFINED);
 
-	ulint  flags = mach_read_from_4(
-	static_cast<byte*>(dfield_get_data(dfield)));
+	//ulint  flags = mach_read_from_4(
+	//static_cast<byte*>(dfield_get_data(dfield)));
 
-	flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+	//flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
 
-	mach_write_to_4(static_cast<byte*>(user_arg), flags);
+	//mach_write_to_4(static_cast<byte*>(user_arg), flags);
 
-	return(FALSE);
-}
+	//return(FALSE);
+//}
 
-static
-ibool
-read_table_id(
-/*============*/
-	void*		row,		/*!< in: sel_node_t* */
-	void*		user_arg)	/*!< in: pointer to ib_vector_t */
-{
-	ib_vector_t*	tables_ids = static_cast<ib_vector_t*>(user_arg);
+//static
+//ibool
+//read_table_id(
+//[>============<]
+	//void*		row,		[>!< in: sel_node_t* <]
+	//void*		user_arg)	[>!< in: pointer to ib_vector_t <]
+//{
+	//ib_vector_t*	tables_ids = static_cast<ib_vector_t*>(user_arg);
 
-	sel_node_t*	node = static_cast<sel_node_t*>(row);
-	dfield_t*	dfield = que_node_get_val(node->select_list);
+	//sel_node_t*	node = static_cast<sel_node_t*>(row);
+	//dfield_t*	dfield = que_node_get_val(node->select_list);
 
-	ut_ad(dfield_get_len(dfield) == 8);
+	//ut_ad(dfield_get_len(dfield) == 8);
 
-	table_id_t *table_id = static_cast<table_id_t*>(ib_vector_push(tables_ids, NULL));
+	//table_id_t *table_id = static_cast<table_id_t*>(ib_vector_push(tables_ids, NULL));
 
-	*table_id = mach_read_from_8(static_cast<byte*>(dfield_get_data(dfield)));
+	//*table_id = mach_read_from_8(static_cast<byte*>(dfield_get_data(dfield)));
 
-	return(TRUE);
-}
+	//return(TRUE);
+//}
 
-static
-dberr_t
-fts_update_encrypted_flag_for_tablespace_sql(
-	trx_t*		trx,		// in/out: transaction that
-					// covers the update 
-	ulint		space_id,
-	bool set) {
+//static
+//dberr_t
+//fts_update_encrypted_flag_for_tablespace_sql(
+	//trx_t*		trx,		// in/out: transaction that
+					//// covers the update 
+	//ulint		space_id,
+	//bool set) {
 
-	pars_info_t*		info;
-	ib_uint32_t		flags;
+	//pars_info_t*		info;
+	//ib_uint32_t		flags;
 
-	static const char	sql[] =
-		"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-		"DECLARE FUNCTION my_func;\n"
-		"DECLARE CURSOR c IS\n"
-		" SELECT FLAGS"
-		" FROM SYS_TABLESPACES"
-		" WHERE SPACE=:space_id FOR UPDATE;"
-		"\n"
-		"BEGIN\n"
-		"OPEN c;\n"
-		"WHILE 1 = 1 LOOP\n"
-		"  FETCH c INTO my_func();\n"
-		"  IF c % NOTFOUND THEN\n"
-		"    EXIT;\n"
-		"  END IF;\n"
-		"END LOOP;\n"
-		"UPDATE SYS_TABLESPACES"
-		" SET FLAGS=:flags"
-		" WHERE SPACE=:space_id;\n"
-		"CLOSE c;\n"
-		"END;\n";
+	//static const char	sql[] =
+		//"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
+		//"DECLARE FUNCTION my_func;\n"
+		//"DECLARE CURSOR c IS\n"
+		//" SELECT FLAGS"
+		//" FROM SYS_TABLESPACES"
+		//" WHERE SPACE=:space_id FOR UPDATE;"
+		//"\n"
+		//"BEGIN\n"
+		//"OPEN c;\n"
+		//"WHILE 1 = 1 LOOP\n"
+		//"  FETCH c INTO my_func();\n"
+		//"  IF c % NOTFOUND THEN\n"
+		//"    EXIT;\n"
+		//"  END IF;\n"
+		//"END LOOP;\n"
+		//"UPDATE SYS_TABLESPACES"
+		//" SET FLAGS=:flags"
+		//" WHERE SPACE=:space_id;\n"
+		//"CLOSE c;\n"
+		//"END;\n";
 
-	flags = ULINT32_UNDEFINED;
+	//flags = ULINT32_UNDEFINED;
 
-	info = pars_info_create();
+	//info = pars_info_create();
 
-	pars_info_add_int4_literal(info, "space_id", space_id);
-	pars_info_bind_int4_literal(info, "flags", &flags);
+	//pars_info_add_int4_literal(info, "space_id", space_id);
+	//pars_info_bind_int4_literal(info, "flags", &flags);
 
-	pars_info_bind_function(
-		info, "my_func", set ? fts_set_encrypted_flag_for_tablespace
-				     : fts_unset_encrypted_flag_for_tablespace, &flags);
+	//pars_info_bind_function(
+		//info, "my_func", set ? fts_set_encrypted_flag_for_tablespace
+				     //: fts_unset_encrypted_flag_for_tablespace, &flags);
 
-	if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) { // TODO:Robert - is this needed - I think not, they are not using it in
-                                                             // fts_drop_orphaned tables for getting a list of tables
-                                                             // może trx_set_dict_operation(trx, TRX_DICT_OP_TABLE); ?
-              trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
-      }
+	//if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) { // TODO:Robert - is this needed - I think not, they are not using it in
+                                                             //// fts_drop_orphaned tables for getting a list of tables
+                                                             //// może trx_set_dict_operation(trx, TRX_DICT_OP_TABLE); ?
+              //trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
+      //}
 
-	dberr_t err = que_eval_sql(info, sql, false, trx);
+	//dberr_t err = que_eval_sql(info, sql, false, trx);
 
 
-	ut_a(flags != ULINT32_UNDEFINED);
+	//ut_a(flags != ULINT32_UNDEFINED);
 
-	if (flags == ULINT32_UNDEFINED)
-		return DB_ERROR;
+	//if (flags == ULINT32_UNDEFINED)
+		//return DB_ERROR;
 
-	return(err);
-}
+	//return(err);
+//}
 
-static
-dberr_t
-get_table_ids_in_space_sql(
-	trx_t*		trx,		// in/out: transaction that
-	fil_space_t *space,
-	ib_vector_t* tables_ids
-) {
-	pars_info_t *info = pars_info_create();
+//static
+//dberr_t
+//get_table_ids_in_space_sql(
+	//trx_t*		trx,		// in/out: transaction that
+	//fil_space_t *space,
+	//ib_vector_t* tables_ids
+//) {
+	//pars_info_t *info = pars_info_create();
 
-	static const char	sql[] =
-		"PROCEDURE GET_TABLES_IDS() IS\n"
-		"DECLARE FUNCTION my_func;\n"
-		"DECLARE CURSOR c IS"
-		" SELECT ID"
-		" FROM SYS_TABLES"
-		" WHERE SPACE=:space_id;\n"
-		"BEGIN\n"
-		"\n"
-		"OPEN c;\n"
-		"WHILE 1 = 1 LOOP\n"
-		"  FETCH c INTO my_func();\n"
-		"  IF c % NOTFOUND THEN\n"
-		"    EXIT;\n"
-		"  END IF;\n"
-		"END LOOP;\n"
-		"CLOSE c;\n"
-		"END;\n";
+	//static const char	sql[] =
+		//"PROCEDURE GET_TABLES_IDS() IS\n"
+		//"DECLARE FUNCTION my_func;\n"
+		//"DECLARE CURSOR c IS"
+		//" SELECT ID"
+		//" FROM SYS_TABLES"
+		//" WHERE SPACE=:space_id;\n"
+		//"BEGIN\n"
+		//"\n"
+		//"OPEN c;\n"
+		//"WHILE 1 = 1 LOOP\n"
+		//"  FETCH c INTO my_func();\n"
+		//"  IF c % NOTFOUND THEN\n"
+		//"    EXIT;\n"
+		//"  END IF;\n"
+		//"END LOOP;\n"
+		//"CLOSE c;\n"
+		//"END;\n";
 
-	pars_info_bind_function(info, "my_func", read_table_id, tables_ids);
-	pars_info_add_int4_literal(info, "space_id", space->id);
+	//pars_info_bind_function(info, "my_func", read_table_id, tables_ids);
+	//pars_info_add_int4_literal(info, "space_id", space->id);
 
-	dberr_t err = que_eval_sql(info, sql, false, trx);
+	//dberr_t err = que_eval_sql(info, sql, false, trx);
 
-	return(err);
-}
+	//return(err);
+//}
 /*
 static
 void

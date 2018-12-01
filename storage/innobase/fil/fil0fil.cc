@@ -8635,7 +8635,7 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
 
     /* Check encryption is matched or not. */
     if (err == DB_SUCCESS && FSP_FLAGS_GET_ENCRYPTION(space_flags)) {
-      ut_ad(iter.encryption_key != NULL);
+      ut_ad(iter.m_encryption_key != NULL);
 
       if (!dict_table_is_encrypted(table)) {
         ib::error(ER_IB_MSG_338) << "Table is not in an encrypted"

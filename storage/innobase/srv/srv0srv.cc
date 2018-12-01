@@ -1976,7 +1976,6 @@ const char *srv_any_background_threads_are_active() {
   os_event_set(srv_buf_dump_event);
   os_event_set(lock_sys->timeout_event);
   os_event_set(srv_buf_resize_event);
-  os_event_set(fil_crypt_threads_event);
 
   return (thread_active);
 }

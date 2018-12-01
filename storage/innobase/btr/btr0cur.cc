@@ -973,7 +973,7 @@ retry_page_get:
   tree_blocks[n_blocks] = block;
 
   if (err == DB_DECRYPTION_FAILED) {
-    ut_ad(block == NULL)
+    ut_ad(block == NULL);
     ib::warn() << "Table is encrypted but encryption service or"
                   " used key_id is not available. "
                   " Can't continue reading table.";

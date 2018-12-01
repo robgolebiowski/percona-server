@@ -246,6 +246,7 @@ dberr_t dict_build_tablespace_for_table(dict_table_t *table, trx_t *trx, fil_enc
       return DB_IO_ERROR;
     }
 
+    log_ddl->write_delete_space_log(trx, table, space, filepath, false, false);
 
     /* We create a new single-table tablespace for the table.
     We initially let it be 4 pages:
