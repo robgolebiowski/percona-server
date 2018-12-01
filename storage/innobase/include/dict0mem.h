@@ -2189,7 +2189,9 @@ detect this and will eventually quit sooner. */
 };
 
 inline bool dict_index_t::is_readable() const {
-  return(UNIV_LIKELY(!table->file_unreadable));
+  volatile bool is_readable = !table->file_unreadable;
+  return is_readable;
+  //return(UNIV_LIKELY(!table->file_unreadable));
 }
 
 /** Persistent dynamic metadata type, there should be 1 to 1

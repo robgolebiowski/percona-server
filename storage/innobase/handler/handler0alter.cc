@@ -4557,7 +4557,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       dict_mem_table_free(ctx->new_table);
       my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
       goto new_clustered_failed;
-    } else if (!Encryption::is_master_key_encryption(encrypt)) {
+    } else if (Encryption::is_master_key_encryption(encrypt)) {
       /* Set the encryption flag. */
       byte *master_key = NULL;
       ulint master_key_id;
@@ -5408,7 +5408,7 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
   flags. There are places where it is done afterwards, there are places
   where it isn't done. We need to inspect all code paths and check if
   encryption flag can be set in one place. */
-  if (!Encryption::is_master_key_encryption(ha_alter_info->create_info->encrypt_type.str)) {
+  if (Encryption::is_master_key_encryption(ha_alter_info->create_info->encrypt_type.str)) {
     /* Set the encryption flag. */
     byte *master_key = nullptr;
     ulint master_key_id;
@@ -5417,7 +5417,6 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
     Encryption::get_master_key(&master_key_id, &master_key);
 
     if (master_key == nullptr) {
-      my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
       goto err_exit_no_heap;
     } else {
       my_free(master_key);
