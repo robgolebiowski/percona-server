@@ -1,9 +1,9 @@
---skip # Test unstable on Jenkins
--- source include/have_innodb.inc
+#--skip # Test unstable on Jenkins
+#-- source include/have_innodb.inc
 #-- source include/have_file_key_management_plugin.inc
 
 # embedded does not support restart
--- source include/not_embedded.inc
+#-- source include/not_embedded.inc
 
 #--echo $KEYRING_PLUGIN_OPT
 #--echo $KEYRING_PLUGIN_LOAD
@@ -26,7 +26,6 @@ eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 
 --disable_warnings
 SET GLOBAL innodb_file_per_table = ON;
-SET GLOBAL innodb_file_format = `Barracuda`;
 --enable_warnings
 
 create table t1 (a varchar(255)) engine=innodb encryption='KEYRING';
@@ -79,7 +78,7 @@ ALTER TABLE t6 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 
 
 
---let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
+--let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --echo $encrypted_tables_counts
 --let $wait_timeout= 600
@@ -90,7 +89,7 @@ ALTER TABLE t6 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 --let $assert_text= All encrypted tables should have encrypted flag set, apart from t3
 #--let $assert_cond= "[SELECT COUNT(*) = $encrypted_tables_count - 1] FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225" = 1
 # encryted_tables_count - 1 here, as INNODB_SYS_TABLESPACES does not include innodb_system
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count - 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count - 1
 --source include/assert.inc
 
 #SELECT COUNT(*) FROM SYS_TABLES WHERE
@@ -107,8 +106,8 @@ ALTER TABLE t6 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 #SELECT * FROM SYS_TABLESPACES;
 #SELECT * FROM SYS_TABLES;
 
-SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
-SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLES;
+SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_TABLESPACES;
+#SHOW CREATE TABLE INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 
 
 --source include/shutdown_mysqld.inc

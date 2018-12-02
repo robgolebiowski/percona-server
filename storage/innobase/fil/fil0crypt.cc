@@ -946,7 +946,8 @@ fil_crypt_start_encrypting_space(
 		mtr_t mtr;
 		mtr.start();
 		//mtr.set_named_space(space);
-
+		mtr.set_log_mode(MTR_LOG_NO_REDO); // We do not need page 0 to be redo log. If we fail to update page 0 we will rotate
+     					           // those pages again after restart - when encryption threads discover that there is work to do.
                 mtr.set_flush_observer(&flush_observer);
 		/* 2 - get page 0 */
 

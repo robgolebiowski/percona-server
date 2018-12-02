@@ -5946,7 +5946,6 @@ create_table_option:
         | ENCRYPTION_KEY_ID_SYM opt_equal real_ulong_num
           {
             $$= NEW_PTN PT_create_encryption_key_id_option($3);
-            Lex->create_info->was_encryption_key_id_set= true;
           }
         | AUTO_INC opt_equal ulonglong_num
           {

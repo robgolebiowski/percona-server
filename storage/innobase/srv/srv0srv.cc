@@ -2770,7 +2770,7 @@ static void srv_enable_undo_encryption_if_set() {
     space = fil_space_get(undo_space->id());
     ut_ad(space);
 
-    if (space->encryption_type == Encryption::NONE) {
+    if (space->encryption_type != Encryption::AES) {
       continue;
     }
 

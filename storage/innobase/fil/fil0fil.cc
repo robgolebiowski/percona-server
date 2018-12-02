@@ -3815,7 +3815,7 @@ fil_space_next(fil_space_t* prev_space) //TODO: To powinno być częścią Fil_s
 
   while (space == nullptr && next_shard_index != 0) {
     shard->mutex_release();
-    auto shard = fil_system->shard_by_index(next_shard_index);
+    shard = fil_system->shard_by_index(next_shard_index);
     ut_ad(shard != nullptr);
     shard->mutex_acquire();
     space = UT_LIST_GET_FIRST(shard->m_space_list);

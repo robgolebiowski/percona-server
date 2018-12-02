@@ -2640,7 +2640,8 @@ static inline dict_table_t *dd_fill_dict_table(const Table *dd_tab,
   if (dd_tab->table().options().exists("encrypt_type")) {
     dd_tab->table().options().get("encrypt_type", encrypt);
     if (!Encryption::is_none(encrypt.c_str())) {
-      ut_ad(innobase_strcasecmp(encrypt.c_str(), "y") == 0);
+      ut_ad(innobase_strcasecmp(encrypt.c_str(), "y") == 0 ||
+            innobase_strcasecmp(encrypt.c_str(), "keyring") == 0);
       is_encrypted = true;
     }
   }
