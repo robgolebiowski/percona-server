@@ -969,7 +969,7 @@ retry_page_get:
   ut_ad(n_blocks < BTR_MAX_LEVELS);
   tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
   block = buf_page_get_gen(page_id, page_size, rw_latch, guess,
-     buf_mode, file, line, mtr);
+     buf_mode, file, line, mtr, false, &err);
   tree_blocks[n_blocks] = block;
 
   if (err == DB_DECRYPTION_FAILED) {
@@ -1084,7 +1084,7 @@ retry_page_get:
       prev_tree_savepoints[prev_n_blocks] = mtr_set_savepoint(mtr);
       get_block =
           buf_page_get_gen(page_id_t(page_id.space(), left_page_no), page_size,
-                           rw_latch, NULL, buf_mode, file, line, mtr);
+                           rw_latch, NULL, buf_mode, file, line, mtr, false, &err);
       prev_tree_blocks[prev_n_blocks] = get_block;
       prev_n_blocks++;
 

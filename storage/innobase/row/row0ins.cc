@@ -1487,7 +1487,7 @@ dberr_t row_ins_check_foreign_constraint(
     check_index = foreign->foreign_index;
   }
 
-  if (check_table == NULL || check_table->ibd_file_missing ||
+  if (check_table == NULL || !check_table->is_readable() ||
       check_index == NULL) {
     if (!srv_read_only_mode && check_ref) {
       FILE *ef = dict_foreign_err_file;

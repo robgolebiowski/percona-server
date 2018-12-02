@@ -3937,7 +3937,7 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
   At the end of successful import, set sdi_table->ibd_file_missing to
   false, indicating that .ibd of SDI table is available */
   dict_table_t *sdi_table = dict_sdi_get_table(space->id, true, false);
-  sdi_table->ibd_file_missing = false;
+  sdi_table->set_file_readable();
   dict_sdi_close_table(sdi_table);
 
   row_mysql_unlock_data_dictionary(trx);

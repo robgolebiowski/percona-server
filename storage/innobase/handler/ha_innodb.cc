@@ -6829,24 +6829,40 @@ int ha_innobase::open(const char *name, int, uint open_flags,
     FilSpace space;
     if (ib_table)
       space = fil_space_acquire_silent(ib_table->space);
-    if (space() == NULL) {
-      int ret_err= HA_ERR_TABLE_CORRUPT;
-      if (ib_table->keyring_encryption_info.keyring_encryption_key_is_missing ||
-          ib_table->keyring_encryption_info.page0_has_crypt_data) {
+    if (space() == NULL && (ib_table->keyring_encryption_info.keyring_encryption_key_is_missing ||
+                            ib_table->keyring_encryption_info.page0_has_crypt_data)) {
         /* Proper error message has been already printed by Datafile::validate_first_page,
          * thus we do not print anything here */
-        ret_err= HA_ERR_DECRYPTION_FAILED;
-      } else {
-        my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
-        dict_table_close(ib_table, FALSE, FALSE);
-        ib_table = NULL;
-        is_part = NULL;
-        free_share(m_share);
+      DBUG_RETURN(HA_ERR_DECRYPTION_FAILED);
+    } else {
+      my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+      dict_table_close(ib_table, FALSE, FALSE);
+      ib_table = NULL;
+      is_part = NULL;
+      free_share(m_share);
 
-        DBUG_RETURN(ret_err);
-      }
+      DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
     }
   }
+
+    //if (space() == NULL) {
+      //int ret_err= HA_ERR_TABLE_CORRUPT;
+      //if (ib_table->keyring_encryption_info.keyring_encryption_key_is_missing ||
+          //ib_table->keyring_encryption_info.page0_has_crypt_data) {
+        /* Proper error message has been already printed by Datafile::validate_first_page,
+         * thus we do not print anything here */
+        //ret_err= HA_ERR_DECRYPTION_FAILED;
+      //} else {
+        //my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+        //dict_table_close(ib_table, FALSE, FALSE);
+        //ib_table = NULL;
+        //is_part = NULL;
+        //free_share(m_share);
+
+        //DBUG_RETURN(ret_err);
+      //}
+    //}
+  //}
 
   if (NULL == ib_table) {
     if (is_part) {
@@ -14109,7 +14125,7 @@ int ha_innobase::truncate_impl(const char *name, TABLE *form,
   if (dict_table_is_discarded(innodb_table)) {
     ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_DISCARDED, norm_name);
     DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
-  } else if (innodb_table->ibd_file_missing) {
+  } else if (!innodb_table->is_readable()) {
     DBUG_RETURN(HA_ERR_TABLESPACE_MISSING);
   }
 
@@ -21931,7 +21947,7 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(encryption_threads),
     MYSQL_SYSVAR(encryption_rotate_key_age),
     MYSQL_SYSVAR(encryption_rotation_iops),
-    MYSQL_SYSVAR(default_encryption_key_id)
+    MYSQL_SYSVAR(default_encryption_key_id),
     MYSQL_SYSVAR(immediate_scrub_data_uncompressed),
     NULL};
 

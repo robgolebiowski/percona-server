@@ -1825,18 +1825,18 @@ static dberr_t os_file_io_complete(const IORequest &type, os_file_t fh,
             ? false
             : encryption.is_encrypted_page(buf);
     
-    if (is_page_encrypted) {
+    if (is_page_encrypted && encryption.m_type != Encryption::NONE) {
       dberr_t err = verify_post_encryption_checksum(type, encryption, buf, src_len, offset);
       if (err != DB_SUCCESS)
         return err;
       
       if (!load_key_needed_for_decryption(type, encryption, buf))
         return DB_DECRYPTION_FAILED;
-      
-      ret = encryption.decrypt(type, buf, src_len, scratch, len);
-      if (ret != DB_SUCCESS)
-        return ret;
     }
+      
+    ret = encryption.decrypt(type, buf, src_len, scratch, len);
+    if (ret != DB_SUCCESS)
+      return ret;
     
     ret = os_file_decompress_page(type.is_dblwr_recover(), buf, scratch, len);
     if (ret != DB_SUCCESS)

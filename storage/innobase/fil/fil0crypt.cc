@@ -520,7 +520,8 @@ fil_space_destroy_crypt_data(
 			*crypt_data = NULL;
 			mutex_exit(&fil_crypt_threads_mutex);
 		} else {
-			ut_ad(srv_read_only_mode || srv_is_being_started);
+			ut_ad(srv_read_only_mode || srv_is_being_started ||
+			      srv_is_being_shutdown);
 			c = *crypt_data;
 			*crypt_data = NULL;
 		}

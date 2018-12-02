@@ -9039,8 +9039,6 @@ bool Fil_system::encryption_rotate_in_a_shard(Fil_shard *shard) {
       return (false);
     }
 
-    mtr_commit(&mtr);
-
     DBUG_EXECUTE_IF("ib_crash_during_rotation_for_encryption", DBUG_SUICIDE(););
   }
 

@@ -7148,7 +7148,7 @@ static void alter_stats_rebuild(dict_table_t *table, const char *table_name,
   dberr_t ret = dict_stats_update(table, DICT_STATS_RECALC_PERSISTENT);
 
   DBUG_EXECUTE_IF("ib_rename_index_fail2",
-                  table->ibd_file_missing = file_unreadable_orig;);
+                  table->file_unreadable = file_unreadable_orig;);
 
   if (ret != DB_SUCCESS) {
     push_warning_printf(thd, Sql_condition::SL_WARNING, ER_ALTER_INFO,

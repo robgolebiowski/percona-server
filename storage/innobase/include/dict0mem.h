@@ -1606,11 +1606,6 @@ struct dict_table_t {
   file is missing or page decryption failed and page is corrupted */
   unsigned file_unreadable:1;
 
-  /** TRUE if this is in a single-table tablespace and the .ibd file is
-  missing. Then we must return in ha_innodb.cc an error if the user
-  tries to query such an orphaned table. */
-  unsigned ibd_file_missing : 1;
-
   /** TRUE if the table object has been added to the dictionary cache. */
   unsigned cached : 1;
 
