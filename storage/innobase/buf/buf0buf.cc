@@ -3724,7 +3724,8 @@ got_block:
   }
 #endif /* UNIV_DEBUG */
 
-  ut_ad(mode == BUF_GET_POSSIBLY_FREED || !fix_block->page.file_page_was_freed);
+  ut_ad(mode == BUF_GET_POSSIBLY_FREED || mode == BUF_PEEK_IF_IN_POOL
+       || !fix_block->page.file_page_was_freed);
 
   /* Check if this is the first access to the page */
   access_time = buf_page_is_accessed(&fix_block->page);

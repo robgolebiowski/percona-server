@@ -1424,20 +1424,23 @@ class Fil_system {
   /** Fil_shard by space ID.
   @param[in]	space_id	Tablespace ID
   @return reference to the shard */
-  Fil_shard *shard_by_id(space_id_t space_id) const
+  Fil_shard *shard_by_id(space_id_t space_id, uint *index = nullptr) const
       MY_ATTRIBUTE((warn_unused_result)) {
 #ifndef UNIV_HOTBACKUP
     if (space_id == dict_sys_t::s_log_space_first_id) {
+      if (index) *index = REDO_SHARD;
       return (m_shards[REDO_SHARD]);
 
     } else if (fsp_is_undo_tablespace(space_id)) {
       const size_t limit = space_id % UNDO_SHARDS;
 
+      if (index) *index = UNDO_SHARDS_START + limit;
       return (m_shards[UNDO_SHARDS_START + limit]);
     }
 
     ut_ad(m_shards.size() == MAX_SHARDS);
 
+    if (index) *index = space_id % UNDO_SHARDS_START;
     return (m_shards[space_id % UNDO_SHARDS_START]);
 #else  /* !UNIV_HOTBACKUP */
     ut_ad(m_shards.size() == 1);
@@ -3790,7 +3793,7 @@ fil_space_next(fil_space_t* prev_space) //TODO: To powinno być częścią Fil_s
   mutex_enter(&fil_crypt_list_mutex);
 
   Fil_shard *shard = nullptr;
-  static uint next_shard_index = 1;
+  uint next_shard_index = 1;
 
   if (prev_space == nullptr) {
     shard = fil_system->shard_by_index(0);
@@ -3803,14 +3806,15 @@ fil_space_next(fil_space_t* prev_space) //TODO: To powinno być częścią Fil_s
   if (prev_space != nullptr ) {
     ut_ad(space->n_pending_ops > 0); // we are sure that space exists as space
                                      // with n_pending_ops > 0 cannot be removed
-    shard = fil_system->shard_by_id(space->id);
+    uint shard_index = 0;
+    shard = fil_system->shard_by_id(space->id, &shard_index);
     shard->mutex_acquire();
 
     /* Move on to the next fil_space_t */
     space->n_pending_ops--;
     space = UT_LIST_GET_NEXT(space_list, space);
     if (space == nullptr)
-      next_shard_index = (next_shard_index + 1) % fil_system->get_number_of_shards();
+      next_shard_index = (shard_index + 1) % fil_system->get_number_of_shards();
   }
 
   while (space == nullptr && next_shard_index != 0) {
@@ -3875,7 +3879,7 @@ fil_space_keyrotate_next(fil_space_t* prev_space) {  //TODO: To powinno być cz�
 
   mutex_enter(&fil_crypt_list_mutex);
 
-  static uint next_shard_index = 1;
+  uint next_shard_index = 0;
 
   Fil_shard* shard = nullptr;
 
@@ -3889,7 +3893,8 @@ fil_space_keyrotate_next(fil_space_t* prev_space) {  //TODO: To powinno być cz�
   if (prev_space != NULL ) {
     ut_ad(space->n_pending_ops > 0); // we are sure that space exists as space
                                      // with n_pending_ops > 0 cannot be removed
-    shard = fil_system->shard_by_id(space->id);
+    uint shard_index = 0;
+    shard = fil_system->shard_by_id(space->id, &shard_index);
     shard->mutex_acquire();
     /* Move on to the next fil_space_t */
     space->n_pending_ops--;
@@ -3897,7 +3902,7 @@ fil_space_keyrotate_next(fil_space_t* prev_space) {  //TODO: To powinno być cz�
     space = UT_LIST_GET_NEXT(rotation_list, space);
     fil_space_remove_from_keyrotation(shard, old); //TODO: to powinna być funkcja sharda
     if (space == NULL)
-      next_shard_index = (next_shard_index + 1) % fil_system->get_number_of_shards();
+      next_shard_index = (shard_index + 1) % fil_system->get_number_of_shards();
   }
 
   while (space == NULL && next_shard_index != 0) {

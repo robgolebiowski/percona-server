@@ -7436,79 +7436,70 @@ static int i_s_tablespaces_encryption_fill_table(THD* thd,
                                                  Item* ) /*!< in: condition (not used) */
 {
   btr_pcur_t pcur;
-  const rec_t* rec;
-  mem_heap_t* heap;
+  const rec_t *rec;
+  mem_heap_t *heap;
   mtr_t mtr;
-  bool found_space_0 = false;
-  
-  DBUG_ENTER("i_s_tablespaces_encryption_fill_table");
-  
+  dict_table_t *dd_spaces;
+  MDL_ticket *mdl = nullptr;
+  bool ret;
+
+  DBUG_ENTER("i_s_innodb_tablespaces_fill_table");
+
   /* deny access to user without PROCESS_ACL privilege */
-  if (check_global_access(thd, SUPER_ACL)) {
+  if (check_global_access(thd, PROCESS_ACL)) {
     DBUG_RETURN(0);
   }
-  
+
   heap = mem_heap_create(1000);
   mutex_enter(&dict_sys->mutex);
   mtr_start(&mtr);
-  
-  rec = dict_startscan_system(&pcur, &mtr, SYS_TABLESPACES);
-  
-  while (rec) {
-    const char* err_msg;
+
+  for (rec = dd_startscan_system(thd, &mdl, &pcur, &mtr,
+                                 dd_tablespaces_name.c_str(), &dd_spaces);
+       rec != NULL; rec = dd_getnext_system_rec(&pcur, &mtr)) {
     space_id_t space_id;
-    const char* name;
-    ulint flags;
-    
-    /* Extract necessary information from a SYS_TABLESPACES row */
-    err_msg = dict_process_sys_tablespaces(heap, rec, &space_id, &name, &flags);
-    
+    char *name;
+    uint flags;
+    uint32 server_version;
+    uint32 space_version;
+
+    /* Extract necessary information from a INNODB_TABLESPACES
+    row */
+    ret = dd_process_dd_tablespaces_rec(heap, rec, &space_id, &name, &flags,
+                                        &server_version, &space_version,
+                                        dd_spaces);
+
     mtr_commit(&mtr);
     mutex_exit(&dict_sys->mutex);
-    
-    if (space_id == 0) {
-      found_space_0 = true;
-    }
-    
+
     fil_space_t* space = fil_space_acquire_silent(space_id);
-    
-    if (!err_msg && space) {
+
+    if (ret && space != nullptr) {
       i_s_dict_fill_tablespaces_encryption(thd, space, tables->table);
     } else {
       push_warning_printf(thd, Sql_condition::SL_WARNING, ER_CANT_FIND_SYSTEM_REC,
-                          "%s", err_msg);
+                            "%s", name);
     }
-    
+
     if (space) {
       fil_space_release(space);
     }
-    
+
     mem_heap_empty(heap);
-    
+
     /* Get the next record */
     mutex_enter(&dict_sys->mutex);
     mtr_start(&mtr);
-    rec = dict_getnext_system(&pcur, &mtr);
   }
-  
+
   mtr_commit(&mtr);
+  dd_table_close(dd_spaces, thd, &mdl, true);
   mutex_exit(&dict_sys->mutex);
   mem_heap_free(heap);
-  
-  if (found_space_0 == false) {
-    /* space 0 does for what ever unknown reason not show up
-    * in iteration above, add it manually */
-    
-    fil_space_t* space = fil_space_acquire_silent(0);
-    
-    i_s_dict_fill_tablespaces_encryption(
-    	thd, space, tables->table);
-    
-    fil_space_release(space);
-  }
-  
+
   DBUG_RETURN(0);
 }
+
 /*******************************************************************//**
 Bind the dynamic table INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION
 @return 0 on success */
