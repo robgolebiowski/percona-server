@@ -2808,13 +2808,13 @@ fil_space_crypt_close_tablespace(
 		mutex_exit(&crypt_data->mutex);
 		/* release dict mutex so that scrub threads can release their
 		* table references */
-		dict_mutex_exit_for_mysql();
+		//dict_mutex_exit_for_mysql();
 
 		/* wakeup throttle (all) sleepers */
 		os_event_set(fil_crypt_throttle_sleep_event);
 
 		os_thread_sleep(20000);
-		dict_mutex_enter_for_mysql();
+		//dict_mutex_enter_for_mysql();
 
 		mutex_enter(&crypt_data->mutex);
 		cnt = crypt_data->rotate_state.active_threads;

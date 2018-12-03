@@ -361,7 +361,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t row_quiesce_write_header(
   if (space->crypt_data != NULL && space->crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
     mach_write_to_4(value, IB_EXPORT_CFG_VERSION_V1_WITH_RK);
   } else {
-    mach_write_to_4(value, IB_EXPORT_CFG_VERSION_V1);
+    mach_write_to_4(value, IB_EXPORT_CFG_VERSION_V3);
   }
 
   DBUG_EXECUTE_IF("ib_export_io_write_failure_4", close(fileno(file)););
@@ -616,7 +616,7 @@ static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
   fil_space_t*	space = fil_space_get(table->space);
   //The table is read locked so it will not be dropped
   ut_ad(space != nullptr);
-  /* If table is not encrypted, return. */
+  /* If table is not encrypted or encrypted with keyring encryption, return. */
   if (!dict_table_is_encrypted(table) || space->crypt_data != NULL) {
     return(DB_SUCCESS);
   }
