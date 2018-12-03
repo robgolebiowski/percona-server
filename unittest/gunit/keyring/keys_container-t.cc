@@ -713,7 +713,7 @@ TEST_F(Keys_container_test, StoreWithoutVersionFetchSystemKey) {
   ASSERT_TRUE(keys_container->get_number_of_keys() == 1);
 
   Key pb_key_verion1("percona_binlog:1", nullptr, nullptr, nullptr, 0);
-  IKey *fetched_pb_key_version0 = keys_container->fetch_key(&pb_key_verion1);
+  IKey *fetched_pb_key_version1 = keys_container->fetch_key(&pb_key_verion1);
 
   ASSERT_TRUE(fetched_pb_key_version1 != nullptr);
   std::string expected_pb_key_version1_signature = "percona_binlog:1";

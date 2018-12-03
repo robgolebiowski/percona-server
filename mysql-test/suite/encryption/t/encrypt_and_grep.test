@@ -93,9 +93,8 @@ select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES;
 
 #SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225;
 --let $assert_text= All encrypted tables should have encrypted flag set, apart from t3
-#--let $assert_cond= "[SELECT COUNT(*) = $encrypted_tables_count - 1] FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE FLAG = 8225" = 1
-# encryted_tables_count - 1 here, as INNODB_SYS_TABLESPACES does not include innodb_system
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count - 1
+# encryted_tables_count - 1 here, as t3 is not encrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count
 --source include/assert.inc
 
 #SELECT COUNT(*) FROM SYS_TABLES WHERE
