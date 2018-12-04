@@ -1098,5 +1098,7 @@ Update the cached tablespace objects, if they differ from dictionary
 MY_ATTRIBUTE((warn_unused_result))
 bool dd_tablespace_update_cache(THD *thd);
 
+bool dd_update_encryption_status(THD *thd, const fil_space_t *space);
+
 #include "dict0dd.ic"
 #endif

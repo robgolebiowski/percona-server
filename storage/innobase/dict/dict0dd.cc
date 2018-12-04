@@ -65,6 +65,7 @@ Data dictionary interface */
 #include "query_options.h"
 #include "sql_base.h"
 #include "sql_table.h"
+#include "thd_raii.h"
 #endif /* !UNIV_HOTBACKUP */
 
 const char *DD_instant_col_val_coder::encode(const byte *stream, size_t in_len,
@@ -5806,4 +5807,37 @@ bool dd_tablespace_update_cache(THD *thd) {
   fil_set_max_space_id_if_bigger(max_id);
   return (fail);
 }
+
+/* false on success, true on failure */
+bool dd_update_encryption_status(THD *thd, const fil_space_t *space) {
+  Disable_autocommit_guard autocommit_guard(thd);
+  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(client);
+
+  dd::Tablespace *dd_space = nullptr;
+
+  trx_t *trx = check_trx_exists(thd);
+  trx_start_if_not_started(trx, true);
+
+
+  if (dd::acquire_exclusive_tablespace_mdl(thd, space->name, false)) {
+    ut_a(false);
+  }
+
+  if (client->acquire_for_modification<dd::Tablespace>(space->name,
+                                                       &dd_space)) {
+    return (true);
+  }
+
+  /* Update DD flags for tablespace */
+  dd_space->se_private_data().set_uint32(dd_space_key_strings[DD_SPACE_FLAGS],
+                                         static_cast<uint32>(space->flags));
+
+  if (dd::commit_or_rollback_tablespace_change(thd, dd_space, false)) {
+    return (true);
+  }
+
+  return (false);
+}
+
 #endif /* !UNIV_HOTBACKUP */

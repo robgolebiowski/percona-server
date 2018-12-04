@@ -56,6 +56,7 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "os0file.h"
 
 #include <list>
+#include "sql_thd_internal_api.h"
 
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
@@ -2255,6 +2256,15 @@ private:
 	bool		do_rollback;
 };
 
+static dberr_t fil_update_encrypted_flag(const fil_space_t *space) {
+  // TODO: move this thread creation to start of the encryption thread creation.
+  // Pass THD* from top to down (or check if current_thd works)
+
+  THD *thd = create_thd(false, true, true, 0);
+  bool failure = dd_update_encryption_status(thd, space);
+  destroy_thd(thd);
+  return (failure ? DB_ERROR : DB_SUCCESS);
+}
 
 //static
 //dberr_t
@@ -2409,19 +2419,26 @@ fil_crypt_flush_space(
 			//return DB_ERROR;
 		//}
 
-		DBUG_EXECUTE_IF(
-		"crash_on_t1_flush_after_dd_update",
-		if (strcmp(state->space->name, "test/t1") == 0)
-		DBUG_ABORT();
-		);
-
 		fil_lock_shard_by_id(space->id);
 		if (current_type == CRYPT_SCHEME_UNENCRYPTED)
 			space->flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
 		else
 			space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+
                 fil_unlock_shard_by_id(space->id);
-	}
+
+                if (DB_SUCCESS != fil_update_encrypted_flag(space)) {
+                  ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1,
+                                         0));
+                  return (DB_ERROR);
+                }
+
+		DBUG_EXECUTE_IF(
+		"crash_on_t1_flush_after_dd_update",
+		if (strcmp(state->space->name, "test/t1") == 0)
+		DBUG_ABORT();
+		);
+        }
 
 	/* update page 0 */
 	mtr_t mtr;
