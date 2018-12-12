@@ -129,6 +129,8 @@ using std::max;
 using std::min;
 using std::string;
 
+extern bool must_crypt;
+
 #define FLAGSTR(V, F) ((V) & (F) ? #F " " : "")
 #define YESNO(X) ((X) ? "yes" : "no")
 
@@ -1260,13 +1262,21 @@ class Binlog_event_writer : public Basic_ostream {
 
         if (header_len == LOG_EVENT_HEADER_LEN) {
           update_header();
-          if (event_encrypter.is_encryption_enabled() &&
-              event_encrypter.init(m_binlog_file, header, header_len)) {
-            DBUG_RETURN(true);
+          if (event_encrypter.is_encryption_enabled()) {
+
+            uchar *header_for_encryption = header;
+            size_t header_for_encryption_length = header_len;
+
+            if (event_encrypter.init(m_binlog_file, header_for_encryption, header_for_encryption_length)) {
+              DBUG_RETURN(true);
+            }
+            if (event_encrypter.encrypt_and_write(m_binlog_file, header_for_encryption,
+                                                header_for_encryption_length))
+              DBUG_RETURN(true);
+          } else {
+            if (event_encrypter.encrypt_and_write(m_binlog_file, header, header_len))
+              DBUG_RETURN(true);
           }
-          if (event_encrypter.encrypt_and_write(m_binlog_file, header,
-                                                header_len))
-            DBUG_RETURN(true);
           thd->binlog_bytes_written += header_len;
           event_len -= header_len;
           header_len = 0;
@@ -1288,15 +1298,20 @@ class Binlog_event_writer : public Basic_ostream {
         buffer += write_bytes;
 
         // The whole event is copied, now add the checksum
-        if (have_checksum && event_len == 0) {
-          uchar checksum_buf[BINLOG_CHECKSUM_LEN];
+        if (event_len == 0) {
+          if (have_checksum) {
+            uchar checksum_buf[BINLOG_CHECKSUM_LEN];
 
-          int4store(checksum_buf, checksum);
-          if (event_encrypter.encrypt_and_write(m_binlog_file, checksum_buf,
-                                                BINLOG_CHECKSUM_LEN))
+            int4store(checksum_buf, checksum);
+            if (event_encrypter.encrypt_and_write(m_binlog_file, checksum_buf,
+                                                  BINLOG_CHECKSUM_LEN))
+              DBUG_RETURN(true);
+            thd->binlog_bytes_written += BINLOG_CHECKSUM_LEN;
+            checksum = initial_checksum;
+          }
+          if (event_encrypter.is_encryption_enabled() && event_encrypter.finish(m_binlog_file))
             DBUG_RETURN(true);
-          thd->binlog_bytes_written += BINLOG_CHECKSUM_LEN;
-          checksum = initial_checksum;
+
         }
       }
     }
@@ -4641,6 +4656,8 @@ bool MYSQL_BIN_LOG::open_binlog(
 
   mysql_mutex_assert_owner(get_log_lock());
 
+  must_crypt = false;
+
   if (init_and_set_log_file_name(log_name, new_name, new_index_number)) {
     LogErr(ERROR_LEVEL, ER_BINLOG_CANT_GENERATE_NEW_FILE_NAME);
     DBUG_RETURN(1);
@@ -4769,6 +4786,7 @@ bool MYSQL_BIN_LOG::open_binlog(
       sql_print_error("Failed to initialize %s encryption.", log_to_encrypt);
       goto err;
     }
+    must_crypt = true;
   }
 
   /*
@@ -4847,6 +4865,7 @@ bool MYSQL_BIN_LOG::open_binlog(
       Previous_gtids_log_event prev_gtids_ev(previous_gtid_set_relaylog);
       prev_gtids_ev.set_relay_log_event();
 
+
       if (need_sid_lock) sid_lock->unlock();
 
       if (write_event_to_binlog(&prev_gtids_ev)) goto err;
@@ -4876,7 +4895,7 @@ bool MYSQL_BIN_LOG::open_binlog(
     extra_description_event->created = 0;
     /* Don't set log_pos in event header */
     extra_description_event->set_artificial_event();
-
+    //TODO: Enable encryption
     if (binary_event_serialize(extra_description_event, m_binlog_file))
       goto err;
     bytes_written += extra_description_event->common_header->data_written;
@@ -6681,6 +6700,9 @@ bool MYSQL_BIN_LOG::write_event(Log_event *ev, Master_info *mi) {
 
   mysql_mutex_assert_owner(&LOCK_log);
 
+  if (crypto.is_enabled() && !ev->event_encrypter.is_encryption_enabled()) {
+    ev->event_encrypter.enable_encryption(&crypto);
+  }
   // write data
   bool error = false;
   if (!binary_event_serialize(ev, m_binlog_file)) {
@@ -7343,6 +7365,10 @@ inline bool MYSQL_BIN_LOG::write_event_to_binlog(Log_event *ev) {
           : static_cast<enum_binlog_checksum_alg>(binlog_checksum_options);
   DBUG_ASSERT(ev->common_footer->checksum_alg !=
               binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
+
+  if (crypto.is_enabled()) {
+    ev->event_encrypter.enable_encryption(&crypto);
+  }
 
   /*
     Stores current position into log_pos, it is used to calculate correcty

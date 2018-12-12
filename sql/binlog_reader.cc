@@ -15,6 +15,7 @@
 
 #include "sql/binlog_reader.h"
 #include "sql/log_event.h"
+#include "sql/event_crypt.h"
 
 unsigned char *Default_binlog_event_allocator::allocate(size_t size) {
   DBUG_EXECUTE_IF("simulate_allocate_failure", return nullptr;);
@@ -51,6 +52,24 @@ static void debug_corrupt_event(unsigned char *buffer, unsigned int event_len) {
 }
 #endif  // ifdef DBUG_OFF
 
+bool Binlog_event_data_istream::start_decryption(
+    binary_log::Start_encryption_event *see) {
+  DBUG_ASSERT(!crypto_data.is_enabled());
+
+  Start_encryption_log_event *sele =
+      down_cast<Start_encryption_log_event *>(see);
+  if (!sele->is_valid()) return true;
+  if (crypto_data.init(see->crypto_scheme, see->key_version, see->nonce)) {
+    //sql_print_error(
+        //"Failed to fetch percona_binlog key (version %u) from keyring and thus "
+        //"failed to initialize binlog encryption.",
+        //see->key_version);
+    return true;
+  }
+  return false;
+}
+
+
 Binlog_event_data_istream::Binlog_event_data_istream(
     Binlog_read_error *error, Basic_istream *istream,
     unsigned int max_event_size)
@@ -69,6 +88,37 @@ bool Binlog_event_data_istream::fill_event_data(
           event_data + LOG_EVENT_MINIMAL_HEADER_LEN,
           m_event_length - LOG_EVENT_MINIMAL_HEADER_LEN))
     return true;
+
+  if (crypto_data.is_enabled()) {
+#if defined(MYSQL_CLIENT)
+    // Clients do not have access to keyring and thus cannot decrypt
+    // binlog events
+    error= "Decryption error as clients do not have access to keyring and thus "
+           "cannot decrypt binlog events.";
+    goto err;
+#endif
+    // crypto only works on binlog files
+    Basic_binlog_ifile* binlog_file = down_cast<Basic_binlog_ifile*>(m_istream);
+    //TODO: I am getting rid of + 1 and dst_bug[data_len] = 0. It is not longer a packet as in 5.7
+    //so probably should not end with 0
+      //reinterpret_cast<char*>(my_malloc(key_memory_log_event, m_event_length+ 1, MYF(MY_WME)));
+    //dst_buf[data_len]=0;
+    //TODO: not needed ? - since decrypt_event_data is a sink for decrypted data
+    //TODO : memset_0 before memory is deleted ?
+    std::unique_ptr<uchar[]> decryption_buffer(new uchar[m_event_length]);
+    memcpy(decryption_buffer.get(), event_data, m_event_length);
+    
+    //TODO: get rid of cast 
+    if (decrypt_event((uint32_t)(binlog_file->position() - m_event_length), crypto_data, event_data, decryption_buffer.get(),
+                      m_event_length))
+    {
+      //error= "decryption error";
+      //goto err;
+      return true;
+    }
+
+    memcpy(event_data, decryption_buffer.get(), m_event_length);
+  }
 
 #ifndef DBUG_OFF
   debug_corrupt_event(event_data, m_event_length);
@@ -142,31 +192,7 @@ Binlog_read_error::Error_type binlog_event_deserialize(
                     : Binlog_read_error::TRUNC_EVENT);
   }
 
-  unique_ptr_my_free<char> decrypted_packet;
-  if (fde != nullptr && fde->is_decrypting()) {
-    const Format_description_log_event &fdle =
-        dynamic_cast<const Format_description_log_event &>(*fde);
-    size_t true_data_len = event_len + LOG_EVENT_MINIMAL_HEADER_LEN;
-
-    decrypted_packet.reset(reinterpret_cast<char *>(
-        my_malloc(key_memory_log_event, true_data_len + 1,
-                  MYF(MY_WME))));  // TODO laurynas why +1?
-
-    if (!decrypted_packet) DBUG_RETURN(Binlog_read_error::MEM_ALLOCATE);
-
-    uchar *src = (uchar *)buf;
-    uchar *dst = (uchar *)decrypted_packet.get();
-    memcpy(src + EVENT_LEN_OFFSET, src, 4);
-
-    // TODO laurynas: fdle->crypto_data.offs must be updated
-    if (decrypt_event(fdle.crypto_data, src, dst, true_data_len)) {
-      DBUG_RETURN(Binlog_read_error::DECRYPT);
-    }
-
-    buf = decrypted_packet.get();
-  }
-
-  uint event_type = buf[EVENT_TYPE_OFFSET];
+  uchar event_type = buf[EVENT_TYPE_OFFSET];
 
   /*
     Sanity check for Format description event. This is needed because
@@ -191,6 +217,7 @@ Binlog_read_error::Error_type binlog_event_deserialize(
   alg = (event_type != binary_log::FORMAT_DESCRIPTION_EVENT)
             ? fde->footer()->checksum_alg
             : Log_event_footer::get_checksum_alg(buf, event_len);
+  DBUG_ASSERT(alg ==  binary_log::BINLOG_CHECKSUM_ALG_OFF || alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
 
 #ifndef DBUG_OFF
   binary_log_debug::debug_checksum_test =
@@ -205,6 +232,7 @@ Binlog_read_error::Error_type binlog_event_deserialize(
   }
 
   if (event_type > fde->number_of_event_types &&
+      event_type != binary_log::START_ENCRYPTION_EVENT &&
       /*
         Skip the event type check when simulating an unknown ignorable event.
       */
@@ -215,7 +243,7 @@ Binlog_read_error::Error_type binlog_event_deserialize(
     */
     DBUG_PRINT("error", ("event type %d found, but the current "
                          "Format_description_event supports only %d event "
-                         "types",
+                         "types, plus Start Encryption Event",
                          event_type, fde->number_of_event_types));
     DBUG_RETURN(Binlog_read_error::INVALID_EVENT);
   }
