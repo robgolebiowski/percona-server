@@ -339,7 +339,7 @@ bool Rpl_applier_reader::move_to_next_log() {
 
   m_relaylog_file_reader.close();
 
-  m_rli->get_rli_description_event()->reset_crypto();
+  //m_rli->get_rli_description_event()->reset_crypto();
 
   if (!m_rli->relay_log.is_open() ||
       m_rli->relay_log.find_next_log(&m_linfo, true)) {
