@@ -50,6 +50,8 @@ const char *Binlog_read_error::get_str() const {
     case BAD_BINLOG_MAGIC:
       return "Binlog has bad magic number;  It's not a binary log file "
              "that can be used by this version of MySQL";
+    case DECRYPT:
+      return "Error initializing decryption";
     default:
       /* There must be something wrong in the code if it reaches this branch. */
       DBUG_ASSERT(0);

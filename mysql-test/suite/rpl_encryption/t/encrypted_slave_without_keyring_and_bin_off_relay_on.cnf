@@ -4,7 +4,7 @@
 encrypt-binlog=0
 
 [mysqld.2]
-encrypt-binlog
+encrypt-binlog=0
 log-slave-updates=0
 master-verify-checksum=1
 plugin_dir=@env.KEYRING_PLUGIN_DIR
