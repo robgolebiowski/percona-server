@@ -1100,7 +1100,6 @@ int Binlog_sender::send_format_description_event(File_reader *reader,
       if (unlikely(send_heartbeat_event(log_pos))) DBUG_RETURN(1);
     }
   } else {
-    DBUG_ASSERT(encrypt_binlog == false);
     reader->seek(binlog_pos_after_fdle);
     set_last_pos(binlog_pos_after_fdle);
   }

@@ -321,21 +321,25 @@ class Basic_binlog_file_reader {
           down_cast<Format_description_log_event *>(ev);
       //m_data_istream.crypto_data = new_fde->crypto_data;
       //new_fde->copy_crypto_data(m_fde);
+      //m_data_istream.reset_crypto();
       m_fde = *new_fde;
       DBUG_ASSERT(m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF || m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
     } else if (ev &&
                ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {
-      if (m_fde.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
-        delete ev;
-        ev = nullptr;
-      }
-      else {
+      //if (m_fde.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
+        //delete ev;
+        //ev = nullptr;
+      //}
+      //else {
         if (m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))){
+          //TODO:DECRYPT should be returned if event is encrypted and checksum fail
+          //TODO:here should be a different error DECYPT_INIT_FAILURE
+          //m_error.set_type(Binlog_read_error::DECRYPT);
           delete ev;
           ev = nullptr;
         }
         //TODO: add delete ev; ev = nullptr as above?
-      }
+      //}
     }
     return ev;
   }
@@ -413,16 +417,21 @@ class Basic_binlog_file_reader {
         m_fde = *fdle;
         DBUG_ASSERT(m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF || m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
       } else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {
-        if (!fdle) break;
-        if (m_fde.start_decryption(
-                down_cast<Start_encryption_log_event *>(ev))) {
-          delete ev;
-          delete fdle;
-          fdle = nullptr;
-          break;
-        } else {
-          m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev));
-        }
+        //if (!fdle) break;
+        //if (m_fde.start_decryption(
+                //down_cast<Start_encryption_log_event *>(ev))) {
+          //delete ev;
+          //delete fdle;
+          //fdle = nullptr;
+          //break;
+        //} else {
+          if (m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
+            //m_error.set_type(Binlog_read_error::DECRYPT);
+            delete ev;
+            ev = nullptr;
+            break;
+          }
+        //}
       } else {
         binary_log::Log_event_type type = ev->get_type_code();
         delete ev;
