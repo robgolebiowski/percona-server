@@ -60,6 +60,8 @@ bool Binlog_event_data_istream::start_decryption(
       down_cast<Start_encryption_log_event *>(see);
   if (!sele->is_valid()) return true;
   if (crypto_data.init(see->crypto_scheme, see->key_version, see->nonce)) {
+    //TODO:change to init error
+    m_error->set_type(Binlog_read_error::DECRYPT);
     //sql_print_error(
         //"Failed to fetch percona_binlog key (version %u) from keyring and thus "
         //"failed to initialize binlog encryption.",
