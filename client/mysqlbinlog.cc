@@ -2524,9 +2524,6 @@ static Exit_status dump_local_log_entries(PRINT_EVENT_INFO *print_event_info,
     char llbuff[21];
     my_off_t old_off = mysqlbinlog_file_reader.position();
 
-    binary_log_debug::debug_expect_unknown_event =
-        DBUG_EVALUATE_IF("expect_Unknown_event", true, false);
-
     Log_event *ev = mysqlbinlog_file_reader.read_event_object();
     if (mysqlbinlog_file_reader.event_data_istream()->is_binlog_encrypted() &&
         (!ev || ev->get_type_code() != binary_log::START_ENCRYPTION_EVENT)) {

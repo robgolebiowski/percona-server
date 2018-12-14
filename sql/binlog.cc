@@ -129,8 +129,6 @@ using std::max;
 using std::min;
 using std::string;
 
-extern bool must_crypt;
-
 #define FLAGSTR(V, F) ((V) & (F) ? #F " " : "")
 #define YESNO(X) ((X) ? "yes" : "no")
 
@@ -3943,7 +3941,7 @@ static bool read_gtids_and_update_trx_parser_from_relaylog(
     // This is not a fatal error; the log may just be truncated.
     // @todo but what other errors could happen? IO error?
     LogErr(WARNING_LEVEL, ER_BINLOG_ERROR_READING_GTIDS_FROM_RELAY_LOG, -1);
-    sql_print_warning(relaylog_file_reader.get_error_str()); 
+    sql_print_warning(relaylog_file_reader.get_error_str());
   }
 
 #ifndef DBUG_OFF
@@ -4176,7 +4174,7 @@ static enum_read_gtids_from_binlog_status read_gtids_from_binlog(
 
     // @todo but what other errors could happen? IO error?
     LogErr(WARNING_LEVEL, ER_BINLOG_ERROR_READING_GTIDS_FROM_BINARY_LOG, -1);
-    sql_print_warning(binlog_file_reader.get_error_str()); 
+    sql_print_warning(binlog_file_reader.get_error_str());
   }
 
   if (all_gtids)
@@ -4658,8 +4656,6 @@ bool MYSQL_BIN_LOG::open_binlog(
 
   mysql_mutex_assert_owner(get_log_lock());
 
-  must_crypt = false;
-
   if (init_and_set_log_file_name(log_name, new_name, new_index_number)) {
     LogErr(ERROR_LEVEL, ER_BINLOG_CANT_GENERATE_NEW_FILE_NAME);
     DBUG_RETURN(1);
@@ -4788,7 +4784,6 @@ bool MYSQL_BIN_LOG::open_binlog(
       sql_print_error("Failed to initialize %s encryption.", log_to_encrypt);
       goto err;
     }
-    must_crypt = true;
   }
 
   /*
@@ -4866,7 +4861,6 @@ bool MYSQL_BIN_LOG::open_binlog(
       DBUG_PRINT("info", ("Generating PREVIOUS_GTIDS for relaylog file."));
       Previous_gtids_log_event prev_gtids_ev(previous_gtid_set_relaylog);
       prev_gtids_ev.set_relay_log_event();
-
 
       if (need_sid_lock) sid_lock->unlock();
 
