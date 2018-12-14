@@ -92,13 +92,6 @@ bool Binlog_event_data_istream::fill_event_data(
     return true;
 
   if (crypto_data.is_enabled()) {
-#if defined(MYSQL_CLIENT)
-    // Clients do not have access to keyring and thus cannot decrypt
-    // binlog events
-    error= "Decryption error as clients do not have access to keyring and thus "
-           "cannot decrypt binlog events.";
-    goto err;
-#endif
     // crypto only works on binlog files
     Basic_binlog_ifile* binlog_file = down_cast<Basic_binlog_ifile*>(m_istream);
     //TODO: I am getting rid of + 1 and dst_bug[data_len] = 0. It is not longer a packet as in 5.7
@@ -161,16 +154,6 @@ Binlog_read_error::Error_type binlog_event_deserialize(
 
   DBUG_ENTER("binlog_event_deserialize");
 
-#ifndef MYSQL_SERVER
-  static bool was_start_encryption_event = false;
-  if (was_start_encryption_event) {
-    // We know that binlog is encrypted (as we read Start_encryption event) and
-    // we know that client applications cannot decrypt encrypted binlogs as they
-    // have no access to keyring. Thus we return Unknown_event for all encrypted
-    // events when force is used and close mysqlbinlog when no force.
-    if (!force_opt) DBUG_RETURN(Binlog_read_error::DECRYPT);
-  }
-#endif
 
   DBUG_ASSERT(fde != 0);
   DBUG_PRINT("info", ("binlog_version: %d", fde->binlog_version));
@@ -219,7 +202,6 @@ Binlog_read_error::Error_type binlog_event_deserialize(
   alg = (event_type != binary_log::FORMAT_DESCRIPTION_EVENT)
             ? fde->footer()->checksum_alg
             : Log_event_footer::get_checksum_alg(buf, event_len);
-  DBUG_ASSERT(alg ==  binary_log::BINLOG_CHECKSUM_ALG_OFF || alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
 
 #ifndef DBUG_OFF
   binary_log_debug::debug_checksum_test =
@@ -349,9 +331,6 @@ Binlog_read_error::Error_type binlog_event_deserialize(
       break;
     case binary_log::START_ENCRYPTION_EVENT:
       ev = new Start_encryption_log_event(buf, fde);
-#ifndef MYSQL_SERVER
-      was_start_encryption_event = true;
-#endif
       break;
     default:
       /*
