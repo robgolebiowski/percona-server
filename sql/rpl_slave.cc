@@ -7383,26 +7383,6 @@ QUEUE_EVENT_RESULT queue_event(Master_info *mi, const char *buf,
 
     } break;
 
-    //case binary_log::START_ENCRYPTION_EVENT: {
-
-      //Log_event *ev = NULL;
-
-      //if (binlog_event_deserialize(reinterpret_cast<const unsigned char *>(buf),
-                                   //event_len, mi->get_mi_description_event(),
-                                   //true, &ev) != Binlog_read_error::SUCCESS) {
-        //// This error will be reported later at handle_slave_io().
-        //goto err;
-      //}
-      //if (mi->get_mi_description_event()->start_decryption(down_cast<Start_encryption_log_event*>(ev)))
-      //{
-        //mi->report(ERROR_LEVEL, ER_RELAY_LOG_INIT, 
-                   //"Unable to set up decryption of binlog.");
-        //delete ev;
-        //goto err;
-      //}
-      //delete ev;
-    //} break;
-
     case binary_log::HEARTBEAT_LOG_EVENT: {
       /*
         HB (heartbeat) cannot come before RL (Relay)

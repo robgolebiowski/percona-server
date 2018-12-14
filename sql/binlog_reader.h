@@ -55,7 +55,7 @@ class Binlog_event_data_istream {
   Binlog_event_data_istream(const Binlog_event_data_istream &) = delete;
   Binlog_event_data_istream &operator=(const Binlog_event_data_istream &) =
       delete;
-  virtual ~Binlog_event_data_istream() {}
+  virtual ~Binlog_event_data_istream() {} 
 
   /**
      Read an event data from the stream and verify its checksum if
@@ -150,6 +150,16 @@ class Binlog_event_data_istream {
   Basic_istream *m_istream = nullptr;
   unsigned int m_max_event_size;
   unsigned int m_event_length = 0;
+
+  class Decryption_buffer final {
+   public:
+    ~Decryption_buffer();
+    bool set_needed_capacity(size_t needed_capacity);
+    uchar *data();
+  private:
+    std::vector<uchar> m_decryption_buffer;
+  };
+  Decryption_buffer m_decryption_buffer;
 
   /**
      Fill the event data into the given buffer and verify checksum if
@@ -319,27 +329,16 @@ class Basic_binlog_file_reader {
     if (ev && ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT) {
       Format_description_log_event *const new_fde =
           down_cast<Format_description_log_event *>(ev);
-      //m_data_istream.crypto_data = new_fde->crypto_data;
-      //new_fde->copy_crypto_data(m_fde);
-      //m_data_istream.reset_crypto();
       m_fde = *new_fde;
-      DBUG_ASSERT(m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF || m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
     } else if (ev &&
                ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {
-      //if (m_fde.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
-        //delete ev;
-        //ev = nullptr;
-      //}
-      //else {
-        if (m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))){
+         if (m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))){
           //TODO:DECRYPT should be returned if event is encrypted and checksum fail
           //TODO:here should be a different error DECYPT_INIT_FAILURE
           //m_error.set_type(Binlog_read_error::DECRYPT);
           delete ev;
           ev = nullptr;
         }
-        //TODO: add delete ev; ev = nullptr as above?
-      //}
     }
     return ev;
   }
@@ -361,7 +360,6 @@ class Basic_binlog_file_reader {
 
   void set_format_description_event(const Format_description_event &fde) {
     m_fde = fde;
-    DBUG_ASSERT(m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF || m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
   }
   const Format_description_event *format_description_event() { return &m_fde; }
   my_off_t event_start_pos() { return m_event_start_pos; }
@@ -412,19 +410,10 @@ class Basic_binlog_file_reader {
         delete fdle;
         Format_description_log_event *new_fdev =
             down_cast<Format_description_log_event *>(ev);
-        new_fdev->copy_crypto_data(m_fde);
         fdle = new_fdev;
         m_fde = *fdle;
         DBUG_ASSERT(m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF || m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
       } else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {
-        //if (!fdle) break;
-        //if (m_fde.start_decryption(
-                //down_cast<Start_encryption_log_event *>(ev))) {
-          //delete ev;
-          //delete fdle;
-          //fdle = nullptr;
-          //break;
-        //} else {
           if (m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
             //m_error.set_type(Binlog_read_error::DECRYPT);
             delete ev;

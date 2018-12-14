@@ -1927,29 +1927,6 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
       }
     }
 
-    //const auto binlog_pos_start_tmp = relaylog_file_reader.position();
-
-    //// Search for Start_encryption_event. When relay log is encrypted the second
-    //// event (after Format_description_event) will be Start_encryption_event.
-    ////TODO:MOVE IT TO IS_OPEN!
-    //for (uint i= 0; i < 2; i++)
-    //{
-      //ev = relaylog_file_reader.read_event_object();
-
-      //if (ev != NULL)
-      //{
-        //if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT && 
-            //!rli->get_rli_description_event()->start_decryption(down_cast<Start_encryption_log_event*>(ev)))
-        //{
-          //delete ev;
-          //goto end;
-          //error= true;
-        //}
-        //delete ev;
-      //}
-    //}
-    //relaylog_file_reader.seek(binlog_pos_start_tmp);
-
     /* If it is the last event, then set arrive_end as true */
     arrive_end = (relaylog_file_reader.position() == end_relay_pos &&
                   file_number == end_relay_number);

@@ -3,8 +3,6 @@
 #include "my_byteorder.h"
 #include "sql/binlog_ostream.h"
 
-bool must_crypt = false;
-
 static bool encrypt_event(uint32 offs, int flags,
                           const Binlog_crypt_data &crypto, uchar *buf,
                           uchar *ebuf, size_t buf_len) {
@@ -97,7 +95,6 @@ bool Event_encrypter::encrypt_and_write(Basic_ostream *ostream,
     pos = dst;
     len = dstlen;
   } else {
-    //DBUG_ASSERT(must_crypt == false);
     dst = 0;
   }
 

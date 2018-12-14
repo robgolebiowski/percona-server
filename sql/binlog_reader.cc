@@ -82,6 +82,54 @@ bool Binlog_event_data_istream::read_event_header() {
       m_header, LOG_EVENT_MINIMAL_HEADER_LEN);
 }
 
+Binlog_event_data_istream::Decryption_buffer::~Decryption_buffer() {
+  memset_s(m_decryption_buffer.data(), m_decryption_buffer.capacity(),
+           0, m_decryption_buffer.capacity());
+}
+
+bool Binlog_event_data_istream::Decryption_buffer::set_needed_capacity(size_t needed_capacity) {
+  if (needed_capacity > m_decryption_buffer.capacity()) {
+    m_decryption_buffer.resize(needed_capacity);
+  } else if (needed_capacity < (m_decryption_buffer.capacity() / 2)) {
+    // could be that we allocated a lot of memory
+    // that is no longer needed
+    m_decryption_buffer.resize(needed_capacity);
+    m_decryption_buffer.shrink_to_fit(); 
+  }
+  //TODO: Do something about OOM - return error
+  return false;
+}
+
+uchar* Binlog_event_data_istream::Decryption_buffer::data() {
+  return m_decryption_buffer.data();
+}
+
+//class Binlog_event_data_istream::Decryption_buffer final {
+  //public:
+    //~Decryption_buffer() {
+      //memset_s(m_decryption_buffer.data(), m_decryption_buffer.capacity(),
+               //0, m_decryption_buffer.capacity());
+    //}
+
+    //bool set_needed_capacity(size_t needed_capacity) {
+      //if (needed_capacity > m_decryption_buffer.capacity()) {
+        //m_decryption_buffer.resize(needed_capacity);
+      //} else if (needed_capacity < (m_decryption_buffer.capacity() / 2)) {
+        //// could be that we allocated a lot of memory
+        //// that is no longer needed
+        //m_decryption_buffer.resize(needed_capacity);
+        //m_decryption_buffer.shrink_to_fit(); 
+      //}
+    //}
+
+    //uchar *data() {
+      //return m_decryption_buffer.data();
+    //}
+ 
+  //private:
+    //std::vector<uchar> m_decryption_buffer;
+//};
+
 bool Binlog_event_data_istream::fill_event_data(
     unsigned char *event_data, bool verify_checksum,
     enum_binlog_checksum_alg checksum_alg) {
@@ -100,19 +148,24 @@ bool Binlog_event_data_istream::fill_event_data(
     //dst_buf[data_len]=0;
     //TODO: not needed ? - since decrypt_event_data is a sink for decrypted data
     //TODO : memset_0 before memory is deleted ?
-    std::unique_ptr<uchar[]> decryption_buffer(new uchar[m_event_length]);
-    memcpy(decryption_buffer.get(), event_data, m_event_length);
+    //if (m_event_length > m_decryption_buffer.size()) {
+      //m_decryption_buffer.resize(m_event_length);
+    //}
+    m_decryption_buffer.set_needed_capacity(m_event_length); 
+    //std::unique_ptr<uchar[]> decryption_buffer(new uchar[m_event_length]);
+    //memcpy(decryption_buffer.get(), event_data, m_event_length);
     
     //TODO: get rid of cast 
-    if (decrypt_event((uint32_t)(binlog_file->position() - m_event_length), crypto_data, event_data, decryption_buffer.get(),
+    if (decrypt_event((uint32_t)(binlog_file->position() - m_event_length), crypto_data, event_data, m_decryption_buffer.data(),
                       m_event_length))
     {
       //error= "decryption error";
       //goto err;
-      return true;
+      return m_error->set_type(Binlog_read_error::DECRYPT);
+      //return true;
     }
 
-    memcpy(event_data, decryption_buffer.get(), m_event_length);
+    memcpy(event_data, m_decryption_buffer.data(), m_event_length);
   }
 
 #ifndef DBUG_OFF
