@@ -1047,8 +1047,8 @@ int Binlog_sender::send_format_description_event(File_reader *reader,
   if (binlog_read_error.has_error()) {
     reader->seek(binlog_pos_after_fdle);
     set_last_pos(binlog_pos_after_fdle);
-    set_fatal_error(binlog_read_error.get_str());
-    DBUG_RETURN(1);
+    //set_fatal_error(binlog_read_error.get_str());
+    DBUG_RETURN(0);
   }
 
   if (ev && ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {
