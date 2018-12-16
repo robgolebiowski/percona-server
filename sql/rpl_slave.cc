@@ -2966,7 +2966,6 @@ static int write_rotate_to_master_pos_into_relay_log(THD *thd, Master_info *mi,
                                               mi->get_master_log_pos(),
                                               Rotate_log_event::DUP_NAME);
 
-
   DBUG_EXECUTE_IF("fail_generating_rotate_event_on_write_rotate_to_master_pos",
                   {
                     if (likely((bool)ev)) {

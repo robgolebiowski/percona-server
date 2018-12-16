@@ -1036,19 +1036,15 @@ int Binlog_sender::send_format_description_event(File_reader *reader,
   // Let's check if next event is Start encryption event
   const auto binlog_pos_after_fdle = reader->position();
   if (read_event(reader, &event_ptr, &event_len)) {
-    reader->seek(binlog_pos_after_fdle);
-    set_last_pos(binlog_pos_after_fdle);
-    DBUG_RETURN(0);
+    DBUG_RETURN(1);
   }
 
   binlog_read_error = binlog_event_deserialize(
       event_ptr, event_len, reader->format_description_event(), false, &ev, reader->position());
 
   if (binlog_read_error.has_error()) {
-    reader->seek(binlog_pos_after_fdle);
-    set_last_pos(binlog_pos_after_fdle);
-    //set_fatal_error(binlog_read_error.get_str());
-    DBUG_RETURN(0);
+    set_fatal_error(binlog_read_error.get_str());
+    DBUG_RETURN(1);
   }
 
   if (ev && ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {

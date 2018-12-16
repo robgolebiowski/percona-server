@@ -154,10 +154,14 @@ class Binlog_event_data_istream {
   class Decryption_buffer final {
    public:
     ~Decryption_buffer();
-    bool set_needed_capacity(size_t needed_capacity);
+    bool set_size(size_t size);
     uchar *data();
   private:
-    std::vector<uchar> m_decryption_buffer;
+    bool resize(size_t new_size);
+
+    uchar *m_buffer = nullptr;
+    size_t m_size = 0;
+    uint m_number_of_events_with_half_the_size = 0;
   };
   Decryption_buffer m_decryption_buffer;
 
@@ -331,14 +335,10 @@ class Basic_binlog_file_reader {
           down_cast<Format_description_log_event *>(ev);
       m_fde = *new_fde;
     } else if (ev &&
-               ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {
-         if (m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))){
-          //TODO:DECRYPT should be returned if event is encrypted and checksum fail
-          //TODO:here should be a different error DECYPT_INIT_FAILURE
-          //m_error.set_type(Binlog_read_error::DECRYPT);
-          delete ev;
-          ev = nullptr;
-        }
+               ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT &&
+               m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
+      delete ev;
+      ev = nullptr;
     }
     return ev;
   }
@@ -413,14 +413,11 @@ class Basic_binlog_file_reader {
         fdle = new_fdev;
         m_fde = *fdle;
         DBUG_ASSERT(m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF || m_fde.footer()->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
-      } else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT) {
-          if (m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
-            //m_error.set_type(Binlog_read_error::DECRYPT);
-            delete ev;
-            ev = nullptr;
-            break;
-          }
-        //}
+      } else if (ev->get_type_code() == binary_log::START_ENCRYPTION_EVENT &&
+                 m_data_istream.start_decryption(down_cast<Start_encryption_log_event *>(ev))) {
+        delete ev;
+        ev = nullptr;
+        break;
       } else {
         binary_log::Log_event_type type = ev->get_type_code();
         delete ev;

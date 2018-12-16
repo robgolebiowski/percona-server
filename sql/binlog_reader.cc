@@ -58,14 +58,9 @@ bool Binlog_event_data_istream::start_decryption(
 
   Start_encryption_log_event *sele =
       down_cast<Start_encryption_log_event *>(see);
-  if (!sele->is_valid()) return true;
-  if (crypto_data.init(see->crypto_scheme, see->key_version, see->nonce)) {
-    //TODO:change to init error
-    m_error->set_type(Binlog_read_error::DECRYPT);
-    //sql_print_error(
-        //"Failed to fetch percona_binlog key (version %u) from keyring and thus "
-        //"failed to initialize binlog encryption.",
-        //see->key_version);
+  if (!sele->is_valid() ||
+      crypto_data.init(see->crypto_scheme, see->key_version, see->nonce)) {
+    m_error->set_type(Binlog_read_error::DECRYPT_INIT_FAILURE);
     return true;
   }
   return false;
@@ -83,52 +78,49 @@ bool Binlog_event_data_istream::read_event_header() {
 }
 
 Binlog_event_data_istream::Decryption_buffer::~Decryption_buffer() {
-  memset_s(m_decryption_buffer.data(), m_decryption_buffer.capacity(),
-           0, m_decryption_buffer.capacity());
+  resize(0);
 }
 
-bool Binlog_event_data_istream::Decryption_buffer::set_needed_capacity(size_t needed_capacity) {
-  if (needed_capacity > m_decryption_buffer.capacity()) {
-    m_decryption_buffer.resize(needed_capacity);
-  } else if (needed_capacity < (m_decryption_buffer.capacity() / 2)) {
-    // could be that we allocated a lot of memory
-    // that is no longer needed
-    m_decryption_buffer.resize(needed_capacity);
-    m_decryption_buffer.shrink_to_fit(); 
+bool Binlog_event_data_istream::Decryption_buffer::resize(size_t new_size) {
+  memset_s(m_buffer, m_size, 0, m_size);
+  delete[] m_buffer;
+  m_size = 0;
+  m_buffer = nullptr;
+  if (new_size == 0) {
+    return false;
   }
-  //TODO: Do something about OOM - return error
+  m_buffer = new (std::nothrow) uchar[new_size];
+  if (m_buffer == nullptr) {
+    return true;
+  }
+  m_size = new_size;
+  return false;
+}
+
+bool Binlog_event_data_istream::Decryption_buffer::set_size(size_t size_to_set) {
+  if (size_to_set == m_size) {
+    return false;
+  }
+  if (size_to_set > m_size) {
+    return resize(size_to_set);
+  }
+  DBUG_ASSERT(size_to_set < m_size);
+
+  if (size_to_set < (m_size / 2) && ++m_number_of_events_with_half_the_size == 100) {
+    // There were already 101 events which size was a half of currently
+    // allocated size. This is strong indication that we had occured an
+    // event which was unusually big. Shrink the buffer to half the size.
+    if (resize(m_size / 2)) {
+      return true;
+    }
+    m_number_of_events_with_half_the_size = 0;
+  }
   return false;
 }
 
 uchar* Binlog_event_data_istream::Decryption_buffer::data() {
-  return m_decryption_buffer.data();
+  return m_buffer;
 }
-
-//class Binlog_event_data_istream::Decryption_buffer final {
-  //public:
-    //~Decryption_buffer() {
-      //memset_s(m_decryption_buffer.data(), m_decryption_buffer.capacity(),
-               //0, m_decryption_buffer.capacity());
-    //}
-
-    //bool set_needed_capacity(size_t needed_capacity) {
-      //if (needed_capacity > m_decryption_buffer.capacity()) {
-        //m_decryption_buffer.resize(needed_capacity);
-      //} else if (needed_capacity < (m_decryption_buffer.capacity() / 2)) {
-        //// could be that we allocated a lot of memory
-        //// that is no longer needed
-        //m_decryption_buffer.resize(needed_capacity);
-        //m_decryption_buffer.shrink_to_fit(); 
-      //}
-    //}
-
-    //uchar *data() {
-      //return m_decryption_buffer.data();
-    //}
- 
-  //private:
-    //std::vector<uchar> m_decryption_buffer;
-//};
 
 bool Binlog_event_data_istream::fill_event_data(
     unsigned char *event_data, bool verify_checksum,
@@ -142,27 +134,13 @@ bool Binlog_event_data_istream::fill_event_data(
   if (crypto_data.is_enabled()) {
     // crypto only works on binlog files
     Basic_binlog_ifile* binlog_file = down_cast<Basic_binlog_ifile*>(m_istream);
-    //TODO: I am getting rid of + 1 and dst_bug[data_len] = 0. It is not longer a packet as in 5.7
-    //so probably should not end with 0
-      //reinterpret_cast<char*>(my_malloc(key_memory_log_event, m_event_length+ 1, MYF(MY_WME)));
-    //dst_buf[data_len]=0;
-    //TODO: not needed ? - since decrypt_event_data is a sink for decrypted data
-    //TODO : memset_0 before memory is deleted ?
-    //if (m_event_length > m_decryption_buffer.size()) {
-      //m_decryption_buffer.resize(m_event_length);
-    //}
-    m_decryption_buffer.set_needed_capacity(m_event_length); 
-    //std::unique_ptr<uchar[]> decryption_buffer(new uchar[m_event_length]);
-    //memcpy(decryption_buffer.get(), event_data, m_event_length);
     
-    //TODO: get rid of cast 
-    if (decrypt_event((uint32_t)(binlog_file->position() - m_event_length), crypto_data, event_data, m_decryption_buffer.data(),
-                      m_event_length))
-    {
-      //error= "decryption error";
-      //goto err;
+    // if file position if larger than 4 bytes we still care only about
+    // least significant 4 bytes
+    if (m_decryption_buffer.set_size(m_event_length) ||
+        decrypt_event(static_cast<uint32_t>((binlog_file->position() - m_event_length)), crypto_data, event_data, m_decryption_buffer.data(),
+                      m_event_length)) {
       return m_error->set_type(Binlog_read_error::DECRYPT);
-      //return true;
     }
 
     memcpy(event_data, m_decryption_buffer.data(), m_event_length);
@@ -180,7 +158,8 @@ bool Binlog_event_data_istream::fill_event_data(
     if (Log_event_footer::event_checksum_test(event_data, m_event_length,
                                               checksum_alg) &&
         !DBUG_EVALUATE_IF("simulate_unknown_ignorable_log_event", 1, 0)) {
-      return m_error->set_type(Binlog_read_error::CHECKSUM_FAILURE);
+      return m_error->set_type(crypto_data.is_enabled() ? Binlog_read_error::CHECKSUM_FAILURE
+                                                        : Binlog_read_error::DECRYPT);
     }
   }
   return false;

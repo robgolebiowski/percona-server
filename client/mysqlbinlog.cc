@@ -2540,9 +2540,6 @@ static Exit_status dump_local_log_entries(PRINT_EVENT_INFO *print_event_info,
         mysqlbinlog_file_reader.get_error_type() != Binlog_read_error::READ_EOF &&
         (!ev || ev->get_type_code() != binary_log::START_ENCRYPTION_EVENT)) {
       DBUG_ASSERT(ev == nullptr);
-      //if (ev) delete ev;
-      //ev = (force_opt && mysqlbinlog_file_reader.get_error_type() != Binlog_read_error::READ_EOF)
-             //? new Unknown_log_event : nullptr;
       if (force_opt) {
         ev = new Unknown_log_event;
       }

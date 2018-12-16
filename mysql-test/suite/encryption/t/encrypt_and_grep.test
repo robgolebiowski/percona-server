@@ -26,8 +26,8 @@ show warnings;
 create table t3 (a varchar(255)) engine=innodb encryption='N';
 create table t4 (a varchar(255)) engine=innodb encryption='KEYRING' encryption_key_id=5;
 
-#CREATE TABLESPACE ts_encrypted ADD DATAFILE 'ts_encrypted.ibd' ENCRYPTION="Y" ENGINE="InnoDB";
-#CREATE TABLE t5 (a varchar(255)) TABLESPACE ts_encrypted ENCRYPTION="Y" ENGINE="InnoDB";
+CREATE TABLESPACE ts_encrypted ADD DATAFILE 'ts_encrypted.ibd' ENCRYPTION="Y" ENGINE="InnoDB";
+CREATE TABLE t5 (a varchar(255)) TABLESPACE ts_encrypted ENCRYPTION="Y" ENGINE="InnoDB";
 
 --error ER_INVALID_ENCRYPTION_OPTION
 CREATE TABLESPACE ts_rk_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='KEYRING' ENGINE="InnoDB";
@@ -39,14 +39,14 @@ insert t1 values (repeat('foobarsecret', 12));
 insert t2 values (repeat('tempsecret', 12));
 insert t3 values (repeat('dummysecret', 12));
 insert t4 values (repeat('verysecret', 12));
-#insert t5 values (repeat('moresecret', 12));
+insert t5 values (repeat('moresecret', 12));
 insert t6 values (repeat('sooosecret', 12));
 
 select * from t1;
 select * from t2;
 select * from t3;
 select * from t4;
-#select * from t5;
+select * from t5;
 select * from t6;
 
 ALTER TABLE t4 ENCRYPTION='N', ALGORITHM=INPLACE;
