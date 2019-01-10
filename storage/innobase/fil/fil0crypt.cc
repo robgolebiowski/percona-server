@@ -57,6 +57,7 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "os0file.h"
 
 #include <list>
+#include "sql_thd_internal_api.h"
 
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
@@ -2365,100 +2366,20 @@ private:
 	bool		do_rollback;
 };
 
+enum class UpdateEncryptedFlagOperation : char {
+  SET,
+  CLEAR
+};
 
-//static
-//dberr_t
-//fil_update_encrypted_flag(fil_space_t *space, bool set){
-	//// We are only modifying DD so the lock on DD is enough, we do not need
-	//// lock on space
-	
-	//TransactionAndHeapGuard	guard;
+static dberr_t fil_update_encrypted_flag(const char *space_name, UpdateEncryptedFlagOperation update_operation) {
+  THD *thd = create_thd(false, true, true, 0);
 
-	//if (!guard.lock_x_dict_operation_lock(space))
-		//return DB_SUCCESS;
+  bool failure = (update_operation == UpdateEncryptedFlagOperation::SET ? dd_set_encryption_flag(thd, space_name)
+                                                                        : dd_clear_encryption_flag(thd, space_name));
 
-
-	//if(!guard.allocate_trx())
-		//return DB_ERROR;
-
-	//guard.enter_dict_sys_mutex();
-
-	//if (space->stop_new_ops) // space is about to be dropped
-		//return DB_SUCCESS;
-
-	//if (!guard.create_heap())
-		//return DB_OUT_OF_MEMORY;
-
-	//if (!guard.create_allocator())
-		//return DB_OUT_OF_MEMORY;
-
-	//[> We store the table ids of all the FTS indexes that were found. <]
-	//if(!guard.create_table_ids_vector())
-		//return DB_OUT_OF_MEMORY;
-
-	//dberr_t	error = get_table_ids_in_space_sql(guard.get_trx(), space,
-				//guard.get_table_ids());
-	//if (error != DB_SUCCESS)
-		//return error;
-
-	//// First update tablespace's encryption flag
-	//error = fts_update_encrypted_flag_for_tablespace_sql(guard.get_trx(),
-			//space->id, set);
-	//if (error != DB_SUCCESS)
-		//return error;
-
-	//if (!guard.create_table_ids_to_revert_vector())
-		//return DB_OUT_OF_MEMORY;
-
-	//while (!guard.is_table_ids_empty())
-	//{
-		//table_id_t	table_id = guard.pop_from_table_ids();
-
-		//// Update table's encryption flag
-		//error = fts_update_encrypted_tables_flag(guard.get_trx(),
-				//table_id, set);
-
-		//DBUG_EXECUTE_IF(
-			//"fail_encryption_flag_update_on_t3",
-			//dict_table_t*	table =
-				//dict_table_open_on_id(table_id, TRUE,
-					//DICT_TABLE_OP_NORMAL);
-
-			//if (strcmp(table->name.m_name, "test/t3") == 0)
-				//error = DB_ERROR; 
-			//dict_table_close(table, TRUE, FALSE);
-		//);
-
-		//if (error != DB_SUCCESS)
-		//{
-			//fil_revert_encryption_flag_updates(
-				//guard.get_table_ids_to_revert(), !set);
-			//return error;
-		//}
-
-		//dict_table_t*	table = dict_table_open_on_id(table_id, TRUE,
-					//DICT_TABLE_OP_NORMAL);
-
-		//ut_ad(table != NULL);
-
-		//if (set)
-		//{
-			////ib::error() << "Setting encryption for table " << table->name.m_name; 
-			//DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-		//}
-		//else
-			//DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
-
-
-		//guard.push_to_table_ids_to_revert(table_id);
-
-		//dict_table_close(table, TRUE, FALSE);
-	//}
-
-	//guard.commit();
-
-	//return DB_SUCCESS;
-//}
+  destroy_thd(thd);
+  return (failure ? DB_ERROR : DB_SUCCESS);
+}
 
 /***********************************************************************
 Flush rotated pages and then update page 0
@@ -2512,26 +2433,31 @@ fil_crypt_flush_space(
 										? CRYPT_SCHEME_UNENCRYPTED
 										: crypt_data->type;
 
-	if (space->id != 0) {
 
-		//if (DB_SUCCESS != fil_update_encrypted_flag(space, current_type == CRYPT_SCHEME_UNENCRYPTED ? false : true)) {
-			//ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0));
-			//return DB_ERROR;
-		//}
+	UpdateEncryptedFlagOperation update_enc_flag_op = (current_type == CRYPT_SCHEME_UNENCRYPTED)
+		? UpdateEncryptedFlagOperation::CLEAR
+		: UpdateEncryptedFlagOperation::SET;
 
-		DBUG_EXECUTE_IF(
-		"crash_on_t1_flush_after_dd_update",
-		if (strcmp(state->space->name, "test/t1") == 0)
-		DBUG_ABORT();
-		);
-
-		fil_lock_shard_by_id(space->id);
-		if (current_type == CRYPT_SCHEME_UNENCRYPTED)
-			space->flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
-		else
-			space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
-                fil_unlock_shard_by_id(space->id);
+	if (DB_SUCCESS != fil_update_encrypted_flag(space->name, update_enc_flag_op)) {
+		ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1,
+		      0));
+		return (DB_ERROR);
 	}
+
+	fil_lock_shard_by_id(space->id);
+	if (update_enc_flag_op == UpdateEncryptedFlagOperation::SET) {
+		space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+	} else {
+		ut_ad(update_enc_flag_op == UpdateEncryptedFlagOperation::CLEAR);
+		space->flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+	}
+	fil_unlock_shard_by_id(space->id);
+
+	DBUG_EXECUTE_IF(
+	"crash_on_t1_flush_after_dd_update",
+	if (strcmp(state->space->name, "test/t1") == 0)
+		DBUG_ABORT();
+	);
 
 	/* update page 0 */
 	mtr_t mtr;
@@ -2684,6 +2610,7 @@ void fil_crypt_thread() {
 	mutex_enter(&fil_crypt_threads_mutex);
 	uint thread_no = srv_n_fil_crypt_threads_started;
 	srv_n_fil_crypt_threads_started++;
+	srv_threads.m_encryption_threads_active = true;
 	os_event_set(fil_crypt_event); /* signal that we started */
 	mutex_exit(&fil_crypt_threads_mutex);
 
@@ -2792,6 +2719,9 @@ void fil_crypt_thread() {
 
 	mutex_enter(&fil_crypt_threads_mutex);
 	srv_n_fil_crypt_threads_started--;
+	if (srv_n_fil_crypt_threads_started == 0) {
+		srv_threads.m_encryption_threads_active = false;
+	}
 	os_event_set(fil_crypt_event); /* signal that we stopped */
 	mutex_exit(&fil_crypt_threads_mutex);
 

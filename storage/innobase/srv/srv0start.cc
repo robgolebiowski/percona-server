@@ -1668,14 +1668,16 @@ static dberr_t srv_sys_enable_encryption(bool create_new_db) {
     const ulint fsp_flags = srv_sys_space.m_files.begin()->flags();
     const bool is_encrypted = FSP_FLAGS_GET_ENCRYPTION(fsp_flags);
 
-    if (is_encrypted && !srv_sys_tablespace_encrypt) {
+    if (is_encrypted && !srv_sys_tablespace_encrypt &&
+        !srv_sys_space.keyring_encryption_info.page0_has_crypt_data) {
       ib::error() << "The system tablespace is encrypted but"
                   << " --innodb_sys_tablespace_encrypt is"
                   << " OFF. Enable the option and start server";
       return (DB_ERROR);
     }
 
-    if (!is_encrypted && srv_sys_tablespace_encrypt) {
+    if (!is_encrypted && srv_sys_tablespace_encrypt &&
+        !srv_sys_space.keyring_encryption_info.page0_has_crypt_data) {
       ib::error() << "The system tablespace is not encrypted but"
                   << " --innodb_sys_tablespace_encrypt is"
                   << " ON. This instance was not bootstrapped"
@@ -1684,7 +1686,8 @@ static dberr_t srv_sys_enable_encryption(bool create_new_db) {
       return (DB_ERROR);
     }
 
-    if (is_encrypted) {
+    if (is_encrypted &&
+        !srv_sys_space.keyring_encryption_info.page0_has_crypt_data) {
       space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
       srv_sys_space.set_flags(space->flags);
 
@@ -2950,6 +2953,15 @@ void srv_pre_dd_shutdown() {
       if ((count % 600) == 0) {
         ib::info(ER_IB_MSG_1276) << "Waiting for"
                                     " tablespace_alter_encrypt_thread to"
+                                    " to exit";
+      }
+    }
+
+    if (srv_threads.m_encryption_threads_active) {
+      wait = true;
+      if ((count % 600) == 0) {
+        ib::info(ER_IB_MSG_1276) << "Waiting for"
+                                    " keyring encryption threads"
                                     " to exit";
       }
     }

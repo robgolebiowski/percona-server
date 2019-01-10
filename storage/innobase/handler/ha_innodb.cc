@@ -11967,6 +11967,7 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
         create_info->encrypt_type = keyring_string;
         break;
       case SRV_ENCRYPT_TABLES_OFF:
+      case SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING:
         break;
       default:
         ut_ad(0);
