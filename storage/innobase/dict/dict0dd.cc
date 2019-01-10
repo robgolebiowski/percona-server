@@ -66,6 +66,7 @@ Data dictionary interface */
 #include "query_options.h"
 #include "sql_base.h"
 #include "sql_table.h"
+#include "thd_raii.h"
 #endif /* !UNIV_HOTBACKUP */
 
 const char *DD_instant_col_val_coder::encode(const byte *stream, size_t in_len,
@@ -5905,5 +5906,89 @@ bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table) {
     ut_ad(0);
     return false;
   }
+}
+
+/* false on success, true on failure */
+static bool dd_update_encryption_status(THD *thd, const char *space_name,
+                                        bool *is_space_being_removed,
+                                        std::function<void(uint32 &)> update) {
+  Disable_autocommit_guard autocommit_guard(thd);
+  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(client);
+
+  dd::Tablespace *dd_space = nullptr;
+
+  const unsigned long int lock_wait_timeout = 20;
+  unsigned long int waited_so_far_for_lock = 0;
+
+  auto handle_timeout_or_space_drop = [&]() {
+    if (*is_space_being_removed ||
+        waited_so_far_for_lock > thd->variables.lock_wait_timeout) {
+      dd::commit_or_rollback_tablespace_change(thd, dd_space, true); //need to unlock tablespace mdl
+      if (waited_so_far_for_lock  > thd->variables.lock_wait_timeout) {
+        my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+      }
+      return true; 
+    }
+    return false;
+  };
+
+  while (dd::acquire_exclusive_tablespace_mdl(thd, space_name, lock_wait_timeout)) {
+    waited_so_far_for_lock += lock_wait_timeout;
+    if (handle_timeout_or_space_drop()) {
+      return true;
+    }
+  }
+
+  waited_so_far_for_lock = 0;
+
+  while (client->acquire_for_modification<dd::Tablespace>(space_name, &dd_space)) {
+    if (handle_timeout_or_space_drop()) {
+      return true;
+    }
+    os_thread_sleep(lock_wait_timeout);
+    waited_so_far_for_lock += lock_wait_timeout;
+  }
+
+  waited_so_far_for_lock = 0;
+  uint32_t space_flags = 0;
+
+  if (dd_space->se_private_data().get_uint32(
+          dd_space_key_strings[DD_SPACE_FLAGS], &space_flags)) {
+    dd::commit_or_rollback_tablespace_change(thd, dd_space, true);
+    return (true);
+  }
+
+  update(space_flags);
+
+  /* Update DD flags for tablespace */
+  dd_space->se_private_data().set_uint32(dd_space_key_strings[DD_SPACE_FLAGS],
+                                         static_cast<uint32>(space_flags));
+
+  /* Pass 'true' for 'release_mdl_on_commit' parameter because we want
+  transactional locks to be released only in case of successful commit */
+  while (dd::commit_or_rollback_tablespace_change(thd, dd_space, false, true)) {
+    if (handle_timeout_or_space_drop()){
+      return true;
+    }
+    os_thread_sleep(lock_wait_timeout);
+    waited_so_far_for_lock += lock_wait_timeout;
+  }
+
+  return (false);
+}
+
+bool dd_set_encryption_flag(THD *thd, const char *space_name, bool *is_space_being_removed) {
+  auto update_func = [](uint32_t &space_flags) {
+    space_flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+  };
+  return dd_update_encryption_status(thd, space_name, is_space_being_removed, update_func);
+}
+
+bool dd_clear_encryption_flag(THD *thd, const char *space_name, bool *is_space_being_removed) {
+  auto update_func = [](uint32_t &space_flags) {
+    space_flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+  };
+  return dd_update_encryption_status(thd, space_name, is_space_being_removed, update_func);
 }
 #endif /* !UNIV_HOTBACKUP */

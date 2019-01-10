@@ -170,9 +170,7 @@ buf_block_t *btr_root_block_get(
   buf_block_t *block = btr_block_get(page_id, page_size, mode, index, mtr);
 
   if (!block && index && index->table && !index->table->is_readable()) {
-    ib::warn() << "Table in tablespace is encrypted but encryption service or"
-                  " used key_id is not available. "
-                  " Can't continue reading table.";
+    ib::warn(ER_XB_MSG_3, index->table_name);
     return nullptr;
   }
 

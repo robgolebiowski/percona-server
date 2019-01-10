@@ -52,6 +52,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifndef UNIV_HOTBACKUP
 #include "clone0api.h"
+#include "fil0crypt.h"
 #include "mysqld.h"  // system_charset_info
 #include "que0types.h"
 #include "row0sel.h"
@@ -7444,26 +7445,83 @@ dberr_t dict_get_dictionary_info_by_id(ulint dict_id, char **name,
   return err;
 }
 
-bool dict_detect_encryption(bool is_upgrade, space_id_t mysql_plugin_space) {
-  bool encrypt_mysql = false;
-  if (is_upgrade) {
-    if (mysql_plugin_space == SYSTEM_TABLE_SPACE) {
-      return (srv_sys_space.is_encrypted());
-    }
-
-    space_id_t space_id = fil_space_get_id_by_name("mysql/plugin");
-    ut_ad(space_id != SPACE_UNKNOWN);
-    ut_ad(space_id == mysql_plugin_space);
-
-    fil_space_t *space = fil_space_get(space_id);
-    ut_ad(space != nullptr);
-
-    if (space == nullptr) {
-      return (false);
-    }
-    encrypt_mysql = FSP_FLAGS_GET_ENCRYPTION(space->flags);
+static bool dict_should_mysql_ibd_be_created_encrypted_due_to_upgrade(
+    space_id_t mysql_plugin_space) {
+  if (mysql_plugin_space == SYSTEM_TABLE_SPACE) {
+    return (srv_sys_space.is_encrypted());
   }
 
-  return (encrypt_mysql || srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
-          srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE);
+  space_id_t space_id = fil_space_get_id_by_name("mysql/plugin");
+  ut_ad(space_id != SPACE_UNKNOWN);
+  ut_ad(space_id == mysql_plugin_space);
+
+  fil_space_t *space = fil_space_get(space_id);
+  ut_ad(space != nullptr);
+
+  if (space == nullptr) {
+    return false;
+  }
+  return FSP_FLAGS_GET_ENCRYPTION(space->flags);
+}
+
+static bool dict_should_mysql_ibd_be_create_encrypted() {
+  return srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
+         srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE;
+}
+
+static bool dict_should_mysql_ibd_be_opened_as_encrypted(const char *filepath,
+                                                         bool &encrypt_mysql) {
+  bool success = false;
+
+  pfs_os_file_t file = os_file_create_simple_no_error_handling(
+      innodb_data_file_key, filepath, OS_FILE_OPEN, OS_FILE_READ_ONLY,
+      srv_read_only_mode, &success);
+
+  if (success == false) {
+    return (false);
+  }
+
+  /* Read the first page of the tablespace */
+  byte *buf = static_cast<byte *>(ut_malloc_nokey(2 * UNIV_PAGE_SIZE));
+  /* Align memory for file I/O if we might have O_DIRECT set */
+  byte *page = static_cast<byte *>(ut_align(buf, UNIV_PAGE_SIZE));
+
+  ut_ad(page == page_align(page));
+
+  IORequest request(IORequest::READ);
+
+  dberr_t err = os_file_read_first_page(request, file, page, UNIV_PAGE_SIZE);
+
+  if (DB_SUCCESS != err) {
+    ut_free(buf);
+    os_file_close(file);
+    return (false);
+  }
+
+  ulint flags = fsp_header_get_flags(page);
+  encrypt_mysql = FSP_FLAGS_GET_ENCRYPTION(flags);
+  ut_free(buf);
+  os_file_close(file);
+  return (true);
+}
+
+bool dict_detect_encryption_of_mysql_ibd(dict_init_mode_t dict_init_mode,
+                                         space_id_t mysql_plugin_space,
+                                         const char *filepath,
+                                         bool &encrypt_mysql) {
+  switch (dict_init_mode) {
+    case DICT_INIT_CREATE_FILES:
+      encrypt_mysql = dict_should_mysql_ibd_be_create_encrypted();
+      return true;
+    case DICT_INIT_UPGRADE_57_FILES:
+      encrypt_mysql = dict_should_mysql_ibd_be_created_encrypted_due_to_upgrade(
+          mysql_plugin_space);
+      return true;
+    case DICT_INIT_CHECK_FILES:
+      return dict_should_mysql_ibd_be_opened_as_encrypted(filepath,
+                                                          encrypt_mysql);
+    default:
+      ut_ad(0);
+      return false;
+  }
 }

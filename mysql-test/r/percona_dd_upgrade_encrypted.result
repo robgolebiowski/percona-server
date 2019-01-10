@@ -79,3 +79,5 @@ t6	CREATE TABLE `t6` (
 # Remove copied files
 # Restart the server with default options.
 # restart
+#PS-5333: Remove need for innodb_encrypt_tables to ON/FORCE when mysql.ibd is encrypted 
+# restart:--innodb-encrypt-tables=OFF

@@ -1113,5 +1113,8 @@ bool dd_tablespace_update_cache(THD *thd);
 @return true if it does. */
 bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table);
 
+bool dd_set_encryption_flag(THD *thd, const char *space_name, bool *is_space_being_removed);
+bool dd_clear_encryption_flag(THD *thd, const char *space_name, bool *is_space_being_removed);
+
 #include "dict0dd.ic"
 #endif
