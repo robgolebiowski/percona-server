@@ -66,6 +66,7 @@ Data dictionary interface */
 #include "query_options.h"
 #include "sql_base.h"
 #include "sql_table.h"
+#include "thd_raii.h"
 #endif /* !UNIV_HOTBACKUP */
 
 const char *DD_instant_col_val_coder::encode(const byte *stream, size_t in_len,
@@ -5905,5 +5906,59 @@ bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table) {
     ut_ad(0);
     return false;
   }
+}
+
+/* false on success, true on failure */
+static bool dd_update_encryption_status(THD *thd, const char *space_name,
+                                        std::function<void(uint32 &)> update) {
+  Disable_autocommit_guard autocommit_guard(thd);
+  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(client);
+
+  dd::Tablespace *dd_space = nullptr;
+
+  trx_t *trx = check_trx_exists(thd);
+  trx_start_if_not_started(trx, true);
+
+  if (dd::acquire_exclusive_tablespace_mdl(thd, space_name, false)) {
+    ut_a(false);
+  }
+
+  if (client->acquire_for_modification<dd::Tablespace>(space_name, &dd_space)) {
+    return (true);
+  }
+
+  uint32_t space_flags = 0;
+
+  if (dd_space->se_private_data().get_uint32(
+          dd_space_key_strings[DD_SPACE_FLAGS], &space_flags)) {
+    return (true);
+  }
+
+  update(space_flags);
+
+  /* Update DD flags for tablespace */
+  dd_space->se_private_data().set_uint32(dd_space_key_strings[DD_SPACE_FLAGS],
+                                         static_cast<uint32>(space_flags));
+
+  if (dd::commit_or_rollback_tablespace_change(thd, dd_space, false)) {
+    return (true);
+  }
+
+  return (false);
+}
+
+bool dd_set_encryption_flag(THD *thd, const char *space_name) {
+  auto update_func = [](uint32_t &space_flags) {
+    space_flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+  };
+  return dd_update_encryption_status(thd, space_name, update_func);
+}
+
+bool dd_clear_encryption_flag(THD *thd, const char *space_name) {
+  auto update_func = [](uint32_t &space_flags) {
+    space_flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+  };
+  return dd_update_encryption_status(thd, space_name, update_func);
 }
 #endif /* !UNIV_HOTBACKUP */
