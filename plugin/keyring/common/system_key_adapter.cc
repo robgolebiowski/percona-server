@@ -61,6 +61,16 @@ System_key_adapter::System_key_data::System_key_data()
 
 System_key_adapter::System_key_data::~System_key_data() { free(); }
 
+bool System_key_adapter::System_key_data::allocate(size_t key_data_size) {
+  free();
+  key_data = new uchar[key_data_size];
+  if (key_data) {
+    this->key_data_size = key_data_size;
+    return false;
+  }
+  return true;
+}
+
 void System_key_adapter::System_key_data::free() {
   if (key_data.load()) {
     DBUG_ASSERT(key_data_size <= 512);

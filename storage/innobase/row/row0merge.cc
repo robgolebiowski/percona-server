@@ -3724,9 +3724,7 @@ dberr_t row_merge_build_indexes(
 
   if (!old_table->is_readable() || !new_table->is_readable()) {
     error = DB_DECRYPTION_FAILED;
-    ib::warn() << "Table %s is encrypted but encryption service or"
-                  " used key_id is not available. "
-                  " Can't continue reading table.";
+    ib::warn(ER_XB_MSG_3, table->s->table_name.str);
     goto func_exit;
   }
 

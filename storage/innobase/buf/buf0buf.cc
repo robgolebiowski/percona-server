@@ -5115,7 +5115,6 @@ dberr_t buf_page_check_corrupt(buf_page_t *bpage, fil_space_t *space) {
       (bpage->zip.data) ? bpage->zip.data : ((buf_block_t *)bpage)->frame;
 
   dberr_t err = DB_SUCCESS;
-  fil_space_crypt_t *crypt_data = space->crypt_data;
   ulint page_type = mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
   ulint original_page_type =
       mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
@@ -5146,21 +5145,8 @@ dberr_t buf_page_check_corrupt(buf_page_t *bpage, fil_space_t *space) {
     bpage->encrypted = true;
     err = DB_DECRYPTION_FAILED;
     ib::error() << "The page " << bpage->id << " in file '"
-                << space->files.begin()->name << "' cannot be decrypted.";
-
-    if (crypt_data) {
-      ib::info() << "However key management plugin or used key_version "
-                 << mach_read_from_4(dst_frame + FIL_PAGE_FILE_FLUSH_LSN)
-                 << " is not found or"
-                    " used encryption algorithm or method does not match.";
-    }
-
-    if (bpage->id.space() != TRX_SYS_SPACE) {
-      ib::info() << "Marking tablespace as missing."
-                    " You may drop this table or"
-                    " install correct key management plugin"
-                    " and key file.";
-    }
+                << space->files.begin()->name 
+                << "' cannot be decrypted. Are you using correct keyring?";
   }
   return err;
 }
@@ -5275,9 +5261,6 @@ dberr_t buf_page_io_complete(buf_page_t *bpage, bool evict) {
         // Here bpage should not be encrypted. If it is still encrypted it means
         // that decryption failed and whole space is not readable
         if (bpage->encrypted) {
-          ib::error()
-              << "Page is still encrypted - which means decryption failed. "
-                 "Marking whole space as encrypted";
           fil_space_set_encrypted(bpage->id.space());
 
           trx_t *trx;

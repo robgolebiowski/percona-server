@@ -991,10 +991,15 @@ static monitor_info_t innodb_counter_info[] = {
      MONITOR_NONE, MONITOR_DEFAULT_START, MONITOR_PAD_DECREMENTS},
 
     /* ========== Counters for Encryption ========== */
-    {"pages_encrypted", "encryption", "Number of pages encrypted", MONITOR_NONE,
+    {"module_encryption", "encryption", "Counters for encryption", MONITOR_MODULE,
+     MONITOR_DEFAULT_START, MONITOR_MODULE_ENCRYPTION},
+
+    {"pages_encrypted", "encryption", "Number of pages encrypted",
+     static_cast<monitor_type_t>(MONITOR_EXISTING),
      MONITOR_DEFAULT_START, MONITOR_OVLD_PAGES_ENCRYPTED},
 
-    {"pages_decrypted", "encryption", "Number of pages decrypted", MONITOR_NONE,
+    {"pages_decrypted", "encryption", "Number of pages decrypted",
+     static_cast<monitor_type_t>(MONITOR_EXISTING),
      MONITOR_DEFAULT_START, MONITOR_OVLD_PAGES_DECRYPTED},
 
     /* ========== Counters for Index ========== */
