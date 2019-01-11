@@ -3027,6 +3027,13 @@ fil_space_t *Fil_shard::space_create(const char *name, space_id_t space_id,
                                      fil_encryption_t mode) {
   ut_ad(mutex_owned());
 
+  std::string space_name_str(name);
+  if (space_name_str.find("undo") != std::string::npos)
+  {
+    int x = 1;
+    (void)x;
+  }
+
   /* Look for a matching tablespace. */
   fil_space_t *space = get_space_by_name(name);
 
@@ -5528,6 +5535,14 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
                      bool old_space,
                      Keyring_encryption_info &keyring_encryption_info) {
   Datafile df;
+
+  std::string space_name_str(space_name);
+  if (space_name_str.find("undo") != std::string::npos)
+  {
+    int x = 1;
+    (void)x;
+  }
+
   bool is_encrypted = FSP_FLAGS_GET_ENCRYPTION(flags);
   bool for_import = (purpose == FIL_TYPE_IMPORT);
 

@@ -682,9 +682,15 @@ static dberr_t srv_undo_tablespace_read_encryption(pfs_os_file_t fh,
   offset = fsp_header_get_encryption_offset(space_page_size);
   ut_ad(offset);
 
+  fil_space_crypt_t *crypt_data =
+      fil_space_read_crypt_data(space_page_size, first_page);
+
+  space->crypt_data = crypt_data;
+
   /* Return if the encryption metadata is empty. */
   if (memcmp(first_page + offset, ENCRYPTION_KEY_MAGIC_V3,
-             ENCRYPTION_MAGIC_SIZE) != 0) {
+             ENCRYPTION_MAGIC_SIZE) != 0 &&
+      (crypt_data == nullptr || crypt_data->min_key_version == 0)) {
     ut_free(first_page_buf);
     return (DB_SUCCESS);
   }
@@ -695,6 +701,9 @@ static dberr_t srv_undo_tablespace_read_encryption(pfs_os_file_t fh,
     space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
     err = fil_set_encryption(space->id, Encryption::AES, key, iv);
     ut_ad(err == DB_SUCCESS);
+  } else if (crypt_data) {
+    space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+    err = fil_set_encryption(space->id, Encryption::KEYRING, NULL, crypt_data->iv);
   } else {
     ut_free(first_page_buf);
     return (DB_FAIL);

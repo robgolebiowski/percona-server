@@ -2372,6 +2372,12 @@ enum class UpdateEncryptedFlagOperation : char {
 };
 
 static dberr_t fil_update_encrypted_flag(const char *space_name, UpdateEncryptedFlagOperation update_operation) {
+  DBUG_EXECUTE_IF(
+    "fail_encryption_flag_update_on_t3",
+     if (strcmp(space_name, "test/t3") == 0) {
+       return DB_ERROR;
+     });
+
   THD *thd = create_thd(false, true, true, 0);
 
   bool failure = (update_operation == UpdateEncryptedFlagOperation::SET ? dd_set_encryption_flag(thd, space_name)

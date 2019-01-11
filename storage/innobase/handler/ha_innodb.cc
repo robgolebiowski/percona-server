@@ -11712,12 +11712,12 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
     return (false);
   }
 
+  // in case KEYRING_FORCE is used all newly created tables need to have
+  // ENCRYPTION='KEYRING' specified, unless it is temporary table.
   if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE &&
       (!Encryption::is_keyring(m_create_info->encrypt_type.str) &&
-       !(Encryption::is_master_key_encryption(
-             m_create_info->encrypt_type.str) &&
-         m_create_info->options & HA_LEX_CREATE_TMP_TABLE)) &&
-      !(m_create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE)) {
+       !(m_create_info->options & HA_LEX_CREATE_TMP_TABLE) &&
+       !(m_create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE))) {
     my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
                     "InnoDB: Only KEYRING encrypted tables "
                     "(ENCRYPTION=\'KEYRING\') can be created with "
@@ -11968,6 +11968,7 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
         create_info->encrypt_type = keyring_string;
         break;
       case SRV_ENCRYPT_TABLES_OFF:
+      case SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED:
       case SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING:
         break;
       default:
