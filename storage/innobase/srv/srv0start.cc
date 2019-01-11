@@ -697,13 +697,13 @@ static dberr_t srv_undo_tablespace_read_encryption(pfs_os_file_t fh,
 
   byte key[ENCRYPTION_KEY_LEN];
   byte iv[ENCRYPTION_KEY_LEN];
-  if (fsp_header_get_encryption_key(space->flags, key, iv, first_page)) {
+  if (crypt_data) {
+    space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+    err = fil_set_encryption(space->id, Encryption::KEYRING, NULL, crypt_data->iv);
+  } else if (fsp_header_get_encryption_key(space->flags, key, iv, first_page)) {
     space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
     err = fil_set_encryption(space->id, Encryption::AES, key, iv);
     ut_ad(err == DB_SUCCESS);
-  } else if (crypt_data) {
-    space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
-    err = fil_set_encryption(space->id, Encryption::KEYRING, NULL, crypt_data->iv);
   } else {
     ut_free(first_page_buf);
     return (DB_FAIL);
