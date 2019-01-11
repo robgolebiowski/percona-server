@@ -45,12 +45,12 @@ set autocommit=1;
 if ($is_mk_encrypted)
 {
   --let $assert_text= Make sure t1 is encrypted
-  --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 8192
+  --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'test/t1\\']" = 8192
 }
 if (!$is_mk_encrypted)
 {
   --let $assert_text= Make sure t1 is unencrypted
-  --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME=\\'test/t1\\']" = 0
+  --let $assert_cond= "[SELECT FLAG & 8192 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'test/t1\\']" = 0
 }
 --source include/assert.inc
 
@@ -59,16 +59,19 @@ SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
 
 --echo # Start rotation unnencrypted => encrypted (tables do not have crypt data stored in page 0)
 SET GLOBAL innodb_encryption_threads = 4;
-SET GLOBAL innodb_encrypt_tables=ON;
+SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 
---let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
-# All tables should get encrypted. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
-# and t1 will only have half of the pages encrypted = thus min_key_version will still be 0
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+# All tables should get encrypted. tables_count - 1 because INNODB_TABLESPACES_ENCRYPTION contains artificial innodb_system
+# and t1 will only have half of the pages encrypted = thus min_key_version will still be 0 and
+# temporary tablespace remains unencrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
+
+select * from INFORMATION_SCHEMA.INNODB_TABLESPACES;
 
 --echo # Table t1 should have min_key_version = 0 assigned and ROTATIONG_OR_FLUSHING=1 <= this means that only 100 pages
 --echo # have been rotatted.
@@ -97,13 +100,13 @@ if ($grep_log)
 }
 
 --echo # t1 is only half rotatted, now we will check if the encryption can be completed after the restart
---let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--let $restart_parameters=restart:--innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
---echo # All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
+--echo # All tables should get encrypted. tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial table and temporary tablespace should remain unencrypted
 --echo # innodb_system
---let $wait_condition=SELECT COUNT(*) = $tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
@@ -121,12 +124,12 @@ if (!$is_t1_compressed)
 --echo # Enable rotation of only first 100 pages
 SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
 
-SET GLOBAL innodb_encrypt_tables=OFF;
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 
 --let $wait_timeout= 600
-# All tables should get unencrypted, apart from t1. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains
-# artificial innodb_system and t1 will only have half of the pages unencrypted => thus min_key_version will still be 1
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
+# All tables should get unencrypted, apart from t1. tables_count -1 - because INNODB_TABLESPACES_ENCRYPTION contains
+# artificial innodb_system and t1 will only have half of the pages unencrypted => thus min_key_version will still be 1 and temporary tablespace remains unencrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
 --echo # Table t1 should have min_key_version = 1 assigned and ROTATING_OR_FLUSHING=1 <= this means that only 100 pages
@@ -152,13 +155,12 @@ if (!$is_t1_compressed)
 }
 
 --echo # t1 is only half rotatted, now we will check if the decryption can be completed after the restart
---let $restart_parameters=restart:--innodb-encrypt-tables=OFF --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--let $restart_parameters=restart:--innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
-# All tables should get decrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
-# innodb_system
---let $wait_condition=SELECT COUNT(*) = $tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
+# All tables should get decrypted. tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial tables innodb_system but temporary tablespace remains unencrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
 --echo # Make sure that t1 contains foobar - as it is decrypted
@@ -174,12 +176,13 @@ if (!$is_t1_compressed)
 --echo # Enable rotation of only first 100 pages
 SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
 
-SET GLOBAL innodb_encrypt_tables=ON;
+SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 
 --let $wait_timeout= 600
-# All tables should get unencrypted, apart from t1. $tables_count - because INNODB_TABLESPACES_ENCRYPTION contains
+# All tables should get unencrypted, apart from t1. tables_count - 1 - because INNODB_TABLESPACES_ENCRYPTION contains
 # artificial innodb_system and t1 will only have half of the pages encrypted => thus min_key_version will still be 0
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+# and temporary tablespace remains unencrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --echo # Table t1 should have min_key_version = 0 assigned and ROTATING_OR_FLUSHING=1 <= this means that only 100 pages
@@ -206,13 +209,12 @@ if (!$is_t1_compressed)
 }
 
 --echo # t1 is only half rotatted, now we will check if the decryption can be completed after the restart
---let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--let $restart_parameters=restart:--innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
-# All tables should get encrypted. $tables_count + 1 - because INNODB_TABLESPACES_ENCRYPTION contains artificial table
-# innodb_system
---let $wait_condition=SELECT COUNT(*) = $tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+# All tables should get encrypted. tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial table innodb_system and temporary tablespace remains unencrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --echo # Make sure that t1 does not contain foobar - as it is encrypted
@@ -236,7 +238,7 @@ if (!$is_t1_compressed)
 SET GLOBAL debug="+d,crash_on_t1_flush_after_dd_update";
 
 --source include/expect_crash.inc
-SET GLOBAL innodb_encrypt_tables=OFF;
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 --source include/wait_until_disconnected.inc
 
 # The server crashed after but t1's pages have been flushed to disk by encryption thread
@@ -277,7 +279,7 @@ SELECT COUNT(1) FROM t1;
 --remove_file $error_log
 
 --echo # Restart and finish up the rotation
---let $restart_parameters=restart:--innodb-encrypt-tables=OFF --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--let $restart_parameters=restart:--innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
@@ -301,7 +303,7 @@ SELECT COUNT(1) FROM t1;
 --echo # Now we need to test the rotation unencrypted=>encrypted, when we get a crash after all pages
 --echo # got rotated and DD was updated but before updating page 0
 
---let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0
+--let $restart_parameters=restart:--innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0
 --source include/start_mysqld.inc
 
 SET GLOBAL debug="+d,crash_on_t1_flush_after_dd_update";
@@ -349,7 +351,7 @@ SELECT COUNT(1) FROM t1;
 --remove_file $error_log
 
 --echo # Restart and finish up the rotation
---let $restart_parameters=restart:--innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
+--let $restart_parameters=restart:--innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600

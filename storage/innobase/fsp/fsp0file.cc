@@ -727,6 +727,13 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
         ib::info(ER_IB_MSG_402) << "Read encryption metadata from "
                                 << m_filepath << " successfully, encryption"
                                 << " of this tablespace enabled.";
+        if (recv_recovery_is_on() &&
+            memcmp(m_encryption_key, m_encryption_iv, ENCRYPTION_KEY_LEN) == 0) {
+          ut_free(m_encryption_key);
+          ut_free(m_encryption_iv);
+          m_encryption_key = NULL;
+          m_encryption_iv = NULL;
+        }
       }
     } else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {
       ib::error() << "Table " << m_name << " in file " << m_filename << ' '
@@ -741,14 +748,6 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
       output.keyring_encryption_info.keyring_encryption_key_is_missing = true;
       output.error = DB_CORRUPTION;
       return output;
-    }
-
-    if (recv_recovery_is_on() &&
-        memcmp(m_encryption_key, m_encryption_iv, ENCRYPTION_KEY_LEN) == 0) {
-      ut_free(m_encryption_key);
-      ut_free(m_encryption_iv);
-      m_encryption_key = NULL;
-      m_encryption_iv = NULL;
     }
   }
 #ifndef UNIV_HOTBACKUP
