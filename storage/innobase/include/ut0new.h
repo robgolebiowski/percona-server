@@ -1211,4 +1211,36 @@ class aligned_array_pointer : public aligned_memory<T_Type, T_Align_to> {
   size_t m_size;
 };
 
+auto ut_unique_ptr_deleter = [](byte *buf) { ut_free(buf); };
+
+using ut_unique_ptr = std::unique_ptr<byte, decltype(ut_unique_ptr_deleter)>;
+
+inline ut_unique_ptr ut_make_unique_ptr_nokey(const size_t size) {
+  return ut_unique_ptr(static_cast<byte *>(ut_malloc_nokey(size)),
+                       ut_unique_ptr_deleter);
+}
+
+inline ut_unique_ptr ut_make_unique_ptr(const size_t size,
+                                        PSI_memory_key memory_key) {
+  return ut_unique_ptr(static_cast<byte *>(ut_malloc(size, memory_key)),
+                       ut_unique_ptr_deleter);
+}
+
+inline ut_unique_ptr ut_make_unique_ptr_zalloc(const size_t size,
+                                               PSI_memory_key memory_key) {
+  return ut_unique_ptr(static_cast<byte *>(ut_zalloc(size, memory_key)),
+                       ut_unique_ptr_deleter);
+}
+
+inline ut_unique_ptr ut_make_unique_ptr_zalloc_nokey(const size_t size) {
+  return ut_unique_ptr(static_cast<byte *>(ut_zalloc_nokey(size)),
+                       ut_unique_ptr_deleter);
+}
+
+inline ut_unique_ptr ut_make_unique_ptr_zalloc_nokey_no_fatal(
+    const size_t size) {
+  return ut_unique_ptr(static_cast<byte *>(ut_zalloc_nokey_nofatal(size)),
+                       ut_unique_ptr_deleter);
+}
+
 #endif /* ut0new_h */
