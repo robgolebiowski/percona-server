@@ -413,17 +413,20 @@ Datafile::ValidateOutput Datafile::validate_to_dd(space_id_t space_id,
         output.keyring_encryption_info.keyring_encryption_min_key_version !=
             0)) &&
       FSP_FLAGS_GET_ENCRYPTION(flags) != FSP_FLAGS_GET_ENCRYPTION(m_flags)) {
-    ib::warn() << "In file '" << m_filepath
-               << "' (tablespace id = " << m_space_id << ") encryption flag is "
-               << (FSP_FLAGS_GET_ENCRYPTION(m_flags) ? "ON" : "OFF")
-               << ". However the encryption flag in the data dictionary is "
-               << (FSP_FLAGS_GET_ENCRYPTION(flags) ? "ON" : "OFF")
-               << ". This indicates that the rotation of the table was "
-                  "interrupted before space's flags were updated."
-               << " Please have encryption_thread variable "
-                  "(innodb-encryption-threads) set to value > 0. So the "
-                  "encryption"
-               << " could finish up the rotation.";
+
+    if (srv_n_fil_crypt_threads == 0) {
+      ib::warn() << "In file '" << m_filepath
+                 << "' (tablespace id = " << m_space_id << ") encryption flag is "
+                 << (FSP_FLAGS_GET_ENCRYPTION(m_flags) ? "ON" : "OFF")
+                 << ". However the encryption flag in the data dictionary is "
+                 << (FSP_FLAGS_GET_ENCRYPTION(flags) ? "ON" : "OFF")
+                 << ". This indicates that the rotation of the table was "
+                    "interrupted before space's flags were updated."
+                 << " Please have encryption_thread variable "
+                    "(innodb-encryption-threads) set to value > 0. So the "
+                    "encryption"
+                 << " could finish up the rotation.";
+    }
     // exclude encryption flag from validation
     m_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
     flags &= ~FSP_FLAGS_MASK_ENCRYPTION;

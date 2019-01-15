@@ -2450,12 +2450,6 @@ fil_crypt_flush_space(
 		return (DB_ERROR);
 	}
 
-    std::string space_name(space->name);
-    if (space_name.find("mysql") != std::string::npos) {
-      ib::error() << (update_enc_flag_op == UpdateEncryptedFlagOperation::SET ? "SET" : "CLEARED")
-                  << " flag in dd for mysql.ibd";
-    }
-
 	fil_lock_shard_by_id(space->id);
 	if (update_enc_flag_op == UpdateEncryptedFlagOperation::SET) {
 		space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
@@ -2485,12 +2479,6 @@ fil_crypt_flush_space(
 	}
 
 	mtr.commit();
-
-    if (space_name.find("mysql") != std::string::npos) {
-      ib::error() << "updated flags for mysql.ibd to " << space->flags << " opearation was = "
-                  << (update_enc_flag_op == UpdateEncryptedFlagOperation::SET ? "SET" : "CLEAR");
-    }
-
 	return DB_SUCCESS;
 }
 

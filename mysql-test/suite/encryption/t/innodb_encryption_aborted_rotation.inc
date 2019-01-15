@@ -2,6 +2,8 @@
 --source include/have_debug_sync.inc
 --source include/not_valgrind.inc
 
+call mtr.add_suppression("Attempting backtrace");
+
 # This test is to check if tables get rotated correctly in case of server crash
 # 1) Rotate 100 pages in t1
 # 2) Shut down the sever - this will make sure the t1's pages are flushed to disk
@@ -71,8 +73,6 @@ SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 --let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
-select * from INFORMATION_SCHEMA.INNODB_TABLESPACES;
-
 --echo # Table t1 should have min_key_version = 0 assigned and ROTATIONG_OR_FLUSHING=1 <= this means that only 100 pages
 --echo # have been rotatted.
 --let $wait_timeout= 600
@@ -108,8 +108,6 @@ if ($grep_log)
 --echo # innodb_system
 --let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
-
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 
 --echo # Make sure t1 is encrypted
 if (!$is_t1_compressed)

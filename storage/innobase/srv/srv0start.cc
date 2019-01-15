@@ -682,10 +682,12 @@ static dberr_t srv_undo_tablespace_read_encryption(pfs_os_file_t fh,
   offset = fsp_header_get_encryption_offset(space_page_size);
   ut_ad(offset);
 
-  fil_space_crypt_t *crypt_data =
-      fil_space_read_crypt_data(space_page_size, first_page);
+  fil_space_crypt_t *crypt_data = space->crypt_data;
 
-  space->crypt_data = crypt_data;
+  if (crypt_data == nullptr) {
+    crypt_data = fil_space_read_crypt_data(space_page_size, first_page);
+    space->crypt_data = crypt_data;  
+  }
 
   /* Return if the encryption metadata is empty. */
   if (memcmp(first_page + offset, ENCRYPTION_KEY_MAGIC_V3,
