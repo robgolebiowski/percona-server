@@ -2371,7 +2371,8 @@ enum class UpdateEncryptedFlagOperation : char {
   CLEAR
 };
 
-static dberr_t fil_update_encrypted_flag(const char *space_name, UpdateEncryptedFlagOperation update_operation) {
+static dberr_t fil_update_encrypted_flag(const char *space_name, UpdateEncryptedFlagOperation update_operation,
+                                         bool *is_space_being_removed) {
   DBUG_EXECUTE_IF(
     "fail_encryption_flag_update_on_t3",
      if (strcmp(space_name, "test/t3") == 0) {
@@ -2380,8 +2381,8 @@ static dberr_t fil_update_encrypted_flag(const char *space_name, UpdateEncrypted
 
   THD *thd = create_thd(false, true, true, 0);
 
-  bool failure = (update_operation == UpdateEncryptedFlagOperation::SET ? dd_set_encryption_flag(thd, space_name)
-                                                                        : dd_clear_encryption_flag(thd, space_name));
+  bool failure = (update_operation == UpdateEncryptedFlagOperation::SET ? dd_set_encryption_flag(thd, space_name, is_space_being_removed)
+                                                                        : dd_clear_encryption_flag(thd, space_name, is_space_being_removed));
 
   destroy_thd(thd);
   return (failure ? DB_ERROR : DB_SUCCESS);
@@ -2444,9 +2445,9 @@ fil_crypt_flush_space(
 		? UpdateEncryptedFlagOperation::CLEAR
 		: UpdateEncryptedFlagOperation::SET;
 
-	if (DB_SUCCESS != fil_update_encrypted_flag(space->name, update_enc_flag_op)) {
+	if (DB_SUCCESS != fil_update_encrypted_flag(space->name, update_enc_flag_op, &space->stop_new_ops)) {
 		ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1,
-		      0));
+		      0) || state->space->stop_new_ops);
 		return (DB_ERROR);
 	}
 
@@ -2581,11 +2582,13 @@ fil_crypt_complete_rotate_space(
 			} else {
 				mutex_enter(&crypt_data->mutex);
 				crypt_data->rotate_state.flushing = false;
-				ib::error() << "Encryption thread failed to flush encryption information for tablespace " << state->space->name
-					    << ". This should not happen and could indicate problem with OS or filesystem. Excluding "
-					    << state->space->name << " from encryption rotation. "
-				 	   << "You can try decrypting/encrypting with alter statement for this table or restarting the server.";
-				state->space->exclude_from_rotation = true; // This will stop encryption threads from picking up this tablespace for rotation
+				if (!state->space->stop_new_ops) { // Flag updated failed not due to tablespace being dropped
+					  ib::error() << "Encryption thread failed to flush encryption information for tablespace " << state->space->name
+						      << ". This should not happen and could indicate problem with OS or filesystem. Excluding "
+						      << state->space->name << " from encryption rotation. "
+				 		      << "You can try decrypting/encrypting with alter statement for this table or restarting the server.";
+					  state->space->exclude_from_rotation = true; // This will stop encryption threads from picking up this tablespace for rotation
+				}
 			}
 		}
 
