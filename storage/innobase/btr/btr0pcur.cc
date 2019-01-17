@@ -136,6 +136,9 @@ void btr_pcur_store_position(btr_pcur_t *cursor, /*!< in: persistent cursor */
 
   block = btr_pcur_get_block(cursor);
 
+  if (!block && !btr_pcur_get_btr_cur(cursor)->index->table->is_readable())
+    return; /* decryption failure */
+
   SRV_CORRUPT_TABLE_CHECK(block, return;);
 
   index = btr_cur_get_index(btr_pcur_get_btr_cur(cursor));

@@ -1779,7 +1779,6 @@ static bool load_key_needed_for_decryption(const IORequest &type,
                                        key_version_read_from_page, &key_read,
                                        &key_len) == false) {
       return false;
-      ut_ad(0);
     }
 
     // For test

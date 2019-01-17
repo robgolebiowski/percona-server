@@ -7900,7 +7900,8 @@ dberr_t Fil_shard::do_io(const IORequest &type, bool sync,
   /* We an try to recover the page from the double write buffer if
   the decompression fails or the page is corrupt. */
 
-  ut_a(req_type.is_dblwr_recover() || err == DB_SUCCESS);
+  ut_a(req_type.is_dblwr_recover() || err == DB_SUCCESS ||
+       err == DB_IO_DECRYPT_FAIL);
 
   if (sync) {
     /* The i/o operation is already completed when we return from
