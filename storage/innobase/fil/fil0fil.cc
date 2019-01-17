@@ -3964,7 +3964,7 @@ fil_space_t *fil_space_keyrotate_next(
     shard = fil_system->shard_by_index(shard_index);
     ut_ad(shard != nullptr);
     shard->mutex_acquire();
-    space = fil_space_get_next_in_shards_rotation_list(prev_space, shard);
+    space = fil_space_get_next_in_shards_rotation_list(space, shard);
   }
 
   if (space != nullptr) {
