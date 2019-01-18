@@ -1,4 +1,4 @@
---skip # Test is unstable on Jenkins
+#--skip # Test is unstable on Jenkins
 -- source include/big_test.inc
 
 --disable_query_log
