@@ -1215,6 +1215,8 @@ int main(int argc, char **argv) {
   keyring__vault_keys_container_unittest::logger = new keyring::Mock_logger();
   keyring::Vault_mount vault_mount(
       curl, keyring__vault_keys_container_unittest::logger);
+  std::string mount_point_path=
+      "cicd/" + keyring__vault_keys_container_unittest::uuid;
 
   if (generate_credential_file(
           keyring__vault_keys_container_unittest::credential_file_url, CORRECT,

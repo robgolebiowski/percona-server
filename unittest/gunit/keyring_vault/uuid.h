@@ -3,9 +3,10 @@
 #include <boost/uuid/uuid_io.hpp>          // streaming operators etc.
 #include <string>
 
-static boost::uuids::random_generator gen = boost::uuids::random_generator();
+//static boost::uuids::random_generator gen = boost::uuids::random_generator();
 
 static std::string generate_uuid() {
+  static boost::uuids::random_generator gen; 
   boost::uuids::uuid uuid = gen();
   std::ostringstream uuid_ss;
   uuid_ss << uuid;

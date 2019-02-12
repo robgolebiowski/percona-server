@@ -314,6 +314,9 @@ TEST_F(Vault_io_test, FlushKeyRetrieveDeleteInit) {
   ASSERT_TRUE(serialized_keys == nullptr);  // no keys
 }
 
+#define MOCK_NOEXCEPT_METHOD1(m, ...) GMOCK_METHOD1_(, noexcept, , m, \
+    __VA_ARGS__)
+
 class Mock_vault_curl : public IVault_curl {
  public:
   MOCK_METHOD1(init, bool(const Vault_credentials &vault_credentials));
@@ -321,7 +324,8 @@ class Mock_vault_curl : public IVault_curl {
   MOCK_METHOD2(write_key, bool(const Vault_key &key, Secure_string *response));
   MOCK_METHOD2(read_key, bool(const Vault_key &key, Secure_string *response));
   MOCK_METHOD2(delete_key, bool(const Vault_key &key, Secure_string *response));
-  MOCK_METHOD1(set_timeout, void(uint timeout));
+  MOCK_NOEXCEPT_METHOD1(set_timeout, void(uint timeout));
+  //MOCK_METHOD1(set_timeout, void(uint timeout));
 };
 
 TEST_F(Vault_io_test, ErrorFromVaultCurlOnVaultIOInit) {
@@ -350,7 +354,7 @@ TEST_F(Vault_io_test, ErrorFromVaultCurlOnListKeys) {
                   StrEq("Could not retrieve list of keys from Vault.")));
 
   EXPECT_TRUE(vault_io.get_serialized_object(&serialized_object));
-  EXPECT_EQ(serialized_object, reinterpret_cast<ISerialized_object *>(nullptr));
+  EXPECT_EQ(serialized_object, nullptr);
 }
 
 TEST_F(Vault_io_test, ErrorsFromVaultInVaultsResponseOnListKeys) {
@@ -374,7 +378,7 @@ TEST_F(Vault_io_test, ErrorsFromVaultInVaultsResponseOnListKeys) {
                 "returned the following error(s): [\"list is broken\"]")));
 
   EXPECT_TRUE(vault_io.get_serialized_object(&serialized_object));
-  EXPECT_EQ(serialized_object, reinterpret_cast<ISerialized_object *>(nullptr));
+  EXPECT_EQ(serialized_object, nullptr);
 
   vault_response = "{errors: [\"list is broken\", \"and some other error\"]}";
 
@@ -388,7 +392,7 @@ TEST_F(Vault_io_test, ErrorsFromVaultInVaultsResponseOnListKeys) {
                         "\"and some other error\"]")));
 
   EXPECT_TRUE(vault_io.get_serialized_object(&serialized_object));
-  EXPECT_EQ(serialized_object, reinterpret_cast<ISerialized_object *>(nullptr));
+  EXPECT_EQ(serialized_object, nullptr);
 
   vault_response =
       "{ errors: [\"list is broken\",\n\"and some other error\"\n] }";
@@ -403,7 +407,7 @@ TEST_F(Vault_io_test, ErrorsFromVaultInVaultsResponseOnListKeys) {
                         "broken\",\"and some other error\"]")));
 
   EXPECT_TRUE(vault_io.get_serialized_object(&serialized_object));
-  EXPECT_EQ(serialized_object, reinterpret_cast<ISerialized_object *>(nullptr));
+  EXPECT_EQ(serialized_object, nullptr);
 }
 
 TEST_F(Vault_io_test, ErrorsFromVaultCurlOnReadKey) {

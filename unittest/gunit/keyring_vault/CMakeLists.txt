@@ -40,6 +40,11 @@ SET(TESTS
     vault_keyring-api
 )
 
+SET(ALL_KEYRING_VAULT_TESTS)
+FOREACH(test ${TESTS})
+  LIST(APPEND ALL_KEYRING_VAULT_TESTS ${test}-t.cc)
+ENDFOREACH()
+
 FOREACH(test ${TESTS})
     SET(SRC_FILES ${test}-t.cc
             ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
@@ -58,12 +63,11 @@ FOREACH(test ${TESTS})
             ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_keys_container.cc
             ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
             ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring_vault/vault_mount.cc
-            ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring/psi_memory_key.cc
             )
     IF(WIN32)
         LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
     ENDIF()
-    MYSQL_ADD_EXECUTABLE(${test}-t ${SRC_FILES} SKIP_INSTALL ${EXCLUDE_FROM_ALL})
+    MYSQL_ADD_EXECUTABLE(${test}-t ${SRC_FILES} SKIP_INSTALL)
 
     TARGET_LINK_LIBRARIES(${test}-t gunit_large strings dbug regex)
     TARGET_LINK_LIBRARIES(${test}-t mysys sql_main sql_gis sql_dd)
@@ -75,5 +79,5 @@ FOREACH(test ${TESTS})
         TARGET_LINK_LIBRARIES(${test}-t perfschema)
     ENDIF()
 
-    ADD_TEST(${test} ${test}-t)
+    ADD_TEST(${test} ${CMAKE_BINARY_DIR}/runtime_output_directory/${test}-t)
 ENDFOREACH()

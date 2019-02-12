@@ -62,9 +62,6 @@ bool Vault_mount::mount_secret_backend() {
   curl_slist_free_all(list);
   return true;
 }
-curl_slist_free_all(list);
-return false;
-}  // namespace keyring
 
 bool Vault_mount::unmount_secret_backend() {
   curl_easy_reset(curl);

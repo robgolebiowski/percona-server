@@ -36,7 +36,7 @@ TEST_F(Vault_parser_test, ParseKeySignature) {
   Secure_string encoded_key_signature;
   EXPECT_FALSE(
       Vault_base64::encode(key_signature.c_str(), key_signature.length(),
-                           &encoded_key_signature, Vault_base64::SINGLE_LINE));
+                           &encoded_key_signature, Vault_base64::Format::SINGLE_LINE));
   Vault_parser vault_parser(logger);
   KeyParameters key_parameters;
   EXPECT_FALSE(
@@ -50,7 +50,7 @@ TEST_F(Vault_parser_test, ParseKeySignature2) {
   Secure_string encoded_key_signature;
   EXPECT_FALSE(
       Vault_base64::encode(key_signature.c_str(), key_signature.length(),
-                           &encoded_key_signature, Vault_base64::SINGLE_LINE));
+                           &encoded_key_signature, Vault_base64::Format::SINGLE_LINE));
   Vault_parser vault_parser(logger);
   KeyParameters key_parameters;
   EXPECT_FALSE(
@@ -64,7 +64,7 @@ TEST_F(Vault_parser_test, ParseKeySignature3) {
   Secure_string encoded_key_signature;
   EXPECT_FALSE(
       Vault_base64::encode(key_signature.c_str(), key_signature.length(),
-                           &encoded_key_signature, Vault_base64::SINGLE_LINE));
+                           &encoded_key_signature, Vault_base64::Format::SINGLE_LINE));
   Vault_parser vault_parser(logger);
   KeyParameters key_parameters;
   EXPECT_FALSE(
@@ -78,7 +78,7 @@ TEST_F(Vault_parser_test, ParseKeySignature4) {
   Secure_string encoded_key_signature;
   EXPECT_FALSE(
       Vault_base64::encode(key_signature.c_str(), key_signature.length(),
-                           &encoded_key_signature, Vault_base64::SINGLE_LINE));
+                           &encoded_key_signature, Vault_base64::Format::SINGLE_LINE));
   Vault_parser vault_parser(logger);
   KeyParameters key_parameters;
   EXPECT_FALSE(
@@ -93,7 +93,7 @@ TEST_F(Vault_parser_test, ParseKeySignature5) {
   Secure_string encoded_key_signature;
   EXPECT_FALSE(
       Vault_base64::encode(key_signature.c_str(), key_signature.length(),
-                           &encoded_key_signature, Vault_base64::SINGLE_LINE));
+                           &encoded_key_signature, Vault_base64::Format::SINGLE_LINE));
 
   Vault_parser vault_parser(logger);
   KeyParameters key_parameters;
@@ -110,11 +110,11 @@ TEST_F(Vault_parser_test, ParseVaultPayload) {
   Secure_string encoded_key1_signature;
   EXPECT_FALSE(
       Vault_base64::encode(key1_signature.c_str(), key1_signature.length(),
-                           &encoded_key1_signature, Vault_base64::SINGLE_LINE));
+                           &encoded_key1_signature, Vault_base64::Format::SINGLE_LINE));
   Secure_string encoded_key2_signature;
   EXPECT_FALSE(
       Vault_base64::encode(key2_signature.c_str(), key2_signature.length(),
-                           &encoded_key2_signature, Vault_base64::SINGLE_LINE));
+                           &encoded_key2_signature, Vault_base64::Format::SINGLE_LINE));
 
   Secure_string payload(
       "{\"request_id\":\"724a5ad6-7ee3-7950-879a-488a261a03ec\","
