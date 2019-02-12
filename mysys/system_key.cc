@@ -36,8 +36,7 @@ struct Valid_percona_system_key
    System keys cannot have ':' in their name. We use ':' as a separator between
    system key's name and system key's version.
 */
-struct Valid_percona_system_key valid_percona_system_keys[] = { {PERCONA_BINLOG_KEY_NAME, 16, false},
-                                                                {PERCONA_INNODB_KEY_NAME, 32, true} };
+struct Valid_percona_system_key valid_percona_system_keys[] = { {PERCONA_INNODB_KEY_NAME, 32, true} };
 const size_t valid_percona_system_keys_size = array_elements(valid_percona_system_keys);
 
 bool is_valid_percona_system_key(const char *key_name, size_t *key_length)

@@ -357,7 +357,7 @@ enum Log_event_type {
    * starting from MARIA_EVENTS_BEGIN, i.e. 159, 158 ..
    * till MYSQL_END_EVENT */
 
-  START_ENCRYPTION_EVENT = 159,
+  START_5_7_ENCRYPTION_EVENT = 159,
 
   MARIA_EVENTS_BEGIN = 160,
 
@@ -838,7 +838,7 @@ class Binary_log_event {
     TRANSACTION_CONTEXT_HEADER_LEN = 18,
     VIEW_CHANGE_HEADER_LEN = 52,
     XA_PREPARE_HEADER_LEN = 0,
-    START_ENCRYPTION_HEADER_LEN = 0
+    START_5_7_ENCRYPTION_HEADER_LEN = 0
   };  // end enum_post_header_length
  protected:
   /**

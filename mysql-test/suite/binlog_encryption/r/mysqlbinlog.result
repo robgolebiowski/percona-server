@@ -1,6 +1,2 @@
-RESET MASTER;
-CREATE TABLE t1 (a INT);
-INSERT INTO t1 VALUES (1),(2),(3);
-REPLACE INTO t1 VALUES (4);
-DROP TABLE t1;
-FLUSH LOGS;
+# Make sure that relay logs are encrypted with 5.7 encryption
+# Make sure that relay logs are encrypted with 5.7 encryption

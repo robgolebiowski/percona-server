@@ -414,9 +414,6 @@ class MYSQL_BIN_LOG : public TC_LOG {
   uint file_id;
   uint open_count;  // For replication
 
-  /* binlog encryption data */
-  Binlog_crypt_data crypto;
-
   /* pointer to the sync period variable, for binlog this will be
      sync_binlog_period, for relay log this will be
      sync_relay_log_period
@@ -885,8 +882,6 @@ class MYSQL_BIN_LOG : public TC_LOG {
     True while rotating binlog, which is caused by logging Incident_log_event.
   */
   bool is_rotating_caused_by_incident;
-
-  Binlog_crypt_data *get_crypto_data() { return &crypto; }
 
  private:
   void publish_coordinates_for_global_status(void) const;
