@@ -201,9 +201,9 @@ FLUSH LOCAL LOGS;
 --exec $MYSQL_BINLOG $datadir/$relaylog_file> $outfile
 
 # Make sure that relay logs are not encrypted with 5.7 encryption
---let ABORT_ON=NOT_FOUND
+--let ABORT_ON=FOUND
 --let SEARCH_FILE=$outfile
---let SEARCH_PATTERN=The rest of the binlog is encrypted
+--let SEARCH_PATTERN=The rest of the binlog is encrypted with PS 5.7 encryption!
 --source include/search_pattern_in_file.inc
 
 # Cleanup
