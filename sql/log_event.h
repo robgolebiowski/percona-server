@@ -1445,18 +1445,6 @@ class Start_encryption_log_event final
     common_header->set_is_valid(crypto_scheme == 1);
   }
 
-  //bool write_data_body(Basic_ostream *ostream) override {
-    //uchar scheme_buf = crypto_scheme;
-    //uchar key_version_buf[KEY_VERSION_LENGTH];
-    //int4store(key_version_buf, key_version);
-    //return wrapper_my_b_safe_write(ostream, static_cast<uchar *>(&scheme_buf),
-                                   //sizeof(scheme_buf)) ||
-           //wrapper_my_b_safe_write(ostream,
-                                   //static_cast<uchar *>(key_version_buf),
-                                   //sizeof(key_version_buf)) ||
-           //wrapper_my_b_safe_write(ostream, static_cast<uchar *>(nonce),
-                                   //NONCE_LENGTH);
-  //}
 #else
   void print(FILE *file, PRINT_EVENT_INFO *print_event_info) const override;
 #endif

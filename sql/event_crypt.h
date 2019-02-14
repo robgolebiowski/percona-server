@@ -1,11 +1,8 @@
 #ifndef EVENT_ENCRYPTER_H
 #define EVENT_ENCRYPTER_H
 
-//#include "basic_ostream.h"
 #include "binlog_crypt_data.h"
-//#include "binlog_event.h"
 #include "my_crypt.h"
-//#include "rpl_constants.h"
 
 // 5.7 event decrypted
 bool decrypt_event(uint32 offs, const Binlog_crypt_data &crypto, uchar *buf,

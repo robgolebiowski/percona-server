@@ -61,7 +61,6 @@
 #include "my_compiler.h"
 #include "my_dbug.h"
 #include "my_dir.h"
-//#include "my_rnd.h"
 #include "my_sqlcommand.h"
 #include "my_stacktrace.h"  // my_safe_print_system_time
 #include "my_thread_local.h"

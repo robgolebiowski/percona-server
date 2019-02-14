@@ -950,10 +950,8 @@ static Exit_status process_event(PRINT_EVENT_INFO *print_event_info,
   */
   if (((rec_count >= offset) &&
        ((my_time_t)(ev->common_header->when.tv_sec) >= start_datetime)) ||
-      (ev_type == binary_log::FORMAT_DESCRIPTION_EVENT)) {// ||
-      //(ev_type == binary_log::START_ENCRYPTION_EVENT)) {
-    if (ev_type != binary_log::FORMAT_DESCRIPTION_EVENT) {//&& 
-        //ev_type != binary_log::START_ENCRYPTION_EVENT) {
+      (ev_type == binary_log::FORMAT_DESCRIPTION_EVENT)) {
+    if (ev_type != binary_log::FORMAT_DESCRIPTION_EVENT) {
       /*
         We have found an event after start_datetime, from now on print
         everything (in case the binlog has timestamps increasing and
@@ -1314,11 +1312,6 @@ static Exit_status process_event(PRINT_EVENT_INFO *print_event_info,
         if (head->error == -1) goto err;
         break;
       }
-      //case binary_log::START_ENCRYPTION_EVENT: {
-        //ev->print(result_file, print_event_info);
-        //if (head->error == -1) goto err;
-        //break;
-      //}
       case binary_log::PREVIOUS_GTIDS_LOG_EVENT:
         if (one_database && !opt_skip_gtids)
           warning(

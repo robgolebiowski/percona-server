@@ -376,12 +376,6 @@ class Format_description_event : public Binary_log_event {
     return server_version_split[0] != 0 || server_version_split[1] != 0 ||
            server_version_split[2] != 0;
   }
-
-  //virtual void copy_crypto_data(const Format_description_event &) noexcept {}
-
-  //virtual bool start_decryption(Start_encryption_event *) { return false; }
-
-  //virtual bool is_decrypting() const noexcept { return false; }
 };
 
 /**
