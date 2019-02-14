@@ -74,6 +74,8 @@ class Secure_allocator {
     memset_s(p, n, 0, n);
     my_free(p);
   }
+
+  template <class U> struct rebind { typedef Secure_allocator<U> other; };
 };
 
 template <typename T1, typename T2>
