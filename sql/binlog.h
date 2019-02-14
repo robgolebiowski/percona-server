@@ -45,8 +45,6 @@
 #include "mysql/psi/mysql_mutex.h"
 #include "mysql/udf_registration_types.h"
 #include "mysql_com.h"  // Item_result
-#include "sql/binlog_crypt_data.h"
-#include "sql/rpl_constants.h"
 #include "sql/rpl_trx_tracking.h"
 #include "sql/tc_log.h"            // TC_LOG
 #include "sql/transaction_info.h"  // Transaction_ctx

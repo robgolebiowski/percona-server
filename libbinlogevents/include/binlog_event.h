@@ -799,7 +799,7 @@ class Binary_log_event {
   /*
      The number of types we handle in Format_description_event (UNKNOWN_EVENT
      is not to be handled, it does not exist in binlogs, it does not have a
-     format - unless it's START_ENCRYPTION_EVENT - then Format_description_event
+     format - unless it's START_5_7_ENCRYPTION_EVENT - then Format_description_event
      is not aware of it. That's OK as this event never leaves the server -
      it's not sent to slave).
   */

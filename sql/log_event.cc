@@ -916,7 +916,7 @@ const char *Log_event::get_type_str(Log_event_type type) {
     case binary_log::PARTIAL_UPDATE_ROWS_EVENT:
       return "Update_rows_partial";
     case binary_log::START_5_7_ENCRYPTION_EVENT:
-      return "Start_encryption";
+      return "Start_5_7_encryption";
     default:
       return "Unknown"; /* impossible */
   }
