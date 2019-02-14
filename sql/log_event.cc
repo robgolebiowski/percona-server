@@ -5337,7 +5337,9 @@ void Start_encryption_log_event::print(
   my_b_printf(head, "Encryption scheme: %d", crypto_scheme);
   my_b_printf(head, ", key_version: %d", key_version);
   my_b_printf(head, ", nonce: %s ", nonce_buf);
-  my_b_printf(head, "\n# The rest of the binlog is encrypted with PS 5.7 encryption!\n");
+  my_b_printf(
+      head,
+      "\n# The rest of the binlog is encrypted with PS 5.7 encryption!\n");
 }
 #endif
 
@@ -6712,7 +6714,8 @@ void Unknown_log_event::print(FILE *,
     print_header(&print_event_info->head_cache, print_event_info, false);
     my_b_printf(&print_event_info->head_cache, "\n# %s", "Unknown event\n");
   } else
-    my_b_printf(&print_event_info->head_cache, "\n# %s", "Event encrypted with 5.7 PS binlog encryption\n");
+    my_b_printf(&print_event_info->head_cache, "\n# %s",
+                "Event encrypted with 5.7 PS binlog encryption\n");
 }
 
 /**************************************************************************

@@ -1334,14 +1334,18 @@ bool show_binlogs(THD *thd) {
           /* check for PS encrypted binlog */
           Binlog_file_reader binlog_file_reader(opt_master_verify_checksum);
           if (!binlog_file_reader.open(fname) &&
-              binlog_file_reader.get_error_type() == Binlog_read_error::SUCCESS) {
-            // We need to check if binlog file contains START_5_7_ENCRYPTION_EVENT
-            // If it does - it has to be the second event
-            std::unique_ptr<Log_event> ev(binlog_file_reader.read_event_object());
+              binlog_file_reader.get_error_type() ==
+                  Binlog_read_error::SUCCESS) {
+            // We need to check if binlog file contains
+            // START_5_7_ENCRYPTION_EVENT If it does - it has to be the second
+            // event
+            std::unique_ptr<Log_event> ev(
+                binlog_file_reader.read_event_object());
             if (ev) {
               // proceed to the second event
               ev.reset(binlog_file_reader.read_event_object());
-              if (ev && ev->get_type_code() == binary_log::START_5_7_ENCRYPTION_EVENT) {
+              if (ev && ev->get_type_code() ==
+                            binary_log::START_5_7_ENCRYPTION_EVENT) {
                 is_ps_encrypted = true;
               }
             }

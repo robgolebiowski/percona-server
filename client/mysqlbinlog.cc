@@ -2359,8 +2359,8 @@ class Mysqlbinlog_event_data_istream : public Binlog_event_data_istream {
       return true;
     }
 
-    if (!error &&
-        (*buffer)[EVENT_TYPE_OFFSET] == binary_log::START_5_7_ENCRYPTION_EVENT) {
+    if (!error && (*buffer)[EVENT_TYPE_OFFSET] ==
+                      binary_log::START_5_7_ENCRYPTION_EVENT) {
       m_binlog_5_7_encrypted = true;
     }
 
@@ -2532,7 +2532,8 @@ static Exit_status dump_local_log_entries(PRINT_EVENT_INFO *print_event_info,
     my_off_t old_off = mysqlbinlog_file_reader.position();
 
     Log_event *ev = mysqlbinlog_file_reader.read_event_object();
-    if (mysqlbinlog_file_reader.event_data_istream()->is_5_7_binlog_encrypted() &&
+    if (mysqlbinlog_file_reader.event_data_istream()
+            ->is_5_7_binlog_encrypted() &&
         mysqlbinlog_file_reader.get_error_type() !=
             Binlog_read_error::READ_EOF &&
         !ev) {

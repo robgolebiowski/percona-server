@@ -55,13 +55,12 @@ class Keyring_alloc {
 template <class T>
 class Secure_allocator {
  public:
-
   using size_type = size_t;
   using difference_type = ptrdiff_t;
-  using pointer = T*;
-  using const_pointer = const T*;
-  using reference = T&;
-  using const_reference = const T&;
+  using pointer = T *;
+  using const_pointer = const T *;
+  using reference = T &;
+  using const_reference = const T &;
   using value_type = T;
 
   Secure_allocator() noexcept {}
@@ -82,7 +81,10 @@ class Secure_allocator {
     my_free(p);
   }
 
-  template <class U> struct rebind { typedef Secure_allocator<U> other; };
+  template <class U>
+  struct rebind {
+    typedef Secure_allocator<U> other;
+  };
 };
 
 template <typename T1, typename T2>

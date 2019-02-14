@@ -116,9 +116,9 @@ bool Binlog_event_data_istream::Decryption_buffer::set_size(
 
   if (size_to_set < (m_size / 2)) {
     if (++m_number_of_events_with_half_the_size == 100) {
-      // There were already 101 events in a row, which size was a half of currently
-      // allocated size. This is strong indication that we had occured an
-      // event which was unusually big. Shrink the buffer to half the size.
+      // There were already 101 events in a row, which size was a half of
+      // currently allocated size. This is strong indication that we had occured
+      // an event which was unusually big. Shrink the buffer to half the size.
       if (resize(m_size / 2)) {
         return true;
       }
