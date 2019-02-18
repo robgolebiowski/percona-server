@@ -60,7 +60,7 @@ bool Vault_mount::mount_secret_backend() {
     return true;
   }
   curl_slist_free_all(list);
-  return true;
+  return false;
 }
 
 bool Vault_mount::unmount_secret_backend() {
