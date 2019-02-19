@@ -7525,5 +7525,3 @@ bool dict_detect_encryption_of_mysql_ibd(dict_init_mode_t dict_init_mode,
       return false;
   }
 }
-
-
