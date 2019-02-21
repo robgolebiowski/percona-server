@@ -1,24 +1,14 @@
+call mtr.add_suppression(".* in InnoDB read only mode");
+call mtr.add_suppression(".* in InnoDB read-only mode");
+
+--let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
+#We do not encrypt temporary tablespace, but we do encrypt innodb_system which is not listed in INNODB_TABLESPACES
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
-let $cnt=600;
-while ($cnt)
-{
-    let $success=`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0`;
-    if ($success)
-    {
-        let $cnt=0;
-    }
-    if (!$success)
-    {
-        real_sleep 1;
-        dec $cnt;
-    }
-}
-if (!$success)
-{
-    SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-    SHOW STATUS LIKE 'innodb_encryption%';
-    -- die Timeout waiting for encryption threads
-}
+--echo $encrypted_tables_counts
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
 --echo # Success!
 
 #

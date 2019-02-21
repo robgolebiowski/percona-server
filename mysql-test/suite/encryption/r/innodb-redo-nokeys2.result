@@ -8,6 +8,7 @@ insert into t2 select * from t1;
 insert into t3 select * from t1;
 insert into t4 select * from t1;
 commit;
+# restart:<hidden args>
 SET GLOBAL innodb_flush_log_at_trx_commit=1;
 begin;
 update t1 set c = repeat('secret3', 20);
@@ -20,7 +21,6 @@ insert into t3 (a,c,b) values (21, repeat('secret9',20), repeat('secre10',6000))
 insert into t4 (a,c,b) values (21, repeat('secre11',20), repeat('secre12',6000));
 COMMIT;
 # Kill the server
-# restart
 # Restart mysqld
 # restart:<hidden args>
 drop table t1,t2,t3,t4;

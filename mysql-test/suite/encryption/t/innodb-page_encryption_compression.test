@@ -1,4 +1,4 @@
---skip # Test unstable on Jenkins centos6
+#--skip # Test unstable on Jenkins centos6
 
 #let $innodb_compression_algorithm_orig=`SELECT @@innodb_compression_algorithm`;
 

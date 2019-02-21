@@ -245,6 +245,9 @@ fil_space_crypt_t::fil_space_crypt_t(
 			//key_found = true; // cheat key_get_latest_version that the key exists - if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
 			uchar *key = NULL;
 			uint key_version = 0;
+            //TODO: This is misleading - this function is called when crypt data is created for the first time or it is read from
+            //ibd. If it fails on read - we get an error it was not possible to generate the key instead of error that it was not possible
+            //to fetch the key
 			Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &key_version, &key);
 			if (key == NULL) {
 				key_found = false;
@@ -743,17 +746,19 @@ fil_parse_write_crypt_data(
 		crypt_data->set_tablespace_iv(tablespace_iv);
 	}
 
+		/* Check is used key found from encryption plugin */
+	if (crypt_data->should_encrypt()
+	    && !crypt_data->is_key_found()) {
+		ib::error() << "Key cannot be read for space id = " << space_id; //TODO: To jest zmienione w MariaDB - zmienić!
+		recv_sys->set_corrupt_log();
+	}
+
+
 	/* update fil_space memory cache with crypt_data */
 	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
 
 		crypt_data = fil_space_set_crypt_data(space, crypt_data);
 		fil_space_release(space);
-		/* Check is used key found from encryption plugin */
-		if (crypt_data->should_encrypt()
-		    && !crypt_data->is_key_found()) {
-			ib::error() << "Key cannot be read for SPACE ID = " << space_id; //TODO: To jest zmienione w MariaDB - zmienić!
-			recv_sys->set_corrupt_log();
-		}
 	} else {
 		fil_space_destroy_crypt_data(&crypt_data);
 	}

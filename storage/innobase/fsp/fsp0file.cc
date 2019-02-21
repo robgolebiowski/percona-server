@@ -742,8 +742,9 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
         }
       }
     } else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {
-      ib::error() << "Table " << m_name << " in file " << m_filename << ' '
-                  << "is encrypted but encryption service or "
+      ut_ad(m_filename != nullptr);
+      ib::error() << "Tablespace id " << space_id << " in file " << m_filename << ' '
+                  << "is encrypted but keyring or "
                   << "used key_id " << crypt_data->key_id
                   << " is not available. "
                   << "Can't continue reading table.";
@@ -752,7 +753,7 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
       free_first_page();
       fil_space_destroy_crypt_data(&crypt_data);
       output.keyring_encryption_info.keyring_encryption_key_is_missing = true;
-      output.error = DB_CORRUPTION;
+      output.error = DB_INVALID_ENCRYPTION_META;
       return output;
     }
   }
