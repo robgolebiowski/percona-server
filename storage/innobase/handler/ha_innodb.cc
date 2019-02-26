@@ -2643,6 +2643,17 @@ bool Encryption::is_keyring(const char *algoritm) {
   return (algoritm != NULL && innobase_strcasecmp(algoritm, "keyring") == 0);
 }
 
+bool Encryption::is_online_encryption_on() {
+	return srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+	       srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE;
+}
+
+// This for now excludes MK encryption ...
+bool Encryption::should_be_keyring_encrypted(const char *algorithm) {
+  return !none_explicitly_specified(algorithm) &&
+         (is_keyring(algorithm) || (algorithm == nullptr && is_online_encryption_on()));
+}
+
 /** Check the encryption option and set it
 @param[in]	option		encryption option
 @param[in,out]	encryption	The encryption algorithm
@@ -11672,18 +11683,18 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
   bool table_is_keyring =
       Encryption::is_keyring(m_create_info->encrypt_type.str);
 
-  if (table_is_keyring) {
-    if (!m_allow_file_per_table) {
-      my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                      "InnoDB: KEYRING requires innodb_file_per_table.",
-                      MYF(0));
-      return (false);
-    }
+  if (table_is_keyring && !m_allow_file_per_table) {
+    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                    "InnoDB: KEYRING requires innodb_file_per_table.",
+                    MYF(0));
+    return (false);
+  }
 
-    /* Currently we do not support keyring encryption for
-    spatial indexes thus do not allow creating table with forced
-    encryption */
+  /* Currently we do not support keyring encryption for
+  spatial indexes thus do not allow creating table with forced
+  encryption */
 
+  if (Encryption::should_be_keyring_encrypted(m_create_info->encrypt_type.str)) {
     for (ulint i = 0; i < m_form->s->keys; i++) {
       const KEY *key = m_form->key_info + i;
       if (key->flags & HA_SPATIAL) {
@@ -11940,6 +11951,44 @@ const char *create_table_info_t::create_options_are_invalid() {
 static const LEX_STRING yes_string = {C_STRING_WITH_LEN("Y")};
 static const LEX_STRING keyring_string = {C_STRING_WITH_LEN("KEYRING")};
 
+void ha_innobase::adjust_encryption_key_id(HA_CREATE_INFO *create_info,
+                                           dd::Properties *options) noexcept {
+
+  LEX_STRING *encrypt_type = &create_info->encrypt_type;
+
+  if (false == create_info->was_encryption_key_id_set) {
+    if (Encryption::should_be_keyring_encrypted(encrypt_type->str)) {
+      create_info->encryption_key_id =
+          THDVAR(current_thd, default_encryption_key_id);
+      create_info->was_encryption_key_id_set = true;
+    }
+  } else if (Encryption::is_master_key_encryption(encrypt_type->str) ||
+             Encryption::none_explicitly_specified(encrypt_type->str)) {
+    // if it is encrypted table with Master key encryption or marked as not to
+    // be encrypted and alter table does not have ENCRYPTION_KEY_ID - mark
+    // encryption key id as not set.
+
+    push_warning_printf(current_thd, Sql_condition::SL_WARNING,
+                        HA_WRONG_CREATE_OPTION,
+                        Encryption::none_explicitly_specified(encrypt_type->str)
+                            ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
+                              "encryption is disabled."
+                            : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
+                              "Master Key encryption is enabled.",
+                        create_info->encryption_key_id);
+    create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+    create_info->was_encryption_key_id_set = false;
+  }
+
+  if (options && create_info->was_encryption_key_id_set &&
+      (create_info->tablespace == nullptr ||
+                    strcmp(create_info->tablespace,
+                           dict_sys_t::s_file_per_table_name) == 0)) {
+      options->set_uint32("encryption_key_id",
+                          create_info->encryption_key_id);
+  }
+}
+
 /** Adjust encryption options.
 @param[in,out]  create_info Additional create information.
 @param[in,out]  table_def dd::Table object to be modified.*/
@@ -11975,33 +12024,7 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
     }
   }
 
-  LEX_STRING *encrypt_type = &create_info->encrypt_type;
-
-  if (false == create_info->was_encryption_key_id_set) {
-    if (Encryption::is_keyring(encrypt_type->str) ||
-        (encrypt_type->length == 0 &&
-         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)) {
-      create_info->encryption_key_id =
-          THDVAR(current_thd, default_encryption_key_id);
-      create_info->was_encryption_key_id_set = true;
-    }
-  } else if (Encryption::is_master_key_encryption(encrypt_type->str) ||
-             Encryption::none_explicitly_specified(encrypt_type->str)) {
-    // if it is encrypted table with Master key encryption or marked as not to
-    // be encrypted and alter table does not have ENCRYPTION_KEY_ID - mark
-    // encryption key id as not set.
-
-    push_warning_printf(current_thd, Sql_condition::SL_WARNING,
-                        HA_WRONG_CREATE_OPTION,
-                        Encryption::none_explicitly_specified(encrypt_type->str)
-                            ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
-                              "encryption is disabled."
-                            : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
-                              "Master Key encryption is enabled.",
-                        create_info->encryption_key_id);
-    create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-    create_info->was_encryption_key_id_set = false;
-  }
+   adjust_encryption_key_id(create_info, table_def ? &(table_def->options()) : nullptr);
 
   /* Add encryption attribute only to file_per_table table */
   if (table_def && (create_info->tablespace == nullptr ||
@@ -12013,10 +12036,6 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
       encrypt_type.assign(create_info->encrypt_type.str,
                           create_info->encrypt_type.length);
       table_options.set("encrypt_type", encrypt_type);
-    }
-    if (create_info->was_encryption_key_id_set) {
-      table_options.set_uint32("encryption_key_id",
-                               create_info->encryption_key_id);
     }
   }
 }

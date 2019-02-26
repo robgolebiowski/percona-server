@@ -110,10 +110,6 @@ extern bool srv_background_scrub_data_compressed;
 
 uint get_global_default_encryption_key_id_value();
 
-bool is_online_encryption_on() {
-	return srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-	       srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE;
-}
 
 #define DEBUG_KEYROTATION_THROTTLING 0
 
@@ -235,7 +231,7 @@ fil_space_crypt_t::fil_space_crypt_t(
 		type = new_type;
 
 		if (new_encryption == FIL_ENCRYPTION_OFF ||
-			(is_online_encryption_on() == false &&
+			(Encryption::is_online_encryption_on() == false &&
 			 new_encryption == FIL_ENCRYPTION_DEFAULT)) {
 			type = CRYPT_SCHEME_UNENCRYPTED;
 			min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
@@ -891,7 +887,7 @@ fil_crypt_start_encrypting_space(
 
 	/* If space is not encrypted and encryption is not enabled, then
 	do not continue encrypting the space. */
-	if (!crypt_data && is_online_encryption_on() == false) {
+	if (!crypt_data && Encryption::is_online_encryption_on() == false) {
 		mutex_exit(&fil_crypt_threads_mutex);
 		return false;
 	}
@@ -1414,6 +1410,8 @@ fil_crypt_find_space_to_rotate(
 		fil_crypt_read_crypt_data(state->space);
 
 		ut_ad(state->space->size);
+
+        //TODO: What about excluding spaces that are (has?) SPATIAL INDEXES ?
 
 		// if space is marked as encrytped this means some of the pages are encrypted and space should be skipped
 		// size must be set - i.e. tablespace has been read
@@ -2957,7 +2955,7 @@ fil_space_crypt_get_status(
 
 		mutex_exit(&crypt_data->mutex);
 
-		if (is_online_encryption_on() || crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+		if (Encryption::is_online_encryption_on() || crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 			status->current_key_version =
 			fil_crypt_get_latest_key_version(crypt_data);
 		}
