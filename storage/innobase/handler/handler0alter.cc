@@ -5620,7 +5620,10 @@ ha_innobase::prepare_inplace_alter_table(
 	info.set_tablespace_type(is_file_per_table);
 
 	if (ha_alter_info->handler_flags
-	    & Alter_inplace_info::CHANGE_CREATE_OPTION) {
+	    & Alter_inplace_info::CHANGE_CREATE_OPTION ||
+        (Encryption::should_be_keyring_encrypted(ha_alter_info->create_info->encrypt_type.str) &&
+         innobase_spatial_exist(altered_table)) // We need to make sure spatial index was not added if this is to be keyring encrypted 
+       ) {
 		const char* invalid_opt = info.create_options_are_invalid();
 		if (invalid_opt) {
 			my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),

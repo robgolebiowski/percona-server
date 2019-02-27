@@ -575,8 +575,15 @@ struct Encryption {
         static bool is_empty(const char* algorithm)
 		MY_ATTRIBUTE((warn_unused_result));
 
-        static bool is_keyring(const char *algoritm)
+    static bool is_keyring(const char *algoritm)
 		MY_ATTRIBUTE((warn_unused_result));
+
+    static bool is_online_encryption_on()
+        MY_ATTRIBUTE((warn_unused_result));
+
+  static bool should_be_keyring_encrypted(const char *algorithm)
+      MY_ATTRIBUTE((warn_unused_result));
+
 
         /** Generate random encryption value for key and iv.
         @param[in,out]	value	Encryption value */

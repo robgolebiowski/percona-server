@@ -2875,7 +2875,7 @@ Encryption::is_master_key_encryption(const char* algorithm)
 bool
 Encryption::is_no(const char* algorithm)
 {
-	return innobase_strcasecmp(algorithm, "n") == 0;
+	return algorithm != NULL && innobase_strcasecmp(algorithm, "n") == 0;
 }
 
 bool
@@ -2883,6 +2883,17 @@ Encryption::is_keyring(const char *algoritm)
 {
 	return (algoritm != NULL &&
 		innobase_strcasecmp(algoritm, "keyring") == 0);
+}
+ 
+bool Encryption::is_online_encryption_on() {
+	return srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
+	       srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE;
+}
+
+// This for now excludes MK encryption ...
+bool Encryption::should_be_keyring_encrypted(const char *algorithm) {
+  return !is_no(algorithm) &&
+         (is_keyring(algorithm) || (algorithm == NULL && is_online_encryption_on()));
 }
 
 /** Check the encryption option and set it
