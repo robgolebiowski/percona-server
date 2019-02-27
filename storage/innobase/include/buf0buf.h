@@ -570,8 +570,7 @@ buf_page_get_gen(
 	const char*		file,
 	ulint			line,
 	mtr_t*			mtr,
-	bool			dirty_with_no_latch = false,
-	dberr_t*		err = NULL);
+	bool			dirty_with_no_latch = false);
 
 /** Initializes a page to the buffer buf_pool. The page is usually not read
 from a file even if it cannot be found in the buffer buf_pool. This is one
@@ -1314,13 +1313,8 @@ buf_page_init_for_read(
 /********************************************************************//**
 Completes an asynchronous read or write request of a file page to or from
 the buffer pool.
-@return whether the operation succeeded
-@retval	DB_SUCCESS		always when writing, or if a read page was OK
-@retval	DB_PAGE_CORRUPTED	if the checksum fails on a page read
-@retval	DB_DECRYPTION_FAILED	if page post encryption checksum matches but
-				after decryption normal page checksum does
-				not match */
-dberr_t
+@return true if successful */
+bool
 buf_page_io_complete(
 /*=================*/
 	buf_page_t*	bpage,	/*!< in: pointer to the block in question */
