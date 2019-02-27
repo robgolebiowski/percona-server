@@ -6327,7 +6327,12 @@ _fil_io(
 
 	/* We can try to recover the page from the double write buffer if the decompression fails or the page is corrupt. */ 
         
-        if (sync) { /* The i/o operation is already completed when we return from os_aio: */ mutex_enter(&fil_system->mutex); 
+        if (sync) {
+		/* The i/o operation is already completed when we return from
+		os_aio: */
+
+		mutex_enter(&fil_system->mutex);
+
 		fil_node_complete_io(node, fil_system, req_type);
 
 		mutex_exit(&fil_system->mutex);
@@ -6370,8 +6375,6 @@ fil_aio_wait(
 	mutex_enter(&fil_system->mutex);
 
 	fil_node_complete_io(node, fil_system, type);
-	const fil_type_t	purpose	= node->space->purpose;
-	const ulint		space_id= node->space->id;
 
 	mutex_exit(&fil_system->mutex);
 
@@ -6383,7 +6386,7 @@ fil_aio_wait(
 	deadlocks in the i/o system. We keep tablespace 0 data files always
 	open, and use a special i/o thread to serve insert buffer requests. */
 
-	switch (purpose) {
+	switch (node->space->purpose) {
 	case FIL_TYPE_TABLESPACE:
 	case FIL_TYPE_TEMPORARY:
 	case FIL_TYPE_IMPORT:
@@ -6392,32 +6395,7 @@ fil_aio_wait(
 		/* async single page writes from the dblwr buffer don't have
 		access to the page */
 		if (message != NULL) {
-			buf_page_t* bpage = static_cast<buf_page_t*>(message);
-			if (!bpage) {
-				return;
-			}
-
-			ulint offset = bpage->id.page_no();
-			dberr_t err = buf_page_io_complete(bpage);
-			if (err == DB_SUCCESS) {
-				return;
-		        }
-
-			ut_ad(type.is_read());
-			if (recv_recovery_is_on() && !srv_force_recovery) {
-				recv_sys->found_corrupt_fs = true;
-			}
-
-			if (fil_space_t* space = fil_space_acquire_for_io(space_id)) {
-				if (space == node->space) {
-					ib::error() << "Failed to read file '"
-						    << node->name
-						    << "' at offset " << offset
-						    << ": " << ut_strerr(err);
-				}
-
-				fil_space_release_for_io(space);
-			}
+			buf_page_io_complete(static_cast<buf_page_t*>(message));
 		}
 		return;
 	case FIL_TYPE_LOG:
@@ -7848,7 +7826,7 @@ fil_set_compression(
 	COMPRESSION is set by TABLE DDL, not TABLESPACE DDL. There is
 	no other technical reason.  Also, do not use it for missing
 	tables or tables with compressed row_format. */
-	if (table->file_unreadable
+	if (table->ibd_file_missing
 	    || !DICT_TF2_FLAG_IS_SET(table, DICT_TF2_USE_FILE_PER_TABLE)
 	    || DICT_TF2_FLAG_IS_SET(table, DICT_TF2_TEMPORARY)
 	    || page_size_t(table->flags).is_compressed()) {

@@ -1104,14 +1104,9 @@ buf_flush_write_block_low(
 		ut_ad(flush_type == BUF_FLUSH_SINGLE_PAGE);
 		fil_flush(bpage->id.space());
 
-#ifdef UNIV_DEBUG
-		dberr_t err =
-#endif
 		/* true means we want to evict this page from the
 		LRU list as well. */
 		buf_page_io_complete(bpage, true);
-
-		ut_ad(err == DB_SUCCESS);
 	}
 
 	/* Increment the counter of I/O operations used

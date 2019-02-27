@@ -6515,6 +6515,7 @@ loop:
 	case DB_LOCK_TABLE_FULL:
 	case DB_LOCK_WAIT_TIMEOUT:
 	case DB_INTERRUPTED:
+    case DB_DECRYPTION_FAILED:
 		goto func_exit;
 	default:
 	{

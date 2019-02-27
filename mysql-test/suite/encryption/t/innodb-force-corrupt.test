@@ -78,7 +78,8 @@ EOF
 
 --source include/start_mysqld.inc
 
---error ER_GET_ERRMSG
+
+#--error ER_GET_ERRMSG
 SELECT * FROM t1;
 --error ER_GET_ERRMSG
 SELECT * FROM t2;

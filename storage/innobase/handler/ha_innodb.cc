@@ -14894,6 +14894,12 @@ ha_innobase::records(
 		DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
 
 	} else if (m_prebuilt->table->file_unreadable) {
+		if (m_prebuilt->table->keyring_encryption_info.keyring_encryption_key_is_missing ||
+			m_prebuilt->table->keyring_encryption_info.page0_has_crypt_data) {
+				*num_rows = HA_POS_ERROR;
+				DBUG_RETURN(HA_ERR_DECRYPTION_FAILED);
+        }
+
 		ib_senderrf(
 			m_user_thd, IB_LOG_LEVEL_ERROR,
 			ER_TABLESPACE_MISSING,

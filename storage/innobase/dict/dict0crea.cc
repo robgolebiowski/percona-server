@@ -1015,7 +1015,7 @@ dict_create_index_tree_step(
 
 	mtr_start(&mtr);
 
-	const bool	missing = index->table->file_unreadable
+	const bool	missing = index->table->ibd_file_missing
 		|| dict_table_is_discarded(index->table);
 
 	if (!missing) {
@@ -1089,7 +1089,7 @@ dict_create_index_tree_in_mem(
 
 	/* Currently this function is being used by temp-tables only.
 	Import/Discard of temp-table is blocked and so this assert. */
-	ut_ad(index->table->file_unreadable == 0
+	ut_ad(index->table->ibd_file_missing == 0
 	      && !dict_table_is_discarded(index->table));
 
 	page_no = btr_create(
