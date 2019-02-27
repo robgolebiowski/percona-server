@@ -1294,7 +1294,6 @@ handle_new_error:
 	case DB_FTS_INVALID_DOCID:
 	case DB_INTERRUPTED:
 	case DB_CANT_CREATE_GEOMETRY_OBJECT:
-	case DB_DECRYPTION_FAILED:
 	case DB_COMPUTE_VALUE_FAILED:
 		DBUG_EXECUTE_IF("row_mysql_crash_if_error", {
 					log_buffer_flush_to_disk();
@@ -2189,50 +2188,6 @@ row_insert_for_mysql_using_cursor(
 	return(err);
 }
 
-/** Determine is tablespace encrypted but decryption failed, is table corrupted
-or is tablespace .ibd file missing.
-@param[in]	table		Table
-@param[in]	trx		Transaction
-@param[in]	push_warning	true if we should push warning to user
-@retval	DB_DECRYPTION_FAILED	table is encrypted but decryption failed
-@retval	DB_CORRUPTION		table is corrupted
-@retval	DB_TABLESPACE_NOT_FOUND	tablespace .ibd file not found */
-static
-dberr_t
-row_mysql_get_table_status(
-	const dict_table_t*	table,
-	trx_t*			trx,
-	bool 			push_warning = true)
-{
-	dberr_t err;
-	if (fil_space_t* space = fil_space_acquire_silent(table->space)) {
-		if (space->crypt_data && space->crypt_data->is_encrypted()) {
-			if (push_warning) {
-				push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
-						    HA_ERR_DECRYPTION_FAILED, "Table %s in tablespace %u encrypted."
-						    "However key management plugin or used key_id is not found or"
-						    " used encryption algorithm or method does not match.",
-						    table->name.m_name, table->space);
-			}
-			err = DB_DECRYPTION_FAILED;
-		} else {
-			if (push_warning) {
-				push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
-						    HA_ERR_CRASHED, "Table %s in tablespace %u corrupted.",
-						    table->name.m_name, table->space);
-			}
-			err = DB_CORRUPTION;
-		}
-		fil_space_release(space);
-	} else {
-		ib::error() << ".ibd file is missing for table "
-			<< table->name;
-		err = DB_TABLESPACE_NOT_FOUND;
-	}
-
-	return(err);
-}
-
 /** Does an insert for MySQL using INSERT graph. This function will run/execute
 INSERT graph.
 @param[in]	mysql_rec	row in the MySQL format
@@ -2268,8 +2223,13 @@ row_insert_for_mysql_using_ins_graph(
 
 		return(DB_TABLESPACE_DELETED);
 
-	} else if (!prebuilt->table->is_readable()) {
-		return(row_mysql_get_table_status(prebuilt->table, trx, true));
+-	} else if (prebuilt->table->ibd_file_missing) {
+-
+-		ib::error() << ".ibd file is missing for table "
+-			<< prebuilt->table->name;
+-
+-		return(DB_TABLESPACE_NOT_FOUND);
+
 	} else if (srv_force_recovery) {
 
 		ib::error() << MODIFICATIONS_NOT_ALLOWED_MSG_FORCE_RECOVERY;
@@ -3005,7 +2965,7 @@ row_update_for_mysql_using_upd_graph(
 	ut_a(prebuilt->magic_n2 == ROW_PREBUILT_ALLOCATED);
 	UT_NOT_USED(mysql_rec);
 
-	if (prebuilt->table->file_unreadable) {
+	if (prebuilt->table->ibd_file_missing) {
 		ib::error() << "MySQL is trying to use a table handle but the"
 			" .ibd file for table " << prebuilt->table->name
 			<< " does not exist. Have you deleted"
@@ -4468,7 +4428,7 @@ row_discard_tablespace(
 		/* All persistent operations successful, update the
 		data dictionary memory cache. */
 
-		table->set_file_unreadable();
+        table->ibd_file_missing = TRUE;
 
 		table->flags2 |= DICT_TF2_DISCARDED;
 
@@ -4507,7 +4467,7 @@ row_discard_tablespace(
 /*********************************************************************//**
 Discards the tablespace of a table which stored in an .ibd file. Discarding
 means that this function renames the .ibd file and assigns a new table id for
-the table. Also the flag table->file_unreadable is set to TRUE.
+the table. Also the flag table->ibd_file_missing is set to TRUE.
 @return error code or DB_SUCCESS */
 dberr_t
 row_discard_tablespace_for_mysql(
@@ -5266,13 +5226,13 @@ row_drop_table_for_mysql(
 		ulint	space_id;
 		bool	is_temp;
 		bool	is_encrypted;
-		bool	file_unreadable;
+		bool	ibd_file_missing;
 		bool	is_discarded;
 		bool	shared_tablespace;
 
 	case DB_SUCCESS:
 		space_id = table->space;
-		file_unreadable = table->file_unreadable;
+		ibd_file_missing = table->ibd_file_missing;
 		is_discarded = dict_table_is_discarded(table);
 		is_temp = dict_table_is_temporary(table);
 		is_encrypted = dict_table_is_encrypted(table);
@@ -5339,13 +5299,13 @@ row_drop_table_for_mysql(
 
 		/* Do not attempt to drop known-to-be-missing tablespaces,
 		nor system or shared general tablespaces. */
-		if (is_discarded || file_unreadable || shared_tablespace
+		if (is_discarded || ibd_file_missing || shared_tablespace
 		    || is_system_tablespace(space_id)) {
 			/* For encrypted table, if ibd file can not be decrypt,
-			we also set file_unreadable. We still need to try to
+			we also set ibd_file_missing. We still need to try to
 			remove the ibd file for this. */
 			if (is_discarded || !is_encrypted
-			    || !file_unreadable) {
+			    || !ibd_file_missing) {
 				break;
 			}
 		}
@@ -5686,7 +5646,7 @@ loop:
 					<< table->name << ".frm' was lost.";
 			}
 
-			if (table->file_unreadable) {
+			if (table->ibd_file_missing) {
 				ib::warn() << "Missing .ibd file for table "
 					<< table->name << ".";
 			}
@@ -5909,7 +5869,7 @@ row_rename_table_for_mysql(
 		err = DB_TABLE_NOT_FOUND;
 		goto funct_exit;
 
-	} else if (table->file_unreadable
+	} else if (table->ibd_file_missing
 		   && !dict_table_is_discarded(table)) {
 
 		err = DB_TABLE_NOT_FOUND;
@@ -6016,7 +5976,7 @@ row_rename_table_for_mysql(
 	the table is in a single-table tablespace. */
 	if (err == DB_SUCCESS
 	    && dict_table_is_file_per_table(table)
-	    && !table->file_unreadable) {
+	    && !table->ibd_file_missing) {
 		/* Make a new pathname to update SYS_DATAFILES. */
 		char*	new_path = row_make_new_pathname(table, new_name);
 		char*	old_path = fil_space_get_first_path(table->space);
@@ -6515,7 +6475,6 @@ loop:
 	case DB_LOCK_TABLE_FULL:
 	case DB_LOCK_WAIT_TIMEOUT:
 	case DB_INTERRUPTED:
-    case DB_DECRYPTION_FAILED:
 		goto func_exit;
 	default:
 	{

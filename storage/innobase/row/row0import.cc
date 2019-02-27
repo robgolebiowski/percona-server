@@ -2176,7 +2176,7 @@ row_import_discard_changes(
 		index->space = FIL_NULL;
 	}
 
-	table->set_file_unreadable();
+	table->ibd_file_missing = TRUE;
 
 	fil_close_tablespace(trx, table->space);
 }
@@ -3600,7 +3600,8 @@ row_import_for_mysql(
 
 	ut_a(table->space);
 	ut_ad(prebuilt->trx);
-	ut_a(table->file_unreadable);
+
+    ut_a(table->ibd_file_missing);
 
 	ibuf_delete_for_discarded_space(table->space);
 
@@ -4028,7 +4029,7 @@ row_import_for_mysql(
 		return(row_import_error(prebuilt, trx, err));
 	}
 
-	table->set_file_readable();
+	table->ibd_file_missing = false;
 	table->flags2 &= ~DICT_TF2_DISCARDED;
 
 	/* Set autoinc value read from cfg file. The value is set to zero

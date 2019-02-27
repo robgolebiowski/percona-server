@@ -1903,12 +1903,6 @@ fil_space_set_corrupt(
 /*==================*/
 	ulint	space_id);
 
-void
-fil_space_set_encrypted(
-/*==================*/
-	ulint	space_id);
-
-
 typedef std::vector<ulint> space_id_vec;
 
 /** Rotate tablespace keys of global tablespaces like system, temporary, etc.

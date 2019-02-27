@@ -588,7 +588,7 @@ row_mysql_drop_temp_tables(void);
 /*********************************************************************//**
 Discards the tablespace of a table which stored in an .ibd file. Discarding
 means that this function deletes the .ibd file and assigns a new table id for
-the table. Also the flag table->file_unreadable is set TRUE.
+the table. Also the flag table->ibd_file_missing is set TRUE.
 @return error code or DB_SUCCESS */
 dberr_t
 row_discard_tablespace_for_mysql(
