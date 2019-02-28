@@ -5642,9 +5642,9 @@ buf_mark_space_corrupt(
 
 	/* Find the table with specified space id, and mark it corrupted */
 	if (dict_set_corrupted_by_space(space)) {
-		if (bpage->encrypted) {
-			dict_set_encrypted_by_space(space); //TODO: Those two should be merge together		
-		}
+		//if (bpage->encrypted) {
+			//dict_set_encrypted_by_space(space); //TODO: Those two should be merge together		
+		//}
 		buf_LRU_free_one_page(bpage);
 	} else {
 		rw_lock_x_unlock(hash_lock);
@@ -5846,9 +5846,9 @@ buf_page_io_complete(
 			// Here bpage should not be encrypted. If it is still encrypted it means
 			// that decryption failed and whole space is not readable
 			if (bpage->encrypted) {
-				ib::error() << "Page is still encrypted - which means decryption failed. "
-					       "Marking whole space as encrypted";
-				fil_space_set_encrypted(bpage->id.space());
+				//ib::error() << "Page is still encrypted - which means decryption failed. "
+						   //"Marking whole space as encrypted";
+				//fil_space_set_encrypted(bpage->id.space());
 				ib::warn()
 					<< "Table in tablespace "
 					<< bpage->id.space()
