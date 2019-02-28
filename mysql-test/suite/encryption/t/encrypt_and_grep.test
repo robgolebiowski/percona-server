@@ -1,4 +1,4 @@
---skip # Test unstable on Jenkins
+#--skip # Test unstable on Jenkins
 -- source include/have_innodb.inc
 #-- source include/have_file_key_management_plugin.inc
 
@@ -83,7 +83,7 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES;
 SELECT * FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES;
 
---die
+#--die
 
 --let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces

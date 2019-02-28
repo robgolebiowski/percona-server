@@ -155,7 +155,7 @@ public:
 	inline void release();
 
 	/** Start mtr and latch block */
-        inline dberr_t latch();
+    inline void latch();
 
 	/** Check if required space is available in the page for the rec
 	to be inserted.	We check fill factor & padding here.

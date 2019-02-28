@@ -2223,12 +2223,12 @@ row_insert_for_mysql_using_ins_graph(
 
 		return(DB_TABLESPACE_DELETED);
 
--	} else if (prebuilt->table->ibd_file_missing) {
--
--		ib::error() << ".ibd file is missing for table "
--			<< prebuilt->table->name;
--
--		return(DB_TABLESPACE_NOT_FOUND);
+	} else if (prebuilt->table->ibd_file_missing) {
+
+		ib::error() << ".ibd file is missing for table "
+			<< prebuilt->table->name;
+
+		return(DB_TABLESPACE_NOT_FOUND);
 
 	} else if (srv_force_recovery) {
 

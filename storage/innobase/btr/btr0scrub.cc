@@ -541,7 +541,7 @@ btr_scrub_table_needs_scrubbing(
 		return false;
 	}
 
-	if (!table->is_readable()) {
+	if (table->ibd_file_missing) {
 		return false;
 	}
 

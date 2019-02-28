@@ -6838,7 +6838,7 @@ ha_innobase::innobase_initialize_autoinc()
 			err = DB_SUCCESS;
 			break;
 		case DB_DECRYPTION_FAILED:
-			ut_ad(index->table->is_readable() == false);
+			ut_ad(index->table->ibd_file_missing == true);
 			return;
 		default:
 			/* row_search_max_autoinc() should only return
