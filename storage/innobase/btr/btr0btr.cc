@@ -171,7 +171,7 @@ buf_block_t *btr_root_block_get(
 
   if (!block && index && index->table && !index->table->is_readable()) {
     ib::warn() << "Table in tablespace is encrypted but encryption service or"
-                  " used key_id is not available. "
+                  " used key_id is not available."
                   " Can't continue reading table.";
     return nullptr;
   }

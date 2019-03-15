@@ -212,7 +212,8 @@ fil_space_crypt_t::fil_space_crypt_t(
 		uint new_min_key_version,
 		uint new_key_id,
 		fil_encryption_t new_encryption,
-		bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
+        Crypt_key_operation key_operation,
+		//bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
 		Encryption::Encryption_rotation encryption_rotation)
 		: min_key_version(new_min_key_version),
 		page0_offset(0),
@@ -244,7 +245,13 @@ fil_space_crypt_t::fil_space_crypt_t(
             //TODO: This is misleading - this function is called when crypt data is created for the first time or it is read from
             //ibd. If it fails on read - we get an error it was not possible to generate the key instead of error that it was not possible
             //to fetch the key
-			Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &key_version, &key);
+            if (key_operation == FETCH_OR_GENERATE_KEY) {
+			  Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &key_version, &key);
+            } else if (key_operation == FETCH_KEY) {
+			  Encryption::get_latest_tablespace_key(key_id, &key_version, &key);
+            } else {
+              ut_ad(0);
+            }
 			if (key == NULL) {
 				key_found = false;
 				min_key_version = ENCRYPTION_KEY_VERSION_INVALID;
@@ -321,7 +328,8 @@ fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			min_key_version,
 	uint			key_id,
-	bool			create_key = true) {
+    Crypt_key_operation key_operation = Crypt_key_operation::FETCH_OR_GENERATE_KEY) {
+	//bool			create_key = true) {
 	fil_space_crypt_t* crypt_data = NULL;
 	if (void* buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
 		crypt_data = new(buf)
@@ -330,7 +338,7 @@ fil_space_create_crypt_data(
 				min_key_version,
 				key_id,
 				encrypt_mode,
-                                create_key);
+                key_operation);
 	}
 
 	return crypt_data;
@@ -369,9 +377,10 @@ fil_space_crypt_t*
 fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			key_id,
-	bool			create_key) {
+    Crypt_key_operation key_operation) {
+	//bool			create_key) {
 
-	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id, create_key));
+	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id, key_operation));
 }
 
 /******************************************************************
@@ -472,7 +481,7 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page) {
 		page + offset + bytes_read);
 	bytes_read += 1;
 
-	crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
+	crypt_data = fil_space_create_crypt_data(encryption, key_id, Crypt_key_operation::FETCH_KEY);
 
 	/* We need to overwrite these as above function will initialize
 	members */
@@ -715,7 +724,7 @@ fil_parse_write_crypt_data(
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(ptr);
 	ptr += 1;
 
-	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
+	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
 	/* Need to overwrite these as above will initialize fields. */
 	crypt_data->page0_offset = offset;
 	crypt_data->min_key_version = min_key_version;
@@ -907,7 +916,7 @@ fil_crypt_start_encrypting_space(
 	* risk of finding encrypted pages without having
 	* crypt data in page 0 */
 
-	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), Crypt_key_operation::FETCH_OR_GENERATE_KEY); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
 
 	if (crypt_data == NULL || crypt_data->key_found == false) {
 		mutex_exit(&fil_crypt_threads_mutex);

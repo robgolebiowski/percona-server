@@ -5,16 +5,20 @@
 # table exists and encryption service is not available.
 #
 
-call mtr.add_suppression("Plugin 'file_key_management' init function returned error");
-call mtr.add_suppression("Plugin 'file_key_management' registration.*failed");
-call mtr.add_suppression("InnoDB: The page \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\] in file '.*test.t[12]\\.ibd' cannot be decrypted\\.");
-call mtr.add_suppression("failed to read or decrypt \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\]");
-call mtr.add_suppression("File '.*mysql-test.std_data.keysbad3\\.txt' not found");
+#call mtr.add_suppression("Plugin 'file_key_management' init function returned error");
+#call mtr.add_suppression("Plugin 'file_key_management' registration.*failed");
+call mtr.add_suppression("InnoDB: The page \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\] in file '.*test.t[12]\\.ibd' cannot be decrypted\\. Are you using correct keyring?");
+call mtr.add_suppression("\\[InnoDB\\] The page \\[page id: space=4, page number=[4-5]\\] in file '\./test/t2\.ibd' cannot be decrypted\. Are you using correct keyring?");
 
-call mtr.add_suppression("\\[Error\\] InnoDB: Page is still encrypted");
-call mtr.add_suppression("\\[Warning\\] InnoDB: Table is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
+
+#call mtr.add_suppression("failed to read or decrypt \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\]");
+#call mtr.add_suppression("File '.*mysql-test.std_data.keysbad3\\.txt' not found");
+
+#call mtr.add_suppression("\\[Error\\] InnoDB: Page is still encrypted");
+#call mtr.add_suppression("\\[Warning\\] InnoDB: Table is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
 call mtr.add_suppression("\\[Warning\\] InnoDB: Cannot save statistics for table `test`\.`t2` because file \./test/t2\.ibd cannot be decrypted\.");
-call mtr.add_suppression("\\[Warning\\] InnoDB: Table in tablespace is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
+#call mtr.add_suppression("\\[Warning\\] InnoDB: Table in tablespace is encrypted but encryption service or used key_id is not available\.  Can't continue reading table\.");
+call mtr.add_suppression("\\[InnoDB\\] Tablespace id 3 in file t1.ibd is encrypted but keyring or used key_id 2 is not available. Can't continue reading table. Please provide the correct keyring\.");
 
 --echo # Start server with keys2.txt
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
@@ -35,25 +39,40 @@ INSERT INTO t1 VALUES ('foobar',2);
 FLUSH TABLE WITH READ LOCK;
 SELECT * FROM t1;
 
+let $log_error= `SELECT @@GLOBAL.log_error`;
+if($log_error == "stderr")
+{
+  let $log_error = $MYSQLTEST_VARDIR/log/mysqld.1.err;
+}
+
+--source include/shutdown_mysqld.inc
+
+--echo # Make sure that there is no error in error log related to missing key for t1
+
+--let SEARCH_PATTERN=Tablespace id 3 in file t1.ibd is encrypted but keyring or used key_id 2 is not available. Can't continue reading table. Please provide the correct keyring
+--let ABORT_ON=FOUND
+--let SEARCH_FILE=$log_error
+--source include/search_pattern_in_file.inc
+
 --echo
 --echo # Restart server with keysbad3.txt
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
---source include/restart_mysqld.inc
+--source include/start_mysqld.inc
+#--source include/restart_mysqld.inc
 
---disable_warnings
 --error ER_GET_ERRMSG
 SELECT * FROM t1;
---enable_warnings
 
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
---let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keysbad3.txt
---source include/restart_mysqld.inc
-
---disable_warnings
 --replace_regex /tablespace [0-9]*/tablespace /
 DROP TABLE t1;
---enable_warnings
+
+--source include/shutdown_mysqld.inc
+
+--let SEARCH_PATTERN=Tablespace id 3 in file t1.ibd is encrypted but keyring or used key_id 2 is not available. Can't continue reading table. Please provide the correct keyring
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$log_error
+--source include/search_pattern_in_file.inc
 
 #
 # MDEV-8591: Database page corruption on disk or a failed space, Assertion failure in file buf0buf.cc
@@ -63,10 +82,12 @@ DROP TABLE t1;
 --echo # Start server with keys3.txt
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 -- let $restart_parameters=restart:--keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt
--- source include/restart_mysqld.inc
+-- source include/start_mysqld.inc
 
 SET GLOBAL innodb_stats_persistent=OFF;
 
+# encryption_key_id 5 exists in keys3.txt and in keys2.txt. The id is the same, but the keys themselves
+# are different.
 SET SESSION innodb_default_encryption_key_id=5;
 CREATE TABLE t2 (c VARCHAR(8), id int not null primary key, b int, key(b)) ENGINE=InnoDB ENCRYPTION='KEYRING';
 

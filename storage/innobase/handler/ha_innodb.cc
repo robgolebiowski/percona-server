@@ -7032,22 +7032,26 @@ int ha_innobase::open(const char *name, int, uint open_flags,
     /* Mark this table as corrupted, so the drop table
     or force recovery can still use it, but not others. */
     FilSpace space;
+    int error = 0;
     if (ib_table) space = fil_space_acquire_silent(ib_table->space);
     if (space() == NULL &&
         (ib_table->keyring_encryption_info.keyring_encryption_key_is_missing ||
          ib_table->keyring_encryption_info.page0_has_crypt_data)) {
       /* Proper error message has been already printed by
        * Datafile::validate_first_page, thus we do not print anything here */
-      DBUG_RETURN(HA_ERR_DECRYPTION_FAILED);
+      error = HA_ERR_ENCRYPTION_KEY_MISSING;
+    } else if (space() && space()->crypt_data) {
+      ib_table->keyring_encryption_info.page0_has_crypt_data = true;
+      error = HA_ERR_DECRYPTION_FAILED;
     } else {
       my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
-      dict_table_close(ib_table, FALSE, FALSE);
-      ib_table = NULL;
-      is_part = NULL;
-      free_share(m_share);
-
-      DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
+      error = HA_ERR_TABLE_CORRUPT;
     }
+    dict_table_close(ib_table, FALSE, FALSE);
+    ib_table = NULL;
+    is_part = NULL;
+    free_share(m_share);
+    DBUG_RETURN(error);
   }
 
   // if (space() == NULL) {
@@ -7151,7 +7155,7 @@ int ha_innobase::open(const char *name, int, uint open_flags,
         push_warning_printf(
             thd, Sql_condition::SL_WARNING, HA_ERR_DECRYPTION_FAILED,
             "Table %s in file %s is encrypted but encryption service or"
-            " used key_id is not available. "
+            " used key_id is not available."
             " Can't continue reading table.",
             table_share->table_name.str, space()->files.begin()->name);
         ret_err = HA_ERR_DECRYPTION_FAILED;
@@ -14425,7 +14429,8 @@ int ha_innobase::truncate_impl(const char *name, TABLE *form,
     ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_DISCARDED, norm_name);
     DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
   } else if (!innodb_table->is_readable()) {
-    DBUG_RETURN(HA_ERR_TABLESPACE_MISSING);
+    DBUG_RETURN(innodb_table->keyring_encryption_info.page0_has_crypt_data == true ? 
+                  HA_ERR_DECRYPTION_FAILED : HA_ERR_TABLESPACE_MISSING);
   }
 
   if (UNIV_UNLIKELY(innodb_table->is_corrupt)) DBUG_RETURN(HA_ERR_CRASHED);
@@ -15090,6 +15095,12 @@ int ha_innobase::records(ha_rows *num_rows) /*!< out: number of rows */
     DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
 
   } else if (m_prebuilt->table->file_unreadable) {
+
+    if (m_prebuilt->table->keyring_encryption_info.page0_has_crypt_data)
+    //if (fil_space_get(m_prebuilt->table->space) != NULL)
+      DBUG_RETURN(m_prebuilt->table->keyring_encryption_info.keyring_encryption_key_is_missing ?
+                  HA_ERR_ENCRYPTION_KEY_MISSING :  HA_ERR_DECRYPTION_FAILED);
+
     ib_senderrf(m_user_thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_MISSING,
                 table->s->table_name.str);
 
@@ -18643,6 +18654,11 @@ bool ha_innobase::get_error_message(int error, String *buf) {
         "Table encrypted but decryption failed. This could be because correct "
         "encryption management plugin is not loaded, used encryption key is "
         "not available or encryption method does not match.";
+    buf->copy(msg, (uint)strlen(msg), system_charset_info);
+  } else if (error == HA_ERR_ENCRYPTION_KEY_MISSING) {
+    const char *msg =
+        "Table encrypted but decryption key was not found. "
+        "Is correct keyring loaded?";
     buf->copy(msg, (uint)strlen(msg), system_charset_info);
   } else {
     buf->copy(trx->detailed_error, (uint)strlen(trx->detailed_error),

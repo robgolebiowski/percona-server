@@ -8429,8 +8429,8 @@ void Encryption::get_latest_tablespace_key(uint key_id,
 }
 
 bool Encryption::tablespace_key_exists(uint key_id) {
-  uint tablespace_key_version;
-  byte *tablespace_key;
+  uint tablespace_key_version = 0;
+  byte *tablespace_key = NULL;
 
   get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
 

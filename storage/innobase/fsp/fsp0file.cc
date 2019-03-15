@@ -747,7 +747,7 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
                   << "is encrypted but keyring or "
                   << "used key_id " << crypt_data->key_id
                   << " is not available. "
-                  << "Can't continue reading table.";
+                  << "Can't continue reading table. Please provide the correct keyring.";
 
       m_is_valid = false;
       free_first_page();

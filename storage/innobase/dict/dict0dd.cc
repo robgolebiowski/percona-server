@@ -3798,9 +3798,6 @@ void dd_load_tablespace(const Table *dd_table, dict_table_t *table,
   } else {
     /* We failed to find a sensible tablespace file */
     table->set_file_unreadable();
-    if (table->keyring_encryption_info.keyring_encryption_key_is_missing) {
-      ib::error() << "Table " << table->space << " is unreadable due to missing key. Have you used correct keyring ?";
-    }
   }
 
   ut_free(shared_space_name);

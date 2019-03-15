@@ -5590,6 +5590,9 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
     Therefore we can get a space ID mismatch when validating
     the files during bootstrap. */
 
+    if (validate_output.keyring_encryption_info.page0_has_crypt_data)
+      keyring_encryption_info = validate_output.keyring_encryption_info;
+
     if (!is_encrypted && validate_output.error != DB_WRONG_FILE_NAME) {
       /* The following call prints an error message.
       For encrypted tablespace we skip print, since it should

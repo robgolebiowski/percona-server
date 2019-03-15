@@ -164,6 +164,10 @@ struct fil_space_rotate_state_t
 
 #ifndef UNIV_INNOCHECKSUM
 
+enum Crypt_key_operation {
+  FETCH_KEY,
+  FETCH_OR_GENERATE_KEY
+};
 
 struct fil_space_crypt_t
 {
@@ -176,8 +180,8 @@ struct fil_space_crypt_t
 		uint new_min_key_version,
 		uint new_key_id,
 		fil_encryption_t new_encryption,
-                bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
-                Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION);
+        Crypt_key_operation key_operation,
+        Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION);
 
 	/** Destructor */
 	~fil_space_crypt_t()
@@ -381,7 +385,7 @@ fil_space_crypt_t*
 fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			key_id,
-        bool                    create_key = true)
+	Crypt_key_operation key_operation = Crypt_key_operation::FETCH_OR_GENERATE_KEY)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /******************************************************************

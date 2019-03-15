@@ -523,11 +523,11 @@ SELECT COUNT(1) FROM t2;
 COUNT(1)
 500
 SELECT COUNT(1) FROM t2,t1 where t2.a = t1.a;
-ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 SELECT COUNT(1) FROM t1 where b = 'ab';
-ERROR HY000: Got error 500 'Table encrypted but decryption failed. This could be because correct encryption management plugin is not loaded, used encryption key is not available or encryption method does not match.' from InnoDB
+ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 SELECT COUNT(1) FROM t1;
-ERROR HY000: Tablespace is missing for table t1.
+ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 
 # Start server with keys2.txt
 # restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys2.txt

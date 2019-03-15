@@ -64,9 +64,9 @@ SELECT COUNT(1) FROM t2;
 SELECT COUNT(1) FROM t2,t1 where t2.a = t1.a;
 --error 1296
 SELECT COUNT(1) FROM t1 where b = 'ab';
-#--error 1296
+--error 1296
 #It used to be 1296, but I have decided to go with MySQL decryption error handling
---error 1812
+#--error ER_TABLESPACE_MISSING
 SELECT COUNT(1) FROM t1;
 
 --echo
