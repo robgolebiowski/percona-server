@@ -7042,6 +7042,7 @@ int ha_innobase::open(const char *name, int, uint open_flags,
       error = HA_ERR_ENCRYPTION_KEY_MISSING;
     } else if (space() && space()->crypt_data) {
       ib_table->keyring_encryption_info.page0_has_crypt_data = true;
+      ib::warn(ER_XB_MSG_3, table_share->table_name.str);
       error = HA_ERR_DECRYPTION_FAILED;
     } else {
       my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
@@ -7146,20 +7147,8 @@ int ha_innobase::open(const char *name, int, uint open_flags,
     is tablespace made unaccessible because encryption service
     or used key_id is not available. */
     if (encrypted) {
-      bool warning_pushed = false;
-
-      /* If table is marked as encrypted then we push
-      warning if it has not been already done as used
-      key_id might be found but it is incorrect. */
-      if (!warning_pushed) {
-        push_warning_printf(
-            thd, Sql_condition::SL_WARNING, HA_ERR_DECRYPTION_FAILED,
-            "Table %s in file %s is encrypted but encryption service or"
-            " used key_id is not available."
-            " Can't continue reading table.",
-            table_share->table_name.str, space()->files.begin()->name);
-        ret_err = HA_ERR_DECRYPTION_FAILED;
-      }
+      ib::warn(ER_XB_MSG_3, table_share->table_name.str);
+      ret_err = HA_ERR_DECRYPTION_FAILED;
     }
 
     dict_table_close(ib_table, FALSE, FALSE);
@@ -16669,11 +16658,7 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
         is_ok = false;
 
         if (err == DB_DECRYPTION_FAILED) {
-          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NO_SUCH_TABLE,
-                              "Table %s is encrypted but encryption service or"
-                              " used key_id is not available. "
-                              " Can't continue checking table.",
-                              index->table->name.m_name);
+          ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_3, index->table->name.m_name);
         } else {
           push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,
                               "InnoDB: The B-tree of"
@@ -16738,11 +16723,7 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
     }
     if (ret != DB_SUCCESS) {
       if (ret == DB_DECRYPTION_FAILED) {
-        push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NO_SUCH_TABLE,
-                            "Table %s is encrypted but encryption service or"
-                            " used key_id is not available. "
-                            " Can't continue checking table.",
-                            index->table->name.m_name);
+        ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_3, index->table->name.m_name);
       } else {
         /* Assume some kind of corruption. */
         push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,
@@ -18651,9 +18632,8 @@ bool ha_innobase::get_error_message(int error, String *buf) {
 
   if (error == HA_ERR_DECRYPTION_FAILED) {
     const char *msg =
-        "Table encrypted but decryption failed. This could be because correct "
-        "encryption management plugin is not loaded, used encryption key is "
-        "not available or encryption method does not match.";
+        "Table encrypted but decryption failed. Seems that the encryption key fetched from keyring is "
+        "not the correct one. Are you using the correct keyring?";
     buf->copy(msg, (uint)strlen(msg), system_charset_info);
   } else if (error == HA_ERR_ENCRYPTION_KEY_MISSING) {
     const char *msg =

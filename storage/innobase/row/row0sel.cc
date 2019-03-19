@@ -4119,9 +4119,7 @@ dberr_t row_search_no_mvcc(byte *buf, page_cur_mode_t mode,
                                         BTR_SEARCH_LEAF, pcur, false, 0, mtr);
       if (err != DB_SUCCESS) {
         if (err == DB_DECRYPTION_FAILED) {
-          ib::warn() << "Table is encrypted but encryption service or"
-                        " used key_id is not available. "
-                        " Can't continue reading table.";
+          ib::warn(ER_XB_MSG_3, index->table_name);
           index->table->set_file_unreadable();
         }
         return (err);
@@ -4813,9 +4811,7 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
                                       BTR_SEARCH_LEAF, pcur, false, 0, &mtr);
     if (err != DB_SUCCESS) {
       if (err == DB_DECRYPTION_FAILED) {
-        ib::warn() << "Table is encrypted but encryption service or"
-                      " used key_id is not available. "
-                      " Can't continue reading table.";
+        ib::warn(ER_XB_MSG_3, index->table_name);
         index->table->set_file_unreadable();
       }
       rec = NULL;

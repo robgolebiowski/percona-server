@@ -5246,14 +5246,7 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
       if (space()) {
         String str;
         const char *engine = table_type();
-
-        push_warning_printf(
-            m_user_thd, Sql_condition::SL_WARNING, HA_ERR_DECRYPTION_FAILED,
-            "Table %s in file %s is encrypted but encryption service or"
-            " used key_id is not available. "
-            " Can't continue reading table.",
-            table_share->table_name.str, space()->files.begin()->name);
-
+        ib::warn(ER_XB_MSG_3, table_share->table_name.str);
         my_error(ER_GET_ERRMSG, MYF(0), HA_ERR_DECRYPTION_FAILED, str.c_ptr(),
                  engine);
         DBUG_RETURN(true);
