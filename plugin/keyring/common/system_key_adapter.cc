@@ -20,7 +20,8 @@
 namespace keyring {
 // Adds key's version to keyring's key data. The resulting system key data looks
 // like this: <key_version>:<keyring key data>
-void System_key_adapter::construct_system_key_data() {
+void System_key_adapter::construct_system_key_data() noexcept {
+  DBUG_ASSERT(system_key_data.get_key_data() == nullptr);
   Secure_ostringstream system_key_data_version_prefix_ss;
   system_key_data_version_prefix_ss << key_version << ':';
   Secure_string system_key_data_version_prefix =
@@ -49,6 +50,7 @@ void System_key_adapter::construct_system_key_data() {
   keyring_key->set_key_data(keyring_key_data, keyring_key_data_size);
 
   keyring_key->xor_data();
+  DBUG_ASSERT(system_key_data.get_key_data() != nullptr);
 }
 
 System_key_adapter::System_key_data::System_key_data()
@@ -57,8 +59,8 @@ System_key_adapter::System_key_data::System_key_data()
 System_key_adapter::System_key_data::~System_key_data() { free(); }
 
 bool System_key_adapter::System_key_data::allocate(size_t key_data_size) {
-  free();
-  key_data = new uchar[key_data_size];
+  DBUG_ASSERT(get_key_data() == nullptr);
+  key_data = new(std::nothrow) uchar[key_data_size];
   if (key_data) {
     this->key_data_size = key_data_size;
     return false;

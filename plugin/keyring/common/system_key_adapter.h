@@ -21,12 +21,15 @@ namespace keyring {
 class System_key_adapter : public IKey {
  public:
   System_key_adapter(uint key_version, IKey *keyring_key)
-      : key_version(key_version), keyring_key(keyring_key) {}
+      : key_version(key_version), keyring_key(keyring_key) {
+    construct_system_key_data();    
+  }
 
   void set_keyring_key(IKey *key, uint key_version) {
     system_key_data.free();
     this->keyring_key = key;
     this->key_version = key_version;
+    construct_system_key_data();  
   }
 
   IKey *get_keyring_key() const noexcept { return keyring_key; }
@@ -52,15 +55,13 @@ class System_key_adapter : public IKey {
   }
   virtual uchar *get_key_data() {
     DBUG_ASSERT(keyring_key != nullptr);
-
-    if (system_key_data.get_key_data() == nullptr) construct_system_key_data();
+    DBUG_ASSERT(system_key_data.get_key_data() != nullptr);
 
     return system_key_data.get_key_data();
   }
   virtual size_t get_key_data_size() {
     DBUG_ASSERT(keyring_key != nullptr);
-
-    if (system_key_data.get_key_data() == nullptr) construct_system_key_data();
+    DBUG_ASSERT(system_key_data.get_key_data() != nullptr);
 
     return system_key_data.get_key_data_size();
   }
@@ -124,7 +125,7 @@ class System_key_adapter : public IKey {
     size_t key_data_size;
   };
 
-  void construct_system_key_data();
+  void construct_system_key_data() noexcept;
 
   System_key_data system_key_data;
   uint key_version;
