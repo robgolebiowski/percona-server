@@ -156,6 +156,8 @@ uchar * fil_space_crypt_t::get_cached_key(Cached_key &cached_key, uint key_versi
 	ut_ad(cached_key.key == NULL ||
 	      cached_key.key_len == ENCRYPTION_KEY_LEN);
 
+	cached_key.key_version = key_version;
+
 	return cached_key.key;
 }
 
@@ -727,6 +729,7 @@ fil_parse_write_crypt_data(
 	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
 	/* Need to overwrite these as above will initialize fields. */
 	crypt_data->page0_offset = offset;
+	DBUG_ASSERT(min_key_version != ENCRYPTION_KEY_VERSION_INVALID);
 	crypt_data->min_key_version = min_key_version;
 	crypt_data->encryption = encryption;
 	memcpy(crypt_data->iv, ptr, iv_len);
@@ -1111,6 +1114,7 @@ fil_crypt_space_needs_rotation(
 	/* If used key_id is not found from encryption plugin we can't
 	continue to rotate the tablespace */
 	if (!crypt_data->is_key_found()) {
+		//ut_ad(0);
 		return false;
 	}
 

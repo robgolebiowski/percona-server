@@ -8491,8 +8491,8 @@ bool Encryption::can_page_be_keyring_encrypted(byte *page) {
 
 uint Encryption::encryption_get_latest_version(uint key_id) {
 #ifndef UNIV_INNOCHECKSUM
-  uint tablespace_key_version;
-  byte *tablespace_key;
+  uint tablespace_key_version = ENCRYPTION_KEY_VERSION_INVALID;
+  byte *tablespace_key = nullptr;
 
   get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
 
