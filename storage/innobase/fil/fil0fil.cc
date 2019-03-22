@@ -3796,9 +3796,31 @@ fil_space_t *fil_space_acquire_for_io(ulint space_id) {
   return (space);
 }
 
+/** Acquire a tablespace for reading or writing a block,
+when it could be dropped concurrently.
+@param[in]	id	tablespace ID
+@return	the tablespace
+@retval	NULL if missing */
+fil_space_t *fil_space_acquire_for_io_with_load(ulint space_id) {
+  auto shard = fil_system->shard_by_id(space_id);
+
+  shard->mutex_acquire();
+
+  fil_space_t *space = shard->space_load(space_id);
+
+  if (space) {
+    space->n_pending_ios++;
+  }
+
+  shard->mutex_release();
+
+  return (space);
+}
+
 /** Release a tablespace acquired with fil_space_acquire_for_io().
 @param[in,out]	space	tablespace to release  */
 void fil_space_release_for_io(fil_space_t *space) {
+  ut_ad(space);
   auto shard = fil_system->shard_by_id(space->id);
 
   shard->mutex_acquire();

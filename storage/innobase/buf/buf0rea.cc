@@ -815,7 +815,7 @@ void buf_read_recv_pages(bool sync, space_id_t space_id,
 
     if (err == DB_DECRYPTION_FAILED) {
       ib::error() << "Recovery failed to decrypt page "
-                  << cur_page_id;
+                  << cur_page_id << ". Are you using the correct keyring?";
     } else if (err == DB_PAGE_CORRUPTED) {
       ib::error() << "Recovery failed due to corrupted page "
                   << cur_page_id;
