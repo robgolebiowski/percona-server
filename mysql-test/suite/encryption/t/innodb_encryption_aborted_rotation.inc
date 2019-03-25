@@ -262,6 +262,7 @@ SET GLOBAL debug="-d,crash_on_t1_flush_after_dd_update";
 
 --let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
 
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=$error_log
 --source include/restart_mysqld.inc
 
@@ -286,6 +287,7 @@ SELECT COUNT(1) FROM t1;
 --source include/wait_condition.inc
 
 # Restart and make sure that warning is no longer available in error log
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 --let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=$error_log
 --source include/restart_mysqld.inc
 
@@ -334,6 +336,7 @@ if (!$is_t1_compressed)
 
 --remove_file $error_log
 
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --let $restart_parameters=restart:--innodb-encryption-threads=0 --log-error=$error_log --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring --early-plugin-load="keyring_file=$KEYRING_PLUGIN"
 --source include/start_mysqld.inc
 
@@ -357,5 +360,16 @@ SELECT COUNT(1) FROM t1;
 --let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
+# cleanup
 DROP TABLE t1;
 DROP PROCEDURE innodb_insert_proc;
+
+# decrypt all the tables
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+--source include/wait_condition.inc
+
+SET GLOBAL innodb_encrypt_tables=OFF;
+SET GLOBAL innodb_encryption_threads=0;

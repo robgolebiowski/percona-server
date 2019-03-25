@@ -82,13 +82,13 @@ SET GLOBAL debug="-d,crash_on_t1_flush_after_dd_update";
 # Now restart the server and select from t1. Validation of t1's flags should proceed.
 # It should be discovered that there is mismatch of flags in t1. However it shoud be possible to use
 # the table. There should be a warning message in the error log file.
-# restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=/home/rob/git/8_0_bld/mysql-test/var/tmp/my_restart.err
+# restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=MYSQLTEST_VARDIR/tmp/my_restart.err
 SELECT COUNT(1) FROM t1;
 COUNT(1)
 30000
 # Restart and finish up the rotation
 # restart:--innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
-# restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=/home/rob/git/8_0_bld/mysql-test/var/tmp/my_restart.err
+# restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=MYSQLTEST_VARDIR/tmp/my_restart.err
 SELECT COUNT(1) FROM t1;
 COUNT(1)
 30000
@@ -105,7 +105,7 @@ SET GLOBAL debug="-d,crash_on_t1_flush_after_dd_update";
 # Now start the server and select from t1. Validation of t1's flags should proceed.
 # It should be discovered that there is mismatch of flags in t1. However it shoud be possible to use
 # the table. There should be a warning message in the error log file.
-# restart:--innodb-encryption-threads=0 --log-error=/home/rob/git/8_0_bld/mysql-test/var/tmp/my_restart.err --loose-keyring_file_data=/home/rob/git/8_0_bld/mysql-test/var/tmp/mysecret_keyring --early-plugin-load=keyring_file=keyring_file.so
+# restart:--innodb-encryption-threads=0 --log-error=MYSQL_TMP_DIR/my_restart.err --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring --early-plugin-load=keyring_file=keyring_file.so
 SELECT COUNT(1) FROM t1;
 COUNT(1)
 30000
@@ -113,3 +113,6 @@ COUNT(1)
 # restart:--innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 DROP TABLE t1;
 DROP PROCEDURE innodb_insert_proc;
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encrypt_tables=OFF;
+SET GLOBAL innodb_encryption_threads=0;

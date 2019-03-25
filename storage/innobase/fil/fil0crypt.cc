@@ -2544,6 +2544,17 @@ fil_crypt_complete_rotate_space(
 		*/
 		bool should_flush = last && done;
 
+		/* In case we simulate only 100 pages being rotated - we stop ourselves from writting to page0. Pages should be
+		* flushed in mtr test with FLUSH FOR EXPORT - this will make sure that buffers will get flushed *
+		* In MTR we can check if we reached this point by checking flushing field - it should be 1 if we are here */
+		DBUG_EXECUTE_IF(
+		"rotate_only_first_100_pages_from_t1",
+		if (strcmp(state->space->name, "test/t1") == 0 && number_of_t1_pages_rotated >= 100) {
+			crypt_data->rotate_state.flushing = true;
+			should_flush = false;
+          }
+		);
+
 		if (should_flush) {
 			/* we're the last active thread */
 			ut_ad(crypt_data->rotate_state.flushing == false);
@@ -2553,15 +2564,6 @@ fil_crypt_complete_rotate_space(
 			crypt_data->encryption_rotation = Encryption::NO_ROTATION;
 
 		}
-
-		/* In case we simulate only 100 pages being rotated - we stop ourselves from writting to page0. Pages should be
-		* flushed in mtr test with FLUSH FOR EXPORT - this will make sure that buffers will get flushed *
-		* In MTR we can check if we reached this point by checking flushing field - it should be 1 if we are here */
-		DBUG_EXECUTE_IF(
-		"rotate_only_first_100_pages_from_t1",
-		if (strcmp(state->space->name, "test/t1") == 0 && number_of_t1_pages_rotated >= 100)
-			should_flush = false;
-		);
 
 		DBUG_EXECUTE_IF(
 		"crash_on_t1_flush_after_dd_update",
