@@ -51,7 +51,7 @@ insert into innodb_datadir2 select * from innodb_normal;
 insert into innodb_datadir3 select * from innodb_normal;
 commit;
 FLUSH STATUS;
-# Restart server and see how many page 0's are read
+# Restart server and see how many pages 0 are read
 # restart
 include/assert.inc [number of page 0 should be greater than 0]
 include/assert.inc [number of page 0 read should be less than number of tables in both innodb_test and mysql databases]
@@ -59,12 +59,12 @@ set global innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 # wait until tables are decrypted
 include/assert.inc [number of page 0 read should be less than number of tables in both innodb_test and mysql databases]
 FLUSH STATUS;
-# restart and see number read page 0
+# restart and see number of pages 0 read
 # restart
 # Since we have restarted the server with encryption threads disabled - the tables from innodb_test database
 # should not have been accessed on server startup - thus selecting from any of those tables should increase
 # innodb_pages0_read only by one
-include/assert.inc [number of page 0 read should be less than number of tables in mysql databases]
+include/assert.inc [number of pages 0 read should be less than number of tables in mysql databases]
 select * from innodb_test.innodb_compact;
 c1	b
 1	secret
