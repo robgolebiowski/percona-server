@@ -260,9 +260,9 @@ SET GLOBAL debug="-d,crash_on_t1_flush_after_dd_update";
 --echo # It should be discovered that there is mismatch of flags in t1. However it shoud be possible to use
 --echo # the table. There should be a warning message in the error log file.
 
---let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
+--let $error_log=$MYSQL_TMP_DIR/my_restart.err
 
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=$error_log
 --source include/restart_mysqld.inc
 
@@ -287,7 +287,7 @@ SELECT COUNT(1) FROM t1;
 --source include/wait_condition.inc
 
 # Restart and make sure that warning is no longer available in error log
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --let $restart_parameters=restart:--innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=0 --log-error=$error_log
 --source include/restart_mysqld.inc
 
