@@ -79,6 +79,7 @@ FLUSH STATUS;
 set global innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 
 --echo # wait until tables are decrypted
+--let $wait_timeout= 600
 --let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
 --source include/wait_condition.inc
 
