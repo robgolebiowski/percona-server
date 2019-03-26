@@ -11971,6 +11971,7 @@ void ha_innobase::adjust_encryption_key_id(HA_CREATE_INFO *create_info,
                         create_info->encryption_key_id);
     create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
     create_info->was_encryption_key_id_set = false;
+    options->remove("encryption_key_id");
   }
 
   if (options && create_info->was_encryption_key_id_set &&
