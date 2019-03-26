@@ -94,8 +94,6 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 --let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 2
 --source include/wait_condition.inc
 
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
 --echo # Make sure t1 is encrypted
 --let SEARCH_PATTERN=foobar
 --let ABORT_ON=FOUND
