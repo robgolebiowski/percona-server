@@ -92,6 +92,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/start_mysqld.inc
 
 alter table t1 encryption='n';
@@ -111,6 +112,7 @@ alter table t1 encryption='n';
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 0)]" = 2
 --source include/assert.inc
 
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/shutdown_mysqld.inc
 
 --let SEARCH_PATTERN=foobarsecret
