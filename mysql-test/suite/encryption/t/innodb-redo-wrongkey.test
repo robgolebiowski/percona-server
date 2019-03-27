@@ -2,6 +2,7 @@
 # is not the correct one.
 
 SET GLOBAL innodb_file_per_table = ON;
+SET GLOBAL innodb_encrypt_tables = KEYRING_ON;
 
 create table t1(a int not null primary key, c char(200), b blob, index(b(10))) engine=innodb row_format=compressed ENCRYPTION='KEYRING' encryption_key_id=2;
 create table t2(a int not null primary key, c char(200), b blob, index(b(10))) engine=innodb row_format=compressed;
@@ -79,5 +80,8 @@ let $cleanup= drop table t1,t2,t3,t4;
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
 --source include/start_mysqld.inc
 
+# cleanup
 drop table t1,t2,t3,t4;
 --remove_file $error_log
+
+SET GLOBAL innodb_encrypt_tables=OFF;

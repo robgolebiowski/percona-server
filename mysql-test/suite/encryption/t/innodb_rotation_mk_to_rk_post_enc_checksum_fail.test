@@ -41,6 +41,7 @@ COMMIT;
 
 --copy_file $MYSQLD_DATADIR/test/t1.ibd $MYSQLD_DATADIR/test/t1.ibd.MK
 
+--replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
 --source include/start_mysqld.inc
 
@@ -80,6 +81,7 @@ EOF
 --echo # Now restart server with encryption from keyring to unencrypted and wait for threads to decrypt everything
 --echo # Apart from t1 which is corrupted and it should not be possible to decrypt this table
 
+--replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
 --source include/start_mysqld.inc
 
@@ -103,7 +105,9 @@ SELECT * FROM t1;
 
 --echo # Restore the original t1
 
---move_file $MYSQLD_DATADIR/test/t1.ibd.MK $MYSQLD_DATADIR/test/t1.ibd
+--move_file $MYSQLD_DATADIR/test/t1.ibd.MK $MYSQLD_DATADIR/test/t1.ibd 
+
+--replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/start_mysqld.inc
 
 SELECT COUNT(*) FROM t1;
