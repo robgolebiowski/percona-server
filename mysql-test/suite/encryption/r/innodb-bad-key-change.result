@@ -1,5 +1,5 @@
 # Start server with keys2.txt
-# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys2.txt --log-error=MYSQLTEST_VARDIR/tmp/error_log.err
+# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys2.txt --log-error=MYSQL_TMP_DIR/error_log.err
 SET GLOBAL innodb_file_per_table = ON;
 CREATE TABLE t1 (c VARCHAR(8)) ENGINE=InnoDB ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=2;
 INSERT INTO t1 VALUES ('foobar');
@@ -23,12 +23,12 @@ foobar	2
 # Make sure that there is no error in error log related to missing key for t1
 
 # Restart server with keysbad3.txt
-# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keysbad3.txt --log-error=MYSQLTEST_VARDIR/tmp/error_log.err
+# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keysbad3.txt --log-error=MYSQL_TMP_DIR/error_log.err
 SELECT * FROM t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 DROP TABLE t1;
 # Start server with keys3.txt
-# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys3.txt --log-error=MYSQLTEST_VARDIR/tmp/error_log.err
+# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys3.txt --log-error=MYSQL_TMP_DIR/error_log.err
 SET GLOBAL innodb_stats_persistent=OFF;
 #### Decryption errors ####
 SET SESSION innodb_default_encryption_key_id=5;
@@ -37,7 +37,7 @@ INSERT INTO t2 VALUES ('foobar',1,2);
 # Make sure that there is no error in error log related to decryption failures of t2
 
 # Restart server with keys2.txt
-# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys2.txt --log-error=MYSQLTEST_VARDIR/tmp/error_log.err
+# restart:--keyring-file-data=MYSQLTEST_VARDIR/std_data/keys2.txt --log-error=MYSQL_TMP_DIR/error_log.err
 SET GLOBAL innodb_stats_persistent=ON;
 SELECT * FROM t2;
 ERROR HY000: Got error 500 'Table encrypted but decryption failed. Seems that the encryption key fetched from keyring is not the correct one. Are you using the correct keyring?' from InnoDB

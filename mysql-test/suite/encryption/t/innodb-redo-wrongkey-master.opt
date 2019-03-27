@@ -4,3 +4,4 @@ $KEYRING_PLUGIN_OPT
 --innodb-change-buffering=none
 --innodb-encrypt-tables=ONLINE_TO_KEYRING
 --innodb-default-encryption-key-id=2
+--innodb-encryption-threads=0;
