@@ -30,7 +30,6 @@ call innodb_insert_proc(1500);
 commit;
 set autocommit=1;
 
-
 --echo # Wait max 10 min for key encryption threads to encrypt all test/t_ tables (all should have MIN_KEY_VERSION 1 assigned)
 --let $wait_timeout= 600
 --let $wait_condition=SELECT SUM(MIN_KEY_VERSION) = 7 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME LIKE 'test/t_'

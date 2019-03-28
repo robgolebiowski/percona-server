@@ -180,8 +180,8 @@ struct fil_space_crypt_t
 		uint new_min_key_version,
 		uint new_key_id,
 		fil_encryption_t new_encryption,
-        Crypt_key_operation key_operation,
-        Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION);
+		Crypt_key_operation key_operation,
+		Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION);
 
 	/** Destructor */
 	~fil_space_crypt_t()

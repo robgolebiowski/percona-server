@@ -4711,7 +4711,6 @@ dberr_t buf_page_check_corrupt(buf_page_t *bpage, fil_space_t *space) {
       (bpage->zip.data) ? bpage->zip.data : ((buf_block_t *)bpage)->frame;
 
   dberr_t err = DB_SUCCESS;
-  //fil_space_crypt_t *crypt_data = space->crypt_data;
   ulint page_type = mach_read_from_2(dst_frame + FIL_PAGE_TYPE);
   ulint original_page_type =
       mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);

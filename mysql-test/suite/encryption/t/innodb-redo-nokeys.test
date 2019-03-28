@@ -1,6 +1,3 @@
-#--skip
-#--source include/have_64bit.inc
-
 # This test is to test scenario when keyring encrypted table is to be created, but a crash occured and
 # on restart keyring is not available.
 
@@ -54,7 +51,6 @@ let $cleanup= drop table t1,t2,t3,t4;
 --let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
 
 --error 1
-#--exec xterm -e gdb --args $MYSQLD_CMD --log-error=$error_log
 --exec $MYSQLD_CMD --log-error=$error_log
 
 # We should get error in error log as it should not be possible to apply update to page0

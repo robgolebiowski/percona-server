@@ -5,7 +5,6 @@ call mtr.add_suppression("\\[InnoDB\\] The page \\[page id: space=[1-9][0-9]*, p
 call mtr.add_suppression("\\[InnoDB\\] Post - encryption checksum verification failed - decryption failed for space id = 2 page_no = 4");
 call mtr.add_suppression("\\[InnoDB\\] Table test/t1 is encrypted but decryption failed\. Seems that the encryption key fetched from keyring is not the correct one\. Are you using the correct keyring?");
 
-
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 

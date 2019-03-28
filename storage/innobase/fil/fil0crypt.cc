@@ -214,8 +214,7 @@ fil_space_crypt_t::fil_space_crypt_t(
 		uint new_min_key_version,
 		uint new_key_id,
 		fil_encryption_t new_encryption,
-        Crypt_key_operation key_operation,
-		//bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
+		Crypt_key_operation key_operation,
 		Encryption::Encryption_rotation encryption_rotation)
 		: min_key_version(new_min_key_version),
 		page0_offset(0),
@@ -244,16 +243,13 @@ fil_space_crypt_t::fil_space_crypt_t(
 			//key_found = true; // cheat key_get_latest_version that the key exists - if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
 			uchar *key = NULL;
 			uint key_version = 0;
-            //TODO: This is misleading - this function is called when crypt data is created for the first time or it is read from
-            //ibd. If it fails on read - we get an error it was not possible to generate the key instead of error that it was not possible
-            //to fetch the key
-            if (key_operation == FETCH_OR_GENERATE_KEY) {
-			  Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &key_version, &key);
-            } else if (key_operation == FETCH_KEY) {
-			  Encryption::get_latest_tablespace_key(key_id, &key_version, &key);
-            } else {
-              ut_ad(0);
-            }
+			if (key_operation == FETCH_OR_GENERATE_KEY) {
+				Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &key_version, &key);
+			} else if (key_operation == FETCH_KEY) {
+				Encryption::get_latest_tablespace_key(key_id, &key_version, &key);
+			} else {
+				ut_ad(0);
+            		}
 			if (key == NULL) {
 				key_found = false;
 				min_key_version = ENCRYPTION_KEY_VERSION_INVALID;
@@ -330,8 +326,7 @@ fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			min_key_version,
 	uint			key_id,
-    Crypt_key_operation key_operation = Crypt_key_operation::FETCH_OR_GENERATE_KEY) {
-	//bool			create_key = true) {
+	Crypt_key_operation key_operation = Crypt_key_operation::FETCH_OR_GENERATE_KEY) {
 	fil_space_crypt_t* crypt_data = NULL;
 	if (void* buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
 		crypt_data = new(buf)
@@ -340,7 +335,7 @@ fil_space_create_crypt_data(
 				min_key_version,
 				key_id,
 				encrypt_mode,
-                key_operation);
+				key_operation);
 	}
 
 	return crypt_data;
@@ -379,8 +374,7 @@ fil_space_crypt_t*
 fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			key_id,
-    Crypt_key_operation key_operation) {
-	//bool			create_key) {
+	Crypt_key_operation key_operation) {
 
 	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id, key_operation));
 }
@@ -754,7 +748,7 @@ fil_parse_write_crypt_data(
 		crypt_data->set_tablespace_iv(tablespace_iv);
 	}
 
-		/* Check is used key found from encryption plugin */
+	/* Check is used key found from encryption plugin */
 	if (crypt_data->should_encrypt()
 	    && !crypt_data->is_key_found()) {
 		ib::error() << "Key cannot be read for space id = " << space_id; //TODO: To jest zmienione w MariaDB - zmienić!
@@ -919,7 +913,7 @@ fil_crypt_start_encrypting_space(
 	* risk of finding encrypted pages without having
 	* crypt data in page 0 */
 
-	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), Crypt_key_operation::FETCH_OR_GENERATE_KEY); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), Crypt_key_operation::FETCH_OR_GENERATE_KEY);
 
 	if (crypt_data == NULL || crypt_data->key_found == false) {
 		mutex_exit(&fil_crypt_threads_mutex);
@@ -1114,7 +1108,6 @@ fil_crypt_space_needs_rotation(
 	/* If used key_id is not found from encryption plugin we can't
 	continue to rotate the tablespace */
 	if (!crypt_data->is_key_found()) {
-		//ut_ad(0);
 		return false;
 	}
 
@@ -1424,7 +1417,7 @@ fil_crypt_find_space_to_rotate(
 
 		ut_ad(state->space->size);
 
-        //TODO: What about excluding spaces that are (has?) SPATIAL INDEXES ?
+		//TODO: What about excluding spaces that are (has?) SPATIAL INDEXES ?
 
 		// if space is marked as encrytped this means some of the pages are encrypted and space should be skipped
 		// size must be set - i.e. tablespace has been read
@@ -2552,8 +2545,7 @@ fil_crypt_complete_rotate_space(
 		if (strcmp(state->space->name, "test/t1") == 0 && number_of_t1_pages_rotated >= 100) {
 			crypt_data->rotate_state.flushing = true;
 			should_flush = false;
-          }
-		);
+		});
 
 		if (should_flush) {
 			/* we're the last active thread */
