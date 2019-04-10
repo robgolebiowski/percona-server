@@ -7493,35 +7493,32 @@ static bool dict_should_be_keyring_encrypted() {
               <1> true if encryption flag is set, false otherwise */
 static std::tuple<bool, bool> dict_mysql_ibd_page_0_has_encryption_flag_set() {
   //<0> element - success, <1> element - encryption flag
-  auto result = std::make_tuple(false, false);
+  auto result = std::make_tuple(false,false);
 
-  pfs_os_file_t file = os_file_create_simple_no_error_handling(
-      innodb_data_file_key, dict_sys_t::s_dd_space_file_name, OS_FILE_OPEN,
-      OS_FILE_READ_ONLY, srv_read_only_mode, &std::get<0>(result));
+  fil_space_t *space = fil_space_acquire(dict_sys_t::s_space_id);
 
-  if (!std::get<0>(result)) {
+  if (space == nullptr) {
+    std::get<0>(result) = false;
     return result;
   }
 
-  /* Read the first page of the tablespace */
-  auto buf = ut_make_unique_ptr_nokey(2 * UNIV_PAGE_SIZE);
-  /* Align memory for file I/O if we might have O_DIRECT set */
-  byte *page = static_cast<byte *>(ut_align(buf.get(), UNIV_PAGE_SIZE));
+  const page_size_t page_size(space->flags);
 
-  ut_ad(page == page_align(page));
+  mtr_t mtr;
+  mtr_start(&mtr);
+  buf_block_t *block = buf_page_get(page_id_t(dict_sys_t::s_space_id, 0), univ_page_size, RW_X_LATCH, &mtr);
+  mtr_commit(&mtr);
 
-  IORequest request(IORequest::READ);
+  fil_space_release(space);
+  buf_frame_t *frame = nullptr;
 
-  dberr_t err = os_file_read_first_page(request, file, page, UNIV_PAGE_SIZE);
-
-  if (DB_SUCCESS != err) {
-    os_file_close(file);
+  if (!block || !(frame = buf_block_get_frame(block))) {
     std::get<0>(result) = false;
-    return (result);
+    return result;
   }
 
-  const ulint flags = fsp_header_get_flags(page);
-  os_file_close(file);
+
+  const ulint flags = fsp_header_get_flags(frame);
   std::get<0>(result) = true;
   std::get<1>(result) = FSP_FLAGS_GET_ENCRYPTION(flags);
   return (result);
