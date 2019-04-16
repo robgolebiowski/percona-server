@@ -93,7 +93,6 @@ SELECT variable_value >= 0 FROM performance_schema.global_status WHERE variable_
 SELECT variable_value >= 0 FROM performance_schema.global_status WHERE variable_name = 'innodb_num_pages_decrypted';
 
 alter table innodb_compact engine=innodb encryption='KEYRING';
-#encryption_key_id=DEFAULT;
 show create table innodb_compact;
 alter table innodb_compressed engine=innodb encryption='KEYRING';
 show create table innodb_compressed;

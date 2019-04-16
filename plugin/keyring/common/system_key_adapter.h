@@ -15,21 +15,19 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include "i_keyring_key.h"
+#include <atomic>
 
 namespace keyring {
 
 class System_key_adapter : public IKey {
  public:
   System_key_adapter(uint key_version, IKey *keyring_key)
-      : key_version(key_version), keyring_key(keyring_key) {
-    construct_system_key_data();    
-  }
+      : key_version(key_version), keyring_key(keyring_key) {}
 
   void set_keyring_key(IKey *key, uint key_version) {
     system_key_data.free();
     this->keyring_key = key;
     this->key_version = key_version;
-    construct_system_key_data();  
   }
 
   IKey *get_keyring_key() const noexcept { return keyring_key; }
@@ -55,15 +53,17 @@ class System_key_adapter : public IKey {
   }
   virtual uchar *get_key_data() {
     DBUG_ASSERT(keyring_key != nullptr);
-    DBUG_ASSERT(system_key_data.get_key_data() != nullptr);
 
-    return system_key_data.get_key_data();
+    if (system_key_data.key_data.load() == nullptr) construct_system_key_data();
+
+    return system_key_data.key_data.load();
   }
   virtual size_t get_key_data_size() {
     DBUG_ASSERT(keyring_key != nullptr);
-    DBUG_ASSERT(system_key_data.get_key_data() != nullptr);
 
-    return system_key_data.get_key_data_size();
+    if (system_key_data.key_data.load() == nullptr) construct_system_key_data();
+
+    return system_key_data.key_data_size;
   }
   virtual size_t get_key_pod_size() const noexcept {
     DBUG_ASSERT(false);
@@ -73,6 +73,7 @@ class System_key_adapter : public IKey {
     DBUG_ASSERT(false);
     return nullptr;
   }
+  virtual void xor_data(uchar*, size_t) noexcept { DBUG_ASSERT(false); }
   virtual void xor_data() noexcept { DBUG_ASSERT(false); }
   virtual void set_key_data(uchar *key_data, size_t key_data_size) {
     keyring_key->set_key_data(key_data, key_data_size);
@@ -110,18 +111,22 @@ class System_key_adapter : public IKey {
   }
 
  private:
+
+
+
   class System_key_data {
    public:
     System_key_data();
     ~System_key_data();
 
-    bool allocate(size_t key_data_size);
+    //bool allocate(size_t key_data_size);
     void free();
-    uchar *get_key_data();
-    size_t get_key_data_size();
+    //uchar *get_key_data();
+    //size_t get_key_data_size();
 
-   private:
-    uchar *key_data;
+   //private 
+    //uchar *key_data;
+    std::atomic<uchar*> key_data;
     size_t key_data_size;
   };
 

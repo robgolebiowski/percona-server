@@ -1,5 +1,7 @@
 #--skip # Test unstable on Jenkins
 
+SET GLOBAL innodb_encryption_threads=4;
+
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 
@@ -265,3 +267,14 @@ alter table t4 encryption='n';
 drop table t1, t2, t3, t4, t5, t6;
 drop tablespace ts_encrypted;
 drop tablespace ts_rk_encrypted;
+
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
+
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+--source include/wait_condition.inc
+
+SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=0;
+

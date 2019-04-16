@@ -7118,7 +7118,7 @@ int ha_innobase::open(const char *name, int, uint open_flags,
 
   } else if (!ib_table->is_readable()) {
     if (space()) {
-      if (space()->crypt_data && space()->crypt_data->is_encrypted()) {
+      if (space()->crypt_data && space()->is_encrypted) {
         /* This means that tablespace was found but we could not
         decrypt encrypted page. */
         no_tablespace = true;

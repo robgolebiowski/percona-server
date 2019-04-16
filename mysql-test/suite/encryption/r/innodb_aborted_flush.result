@@ -39,5 +39,8 @@ include/assert.inc [Make sure only t3's encryption flag is not set (ignore tempo
 # restart:--innodb-encryption-threads=4 --innodb-encrypt-tables=ONLINE_TO_KEYRING
 # Wait for all tables to get encrypted
 include/assert.inc [Make sure all tablespaces have encryption flag set (ignore temporary tablespace)]
-# restart:--innodb-encryption-threads=0 --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --log-error=MYSQL_TMP_DIR/my_restart2.err
 DROP TABLE t1,t2,t3,t4;
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL innodb_encrypt_tables=OFF;

@@ -224,19 +224,14 @@ struct fil_space_crypt_t
 				encryption == FIL_ENCRYPTION_DEFAULT));
 	}
 
-	/** Return true if tablespace is encrypted. */
-	bool is_encrypted() const {
-		return (encryption != FIL_ENCRYPTION_OFF);
+	/** Return true if encryption for this table is disabled. */
+	bool is_encryption_disabled() const {
+		return (encryption == FIL_ENCRYPTION_OFF);
 	}
 
 	/** Return true if default tablespace encryption is used, */
 	bool is_default_encryption() const {
 		return (encryption == FIL_ENCRYPTION_DEFAULT);
-	}
-
-	/** Return true if tablespace is not encrypted. */
-	bool not_encrypted() const {
-		return (encryption == FIL_ENCRYPTION_OFF);
 	}
 
 	/** Write crypt data to a page (0)

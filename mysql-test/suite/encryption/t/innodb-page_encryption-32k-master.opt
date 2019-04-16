@@ -5,3 +5,4 @@ $KEYRING_PLUGIN_OPT
 --innodb-buffer-pool-size=24M
 --bootstrap
 --innodb_page_size=32K
+--innodb-encrypt-tables=OFF

@@ -1,3 +1,4 @@
+SET GLOBAL innodb_encryption_threads=4;
 SET @@global.keyring_file_data="MYSQL_TMP_DIR/mysecret_keyring";
 SET GLOBAL innodb_file_per_table = ON;
 create table t1 (a varchar(255)) engine=innodb encryption='KEYRING';
@@ -84,3 +85,7 @@ include/assert.inc [All spaces apart from t1, t3, t4 and temporary tablespace sh
 drop table t1, t2, t3, t4, t5, t6;
 drop tablespace ts_encrypted;
 drop tablespace ts_rk_encrypted;
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
+SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=0;

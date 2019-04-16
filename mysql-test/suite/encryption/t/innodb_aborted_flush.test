@@ -93,9 +93,16 @@ SELECT * FROM t4;
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 0) AND NAME <> \\'innodb_temporary\\']" = 0
 --source include/assert.inc
 
---let $error_log2=$MYSQL_TMP_DIR/my_restart2.err
---let $restart_parameters=restart:--innodb-encryption-threads=0 --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --log-error=$error_log2
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
---source include/restart_mysqld.inc
-
+# Cleanup
 DROP TABLE t1,t2,t3,t4;
+
+# Decrypt all tables
+SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
+
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+--source include/wait_condition.inc
+
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL innodb_encrypt_tables=OFF;

@@ -162,7 +162,7 @@ uchar * fil_space_crypt_t::get_cached_key(Cached_key &cached_key, uint key_versi
 }
 
 bool fil_space_crypt_t::load_needed_keys_into_local_cache() {
-	return (encrypting_with_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ||
+  return (encrypting_with_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ||
 		get_key_currently_used_for_encryption() != NULL) &&
 		(min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ||
 		get_min_key_version_key() != NULL);
@@ -792,14 +792,13 @@ fil_crypt_get_key_state(
 	key_state_t*			new_state,
 	fil_space_crypt_t*		crypt_data) {
 
-	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-	    srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) {
+	if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED) {
+		new_state->key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+		new_state->rotate_key_age = 0;
+	} else {
 		new_state->key_version = crypt_data->key_get_latest_version();
 		new_state->rotate_key_age = srv_fil_crypt_rotate_key_age;
 		ut_a(new_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-	} else if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED) {
-		new_state->key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-		new_state->rotate_key_age = 0;
 	}
 }
 
@@ -822,13 +821,14 @@ fil_crypt_needs_rotation(
 		return false;
 	}
 
-	if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+	if (key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
+        && Encryption::is_online_encryption_on()) {
 		/* this is rotation unencrypted => encrypted
 		* ignore rotate_key_age */
 		return true;
 	}
 
-	if (latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
+	if (key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 		if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
 			//this is rotation encrypted => unencrypted 
 			return true;
@@ -841,7 +841,9 @@ fil_crypt_needs_rotation(
 
 	/* this is rotation encrypted => encrypted,
 	* only reencrypt if key is sufficiently old */
-	if (rotate_key_age > 0 && (key_version + rotate_key_age <= latest_key_version)) {
+	/* Do not encrypt tables which are unencrypted when key is rotated */
+	if (key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED &&
+	    rotate_key_age > 0 && (key_version + rotate_key_age <= latest_key_version)) {
 		return true;
 	}
 
@@ -1133,7 +1135,7 @@ fil_crypt_space_needs_rotation(
 		}
 
 		/* No need to rotate space if encryption is disabled */
-		if (crypt_data->not_encrypted()) {
+		if (crypt_data->is_encryption_disabled()) {
 			break;
 		}
 
@@ -1493,7 +1495,7 @@ fil_crypt_start_rotate_space(
 		crypt_data->rotate_state.create_flush_observer(state->space->id);
 
 		if (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED &&
-		    crypt_data->is_encrypted() &&
+		    !crypt_data->is_encryption_disabled() &&
 		    key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
 			/* this is rotation unencrypted => encrypted */
 			crypt_data->type = CRYPT_SCHEME_1;
@@ -1765,8 +1767,12 @@ fil_crypt_rotate_page(
 
 			/* statistics */
 			state->crypt_stat.pages_modified++;
-		} else {
-			if (crypt_data->is_encrypted()) {
+		} else if (mach_read_from_4(frame + FIL_PAGE_LSN) == 0) {
+			/* LSN == 0 means that the page was never flushed to disk. Thus it never had the key version assigned.
+			 * We assign the key version to this page here, as it only exists in buffer */ 
+			mlog_write_ulint(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION, crypt_data->encrypting_with_key_version, MLOG_4BYTES, &mtr);
+        	} else {
+			if (!crypt_data->is_encryption_disabled()) {
 				if (kv == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  || kv < state->min_key_version_found) {
 					state->min_key_version_found = kv;
 				}

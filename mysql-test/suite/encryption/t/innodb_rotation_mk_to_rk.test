@@ -101,10 +101,10 @@ alter table t1 encryption='n';
 --let $assert_text= t1 should got decrypted
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 0) AND NAME = \\'test/t1\\']" = 1
 --source include/assert.inc
---let $assert_text= also temporary tablespace should stary unenecrypted
+--let $assert_text= also temporary tablespace should stay unenecrypted
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 0) AND NAME = \\'innodb_temporary\\']" = 1
 --source include/assert.inc
---let $assert_text= t1 and temporary should be the only unencrypted table
+--let $assert_text= t1 and temporary should be the only unencrypted tables
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 0)]" = 2
 --source include/assert.inc
 

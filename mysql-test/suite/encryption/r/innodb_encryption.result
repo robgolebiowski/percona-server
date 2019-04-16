@@ -1,8 +1,7 @@
-SET @start_global_value = @@global.innodb_encryption_threads;
 SHOW VARIABLES LIKE 'innodb_encrypt%';
 Variable_name	Value
 innodb_encrypt_online_alter_logs	OFF
-innodb_encrypt_tables	ON
+innodb_encrypt_tables	OFF
 innodb_encryption_rotate_key_age	15
 innodb_encryption_rotation_iops	100
 innodb_encryption_threads	4
@@ -11,7 +10,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 # Success!
 # Now turn off encryption and wait for threads to decrypt everything
 SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-# Wait max 10 min for key encryption threads to decrypt all spaces (ignore temporary tablespace)
+# Wait max 10 min for key encryption threads to decrypt all spaces
 # Success!
 # Shutdown innodb_encryption_threads
 SET GLOBAL innodb_encryption_threads=0;
@@ -21,10 +20,9 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 # Wait 15s to check that nothing gets encrypted
 # Success!
 # Startup innodb_encryption_threads
-SET GLOBAL innodb_encryption_threads=@start_global_value;
+SET GLOBAL innodb_encryption_threads=4;
 # Wait max 10 min for key encryption threads to encrypt all spaces (apart from temporary tablespace)
 # Success!
-# Restart mysqld --innodb_encrypt_tables=0 --innodb_encryption_threads=0
 # restart:--innodb-encryption-threads=0 --innodb-encrypt-tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED
 SHOW VARIABLES LIKE 'innodb_encrypt%';
 Variable_name	Value
@@ -33,3 +31,7 @@ innodb_encrypt_tables	ONLINE_FROM_KEYRING_TO_UNENCRYPTED
 innodb_encryption_rotate_key_age	15
 innodb_encryption_rotation_iops	100
 innodb_encryption_threads	0
+SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
+# Wait max 10 min for key encryption threads to decrypt all spaces
+SET GLOBAL innodb_encrypt_tables = OFF;
