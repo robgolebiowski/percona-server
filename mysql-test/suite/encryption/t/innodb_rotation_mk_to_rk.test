@@ -1,4 +1,4 @@
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 
 SHOW PLUGINS;
@@ -38,7 +38,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
 --source include/start_mysqld.inc
 
@@ -62,7 +62,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 --source include/start_mysqld.inc
 
@@ -88,7 +88,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 --source include/start_mysqld.inc
 
 alter table t1 encryption='n';
@@ -115,8 +115,8 @@ alter table t1 encryption='n';
 --let SEARCH_FILE=$t1_IBD
 --source include/search_pattern_in_file.inc
 
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
--- source include/start_mysqld.inc
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
+--source include/start_mysqld.inc
 
 # cleanup
 drop table t1;

@@ -51,6 +51,7 @@ COMMIT;
 --let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
+--let $assert_debug=SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION
 --let $assert_text= All encrypted tables should have encrypted flag set apart from temporary tablespace
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count - 1
 --source include/assert.inc

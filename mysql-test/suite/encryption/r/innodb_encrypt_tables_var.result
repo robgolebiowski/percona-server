@@ -35,8 +35,6 @@ SET GLOBAL innodb_encrypt_tables = OFF;
 include/assert.inc [Make sure all tables stay decrypted]
 SET GLOBAL innodb_encrypt_tables = ON;
 include/assert.inc [Make sure all tables stay decrypted]
-SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING_FORCE;
-include/assert.inc [Make sure all tables stay decrypted]
 DROP TABLES t1,t2,t3,t4;
 SET GLOBAL innodb_encrypt_tables = OFF;
 SET GLOBAL innodb_encryption_threads=0;
