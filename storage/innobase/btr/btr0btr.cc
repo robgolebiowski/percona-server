@@ -170,7 +170,7 @@ buf_block_t *btr_root_block_get(
   buf_block_t *block = btr_block_get(page_id, page_size, mode, index, mtr);
 
   if (!block && index && index->table && !index->table->is_readable()) {
-    ib::warn(ER_XB_MSG_3, index->table_name);
+    ib::warn(ER_XB_MSG_4, index->table_name);
     return nullptr;
   }
 

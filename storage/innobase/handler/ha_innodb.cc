@@ -5414,7 +5414,7 @@ static int innobase_init_files(dict_init_mode_t dict_init_mode,
   bool ret = dict_detect_encryption_of_mysql_ibd(
       dict_init_mode, upgrade_mysql_plugin_space, do_encrypt);
   if (!ret) {
-    ib::error(ER_XB_MSG_3) << "Failed to determine if mysql.ibd is encrypted. "
+    ib::error(ER_XB_MSG_4) << "Failed to determine if mysql.ibd is encrypted. "
                               "Have you deleted it?";
     DBUG_RETURN(innodb_init_abort());
   }
@@ -7343,7 +7343,7 @@ int ha_innobase::open(const char *name, int, uint open_flags,
       error = HA_ERR_ENCRYPTION_KEY_MISSING;
     } else if (space() && space()->crypt_data) {
       ib_table->keyring_encryption_info.page0_has_crypt_data = true;
-      ib::warn(ER_XB_MSG_3, table_share->table_name.str);
+      ib::warn(ER_XB_MSG_4, table_share->table_name.str);
       error = HA_ERR_DECRYPTION_FAILED;
     } else {
       my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
@@ -7448,7 +7448,7 @@ int ha_innobase::open(const char *name, int, uint open_flags,
     is tablespace made unaccessible because encryption service
     or used key_id is not available. */
     if (encrypted) {
-      ib::warn(ER_XB_MSG_3, table_share->table_name.str);
+      ib::warn(ER_XB_MSG_4, table_share->table_name.str);
       ret_err = HA_ERR_DECRYPTION_FAILED;
     }
 
@@ -17622,7 +17622,7 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
         is_ok = false;
 
         if (err == DB_DECRYPTION_FAILED) {
-          ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_3, index->table->name.m_name);
+          ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_4, index->table->name.m_name);
         } else {
           push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,
                               "InnoDB: The B-tree of"
@@ -17690,7 +17690,7 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
     }
     if (ret != DB_SUCCESS) {
       if (ret == DB_DECRYPTION_FAILED) {
-        ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_3, index->table->name.m_name);
+        ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_4, index->table->name.m_name);
       } else {
         /* Assume some kind of corruption. */
         push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,

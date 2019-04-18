@@ -1957,7 +1957,7 @@ static dberr_t row_mysql_get_table_status(const dict_table_t *table, trx_t *trx,
   if (fil_space_t *space = fil_space_acquire_silent(table->space)) {
     if (space->is_encrypted) {
       if (push_warning) {
-        ib::warn(ER_XB_MSG_3, table->name);
+        ib::warn(ER_XB_MSG_4, table->name);
       }
       err = DB_DECRYPTION_FAILED;
     } else {

@@ -743,7 +743,7 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
       }
     } else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {
       ut_ad(m_filename != nullptr);
-      ib::warn(ER_XB_MSG_4, space_id, m_filename, crypt_data->key_id);
+      ib::warn(ER_XB_MSG_5, space_id, m_filename, crypt_data->key_id);
 
       m_is_valid = false;
       free_first_page();

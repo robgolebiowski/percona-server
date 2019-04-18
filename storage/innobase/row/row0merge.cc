@@ -3724,7 +3724,7 @@ dberr_t row_merge_build_indexes(
 
   if (!old_table->is_readable() || !new_table->is_readable()) {
     error = DB_DECRYPTION_FAILED;
-    ib::warn(ER_XB_MSG_3, table->s->table_name.str);
+    ib::warn(ER_XB_MSG_4, table->s->table_name.str);
     goto func_exit;
   }
 

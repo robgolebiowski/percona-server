@@ -5331,7 +5331,7 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
       if (space()) {
         String str;
         const char *engine = table_type();
-        ib::warn(ER_XB_MSG_3, table_share->table_name.str);
+        ib::warn(ER_XB_MSG_4, table_share->table_name.str);
         my_error(ER_GET_ERRMSG, MYF(0), HA_ERR_DECRYPTION_FAILED, str.c_ptr(),
                  engine);
         DBUG_RETURN(true);
