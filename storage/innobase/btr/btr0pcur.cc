@@ -75,7 +75,7 @@ void btr_pcur_t::store_position(mtr_t *mtr) {
 
   auto block = get_block();
 
-  if (!block && !btr_pcur_get_btr_cur(cursor)->index->table->is_readable())
+  if (!block && !btr_cur_get_index(get_btr_cur())->table->is_readable())
     return; /* decryption failure */
 
   SRV_CORRUPT_TABLE_CHECK(block, return;);

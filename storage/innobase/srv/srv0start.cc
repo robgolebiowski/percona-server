@@ -701,7 +701,7 @@ static dberr_t srv_undo_tablespace_read_encryption(pfs_os_file_t fh,
       !(srv_is_upgrade_mode &&
         memcmp(first_page + offset, ENCRYPTION_KEY_MAGIC_V2,
                ENCRYPTION_MAGIC_SIZE) == 0) &&
-      (crypt_data == nullptr || crypt_data->min_key_version == 0))) {
+      (crypt_data == nullptr || crypt_data->min_key_version == 0)) {
     ut_free(first_page_buf);
     return (DB_SUCCESS);
   }
@@ -3244,9 +3244,10 @@ void srv_pre_dd_shutdown() {
     if (srv_threads.m_encryption_threads_active) {
       wait = true;
       if ((count % 600) == 0) {
-        ib::info(ER_IB_MSG_1276) << "Waiting for"
-                                    " keyring encryption threads"
-                                    " to exit";
+        ib::info(ER_XB_MSG_WAIT_FOR_KEYRING_ENCRYPT_THREAD)
+            << "Waiting for"
+               " keyring encryption threads"
+               " to exit";
       }
     }
 

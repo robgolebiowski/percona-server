@@ -44,6 +44,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "srv0start.h"
 #include "ut0ut.h"
 
+#include "dict0dd.h"
 #include "dict0dict.h"
 #include "fts0priv.h"
 #include "lock0lock.h"
@@ -933,7 +934,7 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
 
     buf_block_t *block =
         buf_page_get_gen(page_id_t(space->id, 0), page_size_t(space->flags),
-                         RW_X_LATCH, NULL, BUF_GET, __FILE__, __LINE__, &mtr);
+                         RW_X_LATCH, nullptr, Page_fetch::NORMAL, __FILE__, __LINE__, &mtr);
 
     /* 3 - write crypt data to page 0 */
     byte *frame = buf_block_get_frame(block);
@@ -1509,7 +1510,7 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
   }
 
   buf_block_t *block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
-                                        BUF_PEEK_IF_IN_POOL, file, line, mtr);
+                                        Page_fetch::PEEK_IF_IN_POOL, file, line, mtr);
 
   if (block != NULL) {
     /* page was in buffer pool */
@@ -1525,7 +1526,7 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
 
   uintmax_t start = ut_time_us(NULL);
   block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
-                           BUF_GET_POSSIBLY_FREED, file, line, mtr);
+                           Page_fetch::POSSIBLY_FREED, file, line, mtr);
   uintmax_t end = ut_time_us(NULL);
 
   if (end < start) {
@@ -2263,7 +2264,7 @@ enum class UpdateEncryptedFlagOperation : char { SET, CLEAR };
 
 static dberr_t fil_update_encrypted_flag(
     const char *space_name, UpdateEncryptedFlagOperation update_operation,
-    bool *is_space_being_removed) {
+    volatile bool *is_space_being_removed) {
   DBUG_EXECUTE_IF("fail_encryption_flag_update_on_t3",
                   if (strcmp(space_name, "test/t3") == 0) { return DB_ERROR; });
 
@@ -2361,7 +2362,7 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
 
   if (buf_block_t *block = buf_page_get_gen(
           page_id_t(space->id, 0), page_size_t(space->flags), RW_X_LATCH, NULL,
-          BUF_GET, __FILE__, __LINE__, &mtr)) {
+          Page_fetch::NORMAL, __FILE__, __LINE__, &mtr)) {
     // mtr.set_named_space(space);
     crypt_data->write_page0(space, block->frame, &mtr,
                             crypt_data->rotate_state.min_key_version_found,

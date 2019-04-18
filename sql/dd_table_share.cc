@@ -741,7 +741,7 @@ static bool fill_share_from_dd(THD *thd, TABLE_SHARE *share,
 
   if (table_options->exists("encryption_key_id")) {
     share->was_encryption_key_id_set = true;
-    table_options->get_uint32("encryption_key_id", &share->encryption_key_id);
+    table_options->get("encryption_key_id", &share->encryption_key_id);
   }
 
   return false;

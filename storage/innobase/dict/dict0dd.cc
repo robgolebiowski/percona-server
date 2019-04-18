@@ -6188,9 +6188,11 @@ static bool dd_get_tablespace_flags(THD *thd, const char *space_name,
 /* Sets tablespace's DD flags.
 @param[in] Thread       THD
 @param[in] space_name   name of the space for which DD flags are to be set
-@param[in] space_flags  DD flags that are to be assigned to space */
+@param[in] space_flags  DD flags that are to be assigned to space
+@param[in] is_space_being_removed - pass by pointer as this can check outside this function */
 static bool dd_set_flags(THD *thd, const char *space_name,
-                         const uint32_t space_flags) {
+                         const uint32_t space_flags,
+                         volatile bool *is_space_being_removed) {
   auto set_flags = [](uint32_t &dd_space_flags, uint32_t space_flags) {
     // currently we are using this function only for correcting encryption flag
     ut_ad(dd_space_flags == space_flags ||
@@ -6199,7 +6201,7 @@ static bool dd_set_flags(THD *thd, const char *space_name,
     dd_space_flags = space_flags;
   };
   auto update_func = std::bind(set_flags, std::placeholders::_1, space_flags);
-  return dd_update_tablespace_dd_flags(thd, space_name, update_func);
+  return dd_update_tablespace_dd_flags(thd, space_name, is_space_being_removed, update_func);
 }
 
 bool dd_fix_mysql_ibd_encryption_flag_if_needed(THD *thd,
@@ -6225,7 +6227,8 @@ bool dd_fix_mysql_ibd_encryption_flag_if_needed(THD *thd,
         << ") This comparission does *not* include the encryption flag.";
     return true;
   }
-  return dd_set_flags(thd, dict_sys_t::s_dd_space_name, space_flags);
+  bool is_space_being_removed{false};
+  return dd_set_flags(thd, dict_sys_t::s_dd_space_name, space_flags, &is_space_being_removed);
 }
 
 #endif /* !UNIV_HOTBACKUP */
