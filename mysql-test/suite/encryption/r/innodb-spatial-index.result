@@ -50,6 +50,8 @@ NAME
 innodb_system
 innodb_undo_001
 innodb_undo_002
+mtr/global_suppressions
+mtr/test_suppressions
 mysql
 sys/sys_config
 test/t1

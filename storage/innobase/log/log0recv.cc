@@ -2444,7 +2444,7 @@ void recv_recover_page_func(
 
     if (recv->start_lsn >= page_lsn
 #ifndef UNIV_HOTBACKUP
-        && undo::is_active(recv_addr->space)
+        && undo::is_active(recv_addr->space, false)
 #endif /* !UNIV_HOTBACKUP */
     ) {
 

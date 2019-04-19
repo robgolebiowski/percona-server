@@ -18879,7 +18879,7 @@ ER_XB_MSG_4
   eng "Table %s is encrypted but decryption failed. Seems that the encryption key fetched from keyring is not the correct one. Are you using the correct keyring?";
 
 ER_XB_MSG_5
-  eng "Tablespace id %d in file %s is encrypted but keyring or used key_id %d is not available. Can't continue reading table. Please provide the correct keyring.";
+  eng "Tablespace id %u in file %s is encrypted but keyring or used key_id %u is not available. Can't continue reading table. Please provide the correct keyring.";
 
 ER_XB_MSG_WAIT_FOR_KEYRING_ENCRYPT_THREAD
   eng "Waiting for keyring encryption threads to exit"
