@@ -50,9 +50,8 @@ set autocommit=1;
 --echo # Wait for all tables to get encrypted
 --let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --let $wait_timeout= 600
-# Encrypted tables count should be equal tables_count - because INNODB_TABLESPACES_ENCRYPTION
-# contains an artificial table innodb_system and temporary tablespace is not encrypted
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+# Encrypted tables count should be equal tables_count - 1 because temporary tablespace is not encrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --echo # We want only first 100 pages to be rotated
@@ -90,8 +89,8 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
---echo # All tables should get encrypted. tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial table and temporary tablespace is not encrypted
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 2
+--echo # All tables should get encrypted. tables_count - 1 because temporary tablespace is not encrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 2
 --source include/wait_condition.inc
 
 --echo # Make sure t1 is encrypted

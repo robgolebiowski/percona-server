@@ -3484,6 +3484,9 @@ dberr_t Buf_fetch_normal::get(buf_block_t *&block) {
 
     /* Page not in buf_pool: needs to be read from file */
     read_page();
+    if (m_err && *m_err == DB_DECRYPTION_FAILED) {
+      return DB_DECRYPTION_FAILED;
+    }
   }
 
   return (DB_SUCCESS);
@@ -3536,6 +3539,9 @@ dberr_t Buf_fetch_other::get(buf_block_t *&block) {
 
     /* Page not in buf_pool: needs to be read from file */
     read_page();
+    if (m_err && *m_err == DB_DECRYPTION_FAILED) {
+      return DB_DECRYPTION_FAILED;
+    }
   }
 
   return (DB_SUCCESS);
@@ -4019,7 +4025,9 @@ buf_block_t *Buf_fetch<T>::single_page() {
   m_buf_pool->stat.n_page_gets++;
 
   for (;;) {
-    if (static_cast<T *>(this)->get(block) == DB_NOT_FOUND) {
+    dberr_t error = static_cast<T *>(this)->get(block);
+    if (error == DB_NOT_FOUND ||
+        (error == DB_DECRYPTION_FAILED && block == nullptr)) {
       return (nullptr);
     }
 
@@ -4038,7 +4046,9 @@ buf_block_t *Buf_fetch<T>::single_page() {
       }
     }
 
-    if (UNIV_UNLIKELY(block->page.is_corrupt && srv_pass_corrupt_table <= 1)) {
+    if (UNIV_UNLIKELY((block->page.is_corrupt && srv_pass_corrupt_table <= 1) ||
+                      error == DB_DECRYPTION_FAILED)) {
+      ut_ad(*m_err != DB_SUCCESS);
       buf_block_unfix(block);
 
       return (nullptr);
@@ -5145,7 +5155,7 @@ dberr_t buf_page_check_corrupt(buf_page_t *bpage, fil_space_t *space) {
     bpage->encrypted = true;
     err = DB_DECRYPTION_FAILED;
     ib::error() << "The page " << bpage->id << " in file '"
-                << space->files.begin()->name 
+                << space->files.begin()->name
                 << "' cannot be decrypted. Are you using correct keyring?";
   }
   return err;

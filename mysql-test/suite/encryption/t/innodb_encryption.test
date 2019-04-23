@@ -2,11 +2,12 @@ SHOW VARIABLES LIKE 'innodb_encrypt%';
 
 SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 
---let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
+# We do not encrypt temporary tablespace
+--let encrypted_tables_count=`select count(*) - 1 from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces, apart from temporary tablespace
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1;
+--let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1;
 --source include/wait_condition.inc
 
 --echo # Success!
@@ -16,7 +17,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 
 --echo # Wait max 10 min for key encryption threads to decrypt all spaces
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+--let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 --source include/wait_condition.inc
 
 --echo # Success!
@@ -33,7 +34,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 --sleep 15
 
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
+--let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 --source include/wait_condition.inc
 
 --echo # Success!
@@ -43,7 +44,7 @@ SET GLOBAL innodb_encryption_threads=4;
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces (apart from temporary tablespace)
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1;
+--let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1;
 --source include/wait_condition.inc
 
 --echo # Success!

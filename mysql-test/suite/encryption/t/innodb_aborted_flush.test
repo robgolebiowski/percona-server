@@ -32,9 +32,8 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 --echo # Wait for all tables to get encrypted
 --let $tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --let $wait_timeout= 600
-# Encrypted tables count should be equal $tables_count - 1 because INNODB_TABLESPACES_ENCRYPTION
-# contains an artificial table innodb_system, but t3 and temporary tablespace should not be encrypted
---let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+# Encrypted tables count should be equal $tables_count - 2 because t3 and temporary tablespace should not be encrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --let $assert_text= Make sure only t3's encryption flag is not set (ignore temporary tablepsace, which is never encrypted with keyring)
@@ -84,9 +83,8 @@ SELECT * FROM t4;
 --echo # Wait for all tables to get encrypted
 --let $tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --let $wait_timeout= 600
-# Encrypted tables count should be equal $tables_count - because INNODB_TABLESPACES_ENCRYPTION
-# contains an artificial table innodb_system, and temporary tablespace will not be encrypted
---let $wait_condition=SELECT COUNT(*) = $tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+# Encrypted tables count should be equal $tables_count - 1 - because temporary tablespace will not be encrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --let $assert_text= Make sure all tablespaces have encryption flag set (ignore temporary tablespace)

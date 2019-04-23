@@ -43,7 +43,6 @@ ALTER TABLE t4 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 ALTER TABLE t6 ENCRYPTION='N', ALGORITHM=INPLACE;
 ALTER TABLE t6 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 # Wait max 10 min for key encryption threads to encrypt all spaces
-
 include/assert.inc [All encrypted tables should have encrypted flag set, apart from t3 and temporary]
 # t1 yes on expecting NOT FOUND
 # t2 ... on expecting NOT FOUND

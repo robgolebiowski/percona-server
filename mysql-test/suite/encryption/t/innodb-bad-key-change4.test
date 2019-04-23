@@ -1,6 +1,6 @@
 --source include/have_64bit.inc
 
-call mtr.add_suppression("\\[InnoDB\\] The page \\[page id: space=2, page number=4\\] in file '\./test/t1\.ibd' cannot be decrypted\. Are you using correct keyring?");
+call mtr.add_suppression("\\[InnoDB\\] The page \\[page id: space=4, page number=4\\] in file '\./test/t1\.ibd' cannot be decrypted\. Are you using correct keyring?");
 call mtr.add_suppression("\\[InnoDB\\] Table test/t1 is encrypted but decryption failed\. Seems that the encryption key fetched from keyring is not the correct one. Are you using the correct keyring?");
 
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR

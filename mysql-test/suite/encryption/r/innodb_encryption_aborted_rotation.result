@@ -34,7 +34,7 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 # make sense to check the table as table will not contain plaintext
 # t1 is only half rotatted, now we will check if the encryption can be completed after the restart
 # restart:--innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
-# All tables should get encrypted. tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial table and temporary tablespace should remain unencrypted
+# All tables should get encrypted. tables_count - 1 because temporary tablespace should remain unencrypted
 # innodb_system
 # Make sure t1 is encrypted
 # Now we try rotation encrypted => unencrypted

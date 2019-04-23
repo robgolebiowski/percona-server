@@ -29,7 +29,7 @@ SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
 # Make sure that t1 is still encrypted
 # t1 is only half rotatted, now we will check if the encryption can be completed after the restart
 # restart:--innodb-encryption-threads=4
-# All tables should get encrypted. tables_count - because INNODB_TABLESPACES_ENCRYPTION contains artificial table and temporary tablespace is not encrypted
+# All tables should get encrypted. tables_count - 1 because temporary tablespace is not encrypted
 # Make sure t1 is encrypted
 SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 # All tables should get decrypted, apart from t1.
