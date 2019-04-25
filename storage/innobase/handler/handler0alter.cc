@@ -6171,7 +6171,7 @@ oom:
                get_error_key_name(m_prebuilt->trx->error_key_num, ha_alter_info,
                                   m_prebuilt->table));
       break;
-    case DB_DECRYPTION_FAILED: {
+    case DB_IO_DECRYPT_FAIL: {
       String str;
       const char *engine = table_type();
       get_error_message(HA_ERR_DECRYPTION_FAILED, &str);

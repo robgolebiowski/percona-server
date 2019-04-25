@@ -4648,7 +4648,7 @@ dberr_t btr_validate_index(
   page_t *root = btr_root_get(index, &mtr);
 
   if (root == NULL && !index->is_readable()) {
-    err = DB_DECRYPTION_FAILED;
+    err = DB_IO_DECRYPT_FAIL;
     mtr_commit(&mtr);
     return err;
   }

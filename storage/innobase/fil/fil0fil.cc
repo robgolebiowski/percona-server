@@ -2515,7 +2515,7 @@ dberr_t Fil_shard::get_file_size(fil_node_t *file, bool read_only_mode) {
       Encryption::tablespace_key_exists(space->crypt_data->key_id) == false &&
       !recv_recovery_is_on()) {
     ib::error() << "There is no key for tablespace " << space->name;
-    return (DB_DECRYPTION_FAILED);
+    return (DB_IO_DECRYPT_FAIL);
   }
 
   if (file->size == 0) {
@@ -8956,7 +8956,7 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
       Encryption::get_latest_tablespace_key(iter.m_crypt_data->key_id,
                                             &iter.m_encryption_key_version,
                                             &iter.m_encryption_key);
-      if (iter.m_encryption_key == NULL) err = DB_DECRYPTION_FAILED;
+      if (iter.m_encryption_key == NULL) err = DB_IO_DECRYPT_FAIL;
     } else {
       /* Set encryption info. */
       iter.m_encryption_key = table->encryption_key;

@@ -1146,7 +1146,7 @@ handle_new_error:
     case DB_FTS_INVALID_DOCID:
     case DB_INTERRUPTED:
     case DB_CANT_CREATE_GEOMETRY_OBJECT:
-    case DB_DECRYPTION_FAILED:
+    case DB_IO_DECRYPT_FAIL:
     case DB_COMPUTE_VALUE_FAILED:
     case DB_LOCK_NOWAIT:
       DBUG_EXECUTE_IF("row_mysql_crash_if_error", {
@@ -1948,7 +1948,7 @@ or is tablespace .ibd file missing.
 @param[in] table                Table
 @param[in] trx                  Transaction
 @param[in] push_warning         true if we should push warning to user
-@retval DB_DECRYPTION_FAILED    table is encrypted but decryption failed
+@retval DB_IO_DECRYPT_FAIL    table is encrypted but decryption failed
 @retval DB_CORRUPTION           table is corrupted
 @retval DB_TABLESPACE_NOT_FOUND tablespace .ibd file not found */
 static dberr_t row_mysql_get_table_status(const dict_table_t *table, trx_t *trx,
@@ -1959,7 +1959,7 @@ static dberr_t row_mysql_get_table_status(const dict_table_t *table, trx_t *trx,
       if (push_warning) {
         ib::warn(ER_XB_MSG_4, table->name);
       }
-      err = DB_DECRYPTION_FAILED;
+      err = DB_IO_DECRYPT_FAIL;
     } else {
       if (push_warning) {
         push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,

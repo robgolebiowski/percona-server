@@ -504,7 +504,7 @@ dberr_t ibuf_init_at_db_start(void) {
   header_page = ibuf_header_page_get(&mtr);
 
   if (!header_page) {
-    return (DB_DECRYPTION_FAILED);
+    return (DB_IO_DECRYPT_FAIL);
   }
 
   fseg_n_reserved_pages(header_page + IBUF_HEADER + IBUF_TREE_SEG_HEADER,

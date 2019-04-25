@@ -419,7 +419,7 @@ Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
 @param[in]	ptr		Log entry start
 @param[in]	end_ptr		Log entry end
 @param[in]	block		buffer block
-@param[out]	err		DB_SUCCESS or DB_DECRYPTION_FAILED
+@param[out]	err		DB_SUCCESS or DB_IO_DECRYPT_FAIL
 @return position on log buffer */
 byte*
 fil_parse_write_crypt_data(

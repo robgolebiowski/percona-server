@@ -3484,8 +3484,8 @@ dberr_t Buf_fetch_normal::get(buf_block_t *&block) {
 
     /* Page not in buf_pool: needs to be read from file */
     read_page();
-    if (m_err && *m_err == DB_DECRYPTION_FAILED) {
-      return DB_DECRYPTION_FAILED;
+    if (m_err && *m_err == DB_IO_DECRYPT_FAIL) {
+      return DB_IO_DECRYPT_FAIL;
     }
   }
 
@@ -3539,8 +3539,8 @@ dberr_t Buf_fetch_other::get(buf_block_t *&block) {
 
     /* Page not in buf_pool: needs to be read from file */
     read_page();
-    if (m_err && *m_err == DB_DECRYPTION_FAILED) {
-      return DB_DECRYPTION_FAILED;
+    if (m_err && *m_err == DB_IO_DECRYPT_FAIL) {
+      return DB_IO_DECRYPT_FAIL;
     }
   }
 
@@ -3858,7 +3858,7 @@ void Buf_fetch<T>::read_page() {
        corrupted in a way where the key_id field is
        nonzero. There is no checksum on field
        FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION. */
-    if (local_err == DB_DECRYPTION_FAILED) return;
+    if (local_err == DB_IO_DECRYPT_FAIL) return;
 
     ib::fatal(ER_IB_MSG_74)
         << "Unable to read page " << m_page_id << " into the buffer pool after "
@@ -4027,7 +4027,7 @@ buf_block_t *Buf_fetch<T>::single_page() {
   for (;;) {
     dberr_t error = static_cast<T *>(this)->get(block);
     if (error == DB_NOT_FOUND ||
-        (error == DB_DECRYPTION_FAILED && block == nullptr)) {
+        (error == DB_IO_DECRYPT_FAIL && block == nullptr)) {
       return (nullptr);
     }
 
@@ -4047,7 +4047,7 @@ buf_block_t *Buf_fetch<T>::single_page() {
     }
 
     if (UNIV_UNLIKELY((block->page.is_corrupt && srv_pass_corrupt_table <= 1) ||
-                      error == DB_DECRYPTION_FAILED)) {
+                      error == DB_IO_DECRYPT_FAIL)) {
       ut_ad(*m_err != DB_SUCCESS);
       buf_block_unfix(block);
 
@@ -5153,7 +5153,7 @@ dberr_t buf_page_check_corrupt(buf_page_t *bpage, fil_space_t *space) {
     buf_page_io_complete(). */
   } else if (bpage->encrypted && corrupted) {
     bpage->encrypted = true;
-    err = DB_DECRYPTION_FAILED;
+    err = DB_IO_DECRYPT_FAIL;
     ib::error() << "The page " << bpage->id << " in file '"
                 << space->files.begin()->name
                 << "' cannot be decrypted. Are you using correct keyring?";
@@ -5168,7 +5168,7 @@ the buffer pool.
 @retval	DB_SUCCESS		always when writing, or if a read page was OK
 @retval	DB_TABLESPACE_DELETED	if the tablespace does not exist
 @retval	DB_PAGE_CORRUPTED	if the checksum fails on a page read
-@retval	DB_DECRYPTION_FAILED	if page post encryption checksum matches but
+@retval	DB_IO_DECRYPT_FAIL	if page post encryption checksum matches but
                                 after decryption normal page checksum does
                                 not match */
 dberr_t buf_page_io_complete(buf_page_t *bpage, bool evict) {

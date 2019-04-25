@@ -1852,7 +1852,7 @@ static dberr_t os_file_io_complete(const IORequest &type, os_file_t fh,
       if (err != DB_SUCCESS) return err;
 
       if (!load_key_needed_for_decryption(type, encryption, buf))
-        return DB_DECRYPTION_FAILED;
+        return DB_IO_DECRYPT_FAIL;
     }
 
     ret = encryption.decrypt(type, buf, src_len, scratch, len);

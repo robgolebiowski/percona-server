@@ -980,7 +980,7 @@ retry_page_get:
                            line, mtr, false, &err);
   tree_blocks[n_blocks] = block;
 
-  if (err == DB_DECRYPTION_FAILED) {
+  if (err == DB_IO_DECRYPT_FAIL) {
     ut_ad(block == NULL);
     ib::warn(ER_XB_MSG_4, index->table_name);
     page_cursor->block = 0;
@@ -1106,7 +1106,7 @@ retry_page_get:
     block = buf_page_get_gen(page_id, page_size, rw_latch, NULL, fetch, file,
                              line, mtr, false, &err);
 
-    if (err == DB_DECRYPTION_FAILED) {
+    if (err == DB_IO_DECRYPT_FAIL) {
       ib::warn(ER_XB_MSG_4, index->table_name);
       if (estimate) {
         page_cursor->block = 0;
@@ -2039,7 +2039,7 @@ dberr_t btr_cur_open_at_index_side_func(
                          cursor->m_fetch_mode, file, line, mtr, false, &err);
     tree_blocks[n_blocks] = block;
 
-    if (err == DB_DECRYPTION_FAILED) {
+    if (err == DB_IO_DECRYPT_FAIL) {
       ib::warn(ER_XB_MSG_4, index->table_name);
       page_cursor->block = 0;
       page_cursor->rec = 0;
@@ -2463,7 +2463,7 @@ bool btr_cur_open_at_rnd_pos_func(
 
     ut_ad((block != NULL) == (err == DB_SUCCESS));
 
-    if (err == DB_DECRYPTION_FAILED) {
+    if (err == DB_IO_DECRYPT_FAIL) {
       ib::warn(ER_XB_MSG_4, index->table_name);
       page_cursor->block = 0;
       page_cursor->rec = 0;
@@ -5115,7 +5115,7 @@ static int64_t btr_estimate_n_rows_in_range_on_level(
 
     ut_ad((block != nullptr) == (err == DB_SUCCESS));
 
-    if (err == DB_DECRYPTION_FAILED) {
+    if (err == DB_IO_DECRYPT_FAIL) {
       ib::warn(ER_XB_MSG_4, index->table_name);
       index->table->set_file_unreadable();
       mtr_commit(&mtr);

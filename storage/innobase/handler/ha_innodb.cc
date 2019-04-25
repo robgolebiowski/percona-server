@@ -2255,7 +2255,7 @@ int convert_error_code_to_mysql(
     case DB_TABLESPACE_NOT_FOUND:
       return (HA_ERR_TABLESPACE_MISSING);
 
-    case DB_DECRYPTION_FAILED:
+    case DB_IO_DECRYPT_FAIL:
       return (HA_ERR_DECRYPTION_FAILED);
 
     case DB_TOO_BIG_RECORD: {
@@ -7137,7 +7137,7 @@ void ha_innobase::innobase_initialize_autoinc() {
         updates should fail. */
         err = DB_SUCCESS;
         break;
-      case DB_DECRYPTION_FAILED:
+      case DB_IO_DECRYPT_FAIL:
         ut_ad(index->table->is_readable() == false);
         return;
 
@@ -17621,7 +17621,7 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
       if (err != DB_SUCCESS) {
         is_ok = false;
 
-        if (err == DB_DECRYPTION_FAILED) {
+        if (err == DB_IO_DECRYPT_FAIL) {
           ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_4, index->table->name.m_name);
         } else {
           push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,
@@ -17689,7 +17689,7 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
       break;
     }
     if (ret != DB_SUCCESS) {
-      if (ret == DB_DECRYPTION_FAILED) {
+      if (ret == DB_IO_DECRYPT_FAIL) {
         ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_4, index->table->name.m_name);
       } else {
         /* Assume some kind of corruption. */

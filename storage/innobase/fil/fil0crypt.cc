@@ -932,9 +932,9 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
     mtr.set_flush_observer(&flush_observer);
     /* 2 - get page 0 */
 
-    buf_block_t *block =
-        buf_page_get_gen(page_id_t(space->id, 0), page_size_t(space->flags),
-                         RW_X_LATCH, nullptr, Page_fetch::NORMAL, __FILE__, __LINE__, &mtr);
+    buf_block_t *block = buf_page_get_gen(
+        page_id_t(space->id, 0), page_size_t(space->flags), RW_X_LATCH, nullptr,
+        Page_fetch::NORMAL, __FILE__, __LINE__, &mtr);
 
     /* 3 - write crypt data to page 0 */
     byte *frame = buf_block_get_frame(block);
@@ -1509,8 +1509,9 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
     return NULL;
   }
 
-  buf_block_t *block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
-                                        Page_fetch::PEEK_IF_IN_POOL, file, line, mtr);
+  buf_block_t *block =
+      buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
+                       Page_fetch::PEEK_IF_IN_POOL, file, line, mtr);
 
   if (block != NULL) {
     /* page was in buffer pool */
@@ -1525,8 +1526,10 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
   state->crypt_stat.pages_read_from_disk++;
 
   uintmax_t start = ut_time_us(NULL);
+  dberr_t err;
   block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
-                           Page_fetch::POSSIBLY_FREED, file, line, mtr);
+                           Page_fetch::POSSIBLY_FREED, file, line, mtr, false,
+                           &err);
   uintmax_t end = ut_time_us(NULL);
 
   if (end < start) {
