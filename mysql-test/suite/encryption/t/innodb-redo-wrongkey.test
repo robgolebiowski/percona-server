@@ -58,7 +58,7 @@ let $cleanup= drop table t1,t2,t3,t4;
 --error 1
 #--exec xterm -e gdb --args $MYSQLD_CMD --log-error=$error_log
 #--exec xterm -e gdb --args $MYSQLD_CMD --log-error=$error_log --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt $KEYRING_PLUGIN_OPT
---exec $MYSQLD_CMD --core-file --log-error=$error_log --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt $KEYRING_PLUGIN_OPT
+--exec $MYSQLD_CMD --core-file --log-error=$error_log --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=OFF
 
 # We should get error in error log as it should not be possible to apply redo logs
 # to encrypted tables

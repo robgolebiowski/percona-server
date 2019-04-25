@@ -44,16 +44,16 @@ COMMIT;
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=$MYSQL_TMP_DIR/mysecret_keyring $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
 --source include/start_mysqld.inc
 
---let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
-#We do not encrypt temporary tablespace, but we do encrypt innodb_system which is not listed in INNODB_TABLESPACES
---echo # Wait max 10 min for key encryption threads to encrypt all spaces
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
+#We do not encrypt temporary tablespace
+--echo # Wait max 10 min for key encryption threads to encrypt all spaces (apart from temporary)
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --let $assert_debug=SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION
 --let $assert_text= All encrypted tables should have encrypted flag set apart from temporary tablespace
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count - 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $tables_count - 1
 --source include/assert.inc
 
 let INNODB_PAGE_SIZE=`select @@innodb_page_size`;

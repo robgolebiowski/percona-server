@@ -28,7 +28,7 @@ SELECT * FROM t1;
 --echo #### Missing key errors ####
 --echo # Make sure that there is no error in error log related to missing key for t1
 
---let SEARCH_PATTERN=Tablespace id 3 in file t1\.ibd is encrypted but keyring or used key_id 2 is not available\. Can't continue reading table\. Please provide the correct keyring
+--let SEARCH_PATTERN=Tablespace id 5 in file t1\.ibd is encrypted but keyring or used key_id 2 is not available\. Can't continue reading table\. Please provide the correct keyring
 --let ABORT_ON=FOUND
 --let SEARCH_FILE=$test_error_log
 --source include/search_pattern_in_file.inc
@@ -47,7 +47,7 @@ DROP TABLE t1;
 
 --source include/shutdown_mysqld.inc
 
---let SEARCH_PATTERN=Tablespace id 3 in file t1\.ibd is encrypted but keyring or used key_id 2 is not available\. Can't continue reading table\. Please provide the correct keyring
+--let SEARCH_PATTERN=Tablespace id 5 in file t1\.ibd is encrypted but keyring or used key_id 2 is not available\. Can't continue reading table\. Please provide the correct keyring
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_FILE=$test_error_log
 --source include/search_pattern_in_file.inc
@@ -74,7 +74,7 @@ INSERT INTO t2 VALUES ('foobar',1,2);
 --let ABORT_ON=FOUND
 --let SEARCH_FILE=$test_error_log
 --source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=The page \[page id: space=4, page number=4\] in file '\./test/t2\.ibd' cannot be decrypted\. Are you using correct keyring?
+--let SEARCH_PATTERN=The page \[page id: space=6, page number=4\] in file '\./test/t2\.ibd' cannot be decrypted\. Are you using correct keyring?
 --source include/search_pattern_in_file.inc
 
 --echo
@@ -136,7 +136,7 @@ DROP TABLE t2;
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_FILE=$test_error_log
 --source include/search_pattern_in_file.inc
---let SEARCH_PATTERN=The page \[page id: space=4, page number=4\] in file '\./test/t2\.ibd' cannot be decrypted\. Are you using correct keyring?
+--let SEARCH_PATTERN=The page \[page id: space=6, page number=4\] in file '\./test/t2\.ibd' cannot be decrypted\. Are you using correct keyring?
 --source include/search_pattern_in_file.inc
 
 --echo

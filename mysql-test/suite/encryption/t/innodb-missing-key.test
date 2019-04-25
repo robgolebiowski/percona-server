@@ -1,5 +1,5 @@
 --source include/have_64bit.inc
-call mtr.add_suppression("\\[InnoDB\\] Tablespace id 2 in file t1\.ibd is encrypted but keyring or used key_id 7 is not available\. Can't continue reading table\. Please provide the correct keyring\.");
+call mtr.add_suppression("\\[InnoDB\\] Tablespace id 4 in file t1\.ibd is encrypted but keyring or used key_id 7 is not available\. Can't continue reading table\. Please provide the correct keyring\.");
 
 SET GLOBAL innodb_encryption_threads=4;
 

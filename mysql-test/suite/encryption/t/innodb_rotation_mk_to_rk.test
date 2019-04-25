@@ -15,16 +15,15 @@ insert t1 values (repeat('foobarsecret', 12));
 
 SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 
-# Add DD tablespace manually as they sometimes do not appear in innodb_tablespaces immediately
---let encrypted_tables_count=`select count(*) + 4 from INFORMATION_SCHEMA.INNODB_TABLESPACES where SPACE < 1000`
-#We do not encrypt temporary tablespace, but we do encrypt innodb_system which is not listed in INNODB_TABLESPACES
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+#We do not encrypt temporary tablespace
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --let $assert_text= All encrypted tables should have encrypted flag set apart from temporary tablespace
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $encrypted_tables_count - 1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 8192)]" = $tables_count - 1
 --source include/assert.inc
 
 --let $assert_text= Make sure t1 is present in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERSION = 1
@@ -71,7 +70,8 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+#We do not encrypt temporary tablespace
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --let $assert_text= All tables should have been encrypted, apart from temporary tablepsace
