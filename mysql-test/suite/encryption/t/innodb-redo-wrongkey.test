@@ -35,7 +35,7 @@ commit;
 # We are restarting mysql to be sure that redo log was proceed and we get a clean checkout
 # in no_checkpoint_start (tables were created and no write to page0 will be in a redo log)
 --let $restart_hide_args=1
---let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt
+--let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys2.txt --innodb-doublewrite=0
 --source include/restart_mysqld.inc
 
 --source include/no_checkpoint_start.inc
