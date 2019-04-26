@@ -60,6 +60,8 @@ while ($wait_counter)
 }
 if (!$success)
 {
+  SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
+
   echo Timeout in wait_condition.inc for $wait_condition;
   if ($show_rpl_debug_info)
   {

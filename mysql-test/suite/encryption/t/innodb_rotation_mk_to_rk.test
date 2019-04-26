@@ -1,7 +1,6 @@
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 eval SET @@global.keyring_file_data="$MYSQL_TMP_DIR/mysecret_keyring";
 
-SHOW PLUGINS;
 --let $MYSQLD_DATADIR=`select @@datadir`
 --let t1_IBD = $MYSQLD_DATADIR/test/t1.ibd
 
