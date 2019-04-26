@@ -46,6 +46,10 @@ while ($mysql_errno)
   --dec $counter
   if (!$counter)
   {
+    --enable_query_log
+    show session status;
+    --disable_query_log
+
     --die Server failed to restart
   }
   --sleep 0.1
