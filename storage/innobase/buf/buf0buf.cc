@@ -5202,6 +5202,9 @@ dberr_t buf_page_io_complete(buf_page_t *bpage, bool evict) {
 
     dberr_t err = DB_SUCCESS;
 
+    byte *dst_frame =
+        (bpage->zip.data) ? bpage->zip.data : ((buf_block_t *)bpage)->frame;
+
     if (bpage->size.is_compressed()) {
       frame = bpage->zip.data;
       os_atomic_increment_ulint(&buf_pool->n_pend_unzip, 1);
@@ -5209,6 +5212,15 @@ dberr_t buf_page_io_complete(buf_page_t *bpage, bool evict) {
         os_atomic_decrement_ulint(&buf_pool->n_pend_unzip, 1);
 
         compressed_page = false;
+        ulint original_page_type =
+            mach_read_from_2(dst_frame + FIL_PAGE_ORIGINAL_TYPE_V1);
+
+        if (original_page_type == FIL_PAGE_ENCRYPTED) {
+          bpage->encrypted = true;
+          err = DB_IO_DECRYPT_FAIL;
+          goto corrupt;
+        }
+
         err = DB_PAGE_CORRUPTED;
         goto corrupt;
       }

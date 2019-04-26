@@ -1,6 +1,6 @@
 call mtr.add_suppression("\\[InnoDB\\] Space to be marked as encrypted was not found for id");
 call mtr.add_suppression("\\[InnoDB\\] The page \\[page id: space=[1-9][0-9]*, page number=[1-9][0-9]*\\] in file '.*test.t1\\.ibd' cannot be decrypted\\.");
-call mtr.add_suppression("\\[InnoDB\\] Post - encryption checksum verification failed - decryption failed for space id = 2 page_no = 4");
+call mtr.add_suppression("\\[InnoDB\\] Post - encryption checksum verification failed - decryption failed for space id = 4 page_no = 4");
 call mtr.add_suppression("\\[InnoDB\\] Table test/t1 is encrypted but decryption failed\. Seems that the encryption key fetched from keyring is not the correct one\. Are you using the correct keyring?");
 SET @@global.keyring_file_data="MYSQL_TMP_DIR/mysecret_keyring";
 SET GLOBAL innodb_file_per_table = ON;
@@ -9,7 +9,7 @@ BEGIN;
 INSERT INTO t1 (a) VALUES ('foobarsecret');
 COMMIT;
 # restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=1
-# Wait max 10 min for key encryption threads to encrypt all spaces
+# Wait max 10 min for key encryption threads to encrypt all spaces (apart from temporary)
 include/assert.inc [All encrypted tables should have encrypted flag set apart from temporary tablespace]
 # Backup t1 before corrupting
 # Corrupt t1

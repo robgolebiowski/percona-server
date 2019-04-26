@@ -1,6 +1,9 @@
 # Test scenario when there are updates/inserts to encrypted table in redo log, but the key in keyring
-# is not the correct one.
-
+# is not the correct one. First we encrypt tables with key_id = 2 from keys2.txt then while there are
+# inserts running on these tables we kill the server. Then we restart it with keys3.txt. In keys3.txt
+# the key_id = 2 exists, but this is a different key. After decrypting tables with this key, the server
+# should fail to apply redo logs to those tables since the tables will be garbage, as incorrect key was
+# used.
 SET GLOBAL innodb_file_per_table = ON;
 SET GLOBAL innodb_encrypt_tables = KEYRING_ON;
 
@@ -55,10 +58,11 @@ let $cleanup= drop table t1,t2,t3,t4;
 
 --let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
 
+# We need to disable double write buffer. Otherwise some of the pages could have been restored from double write buffer
+# and then encrypted with keys from keys3.txt. Making it impossible to decrypt for subsequentail restart with
+# correct keyring file, i.e. keys2.txt
 --error 1
-#--exec xterm -e gdb --args $MYSQLD_CMD --log-error=$error_log
-#--exec xterm -e gdb --args $MYSQLD_CMD --log-error=$error_log --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt $KEYRING_PLUGIN_OPT
---exec $MYSQLD_CMD --core-file --log-error=$error_log --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=OFF
+--exec $MYSQLD_CMD --core-file --log-error=$error_log --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/keys3.txt $KEYRING_PLUGIN_OPT --innodb-encrypt-tables=OFF --innodb-doublewrite=0
 
 # We should get error in error log as it should not be possible to apply redo logs
 # to encrypted tables

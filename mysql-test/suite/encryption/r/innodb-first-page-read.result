@@ -1,6 +1,5 @@
 SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 SET GLOBAL innodb_file_per_table = ON;
-FLUSH STATUS;
 create database innodb_test;
 use innodb_test;
 create table innodb_normal(c1 bigint not null, b char(200)) engine=innodb;
@@ -51,7 +50,6 @@ insert into innodb_datadir1 select * from innodb_normal;
 insert into innodb_datadir2 select * from innodb_normal;
 insert into innodb_datadir3 select * from innodb_normal;
 commit;
-FLUSH STATUS;
 # Restart server and see how many pages 0 are read
 # restart
 include/assert.inc [number of page 0 should be greater than 0]
@@ -59,7 +57,6 @@ include/assert.inc [number of page 0 read should be less than number of tables i
 set global innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 # wait until tables are decrypted
 include/assert.inc [number of page 0 read should be less than number of tables in both innodb_test and mysql databases]
-FLUSH STATUS;
 # restart and see number of pages 0 read
 # restart:--innodb-encryption-threads=0
 # Since we have restarted the server with encryption threads disabled - the tables from innodb_test database
@@ -71,7 +68,6 @@ c1	b
 1	secret
 include/assert.inc [innodb_pages0_read should be increased only by one]
 drop database innodb_test;
-FLUSH STATUS;
 include/assert.inc [All the tables should to be unencrypted]
 SET GLOBAL innodb_encrypt_tables=OFF;
 SET GLOBAL innodb_encryption_threads=4;
