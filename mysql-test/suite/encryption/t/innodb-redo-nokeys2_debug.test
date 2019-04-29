@@ -1,6 +1,10 @@
 # Test scenario when there are updates/inserts to encrypted table in redo log, but the keyring
 # with encryption key is not available.
 
+# There are two versions of this test - one for debug and the other for release. Please check PS-5590 for details.
+--source include/have_debug.inc
+
+let $MTR_DATADIR= `SELECT @@datadir`;
 SET GLOBAL innodb_file_per_table = ON;
 
 create table t1(a int not null primary key, c char(200), b blob, index(b(10))) engine=innodb row_format=compressed ENCRYPTION='KEYRING' encryption_key_id=20;
@@ -55,7 +59,6 @@ let $cleanup= drop table t1,t2,t3,t4;
 --let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
 
 --error 1
-#--exec xterm -e gdb --args $MYSQLD_CMD --log-error=$error_log
 --exec $MYSQLD_CMD --log-error=$error_log
 
 # We should get error in error log as it should not be possible to apply redo logs

@@ -86,8 +86,9 @@ EOF
 --source include/start_mysqld.inc
 
 --let $wait_timeout= 600
-# Wait till there is only one encrypted table left in INNODB_TABLESPACE_ENCRYPTION (it should be t1)
---let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0
+# Wait till there is only one encrypted table left in INNODB_TABLESPACE_ENCRYPTION (it should be t1). Temp is always
+# not encrypted
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0
 --source include/wait_condition.inc
 
 --let $assert_text= Table t1 should stayed encrypted as some of its pages were corrupted
@@ -105,7 +106,7 @@ SELECT * FROM t1;
 
 --echo # Restore the original t1
 
---move_file $MYSQLD_DATADIR/test/t1.ibd.MK $MYSQLD_DATADIR/test/t1.ibd 
+--move_file $MYSQLD_DATADIR/test/t1.ibd.MK $MYSQLD_DATADIR/test/t1.ibd
 
 --replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT $MYSQL_TMP_DIR MYSQL_TMP_DIR
 --source include/start_mysqld.inc
