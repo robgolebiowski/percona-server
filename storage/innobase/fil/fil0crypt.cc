@@ -2527,6 +2527,7 @@ void fil_crypt_thread() {
 
   /* if we find a space that is starting, skip over it and recheck it later */
   bool recheck = false;
+  bool reset_fil_crypt_threads_event = false;
 
   while (!thr.should_shutdown()) {
     key_state_t new_state;
@@ -2536,10 +2537,17 @@ void fil_crypt_thread() {
       /* wait for key state changes
        * i.e either new key version of change or
        * new rotate_key_age */
-      os_event_reset(fil_crypt_threads_event);
+      if (reset_fil_crypt_threads_event) {
+        os_event_reset(fil_crypt_threads_event);
+      }
+      reset_fil_crypt_threads_event = true;
 
       if (os_event_wait_time(fil_crypt_threads_event, 1000000) == 0) {
         break;
+      } else {
+        /* there was a timeout on fil_crypt_threads_event. Do not reset
+         * fil_crypt_threds_event before we start another wait on it. */
+        reset_fil_crypt_threads_event = false;
       }
 
       if (recheck) {
