@@ -978,11 +978,13 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
 
 /** State of a rotation thread */
 struct rotate_thread_t {
-  explicit rotate_thread_t(uint no) {
+  explicit rotate_thread_t(uint no, THD *thd) {
+    ut_ad(thd != nullptr);
     memset(this, 0, sizeof(*this));
     thread_no = no;
     first = true;
     estimated_max_iops = 20;
+    this->thd = thd;
   }
 
   uint thread_no;
@@ -1001,6 +1003,9 @@ struct rotate_thread_t {
   fil_crypt_stat_t crypt_stat;  // statistics
   btr_scrub_t scrub_data; /*< thread local data used by btr_scrub-functions
                               when iterating pages of tablespace */
+
+  THD *thd;  // We need THD object to be able to update
+             // tablespace's DD encryption flag
 
   /** @return whether this thread should terminate */
   bool should_shutdown() const {
@@ -2267,18 +2272,15 @@ enum class UpdateEncryptedFlagOperation : char { SET, CLEAR };
 
 static dberr_t fil_update_encrypted_flag(
     const char *space_name, UpdateEncryptedFlagOperation update_operation,
-    volatile bool *is_space_being_removed) {
+    volatile bool *is_space_being_removed, THD *thd) {
   DBUG_EXECUTE_IF("fail_encryption_flag_update_on_t3",
                   if (strcmp(space_name, "test/t3") == 0) { return DB_ERROR; });
-
-  THD *thd = create_thd(false, true, true, 0);
 
   bool failure =
       (update_operation == UpdateEncryptedFlagOperation::SET
            ? dd_set_encryption_flag(thd, space_name, is_space_being_removed)
            : dd_clear_encryption_flag(thd, space_name, is_space_being_removed));
 
-  destroy_thd(thd);
   return (failure ? DB_ERROR : DB_SUCCESS);
 }
 
@@ -2340,7 +2342,8 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
           : UpdateEncryptedFlagOperation::SET;
 
   if (DB_SUCCESS != fil_update_encrypted_flag(space->name, update_enc_flag_op,
-                                              &space->stop_new_ops)) {
+                                              &space->stop_new_ops,
+                                              state->thd)) {
     ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0) ||
           state->space->stop_new_ops);
     return (DB_ERROR);
@@ -2508,8 +2511,10 @@ static void fil_crypt_complete_rotate_space(const key_state_t *key_state,
 /*********************************************************************/ /**
  A thread which monitors global key state and rotates tablespaces accordingly
  @return a dummy parameter */
-void fil_crypt_thread() {
+void fil_crypt_thread(bool lock_global_system_var) {
   my_thread_init();
+
+  THD *thd = create_thd(false, true, true, 0, lock_global_system_var);
 
   /* TODO: Add this later */
   //#ifdef UNIV_PFS_THREAD
@@ -2523,7 +2528,7 @@ void fil_crypt_thread() {
   mutex_exit(&fil_crypt_threads_mutex);
 
   /* state of this thread */
-  rotate_thread_t thr(thread_no);
+  rotate_thread_t thr(thread_no, thd);
 
   /* if we find a space that is starting, skip over it and recheck it later */
   bool recheck = false;
@@ -2639,6 +2644,8 @@ void fil_crypt_thread() {
   /* We count the number of threads in os_thread_exit(). A created
   thread should always use that to exit and not use return() to exit. */
 
+  thr.thd = nullptr;
+  destroy_thd(thd);
   my_thread_end();
 }
 
@@ -2646,9 +2653,9 @@ void fil_crypt_thread() {
 Adjust thread count for key rotation
 @param[in]	enw_cnt		Number of threads to be used */
 
-void fil_crypt_set_thread_cnt(const uint new_cnt) {
+void fil_crypt_set_thread_cnt(const uint new_cnt, bool lock_global_system_var) {
   if (!fil_crypt_threads_inited) {
-    fil_crypt_threads_init();
+    fil_crypt_threads_init(lock_global_system_var);
   }
 
   mutex_enter(&fil_crypt_threads_mutex);
@@ -2657,7 +2664,8 @@ void fil_crypt_set_thread_cnt(const uint new_cnt) {
     uint add = new_cnt - srv_n_fil_crypt_threads;
     srv_n_fil_crypt_threads = new_cnt;
     for (uint i = 0; i < add; i++) {
-      os_thread_create(PSI_NOT_INSTRUMENTED, fil_crypt_thread);
+      os_thread_create(PSI_NOT_INSTRUMENTED, fil_crypt_thread,
+                       lock_global_system_var);
       ib::info() << "Creating #" << i + 1 << " encryption thread"
                  << " total threads " << new_cnt << ".";
     }
@@ -2710,7 +2718,7 @@ void fil_crypt_set_encrypt_tables(uint val) {
 /*********************************************************************
 Init threads for key rotation */
 
-void fil_crypt_threads_init() {
+void fil_crypt_threads_init(bool lock_global_system_var) {
   if (!fil_crypt_threads_inited) {
     fil_crypt_event = os_event_create(0);
     fil_crypt_threads_event = os_event_create(0);
@@ -2719,7 +2727,7 @@ void fil_crypt_threads_init() {
     uint cnt = srv_n_fil_crypt_threads;
     srv_n_fil_crypt_threads = 0;
     fil_crypt_threads_inited = true;
-    fil_crypt_set_thread_cnt(cnt);
+    fil_crypt_set_thread_cnt(cnt, lock_global_system_var);
   }
 }
 
