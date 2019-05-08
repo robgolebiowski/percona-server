@@ -474,7 +474,7 @@ bool fil_space_verify_crypt_checksum(byte *page,
 /*********************************************************************
 Adjust thread count for key rotation
 @param[in]	enw_cnt		Number of threads to be used */
-void fil_crypt_set_thread_cnt(uint new_cnt, bool lock_global_system_var);
+void fil_crypt_set_thread_cnt(uint new_cnt);
 
 /*********************************************************************
 Adjust max key age
@@ -493,7 +493,7 @@ void fil_crypt_set_encrypt_tables(uint val);
 
 /*********************************************************************
 Init threads for key rotation */
-void fil_crypt_threads_init(bool lock_global_system_var);
+void fil_crypt_threads_init();
 
 /*********************************************************************
 Clean up key rotation threads resources */

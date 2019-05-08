@@ -93,6 +93,9 @@ static os_event_t fil_crypt_throttle_sleep_event;
 /** Mutex for key rotation threads. */
 ib_mutex_t fil_crypt_threads_mutex;
 
+/** Mutex for setting cnt of threads */
+ib_mutex_t fil_crypt_threads_set_cnt_mutex;
+
 /** Mutex for accessing space_list and key_rotation */
 ib_mutex_t fil_crypt_list_mutex;
 
@@ -2513,11 +2516,15 @@ static void fil_crypt_complete_rotate_space(const key_state_t *key_state,
 /*********************************************************************/ /**
  A thread which monitors global key state and rotates tablespaces accordingly
  @return a dummy parameter */
-void fil_crypt_thread(bool lock_global_system_var) {
+void fil_crypt_thread() {
   /* TODO: Add this later */
   //#ifdef UNIV_PFS_THREAD
   // pfs_register_thread(page_cleaner_thread_key);
   //#endif
+  my_thread_init();
+
+  THD *thd = create_thd(false, true, true, 0);
+
   mutex_enter(&fil_crypt_threads_mutex);
   uint thread_no = srv_n_fil_crypt_threads_started;
   srv_n_fil_crypt_threads_started++;
@@ -2532,10 +2539,6 @@ void fil_crypt_thread(bool lock_global_system_var) {
     }
     os_thread_sleep(1000000);
   }
-
-  my_thread_init();
-
-  THD *thd = create_thd(false, true, true, 0, lock_global_system_var);
 
   /* state of this thread */
   rotate_thread_t thr(thread_no, thd);
@@ -2663,19 +2666,19 @@ void fil_crypt_thread(bool lock_global_system_var) {
 Adjust thread count for key rotation
 @param[in]	enw_cnt		Number of threads to be used */
 
-void fil_crypt_set_thread_cnt(const uint new_cnt, bool lock_global_system_var) {
+void fil_crypt_set_thread_cnt(const uint new_cnt) {
   if (!fil_crypt_threads_inited) {
-    fil_crypt_threads_init(lock_global_system_var);
+    fil_crypt_threads_init();
   }
 
+  mutex_enter(&fil_crypt_threads_set_cnt_mutex);
   mutex_enter(&fil_crypt_threads_mutex);
 
   if (new_cnt > srv_n_fil_crypt_threads) {
     uint add = new_cnt - srv_n_fil_crypt_threads;
     srv_n_fil_crypt_threads = new_cnt;
     for (uint i = 0; i < add; i++) {
-      os_thread_create(PSI_NOT_INSTRUMENTED, fil_crypt_thread,
-                       lock_global_system_var);
+      os_thread_create(PSI_NOT_INSTRUMENTED, fil_crypt_thread);
       ib::info() << "Creating #" << i + 1 << " encryption thread"
                  << " total threads " << new_cnt << ".";
     }
@@ -2696,6 +2699,8 @@ void fil_crypt_set_thread_cnt(const uint new_cnt, bool lock_global_system_var) {
   if (srv_n_fil_crypt_threads) {
     os_event_set(fil_crypt_threads_event);
   }
+  
+  mutex_exit(&fil_crypt_threads_set_cnt_mutex);
 }
 
 /*********************************************************************
@@ -2728,16 +2733,17 @@ void fil_crypt_set_encrypt_tables(uint val) {
 /*********************************************************************
 Init threads for key rotation */
 
-void fil_crypt_threads_init(bool lock_global_system_var) {
+void fil_crypt_threads_init() {
   if (!fil_crypt_threads_inited) {
     fil_crypt_event = os_event_create(0);
     fil_crypt_threads_event = os_event_create(0);
     mutex_create(LATCH_ID_FIL_CRYPT_THREADS_MUTEX, &fil_crypt_threads_mutex);
+    mutex_create(LATCH_ID_FIL_CRYPT_THREADS_SET_CNT_MUTEX, &fil_crypt_threads_set_cnt_mutex);
 
     uint cnt = srv_n_fil_crypt_threads;
     srv_n_fil_crypt_threads = 0;
     fil_crypt_threads_inited = true;
-    fil_crypt_set_thread_cnt(cnt, lock_global_system_var);
+    fil_crypt_set_thread_cnt(cnt);
   }
 }
 
@@ -2752,6 +2758,7 @@ void fil_crypt_threads_cleanup() {
   os_event_destroy(fil_crypt_event);
   os_event_destroy(fil_crypt_threads_event);
   mutex_free(&fil_crypt_threads_mutex);
+  mutex_free(&fil_crypt_threads_set_cnt_mutex);
   fil_crypt_threads_inited = false;
 }
 

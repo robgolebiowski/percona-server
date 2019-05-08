@@ -21721,7 +21721,9 @@ static void innodb_encryption_threads_update(
     const void *save) /*!< in: immediate result
                       from check function */
 {
-  fil_crypt_set_thread_cnt(*static_cast<const uint *>(save), false);
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+  fil_crypt_set_thread_cnt(*static_cast<const uint *>(save));
+  mysql_mutex_lock(&LOCK_global_system_variables);
 }
 
 /******************************************************************

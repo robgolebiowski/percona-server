@@ -3105,7 +3105,7 @@ void srv_start_threads(bool bootstrap) {
 
   fil_system_acquire();
   btr_scrub_init();
-  fil_crypt_threads_init(true);
+  fil_crypt_threads_init();
   fil_system_release();
 
   srv_start_state_set(SRV_START_STATE_STAT);

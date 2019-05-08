@@ -354,7 +354,7 @@ void Open_tables_state::reset_open_tables_state() {
   reset_reprepare_observers();
 }
 
-THD::THD(bool enable_plugins, bool lock_global_system_var)
+THD::THD(bool enable_plugins)
     : Query_arena(&main_mem_root, STMT_REGULAR_EXECUTION),
       mark_used_columns(MARK_COLUMNS_READ),
       want_privilege(0),
@@ -434,8 +434,7 @@ THD::THD(bool enable_plugins, bool lock_global_system_var)
       m_stmt_da(&main_da),
       duplicate_slave_id(false),
       is_a_srv_session_thd(false),
-      m_is_plugin_fake_ddl(false),
-      m_lock_global_system_var(lock_global_system_var) {
+      m_is_plugin_fake_ddl(false) {
   main_lex->reset();
   set_psi(NULL);
   mdl_context.init(this);
@@ -763,7 +762,7 @@ Sql_condition *THD::raise_condition(uint sql_errno, const char *sqlstate,
 */
 
 void THD::init(void) {
-  plugin_thdvar_init(this, m_enable_plugins, m_lock_global_system_var);
+  plugin_thdvar_init(this, m_enable_plugins);
   /*
     variables= global_system_variables above has reset
     variables.pseudo_thread_id to 0. We need to correct it here to
