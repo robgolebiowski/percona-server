@@ -6136,10 +6136,13 @@ static bool dd_update_tablespace_dd_flags(
     waited_so_far_for_lock += lock_wait_timeout;
   }
 
+  ut_ad(dd_space != nullptr);
+
   waited_so_far_for_lock = 0;
   uint32_t dd_space_flags = 0;
 
-  if (dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
+  if (dd_space == nullptr ||
+      dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
                                       &dd_space_flags)) {
     dd::commit_or_rollback_tablespace_change(thd, dd_space, true);
     return (true);
