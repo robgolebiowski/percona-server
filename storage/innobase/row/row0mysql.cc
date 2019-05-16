@@ -4709,12 +4709,7 @@ dberr_t row_rename_table_for_mysql(const char *old_name, const char *new_name,
     goto funct_exit;
 
   } else if (table->ibd_file_missing && !dict_table_is_discarded(table)) {
-    err = DB_TABLE_NOT_FOUND;
-
-    ib::error(ER_IB_MSG_996) << "Table " << old_name
-                             << " does not have an .ibd"
-                                " file in the database directory. "
-                             << TROUBLESHOOTING_MSG;
+    err = row_mysql_get_table_status(table, trx, false, DB_TABLE_NOT_FOUND);
 
     goto funct_exit;
   }

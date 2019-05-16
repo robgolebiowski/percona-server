@@ -9263,13 +9263,17 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
     /* read (optional) crypt data */
     if (iter.m_crypt_data &&
         iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
-      ut_ad(FSP_FLAGS_GET_ENCRYPTION(space_flags));
+      // when importing half encrypted tablespace the encrypted
+      // flag will not be set
+      ut_ad(DBUG_EVALUATE_IF("importing_half_encrypted", true, false) ||
+            FSP_FLAGS_GET_ENCRYPTION(space_flags));
       iter.m_encryption_key_id = iter.m_crypt_data->key_id;
 
       Encryption::get_latest_tablespace_key(
           iter.m_crypt_data->key_id, iter.m_crypt_data->uuid,
           &iter.m_encryption_key_version, &iter.m_encryption_key);
       if (iter.m_encryption_key == NULL) err = DB_IO_DECRYPT_FAIL;
+      iter.m_encryption_iv = iter.m_crypt_data->iv;
     } else {
       /* Set encryption info. */
       iter.m_encryption_key = table->encryption_key;

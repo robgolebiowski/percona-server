@@ -235,10 +235,10 @@ Check if a key needs rotation given a key_state
 @param[in]	latest_key_version	Latest key version
 @param[in]	rotate_key_age		when to rotate
 @return true if key needs rotation, false if not */
-static bool fil_crypt_needs_rotation(fil_encryption_t encrypt_mode,
-                                     uint key_version, uint latest_key_version,
-                                     uint rotate_key_age)
-    MY_ATTRIBUTE((warn_unused_result));
+MY_NODISCARD static bool fil_crypt_needs_rotation(
+    fil_encryption_t encrypt_mode, uint key_version, uint latest_key_version,
+    uint rotate_key_age, Encryption::Encryption_rotation encryption_rotation,
+    uint type);
 
 static bool encrypt_validation_tag(const byte *secret, const size_t secret_size,
                                    const byte *key, byte *encrypted_secret) {
@@ -280,7 +280,8 @@ fil_space_crypt_t::fil_space_crypt_t(uint new_min_key_version, uint new_key_id,
       encryption(new_encryption),
       key_found(false),
       rotate_state(),
-      tablespace_key(NULL) {
+      tablespace_key(NULL),
+      exclude_from_rotation(false) {
   encryption_rotation =
       (new_encryption == FIL_ENCRYPTION_DEFAULT &&
        srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING)
@@ -385,9 +386,10 @@ static inline uint fil_crypt_get_latest_key_version(
   uint key_version = crypt_data->key_get_latest_version();
 
   if (crypt_data->is_key_found()) {
-    if (fil_crypt_needs_rotation(crypt_data->encryption,
-                                 crypt_data->min_key_version, key_version,
-                                 srv_fil_crypt_rotate_key_age)) {
+    if (fil_crypt_needs_rotation(
+            crypt_data->encryption, crypt_data->min_key_version, key_version,
+            srv_fil_crypt_rotate_key_age, crypt_data->encryption_rotation,
+            crypt_data->type)) {
       /* Below event seen as NULL-pointer at startup
       when new database was created and we create a
       checkpoint. Only seen when debugging. */
@@ -1360,9 +1362,10 @@ Check if a key needs rotation given a key_state
 @param[in]	latest_key_version	Latest key version
 @param[in]	rotate_key_age		when to rotate
 @return true if key needs rotation, false if not */
-static bool fil_crypt_needs_rotation(fil_encryption_t encrypt_mode,
-                                     uint key_version, uint latest_key_version,
-                                     uint rotate_key_age) {
+static bool fil_crypt_needs_rotation(
+    fil_encryption_t encrypt_mode, uint key_version, uint latest_key_version,
+    uint rotate_key_age, Encryption::Encryption_rotation encryption_rotation,
+    uint type) {
   if (key_version == ENCRYPTION_KEY_VERSION_INVALID) {
     ut_ad(0);
     return false;
@@ -1376,7 +1379,12 @@ static bool fil_crypt_needs_rotation(fil_encryption_t encrypt_mode,
     return true;
   }
 
-  if (key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED &&
+  // we need to rotate encrypted => unencrypted in case table is fully encrypted
+  // i.e. (min_)key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED or it is
+  // partially encrypted i.e. (min_)key_version ==
+  // ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED and type == CRYPT_SCHEMA_1
+  if (((key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ||
+        type == CRYPT_SCHEME_1)) &&
       latest_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
     if (encrypt_mode == FIL_ENCRYPTION_DEFAULT) {
       // this is rotation encrypted => unencrypted
@@ -1399,7 +1407,7 @@ static bool fil_crypt_needs_rotation(fil_encryption_t encrypt_mode,
 
 /** Read page 0 and possible crypt data from there.
 @param[in,out]	space		Tablespace */
-static inline void fil_crypt_read_crypt_data(fil_space_t *space) {
+void fil_crypt_read_crypt_data(fil_space_t *space) {
   if (space->size != 0) {
     /* When space->size != 0 it means that page0 of the tablespace has
     already been read in order to read the size of the space (i.e. number of the
@@ -1623,7 +1631,8 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
 
   /* If space is not encrypted and encryption is not enabled, then
   do not continue encrypting the space. */
-  if (!crypt_data && Encryption::is_online_encryption_on() == false) {
+  if (!crypt_data && (Encryption::is_online_encryption_on() == false ||
+                      space->exclude_from_rotation)) {
     mutex_exit(&fil_crypt_threads_mutex);
     return false;
   }
@@ -1942,7 +1951,8 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
 
     bool need_key_rotation = fil_crypt_needs_rotation(
         crypt_data->encryption, crypt_data->min_key_version,
-        key_state->key_version, key_state->rotate_key_age);
+        key_state->key_version, key_state->rotate_key_age,
+        crypt_data->encryption_rotation, crypt_data->type);
 
     if (need_key_rotation && crypt_data->rotate_state.active_threads != 0 &&
         crypt_data->rotate_state.next_offset >
@@ -2430,6 +2440,16 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
   mutex_exit(&crypt_data->mutex);
   mutex_exit(&crypt_data->start_rotate_mutex);
 
+  DBUG_EXECUTE_IF("hang_on_t1_rotation",
+                  if (strcmp(state->space->name, "test/t1") == 0) {
+                    // mark as being flushed with min_key_version = 0
+                    // this way MTR test will know that we are hanging
+                    crypt_data->rotate_state.flushing = 1;
+                    while (DBUG_EVALUATE_IF("hang_on_t1_rotation", true, false))
+                      os_thread_sleep(1000);
+                    crypt_data->rotate_state.flushing = 0;
+                  });
+
   return true;
 }
 
@@ -2650,7 +2670,9 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
       ut_ad(page_get_space_id(frame) == 0);
     } else if (fil_crypt_needs_rotation(crypt_data->encryption, kv,
                                         key_state->key_version,
-                                        key_state->rotate_key_age)) {
+                                        key_state->rotate_key_age,
+                                        crypt_data->encryption_rotation,
+                                        crypt_data->type)) {
       // mtr.set_named_space(space);
       mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);
 
@@ -3997,6 +4019,67 @@ bool fil_space_verify_crypt_checksum(byte *page, ulint page_size,
                     checksum == BUF_NO_CHECKSUM_MAGIC);
 
   return (encrypted);
+}
+
+/**
+Modify rotation list by adding or removing space from it
+@param[in,out] space - space to be included/excluded
+@param[in] exclude_space - true - exlude space
+                           false - include space
+return false - if there are threads running on space
+               and thus space cannot be exported
+return true - success
+*/
+static bool fil_modify_rotation_list(fil_space_t *space,
+                                     const bool exclude_space) {
+  if (space->crypt_data == nullptr) {
+    // fil_crypt_threads_mutex makes sure that crypt_data will
+    // not be created for this space.
+    mutex_enter(&fil_crypt_threads_mutex);
+    // check if crypt_data is still null
+    if (space->crypt_data == nullptr) {
+      space->exclude_from_rotation = exclude_space;
+    }
+    mutex_exit(&fil_crypt_threads_mutex);
+  }
+
+  if (space->crypt_data) {
+    mutex_enter(&space->crypt_data->mutex);
+    if (exclude_space && space->crypt_data->rotate_state.active_threads > 0) {
+      mutex_exit(&space->crypt_data->mutex);
+      return false;
+    }
+    ut_ad(space->crypt_data->rotate_state.active_threads == 0);
+    space->crypt_data->exclude_from_rotation = exclude_space;
+    mutex_exit(&space->crypt_data->mutex);
+  }
+  return true;
+}
+
+bool fil_space_crypt_exclude_from_rotation(fil_space_t *space) {
+  return fil_modify_rotation_list(space, true);
+}
+
+void fil_space_crypt_include_in_rotation(space_id_t space_id) {
+  fil_space_t *space = fil_space_get(space_id);
+  ut_ad(space != nullptr);
+
+  fil_modify_rotation_list(space, false);
+}
+
+bool fil_space_crypt_prepare_for_export(const space_id_t space_id,
+                                        std::tuple<bool, bool> &keyring_info) {
+  fil_space_t *space = fil_space_get(space_id);
+  ut_ad(space != nullptr);
+  if (space->crypt_data == nullptr) {
+    fil_crypt_read_crypt_data(space);
+  }
+
+  if (!fil_space_crypt_exclude_from_rotation(space)) return false;
+
+  std::get<0>(keyring_info) = space->crypt_data != nullptr;
+  std::get<1>(keyring_info) = FSP_FLAGS_GET_ENCRYPTION(space->flags);
+  return true;
 }
 
 redo_log_key *redo_log_keys::load_latest_key(THD *thd, bool generate) {
