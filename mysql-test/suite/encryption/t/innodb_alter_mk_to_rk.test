@@ -1,9 +1,5 @@
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
 
---disable_warnings
-SET GLOBAL innodb_file_per_table = ON;
---enable_warnings
-
 create table t1 (a varchar(255)) engine=innodb;
 
 --let $assert_text= Table t1 should be included in INNODB_TABLESPACES_ENCRYPTION yet - since it is not RK

@@ -2724,7 +2724,6 @@ bool Encryption::is_online_encryption_on() {
          srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE;
 }
 
-// This for now excludes MK encryption ...
 bool Encryption::should_be_keyring_encrypted(const char *algorithm) {
   return !none_explicitly_specified(algorithm) &&
          (is_keyring(algorithm) ||
@@ -7358,9 +7357,9 @@ int ha_innobase::open(const char *name, int, uint open_flags,
       my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
       error = HA_ERR_TABLE_CORRUPT;
     }
-    dict_table_close(ib_table, FALSE, FALSE);
-    ib_table = NULL;
-    is_part = NULL;
+    dict_table_close(ib_table, false, false);
+    ib_table = nullptr;
+    is_part = nullptr;
     free_share(m_share);
     DBUG_RETURN(error);
   }
@@ -12433,7 +12432,7 @@ void ha_innobase::adjust_encryption_key_id(HA_CREATE_INFO *create_info,
                                            dd::Properties *options) noexcept {
   LEX_STRING *encrypt_type = &create_info->encrypt_type;
 
-  if (false == create_info->was_encryption_key_id_set) {
+  if (!create_info->was_encryption_key_id_set) {
     if (Encryption::should_be_keyring_encrypted(encrypt_type->str)) {
       create_info->encryption_key_id =
           THDVAR(current_thd, default_encryption_key_id);
@@ -14912,8 +14911,7 @@ int ha_innobase::truncate_impl(const char *name, TABLE *form,
     ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_DISCARDED, norm_name);
     DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
   } else if (!innodb_table->is_readable()) {
-    DBUG_RETURN(innodb_table->keyring_encryption_info.page0_has_crypt_data ==
-                        true
+    DBUG_RETURN(innodb_table->keyring_encryption_info.page0_has_crypt_data
                     ? HA_ERR_DECRYPTION_FAILED
                     : HA_ERR_TABLESPACE_MISSING);
   }
@@ -19611,13 +19609,13 @@ bool ha_innobase::get_error_message(int error, String *buf) {
   trx_t *trx = check_trx_exists(ha_thd());
 
   if (error == HA_ERR_DECRYPTION_FAILED) {
-    const char *msg =
+    static const char *msg =
         "Table encrypted but decryption failed. Seems that the encryption key "
         "fetched from keyring is "
         "not the correct one. Are you using the correct keyring?";
     buf->copy(msg, (uint)strlen(msg), system_charset_info);
   } else if (error == HA_ERR_ENCRYPTION_KEY_MISSING) {
-    const char *msg =
+    static const char *msg =
         "Table encrypted but decryption key was not found. "
         "Is correct keyring loaded?";
     buf->copy(msg, (uint)strlen(msg), system_charset_info);

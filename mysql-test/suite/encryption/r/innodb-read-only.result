@@ -1,5 +1,5 @@
-call mtr.add_suppression(".* in InnoDB read only mode");
-call mtr.add_suppression(".* in InnoDB read-only mode");
+call mtr.add_suppression("in InnoDB read only mode");
+call mtr.add_suppression("in InnoDB read-only mode");
 call mtr.add_suppression("Plugin \'keyring_file\' has ref_count=1 after shutdown");
 SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 SET GLOBAL innodb_encryption_threads=4;

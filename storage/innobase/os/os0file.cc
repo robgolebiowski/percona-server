@@ -8463,11 +8463,11 @@ void Encryption::get_latest_tablespace_key(uint key_id,
 
 bool Encryption::tablespace_key_exists(uint key_id) {
   uint tablespace_key_version = 0;
-  byte *tablespace_key = NULL;
+  byte *tablespace_key = nullptr;
 
   get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
 
-  if (tablespace_key == NULL) {
+  if (tablespace_key == nullptr) {
     return false;
   }
 
@@ -8483,7 +8483,7 @@ bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
   get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version,
                                               &tablespace_key);
 
-  if (tablespace_key == NULL) {
+  if (tablespace_key == nullptr) {
     return false;
   }
 
@@ -8494,7 +8494,7 @@ bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
 void Encryption::get_latest_tablespace_key_or_create_new_one(
     uint key_id, uint *tablespace_key_version, byte **tablespace_key) {
   get_latest_tablespace_key(key_id, tablespace_key_version, tablespace_key);
-  if (*tablespace_key == NULL) {
+  if (*tablespace_key == nullptr) {
     Encryption::create_tablespace_key(tablespace_key, key_id);
     *tablespace_key_version = 1;
   }
@@ -8529,7 +8529,7 @@ uint Encryption::encryption_get_latest_version(uint key_id) {
 
   get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
 
-  if (tablespace_key == NULL) return ENCRYPTION_KEY_VERSION_INVALID;
+  if (tablespace_key == nullptr) return ENCRYPTION_KEY_VERSION_INVALID;
 
   my_free(tablespace_key);
   return tablespace_key_version;

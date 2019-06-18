@@ -6101,42 +6101,22 @@ static bool dd_update_tablespace_dd_flags(
 
   dd::Tablespace *dd_space = nullptr;
 
-  const unsigned long int lock_wait_timeout = 20;
-  unsigned long int waited_so_far_for_lock = 0;
-
-  auto handle_timeout_or_space_drop = [&]() {
-    if (*is_space_being_removed ||
-        waited_so_far_for_lock > thd->variables.lock_wait_timeout) {
-      dd::commit_or_rollback_tablespace_change(
-          thd, dd_space, true);  // need to unlock tablespace mdl
-      if (waited_so_far_for_lock > thd->variables.lock_wait_timeout) {
-        my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
-      }
-      return true;
-    }
-    return false;
-  };
-
-  while (dd::acquire_exclusive_tablespace_mdl(thd, space_name,
-                                              lock_wait_timeout)) {
-    waited_so_far_for_lock += lock_wait_timeout;
-    if (handle_timeout_or_space_drop()) {
-      return true;
-    }
+  MDL_ticket *mdl_ticket;
+  if (dd::acquire_shared_tablespace_mdl(thd, space_name, false, &mdl_ticket,
+                                        false) ||
+      acquire_shared_backup_lock(thd, thd->variables.lock_wait_timeout)) {
+    return (true);
   }
 
-  waited_so_far_for_lock = 0;
-
-  while (
-      client->acquire_for_modification<dd::Tablespace>(space_name, &dd_space)) {
-    if (handle_timeout_or_space_drop()) {
-      return true;
-    }
-    os_thread_sleep(lock_wait_timeout);
-    waited_so_far_for_lock += lock_wait_timeout;
+  if (dd::acquire_exclusive_tablespace_mdl(thd, space_name, false)) {
+    /* since we have S lock it shouldn't be possbile for X lock to fail */
+    ut_a(false);
   }
 
-  waited_so_far_for_lock = 0;
+  if (client->acquire_for_modification<dd::Tablespace>(space_name, &dd_space)) {
+    return (true);
+  }
+
   uint32_t dd_space_flags = 0;
 
   if (dd_space == nullptr ||
@@ -6154,13 +6134,12 @@ static bool dd_update_tablespace_dd_flags(
 
   /* Pass 'true' for 'release_mdl_on_commit' parameter because we want
   transactional locks to be released only in case of successful commit */
-  while (dd::commit_or_rollback_tablespace_change(thd, dd_space, false, true)) {
-    if (handle_timeout_or_space_drop()) {
-      return true;
-    }
-    os_thread_sleep(lock_wait_timeout);
-    waited_so_far_for_lock += lock_wait_timeout;
+  if (dd::commit_or_rollback_tablespace_change(thd, dd_space, false, true)) {
+    return (true);
   }
+
+  /* Release MDL on tablespace explicitly */
+  dd_release_mdl(mdl_ticket);
 
   return (false);
 }

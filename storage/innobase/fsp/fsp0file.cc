@@ -736,8 +736,8 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
                                             ENCRYPTION_KEY_LEN) == 0) {
           ut_free(m_encryption_key);
           ut_free(m_encryption_iv);
-          m_encryption_key = NULL;
-          m_encryption_iv = NULL;
+          m_encryption_key = nullptr;
+          m_encryption_iv = nullptr;
         }
       }
     } else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {

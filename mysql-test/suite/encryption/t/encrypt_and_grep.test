@@ -67,7 +67,7 @@ ALTER TABLE t6 ENCRYPTION='N', ALGORITHM=INPLACE;
 
 ALTER TABLE t6 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 
-#We do not encrypt temporary tablespace
+# We do not encrypt temporary tablespace
 --let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600

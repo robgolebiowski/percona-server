@@ -230,7 +230,7 @@ t3	CREATE TABLE `t3` (
 include/assert.inc [Table t3 should appear in INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERSION (0 => UNECRYPTED) AND ENCRYPTED KEY_ID=5]
 # After the re-encryption t3 should get encrypted with key 5
 SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
-#Wait for all tables to get encrypted (apart from t1 and temporary)
+# Wait for all tables to get encrypted (apart from t1 and temporary)
 include/assert.inc [Table t3 should appear in INNODB_TABLESPACES_ENCRYPTION with MIN_KEY_VERSION (1) ENCRYPTED KEY_ID =5]
 SHOW CREATE TABLE t3;
 Table	Create Table

@@ -207,7 +207,7 @@ SHOW CREATE TABLE t3;
 
 SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;
 
---echo #Wait for all tables to get encrypted (apart from t1 and temporary)
+--echo # Wait for all tables to get encrypted (apart from t1 and temporary)
 --let $wait_timeout= 600
 --let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count - 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc

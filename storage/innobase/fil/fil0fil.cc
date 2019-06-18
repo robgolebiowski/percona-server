@@ -3820,7 +3820,7 @@ when it could be dropped concurrently.
 @param[in]	id	tablespace ID
 @return	the tablespace
 @retval	NULL if missing */
-fil_space_t *fil_space_acquire_for_io(ulint space_id) {
+fil_space_t *fil_space_acquire_for_io(space_id_t space_id) {
   auto shard = fil_system->shard_by_id(space_id);
 
   shard->mutex_acquire();

@@ -1,5 +1,8 @@
 --source include/big_test.inc
 
+#
+# MDEV-8164: Server crashes in pfs_mutex_enter_func after fil_crypt_is_closing or alike
+#
 SET default_storage_engine = InnoDB;
 
 CREATE TABLE t1 (pk INT PRIMARY KEY, c VARCHAR(256));
@@ -32,6 +35,10 @@ dec $i;
 --enable_query_log
 
 drop table t1,t2;
+
+#
+# MDEV-8173: InnoDB; Failing assertion: crypt_data->type == 1
+#
 
 SET GLOBAL innodb_encryption_threads = 4;
 

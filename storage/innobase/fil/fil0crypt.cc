@@ -250,10 +250,10 @@ fil_space_crypt_t::fil_space_crypt_t(
     // if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
     uchar *key = NULL;
     uint key_version = 0;
-    if (key_operation == FETCH_OR_GENERATE_KEY) {
+    if (key_operation == Crypt_key_operation::FETCH_OR_GENERATE_KEY) {
       Encryption::get_latest_tablespace_key_or_create_new_one(
           key_id, &key_version, &key);
-    } else if (key_operation == FETCH_KEY) {
+    } else if (key_operation == Crypt_key_operation::FETCH_KEY) {
       Encryption::get_latest_tablespace_key(key_id, &key_version, &key);
     } else {
       ut_ad(0);
@@ -987,13 +987,20 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
 
 /** State of a rotation thread */
 struct rotate_thread_t {
-  explicit rotate_thread_t(uint no, THD *thd) {
+  rotate_thread_t(uint no, THD *thd)
+      : thread_no(no),
+        first(true),
+        space(nullptr),
+        offset(0),
+        batch(0),
+        min_key_version_found(0),
+        end_lsn(0),
+        estimated_max_iops(20),
+        allocated_iops(0),
+        cnt_waited(0),
+        sum_waited_us(0),
+        thd(thd) {
     ut_ad(thd != nullptr);
-    memset(this, 0, sizeof(*this));
-    thread_no = no;
-    first = true;
-    estimated_max_iops = 20;
-    this->thd = thd;
   }
 
   uint thread_no;
@@ -1524,7 +1531,7 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
   }
 
   buf_block_t *block =
-      buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
+      buf_page_get_gen(page_id, page_size, RW_X_LATCH, nullptr,
                        Page_fetch::PEEK_IF_IN_POOL, file, line, mtr);
 
   if (block != NULL) {
@@ -1541,7 +1548,7 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
 
   uintmax_t start = ut_time_us(NULL);
   dberr_t err;
-  block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
+  block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, nullptr,
                            Page_fetch::POSSIBLY_FREED, file, line, mtr, false,
                            &err);
   uintmax_t end = ut_time_us(NULL);
@@ -2403,9 +2410,7 @@ static void fil_crypt_complete_rotate_space(const key_state_t *key_state,
   if (!state->space->is_stopping()) {
     mutex_enter(&crypt_data->mutex);
 
-    /**
-     * Update crypt data state with state from thread
-     */
+    /* Update crypt data state with state from thread */
     if (state->min_key_version_found == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED ||
         state->min_key_version_found <
             crypt_data->rotate_state.min_key_version_found) {
@@ -2416,25 +2421,21 @@ static void fil_crypt_complete_rotate_space(const key_state_t *key_state,
     ut_a(crypt_data->rotate_state.active_threads > 0);
     bool last = crypt_data->rotate_state.active_threads - 1 == 0;
 
-    /**
-     * check if space is fully done
-     * this as when threads shutdown, it could be that we "complete"
-     * iterating before we have scanned the full space.
-     */
+    /* check if space is fully done
+    this as when threads shutdown, it could be that we "complete"
+    iterating before we have scanned the full space. */
     bool done = crypt_data->rotate_state.next_offset >=
                 crypt_data->rotate_state.max_offset;
 
-    /**
-     * we should flush space if we're last thread AND
-     * the iteration is done
-     */
+    /* we should flush space if we're last thread AND
+     * the iteration is done */
     bool should_flush = last && done;
 
     /* In case we simulate only 100 pages being rotated - we stop ourselves from
-     * writting to page0. Pages should be flushed in mtr test with FLUSH FOR
-     * EXPORT - this will make sure that buffers will get flushed * In MTR we
-     * can check if we reached this point by checking flushing field - it should
-     * be 1 if we are here */
+    writting to page0. Pages should be flushed in mtr test with FLUSH FOR
+    EXPORT - this will make sure that buffers will get flushed * In MTR we
+    can check if we reached this point by checking flushing field - it should
+    be 1 if we are here */
     DBUG_EXECUTE_IF("rotate_only_first_100_pages_from_t1",
                     if (strcmp(state->space->name, "test/t1") == 0 &&
                         number_of_t1_pages_rotated >= 100) {

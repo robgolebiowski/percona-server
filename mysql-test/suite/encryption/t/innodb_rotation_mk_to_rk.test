@@ -17,7 +17,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 --let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
-#We do not encrypt temporary tablespace
+# We do not encrypt temporary tablespace
 --let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
@@ -69,7 +69,7 @@ SET GLOBAL innodb_encrypt_tables = ONLINE_TO_KEYRING;
 
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
-#We do not encrypt temporary tablespace
+# We do not encrypt temporary tablespace
 --let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
@@ -100,7 +100,7 @@ alter table t1 encryption='n';
 --let $assert_text= t1 should got decrypted
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 0) AND NAME = \\'test/t1\\']" = 1
 --source include/assert.inc
---let $assert_text= also temporary tablespace should stay unenecrypted
+--let $assert_text= also temporary tablespace should stay unencrypted
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE ((FLAG & 8192) = 0) AND NAME = \\'innodb_temporary\\']" = 1
 --source include/assert.inc
 --let $assert_text= t1 and temporary should be the only unencrypted tables

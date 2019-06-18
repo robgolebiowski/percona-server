@@ -21,7 +21,7 @@ include/assert.inc [temprorary tablespace should be the only one left unencrypte
 alter table t1 encryption='n';
 # Wait max 10 min for key encryption to decrypt t1
 include/assert.inc [t1 should got decrypted]
-include/assert.inc [also temporary tablespace should stay unenecrypted]
+include/assert.inc [also temporary tablespace should stay unencrypted]
 include/assert.inc [t1 and temporary should be the only unencrypted tables]
 # restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ON --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
 drop table t1;

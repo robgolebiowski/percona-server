@@ -16,12 +16,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 *****************************************************************************/
 
-/**************************************************/ /**
+/**
  @file include/fil0crypt.h
  The low-level file system encryption support functions
 
  Created 04/01/2015 Jan Lindström
- *******************************************************/
+ **/
 
 #ifndef fil0crypt_h
 #define fil0crypt_h
@@ -114,7 +114,7 @@ struct Cached_key {
   size_t key_len;
 
   ~Cached_key() {
-    if (key != NULL) {
+    if (key != nullptr) {
       memset_s(key, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
       my_free(key);
     }
@@ -125,7 +125,7 @@ struct Cached_key {
 extern ulong srv_encrypt_tables;
 
 struct fil_space_rotate_state_t {
-  fil_space_rotate_state_t() : trx(NULL), flush_observer(NULL) {}
+  fil_space_rotate_state_t() : trx(nullptr), flush_observer(nullptr) {}
 
   time_t start_time;          /*!< time when rotation started */
   ulint active_threads;       /*!< active threads in space */
@@ -153,7 +153,7 @@ struct fil_space_rotate_state_t {
 
 #ifndef UNIV_INNOCHECKSUM
 
-enum Crypt_key_operation { FETCH_KEY, FETCH_OR_GENERATE_KEY };
+enum class Crypt_key_operation { FETCH_KEY, FETCH_OR_GENERATE_KEY };
 
 struct fil_space_crypt_t {
  public:
@@ -170,11 +170,10 @@ struct fil_space_crypt_t {
   ~fil_space_crypt_t() {
     mutex_free(&mutex);
     mutex_free(&start_rotate_mutex);
-    if (tablespace_key != NULL) ut_free(tablespace_key);
-    if (tablespace_iv != NULL) ut_free(tablespace_iv);
+    ut_free(tablespace_key);
+    ut_free(tablespace_iv);
 
-    for (std::list<byte *>::iterator iter = fetched_keys.begin();
-         iter != fetched_keys.end(); iter++) {
+    for (auto iter = fetched_keys.begin(); iter != fetched_keys.end(); iter++) {
       memset_s(*iter, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
       my_free(*iter);
     }
@@ -221,11 +220,11 @@ struct fil_space_crypt_t {
                    Encryption::Encryption_rotation current_encryption_rotation);
 
   void set_tablespace_key(const uchar *tablespace_key) {
-    if (tablespace_key == NULL) {
-      if (this->tablespace_key != NULL) ut_free(this->tablespace_key);
-      this->tablespace_key = NULL;
+    if (tablespace_key == nullptr) {
+      ut_free(this->tablespace_key);
+      this->tablespace_key = nullptr;
     } else {
-      if (this->tablespace_key == NULL)
+      if (this->tablespace_key == nullptr)
         this->tablespace_key = (byte *)ut_malloc_nokey(ENCRYPTION_KEY_LEN);
       memcpy(this->tablespace_key, tablespace_key, ENCRYPTION_KEY_LEN);
     }
@@ -366,8 +365,8 @@ void fil_space_merge_crypt_data(fil_space_crypt_t *dst,
 // fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
 // MY_ATTRIBUTE((nonnull, warn_unused_result));
 
-fil_space_crypt_t *fil_space_read_crypt_data(const page_size_t &page_size,
-                                             const byte *page);
+MY_NODISCARD fil_space_crypt_t *fil_space_read_crypt_data(
+    const page_size_t &page_size, const byte *page);
 
 // bool fil_space_read_crypt_data(const page_size_t& page_size, const byte*
 // page, ulint space_id);
@@ -435,9 +434,8 @@ Decrypt a page
 @param[out]	decrypted		true if page was decrypted
 @return decrypted page, or original not encrypted page if decryption is
 not needed.*/
-byte *fil_space_decrypt(const fil_space_t *space, byte *tmp_frame,
-                        byte *src_frame, bool *decrypted)
-    MY_ATTRIBUTE((warn_unused_result));
+MY_NODISCARD byte *fil_space_decrypt(const fil_space_t *space, byte *tmp_frame,
+                                     byte *src_frame, bool *decrypted);
 
 /******************************************************************
 Calculate post encryption checksum
@@ -446,9 +444,8 @@ Calculate post encryption checksum
 @param[in]      is_zip_compressed   is page compressed with old schema
 @return page checksum or BUF_NO_CHECKSUM_MAGIC
 not needed. */
-uint32_t fil_crypt_calculate_checksum(const ulint page_size, const byte *page,
-                                      const bool is_zip_compressed)
-    MY_ATTRIBUTE((warn_unused_result));
+MY_NODISCARD uint32_t fil_crypt_calculate_checksum(
+    const ulint page_size, const byte *page, const bool is_zip_compressed);
 
 /**
 Verify that post encryption checksum match calculated checksum.

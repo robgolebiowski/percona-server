@@ -23,11 +23,12 @@ enum btr_scrub_page_allocation_status_t {
 /**
  * constants returned by btr_page_needs_scrubbing & btr_scrub_recheck_page
  */
-#define BTR_SCRUB_PAGE 1                         /* page should be scrubbed */
-#define BTR_SCRUB_SKIP_PAGE 2                    /* no scrub & no action */
-#define BTR_SCRUB_SKIP_PAGE_AND_CLOSE_TABLE 3    /* no scrub & close table */
-#define BTR_SCRUB_SKIP_PAGE_AND_COMPLETE_SPACE 4 /* no scrub & complete space \
-                                                  */
+#define BTR_SCRUB_PAGE 1                      /* page should be scrubbed */
+#define BTR_SCRUB_SKIP_PAGE 2                 /* no scrub & no action */
+#define BTR_SCRUB_SKIP_PAGE_AND_CLOSE_TABLE 3 /* no scrub & close table */
+#define BTR_SCRUB_SKIP_PAGE_AND_COMPLETE_SPACE \
+  4 /* no scrub & complete space               \
+     */
 #define BTR_SCRUB_TURNED_OFF      \
   5 /* we detected that scrubbing \
     was disabled by global        \
@@ -36,6 +37,13 @@ enum btr_scrub_page_allocation_status_t {
 /**************************************************************/ /**
  struct for keeping scrub statistics. */
 struct btr_scrub_stat_t {
+  btr_scrub_stat_t()
+      : page_reorganizations(0),
+        page_splits(0),
+        page_split_failures_underflow(0),
+        page_split_failures_out_of_filespace(0),
+        page_split_failures_missing_index(0),
+        page_split_failures_unknown(0) {}
   /* page reorganizations */
   ulint page_reorganizations;
   /* page splits */
@@ -50,6 +58,14 @@ struct btr_scrub_stat_t {
 /**************************************************************/ /**
  struct for thread local scrub state. */
 struct btr_scrub_t {
+  btr_scrub_t()
+      : space(0),
+        scrubbing(false),
+        compressed(false),
+        current_table(nullptr),
+        current_index(nullptr),
+        savepoint(0) {}
+
   /* current space */
   ulint space;
 

@@ -1,6 +1,5 @@
 call mtr.add_suppression("Plugin keyring_file reported: 'File .*keyring' not found .*");
 call mtr.add_suppression("keyring_file initialization failure. Please check if the keyring_file_data points to readable keyring file or keyring file can be created in the specified location. The keyring_file will stay unusable until correct path to the keyring file gets provided");
-SET GLOBAL innodb_file_per_table = ON;
 INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 SET GLOBAL keyring_file_data="MYSQL_TMP_DIR/mysecret_keyring";
 SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;

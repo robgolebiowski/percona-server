@@ -1205,14 +1205,14 @@ when it could be dropped concurrently.
 @param[in]	id	tablespace ID
 @return	the tablespace
 @retval	NULL if missing */
-fil_space_t *fil_space_acquire_for_io(ulint id);
+fil_space_t *fil_space_acquire_for_io(space_id_t id);
 
 /** Load and acquire a tablespace for reading or writing a block,
 when it could be dropped concurrently.
 @param[in]	id	tablespace ID
 @return	the tablespace
 @retval	NULL if missing */
-fil_space_t *fil_space_acquire_for_io_with_load(ulint space_id);
+MY_NODISCARD fil_space_t *fil_space_acquire_for_io_with_load(ulint space_id);
 
 /** Release a tablespace acquired with fil_space_acquire_for_io().
 @param[in,out]	space	tablespace to release  */
