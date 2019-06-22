@@ -8,6 +8,10 @@
 --let $restart_parameters=restart:--log-bin=master-bin --debug=d,check_consecutive_binlog_key_versions;
 --source include/restart_mysqld.inc
 
+--let $keyring_file=$MYSQL_TMP_DIR/keyring1
+
+--let $server_uuid=`SELECT @@GLOBAL.SERVER_UUID`
+
 RESET MASTER;
 --echo # master-bin.000001
 
@@ -17,6 +21,12 @@ SELECT 2;
 --let $assert_text= Successful rotation of percona_binlog
 --let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_binlog\\"\\) = 1]" = 1
 --source include/assert.inc
+
+--echo # Make sure that new version of the percona_binlog key got generated
+--let SEARCH_PATTERN=percona_binlog_$server_uuid:1
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$keyring_file
+--source include/search_pattern_in_file.inc
 
 FLUSH LOGS;
 
@@ -29,6 +39,12 @@ SELECT 4;
 --let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_binlog\\"\\) = 1]" = 1
 --source include/assert.inc
 
+--echo # Make sure that new version of the percona_binlog key got generated
+--let SEARCH_PATTERN=percona_binlog_$server_uuid:2
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$keyring_file
+--source include/search_pattern_in_file.inc
+
 FLUSH LOGS;
 
 --echo # master-bin.000003
@@ -39,6 +55,12 @@ SELECT 6;
 --let $assert_text= Successful rotation of percona_binlog
 --let $assert_cond= "[SELECT rotate_system_key\\(\\"percona_binlog\\"\\) = 1]" = 1
 --source include/assert.inc
+
+--echo # Make sure that new version of the percona_binlog key got generated
+--let SEARCH_PATTERN=percona_binlog_$server_uuid:3
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_FILE=$keyring_file
+--source include/search_pattern_in_file.inc
 
 FLUSH LOGS;
 
