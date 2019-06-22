@@ -1739,20 +1739,23 @@ protected:
   data required to decrypt (except the actual key).
 
   For binlog cryptoscheme 1: key version, and nonce for iv generation.
+  For binlog cryptoscheme 2: key version, nonce for iv generation, server's uuid
 */
 class Start_encryption_log_event : public Binary_log_event, public Log_event
 {
 public:
 #ifdef MYSQL_SERVER
   Start_encryption_log_event(uint crypto_scheme_arg, uint key_version_arg,
-                             const uchar* nonce_arg)
+                             const uchar* nonce_arg, const char *srv_uuid)
   : Binary_log_event(binary_log::START_ENCRYPTION_EVENT),
     Log_event(header(), footer(), Log_event::EVENT_NO_CACHE, Log_event::EVENT_IMMEDIATE_LOGGING),
     crypto_scheme(crypto_scheme_arg), key_version(key_version_arg)
   {
-    DBUG_ASSERT(crypto_scheme == 1);
-    is_valid_param= crypto_scheme == 1;
+    DBUG_ASSERT(crypto_scheme == 1 || crypto_scheme == 2);
+    is_valid_param= crypto_scheme == 1 || crypto_scheme == 2;
     memcpy(nonce, nonce_arg, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
+    memset(uuid, 0, sizeof(uuid));
+    memcpy(uuid, srv_uuid, Binlog_crypt_data::BINLOG_UUID_LENGTH);
   }
 
   bool write_data_body(IO_CACHE* file)
@@ -1762,7 +1765,9 @@ public:
     int4store(key_version_buf, key_version);
     return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
            wrapper_my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
-           wrapper_my_b_safe_write(file, (uchar*)nonce, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
+           wrapper_my_b_safe_write(file, (uchar*)nonce, Binlog_crypt_data::BINLOG_NONCE_LENGTH) ||
+           wrapper_my_b_safe_write(file, (uchar*)uuid, Binlog_crypt_data::BINLOG_UUID_LENGTH);
+
   }
 #else
   void print(FILE* file, PRINT_EVENT_INFO* print_event_info);
@@ -1776,14 +1781,23 @@ public:
 
   size_t get_data_size()
   {
-    return Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH +
-           Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH +
-           Binlog_crypt_data::BINLOG_NONCE_LENGTH;
+    // Make sure crypto_scheme was alread read
+    DBUG_ASSERT(crypto_scheme == 1 || crypto_scheme == 2);
+
+    size_t size = Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH +
+                  Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH +
+                  Binlog_crypt_data::BINLOG_NONCE_LENGTH;
+    if (crypto_scheme == 2) {
+      size += Binlog_crypt_data::BINLOG_UUID_LENGTH;
+    }
+
+    return size;
   }
 
   uint crypto_scheme;
   uint key_version;
   uchar nonce[Binlog_crypt_data::BINLOG_NONCE_LENGTH];
+  char uuid[Binlog_crypt_data::BINLOG_UUID_LENGTH + 1];
 
 protected:
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)

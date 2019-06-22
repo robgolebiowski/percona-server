@@ -29,7 +29,8 @@ public:
     BINLOG_KEY_VERSION_LENGTH= 4,
     BINLOG_IV_LENGTH= MY_AES_BLOCK_SIZE,
     BINLOG_IV_OFFS_LENGTH= 4,
-    BINLOG_NONCE_LENGTH= BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH
+    BINLOG_NONCE_LENGTH= BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH,
+    BINLOG_UUID_LENGTH = 36 
   };
 
   Binlog_crypt_data();
@@ -59,11 +60,19 @@ public:
   }
 
   void free_key(uchar *&key, size_t &key_length);
-  bool init(uint sch, uint kv, const uchar* nonce);
+  bool init(uint sch, uint kv, const uchar* nonce, char* srv_uuid);
+  //bool init(uint sch, uint kv, const uchar* nonce);
   bool init_with_loaded_key(uint sch, const uchar* nonce);
   bool load_latest_binlog_key();
   void set_iv(uchar* iv, uint32 offs) const;
 
+private:
+#ifdef MYSQL_SERVER
+  std::string build_binlog_key_name(uint sch, uint kv, char* srv_uuid);
+  std::string build_binlog_key_name(uint sch, char *srv_uuid);
+  //std::ostringstream get_oss_for_binlog_key_name(uint sch, char *srv_uuid);
+  void build_binlog_key_name(std::ostringstream &percona_binlog_key_name_oss, uint sch, char *srv_uuid);
+#endif
 private:
   uint  key_version;
   size_t key_length;

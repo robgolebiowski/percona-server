@@ -5338,7 +5338,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     if (my_rand_buffer(nonce, sizeof(nonce)))
       goto err;
 
-    Start_encryption_log_event sele(1, crypto.get_key_version(), nonce);
+    Start_encryption_log_event sele(2, crypto.get_key_version(), nonce, server_uuid);
     sele.common_footer->checksum_alg= s.common_footer->checksum_alg;
     if (write_to_file(&sele))
     {

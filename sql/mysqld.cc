@@ -4603,6 +4603,16 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+  if (init_server_auto_options())
+  {
+    sql_print_error("Initialization of the server's UUID failed because it could"
+                    " not be read from the auto.cnf file. If this is a new"
+                    " server, the initialization failed because it was not"
+                    " possible to generate a new UUID.");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+
   if (opt_bin_log)
   {
     /*
@@ -5144,14 +5154,14 @@ int mysqld_main(int argc, char **argv)
     Each server should have one UUID. We will create it automatically, if it
     does not exist.
    */
-  if (init_server_auto_options())
-  {
-    sql_print_error("Initialization of the server's UUID failed because it could"
-                    " not be read from the auto.cnf file. If this is a new"
-                    " server, the initialization failed because it was not"
-                    " possible to generate a new UUID.");
-    unireg_abort(MYSQLD_ABORT_EXIT);
-  }
+  //if (init_server_auto_options())
+  //{
+    //sql_print_error("Initialization of the server's UUID failed because it could"
+                    //" not be read from the auto.cnf file. If this is a new"
+                    //" server, the initialization failed because it was not"
+                    //" possible to generate a new UUID.");
+    //unireg_abort(MYSQLD_ABORT_EXIT);
+  //}
 
   /* Server generates uuid after innodb is initialized. But during
   initialization, if tablespaces like system, redo, temporary are encrypted,
