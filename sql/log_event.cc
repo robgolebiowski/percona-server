@@ -5586,19 +5586,36 @@ Start_encryption_log_event::Start_encryption_log_event(
                     description_event->server_version),
    Log_event(header(), footer())
 {
-  if ((int)event_len ==
-     (int)LOG_EVENT_MINIMAL_HEADER_LEN + (int)Start_encryption_log_event::get_data_size())
+  if (event_len < Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH)
   {
-    crypto_scheme = *(uchar*)buf;
-    key_version = uint4korr(buf + Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH);
-    memcpy(nonce,
-           buf + Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH + Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH,
-           Binlog_crypt_data::BINLOG_NONCE_LENGTH);
-  }
-  else
     crypto_scheme= ~0; // invalid
+    is_valid_param = false;
+    return;
+  }
+  crypto_scheme = *(uchar*)buf;
 
-  is_valid_param= crypto_scheme == 1;
+  if((crypto_scheme != 1 && crypto_scheme != 2) ||
+     (static_cast<int>(event_len) != static_cast<int>(LOG_EVENT_MINIMAL_HEADER_LEN) +
+                                     static_cast<int>(Start_encryption_log_event::get_data_size())))
+  {
+    crypto_scheme= ~0; // invalid
+    is_valid_param = false;
+    return;
+  } 
+
+  uint offset = 0;
+  crypto_scheme = *(uchar*)buf;
+  offset = Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH;
+  key_version = uint4korr(buf + offset);
+  offset += Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH;
+  memcpy(nonce, buf + offset, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
+  if (crypto_scheme == 2) {
+    offset += Binlog_crypt_data::BINLOG_NONCE_LENGTH;
+    memset(uuid, 0, sizeof(uuid));
+    memcpy(uuid, buf + offset, Binlog_crypt_data::BINLOG_UUID_LENGTH);
+  }
+
+  is_valid_param= true;
 }
 
 #if defined(HAVE_REPLICATION) && !defined(MYSQL_CLIENT)
@@ -5736,7 +5753,7 @@ bool Format_description_log_event::start_decryption(Start_encryption_log_event* 
 
   if (!sele->is_valid())
     return true;
-  if (crypto_data.init(sele->crypto_scheme, sele->key_version, sele->nonce))
+  if (crypto_data.init(sele->crypto_scheme, sele->key_version, sele->nonce, sele->uuid))
   {
     sql_print_error("Failed to fetch percona_binlog key (version %u) from keyring and thus "
                      "failed to initialize binlog encryption.", sele->key_version);

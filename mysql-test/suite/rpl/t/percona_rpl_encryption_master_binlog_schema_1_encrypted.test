@@ -1,0 +1,150 @@
+--source include/have_debug.inc
+--source include/have_binlog_format_row.inc
+--let $rpl_skip_start_slave= 1
+--source include/master-slave.inc
+
+# The test are done with prepared schema 1 PS encrypted binary logs (encryption key is in keyring_with_percona_binlog_key):
+# 1) schema_1_encrypted_master-bin.000002 - was generated with statements:
+#    CREATE TABLE t1 (a INT);
+#    INSERT INTO t1 (a) VALUES (1);
+#    INSERT INTO t1 (a) VALUES (2);
+#    INSERT INTO t1 (a) VALUES (3);
+#    INSERT INTO t1 (a) VALUES (4);
+#    INSERT INTO t1 (a) VALUES (5);
+# 2) prepared schema_1_encrypted_truncated_master-bin.000002. It has the same statements as 1), however the last event is incomplete -
+#    and was manually truncated; (encryption key is in keyring_with_percona_binlog_key)
+
+# In this test we will test following scenarios:
+# 1) Generate two master-bin on server (without encryption), replace master-bin.000002 with schema_1_encrypted_truncated_master-bin.000002.
+#    Restart the server. Recovery process will have to be able to decrypt master-bin.000002.
+# 2) Start server with master-bin.000001 unencrypted, master-bin.000002 schema 1 PS encrypted. RESET SLAVE, next sync slave with master. This will test
+#    if decryption works without recovery run. Test for unencrypted => PS schema 1 encrypted => unencrypted switch (master-bin.00003 is unencrypted).
+# 3) RESET MASTER, encrypt master. Generate master-bin.000001,000002,000003. Replace master-bin.000002 with schema_1_encrypted-master-bin.000002.
+#    Restart the server, RESET SLAVE and sync. Test for PS schema 2 encrypted => PS schema 1 encrypted => PS schema 2 encrypted.
+
+--echo ########################### 1st scenario ############################################
+
+# Suppress normal warnings for truncated log, the main point here is to proof that master can
+# start with encrypted, yet truncated binlog file
+call mtr.add_suppression("Error reading GTIDs from binary log");
+call mtr.add_suppression("Error in Log_event::read_log_event()");
+
+--let $keyring_file= $MYSQL_TMP_DIR/keyring_master
+--let $encrypted_binlog_file= $MYSQL_TEST_DIR/std_data/binlog_encryption_scheme_1/schema_1_encrypted_truncated_master-bin.000002
+--let $MASTER_DATADIR= `select @@datadir`
+# Makes the index file to contain two files (we will replace the second one
+# by a previously generated encrypted binary log file.
+FLUSH LOCAL LOGS;
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--let $assert_text= Master status shall point to master-bin.000002
+--let $assert_cond= "$binlog_file" = "master-bin.000002"
+--source include/assert.inc
+--let $binlog_file_path= $MASTER_DATADIR/$binlog_file
+
+# Stop the master server
+--let $rpl_server_number= 1
+--source include/rpl_stop_server.inc
+--connection slave
+# Replace the binary log file
+--remove_file $binlog_file_path
+--copy_file $encrypted_binlog_file $binlog_file_path
+# Replace the keyring file (with key used to encrypt binarly log file schema_1_encrypted_master-bin.000002)
+--copy_file $MYSQL_TEST_DIR/std_data/binlog_encryption_scheme_1/keyring_with_percona_binlog_key $keyring_file
+--let $master_keyring_parameters=$KEYRING_PLUGIN_OPT $KEYRING_PLUGIN_LOAD --keyring_file_data=$keyring_file
+
+# Restart the server
+--let $rpl_server_number= 1
+--let $rpl_server_parameters= $master_keyring_parameters
+--let $rpl_omit_print_server_parameters= 1
+--source include/rpl_start_server.inc
+--connection master
+
+--echo ########################### 2nd scenario ############################################
+
+--connection slave
+RESET SLAVE;
+
+# Stop the master server
+--let $rpl_server_number= 1
+--source include/rpl_stop_server.inc
+
+# Replace the binary log file
+--let $encrypted_binlog_file= $MYSQL_TEST_DIR/std_data/binlog_encryption_scheme_1/schema_1_encrypted_master-bin.000002
+--remove_file $binlog_file_path
+--copy_file $encrypted_binlog_file $binlog_file_path
+
+# Restart the server
+--let $rpl_server_number= 1
+--let $rpl_server_parameters= $master_keyring_parameters
+--let $rpl_omit_print_server_parameters= 1
+--source include/rpl_start_server.inc
+--connection master
+
+# Start slave threads so it can sync with master
+--source include/rpl_connection_slave.inc
+--source include/start_slave.inc
+--source include/rpl_connection_master.inc
+--source include/sync_slave_sql_with_master.inc
+--let $assert_text= Slave shall have t1 with a 5 rows on it
+--let $assert_cond= [SELECT COUNT(*) AS t1_rows FROM t1] = 5
+--source include/assert.inc
+# Slave cleanup
+DROP TABLE t1;
+
+--echo ########################### 3rd scenario ############################################
+
+# Restart the master with binlog encryption turned on
+--let $rpl_server_number= 1
+--let $rpl_server_parameters= $master_keyring_parameters --encrypt-binlog=ON --master-verify-checksum=ON
+--let $rpl_omit_print_server_parameters= 1
+--source include/rpl_restart_server.inc
+
+--connection slave
+--source include/stop_slave.inc
+RESET SLAVE;
+
+--connection master
+RESET MASTER;
+CREATE TABLE t0 (a INT);
+INSERT INTO t0 (a) VALUES (1);
+INSERT INTO t0 (a) VALUES (2);
+INSERT INTO t0 (a) VALUES (3);
+FLUSH BINARY LOGS; #master-bin.000001
+CREATE TABLE t1 (a INT);
+INSERT INTO t1 (a) VALUES (1);
+FLUSH BINARY LOGS; #master-bin.000002
+CREATE TABLE t2 (a INT);
+INSERT INTO t2 (a) VALUES (1);
+INSERT INTO t2 (a) VALUES (2);
+FLUSH BINARY LOGS; #master-bin.000003
+
+# Stop the master server
+--let $rpl_server_number= 1
+--source include/rpl_stop_server.inc
+
+# Replace the binary log file
+--let $encrypted_binlog_file= $MYSQL_TEST_DIR/std_data/binlog_encryption_scheme_1/schema_1_encrypted_master-bin.000002
+--remove_file $binlog_file_path
+--copy_file $encrypted_binlog_file $binlog_file_path
+
+# Restart the server
+--let $rpl_server_number= 1
+--let $rpl_server_parameters= $master_keyring_parameters --encrypt-binlog=ON --master-verify-checksum=ON
+--let $rpl_omit_print_server_parameters= 1
+--source include/rpl_start_server.inc
+--connection master
+
+# Start slave threads so it can sync with master
+--source include/rpl_connection_slave.inc
+--source include/start_slave.inc
+--source include/rpl_connection_master.inc
+--source include/sync_slave_sql_with_master.inc
+--let $assert_text= Slave shall have t1 with 5 rows in it
+--let $assert_cond= [SELECT COUNT(*) AS t1_rows FROM t1] = 5
+--source include/assert.inc
+
+# Cleanup
+DROP TABLE t0,t1,t2;
+
+--source include/rpl_end.inc
+--remove_file $keyring_file
