@@ -3,9 +3,9 @@
 --let $rpl_skip_start_slave= 1
 --source include/master-slave.inc
 
-# The test is done with prepared PS encrypted relay logs (encryption key is in
+# The test is done with prepared PS schema 1 encrypted relay logs (encryption key is in
 # keyring_with_percona_binlog_key_for_slave):
-# 1) ps_encrypted_slave-relay-bin.000002 - was generated with statements:
+# 1) schema_1_encrypted_slave-relay-bin.000002 - was generated with statements:
 #    CREATE TABLE t1 (a INT);
 #    INSERT INTO t1 (a) VALUES (1);
 #    INSERT INTO t1 (a) VALUES (2);
@@ -15,7 +15,7 @@
 #
 # In this test we will test following scenarios:
 # Generate the t1 table (as described above) on master. Start slave io thread. Stop master.
-# Replace the relay logs with PS encrypted relay logs and index file. Restart slave and
+# Replace the relay logs with PS schema 1 encrypted relay logs. Restart slave and
 # sync with master
 
 --connection master
@@ -40,12 +40,12 @@ INSERT INTO t1 (a) VALUES (5);
 --remove_file $SLAVE_DATADIR/slave-relay-bin.000002
 
 # Replace with PS encrypted once
---copy_file $MYSQL_TEST_DIR/std_data/57_binlog_encryption/ps_encrypted_slave-relay-bin.000001 $SLAVE_DATADIR/slave-relay-bin.000001
---copy_file $MYSQL_TEST_DIR/std_data/57_binlog_encryption/ps_encrypted_slave-relay-bin.000002 $SLAVE_DATADIR/slave-relay-bin.000002
+--copy_file $MYSQL_TEST_DIR/std_data/binlog_encryption_scheme_1/schema_1_encrypted_slave-relay-bin.000001 $SLAVE_DATADIR/slave-relay-bin.000001
+--copy_file $MYSQL_TEST_DIR/std_data/binlog_encryption_scheme_1/schema_1_encrypted_slave-relay-bin.000002 $SLAVE_DATADIR/slave-relay-bin.000002
 
 --echo # Replace the keyring file (with key used to encrypt relay log files)
 --let $keyring_file= $MYSQL_TMP_DIR/keyring_slave
---copy_file $MYSQL_TEST_DIR/std_data/57_binlog_encryption/keyring_with_percona_binlog_key_for_slave $keyring_file
+--copy_file $MYSQL_TEST_DIR/std_data/binlog_encryption_scheme_1/keyring_with_percona_binlog_key_for_slave $keyring_file
 --let $keyring_parameters=$KEYRING_PLUGIN_OPT $KEYRING_PLUGIN_LOAD --keyring_file_data=$keyring_file
 
 --echo # Restart the slave server
