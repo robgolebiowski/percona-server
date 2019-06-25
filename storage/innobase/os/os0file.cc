@@ -1826,7 +1826,7 @@ load_key_needed_for_decryption(
 		byte *key_read;
 
 		size_t key_len;
-		if (Encryption::get_tablespace_key(encryption.m_key_id,
+		if (Encryption::get_tablespace_key(encryption.m_key_id, encryption.m_uuid, 
 						   key_version_read_from_page,
 						   &key_read, &key_len) == false)
 		{
@@ -9383,20 +9383,20 @@ Encryption::fill_key_name(char *key_name, uint key_id)
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    key_id);
+		    "%s-%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    server_uuid, key_id);
 #endif
 }
 
 void
-Encryption::fill_key_name(char* key_name, uint key_id, uint key_version)
+Encryption::fill_key_name(char* key_name, const char* uuid, uint key_id, uint key_version)
 {
 #ifndef UNIV_INNOCHECKSUM
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    key_id, key_version);
+		    "%s-%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    uuid, key_id, key_version);
 #endif
 }
 
@@ -9523,6 +9523,7 @@ Encryption::get_keyring_key(const char *key_name,
 
 bool
 Encryption::get_tablespace_key(uint key_id,
+			       const char* uuid,
 			       uint tablespace_key_version,
 			       byte** tablespace_key,
 			       size_t *key_len)
@@ -9531,7 +9532,7 @@ Encryption::get_tablespace_key(uint key_id,
 #ifndef UNIV_INNOCHECKSUM
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-	fill_key_name(key_name, key_id, tablespace_key_version);
+	fill_key_name(key_name, key_id, uuid, tablespace_key_version);
 
 	Encryption::get_keyring_key(key_name, tablespace_key, key_len);
 
@@ -9576,6 +9577,7 @@ Encryption::get_latest_system_key(const char *system_key_name,
 // tablespace_key_version as output parameter
 void
 Encryption::get_latest_tablespace_key(uint key_id,
+				      const char* uuid,
 				      uint *tablespace_key_version,
 				      byte** tablespace_key)
 {

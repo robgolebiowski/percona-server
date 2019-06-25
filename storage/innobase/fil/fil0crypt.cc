@@ -120,6 +120,7 @@ uint fil_get_encrypt_info_size(const uint iv_len) {
 		+ 1	//type 
 		+ 4	//min_key_version
 		+ 4	//key_id
+        + UUID_LENGTH // server's UUID
 		+ 1	//encryption
 		+ iv_len	//iv
 		+ 4	//encryption rotation type
@@ -210,6 +211,7 @@ fil_space_crypt_t::fil_space_crypt_t(
 		uint new_type,
 		uint new_min_key_version,
 		uint new_key_id,
+		char *uuid,
 		fil_encryption_t new_encryption,
 		bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
 		Encryption::Encryption_rotation encryption_rotation)
@@ -317,6 +319,7 @@ fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			min_key_version,
 	uint			key_id,
+    char*			uuid,
 	bool			create_key = true) {
 	fil_space_crypt_t* crypt_data = NULL;
 	if (void* buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
@@ -325,8 +328,9 @@ fil_space_create_crypt_data(
 				type,
 				min_key_version,
 				key_id,
+				uuid,
 				encrypt_mode,
-                                create_key);
+				create_key);
 	}
 
 	return crypt_data;
@@ -365,9 +369,10 @@ fil_space_crypt_t*
 fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			key_id,
+    char*           uuid,
 	bool			create_key) {
 
-	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id, create_key));
+	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id, uuid, create_key));
 }
 
 /******************************************************************
@@ -445,11 +450,16 @@ fil_space_read_crypt_data(const page_size_t& page_size, const byte* page) {
 
 	ut_ad(key_id != (uint)(~0));
 
+    char uuid[UUID_LENGTH + 1];
+    memset(uuid, 0, UUID_LENGTH + 1);
+    memcpy(uuid, ptr, UUID_LENGTH);
+    ptr += UUID_LENGTH;
+
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(
 		page + offset + bytes_read);
 	bytes_read += 1;
 
-	crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
+	crypt_data = fil_space_create_crypt_data(encryption, key_id, uuid, false);
 
 	/* We need to overwrite these as above function will initialize
 	members */
@@ -562,6 +572,8 @@ fil_space_crypt_t::write_page0(
 	ut_ad(key_id != (uint)(~0));
 	mach_write_to_4(encrypt_info_ptr, key_id);
 	encrypt_info_ptr += 4;
+    memcpy(encrypt_info_ptr, space->crypt_data->uuid, UUID_LENGTH);
+    encrypt_info_ptr += UUID_LENGTH;
 	mach_write_to_1(encrypt_info_ptr, encryption);
 	encrypt_info_ptr += 1;
 
@@ -684,10 +696,15 @@ fil_parse_write_crypt_data(
 	uint key_id = mach_read_from_4(ptr);
 	ptr += 4;
 
+    char uuid[UUID_LENGTH + 1];
+    memset(uuid, 0, UUID_LENGTH + 1);
+    memcpy(uuid, ptr, UUID_LENGTH);
+    ptr += UUID_LENGTH;
+
 	fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(ptr);
 	ptr += 1;
 
-	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
+	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id, uuid false);
 	/* Need to overwrite these as above will initialize fields. */
 	crypt_data->page0_offset = offset;
 	crypt_data->min_key_version = min_key_version;
@@ -877,7 +894,7 @@ fil_crypt_start_encrypting_space(
 	* risk of finding encrypted pages without having
 	* crypt data in page 0 */
 
-	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), srv_uuid, false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
 
 	if (crypt_data == NULL || crypt_data->key_found == false) {
 		mutex_exit(&fil_crypt_threads_mutex);

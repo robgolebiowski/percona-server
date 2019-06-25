@@ -8,7 +8,7 @@
 --let $restart_parameters=restart:--log-bin=master-bin --debug=d,check_consecutive_binlog_key_versions;
 --source include/restart_mysqld.inc
 
---let $keyring_file=$MYSQL_TMP_DIR/keyring1
+--let $keyring_file=$MYSQLTEST_VARDIR/tmp/keyring1
 
 --let $server_uuid=`SELECT @@GLOBAL.SERVER_UUID`
 

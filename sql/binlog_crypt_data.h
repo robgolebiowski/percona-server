@@ -67,9 +67,9 @@ public:
 
 private:
 #ifdef MYSQL_SERVER
-  std::string build_binlog_key_name(uint sch, uint kv, char* srv_uuid);
-  std::string build_binlog_key_name(uint sch, char *srv_uuid);
-  void build_binlog_key_name(std::ostringstream &percona_binlog_key_name_oss, uint sch, char *srv_uuid);
+  std::string build_binlog_key_name(const uint sch, const uint kv, const char* srv_uuid);
+  std::string build_binlog_key_name(const uint sch, const char *srv_uuid);
+  void build_binlog_key_name(std::ostringstream &percona_binlog_key_name_oss, const uint sch, const char *srv_uuid);
 #endif
 private:
   uint  key_version;
