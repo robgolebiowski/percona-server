@@ -22,6 +22,7 @@
 #include "sql/sql_lex.h"
 #include "sql_class.h"  // THD
 #include "system_key.h"
+#include "mysqld.h"
 
 bool Item_func_rotate_system_key::itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
@@ -47,9 +48,16 @@ longlong Item_func_rotate_system_key::val_int() {
 }
 
 bool Item_func_rotate_system_key::calc_value(const String *arg) {
+  DBUG_ASSERT(strlen(server_uuid) != 0);
   size_t key_length = 0;
-  return is_valid_percona_system_key(arg->ptr(), &key_length) &&
-         !(my_key_generate(arg->ptr(), "AES", NULL, key_length));
+
+  if (!is_valid_percona_system_key(arg->ptr(), &key_length))
+    return false;
+
+  std::ostringstream key_id_with_uuid_ss;
+  key_id_with_uuid_ss << arg->ptr() << '_' << server_uuid;
+  std::string key_id_with_uuid = key_id_with_uuid_ss.str();
+  return !(my_key_generate(key_id_with_uuid.c_str(), "AES", NULL, key_length));
 }
 
 bool Item_func_rotate_system_key::fix_fields(THD *thd, Item **ref) {

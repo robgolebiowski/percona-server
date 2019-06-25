@@ -175,6 +175,7 @@ class Start_encryption_event : public Binary_log_event {
   uint crypto_scheme;
   uint key_version;
   unsigned char nonce[NONCE_LENGTH];
+  char uuid[Uuid::TEXT_LENGTH + 1];
 
   Start_encryption_event(uint crypto_scheme_arg, uint key_version_arg,
                          const unsigned char *nonce_arg) noexcept

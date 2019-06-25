@@ -19,6 +19,7 @@
 
 #include "control_events.h"
 #include "my_crypt.h"
+#include <sstream>
 
 class Binlog_crypt_data final {
  public:
@@ -35,12 +36,17 @@ class Binlog_crypt_data final {
   uint32_t get_offs() const noexcept { return offs; }
 
   void free_key(uchar *&key, size_t &key_length) noexcept;
-  bool init(uint sch, uint kv, const uchar *nonce);
+  bool init(uint sch, uint kv, const uchar *nonce, char* srv_uuid);
   bool init_with_loaded_key(uint sch, const uchar *nonce) noexcept;
-  bool load_latest_binlog_key();
   void set_iv(uchar *iv, uint32 offs) const;
 
- private:
+private:
+#ifdef MYSQL_SERVER
+  std::string build_binlog_key_name(const uint sch, const uint kv, const char* srv_uuid);
+  std::string build_binlog_key_name(const uint sch, const char *srv_uuid);
+  void build_binlog_key_name(std::ostringstream &percona_binlog_key_name_oss, const uint sch, const char *srv_uuid);
+#endif
+private:
   uint key_version;
   size_t key_length;
   uchar *key;

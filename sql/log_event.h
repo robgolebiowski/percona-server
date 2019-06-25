@@ -1455,12 +1455,15 @@ class Start_encryption_log_event final
  public:
 #ifdef MYSQL_SERVER
   Start_encryption_log_event(uint crypto_scheme_arg, uint key_version_arg,
-                             const uchar *nonce_arg) noexcept
+                             const uchar *nonce_arg, const char *srv_uuid) noexcept
       : Start_encryption_event(crypto_scheme_arg, key_version_arg, nonce_arg),
         Log_event(header(), footer(), Log_event::EVENT_NO_CACHE,
                   Log_event::EVENT_IMMEDIATE_LOGGING) {
-    DBUG_ASSERT(crypto_scheme == 1);
-    common_header->set_is_valid(crypto_scheme == 1);
+    DBUG_ASSERT(crypto_scheme == 1 || crypto_scheme == 2);
+    common_header->set_is_valid(crypto_scheme == 1 || crypto_scheme == 2);
+    memcpy(nonce, nonce_arg, binary_log::Start_encryption_event::NONCE_LENGTH);
+    memset(uuid, 0, sizeof(uuid));
+    memcpy(uuid, srv_uuid, binary_log::Uuid::TEXT_LENGTH);
   }
 
 #else
