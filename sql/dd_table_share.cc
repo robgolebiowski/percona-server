@@ -747,6 +747,10 @@ static bool fill_share_from_dd(THD *thd, TABLE_SHARE *share,
     table_options->get("encryption_key_id", &share->encryption_key_id);
   }
 
+  if (table_options->exists("was_encrypt_type_set_explicitly")) {
+    share->was_encrypt_type_set_explicitly = true;
+  }
+
   return false;
 }
 
