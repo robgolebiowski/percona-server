@@ -7483,10 +7483,8 @@ ONLINE_TO_KEYRING*
 @return true if innodb_encrypt_tables is equal to ON or FORCE or
 ONLINE_TO_KEYRING* */
 static bool dict_should_be_keyring_encrypted() {
-  return srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
-         srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE ||
-         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE;
+  return srv_default_table_encryption == DEFAULT_TABLE_ENC_ON ||
+         srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING;
 }
 
 /** Reads mysql.ibd's page0 from buffer if the tablespace is already loaded

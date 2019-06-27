@@ -708,6 +708,8 @@ struct TABLE_SHARE {
 
   uint32_t encryption_key_id{0};
   bool was_encryption_key_id_set{false};
+  bool was_encrypt_type_set_explicitly{false};
+
   const CHARSET_INFO *table_charset{
       nullptr}; /* Default charset of string fields */
 

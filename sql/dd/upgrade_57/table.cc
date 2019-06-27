@@ -104,6 +104,8 @@
 
 #include "sql/dd/impl/upgrade/server.h"
 
+#include "sql/dd/impl/bootstrap/bootstrap_ctx.h"  // DD_bootstrap_ctx
+
 class Sroutine_hash_entry;
 
 bool Table_trigger_dispatcher::reorder_57_list(MEM_ROOT *mem_root,
@@ -1456,6 +1458,36 @@ static bool fix_fk_parent_key_names(THD *thd, const String_type &schema_name,
 }
 
 /**
+  Finds if tablespace is encrypted
+
+  @param  name        Name of tablespace
+
+  @retval false - Not encrypted
+  @retval true  - Encrytpted
+*/
+
+bool is_tablespace_encrypted(const char *name) {
+
+  THD *thd = current_thd;
+  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(client);
+  const dd::Tablespace *dd_space = nullptr;
+
+  if (!client->acquire<dd::Tablespace>(
+          name, &dd_space) &&
+      dd_space != nullptr) {
+    if (!dd_space->options().exists("encryption")) {
+      return false;
+    }
+
+    dd::String_type tablespace_encryption;
+    (void)dd_space->options().get("encryption", &tablespace_encryption);
+    return tablespace_encryption == "Y";
+  }
+  return false;
+}
+
+/**
   Read .frm files and enter metadata for tables/views.
 */
 
@@ -1596,6 +1628,15 @@ static bool migrate_table_to_dd(THD *thd, const String_type &schema_name,
         !(key_info->flags & HA_FULLTEXT) && !(key_info->flags & HA_SPATIAL) &&
         table.file->is_index_algorithm_supported(key_info->algorithm))
       key_info->is_algorithm_explicit = true;
+  }
+
+  // if table is part of tablespace - check if tablespace is encrypted
+  // if it is - assing encryption clause to the table
+  if ( ( (share.tablespace && is_tablespace_encrypted(share.tablespace)) ||
+         (schema_name == "mysql" && bootstrap::DD_bootstrap_ctx::instance().is_system_tablespace_encrypted()) ) &&
+       !is_encrypted(share.encrypt_type) )  {
+
+    share.encrypt_type.str = C_STRING_WITH_LEN("Y");
   }
 
   // Fill create_info to be passed to the DD framework.
