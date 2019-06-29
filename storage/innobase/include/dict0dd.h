@@ -1224,19 +1224,13 @@ bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table);
 
 /* Sets tablespace's DD encryption flag.
 @param[in] Thread       THD
-@param[in] space_name   name of the space for which DD encryption flag is to be
-@param[in] *is_space_being_removed - whether space is being removed
-set */
-bool dd_set_encryption_flag(THD *thd, const char *space_name,
-                            volatile bool *is_space_being_removed);
+@param[in] space_name   name of the space for which DD encryption flag is to be */
+bool dd_set_encryption_flag(THD *thd, const char *space_name);
 
 /* Clears tablespace's DD encryption flag.
 @param[in] Thread       THD
-@param[in] space_name   name of the space for which DD encryption flag is to be
-@param[in] *is_space_being_removed - whether space is being removed
-cleared */
-bool dd_clear_encryption_flag(THD *thd, const char *space_name,
-                              volatile bool *is_space_being_removed);
+@param[in] space_name   name of the space for which DD encryption flag is to be */
+bool dd_clear_encryption_flag(THD *thd, const char *space_name);
 
 /* If mysql_ibd's DD encryption flag is different from the encryption flag in
  * space_flag   the mysql_ibd's encryption flag will be set to the

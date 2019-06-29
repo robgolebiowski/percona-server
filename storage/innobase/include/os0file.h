@@ -457,7 +457,7 @@ struct Encryption {
   /** Check if the NO algorithm was explicitly specified.
   @param[in]      algorithm       Encryption algorithm to check
   @return true if no algorithm explicitly requested */
-  static bool none_explicitly_specified(
+  static bool is_none_explicitly_specified(
       const char *algorithm) noexcept MY_ATTRIBUTE((warn_unused_result));
 
   static bool is_master_key_encryption(const char *algorithm)

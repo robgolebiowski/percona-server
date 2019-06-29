@@ -628,7 +628,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool innobase_need_rebuild(
   Alter_inplace_info::HA_ALTER_FLAGS alter_inplace_flags =
       ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE);
 
-  if ((Encryption::none_explicitly_specified(
+  if ((Encryption::is_none_explicitly_specified(
            ha_alter_info->create_info->encrypt_type.str) &&
        (Encryption::is_keyring(old_table->s->encrypt_type.str) ||
         Encryption::is_empty(old_table->s->encrypt_type.str))) ||
@@ -4503,7 +4503,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       } else if (Encryption::is_keyring(old_table->s->encrypt_type.str) &&
                  (old_table->s->encryption_key_id !=
                       ha_alter_info->create_info->encryption_key_id ||
-                  Encryption::none_explicitly_specified(encrypt))) {
+                  Encryption::is_none_explicitly_specified(encrypt))) {
         // it is KEYRING encryption - check if old's table encryption key is
         // available
         if (Encryption::tablespace_key_exists(
@@ -4518,13 +4518,13 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       }
     }
 
-    if (Encryption::none_explicitly_specified(encrypt))
+    if (Encryption::is_none_explicitly_specified(encrypt))
       mode = FIL_ENCRYPTION_OFF;
     else if (Encryption::is_keyring(encrypt) ||
              ((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
                srv_encrypt_tables ==
                    SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) &&
-              !Encryption::none_explicitly_specified(
+              !Encryption::is_none_explicitly_specified(
                   ha_alter_info->create_info->encrypt_type.str) &&
               !Encryption::is_master_key_encryption(encrypt)) ||
              ha_alter_info->create_info->was_encryption_key_id_set) {

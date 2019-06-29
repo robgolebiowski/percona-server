@@ -2701,7 +2701,7 @@ bool Encryption::is_empty(const char *algorithm) {
 @return true if no algorithm requested */
 bool Encryption::is_none(const char *algorithm) {
   return Encryption::is_empty(algorithm) ||
-         Encryption::none_explicitly_specified(algorithm);
+         Encryption::is_none_explicitly_specified(algorithm);
 }
 
 bool Encryption::is_master_key_encryption(const char *algorithm) {
@@ -2711,7 +2711,7 @@ bool Encryption::is_master_key_encryption(const char *algorithm) {
 /** Check if the NO algorithm was explicitly specified.
 @param[in]      algorithm       Encryption algorithm to check
 @return true if no algorithm explicitly requested */
-bool Encryption::none_explicitly_specified(const char *algorithm) noexcept {
+bool Encryption::is_none_explicitly_specified(const char *algorithm) noexcept {
   return (algorithm != nullptr && innobase_strcasecmp(algorithm, "n") == 0);
 }
 
@@ -2725,7 +2725,7 @@ bool Encryption::is_online_encryption_on() {
 }
 
 bool Encryption::should_be_keyring_encrypted(const char *algorithm) {
-  return !none_explicitly_specified(algorithm) &&
+  return !is_none_explicitly_specified(algorithm) &&
          (is_keyring(algorithm) ||
           (algorithm == nullptr && is_online_encryption_on()));
 }
@@ -11008,7 +11008,7 @@ dberr_t create_table_info_t::enable_master_key_encryption(dict_table_t *table) {
 
 dberr_t create_table_info_t::enable_keyring_encryption(
     dict_table_t *table, fil_encryption_t &keyring_encryption_option) {
-  if (Encryption::none_explicitly_specified(m_create_info->encrypt_type.str)) {
+  if (Encryption::is_none_explicitly_specified(m_create_info->encrypt_type.str)) {
     keyring_encryption_option = FIL_ENCRYPTION_OFF;
   } else if (Encryption::is_keyring(m_create_info->encrypt_type.str) ||
              (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)) {
@@ -12157,14 +12157,14 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
     }
   }
 
-  bool table_is_keyring =
-      Encryption::is_keyring(m_create_info->encrypt_type.str);
+  //bool table_is_keyring =
+      //Encryption::is_keyring(m_create_info->encrypt_type.str);
 
-  if (table_is_keyring && !m_allow_file_per_table) {
-    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                    "InnoDB: KEYRING requires innodb_file_per_table.", MYF(0));
-    return (false);
-  }
+  //if (table_is_keyring && !m_allow_file_per_table) {
+    //my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                    //"InnoDB: KEYRING requires innodb_file_per_table.", MYF(0));
+    //return (false);
+  //}
 
   /* Currently we do not support keyring encryption for
   spatial indexes thus do not allow creating table with forced
@@ -12189,7 +12189,7 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
       !Encryption::is_none(m_create_info->encrypt_type.str);
 
   if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE &&
-      (Encryption::none_explicitly_specified(m_create_info->encrypt_type.str) ||
+      (Encryption::is_none_explicitly_specified(m_create_info->encrypt_type.str) ||
        Encryption::is_keyring(m_create_info->encrypt_type.str))) {
     my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
                     "InnoDB: Only Master Key encrypted tables "
@@ -12439,14 +12439,14 @@ void ha_innobase::adjust_encryption_key_id(HA_CREATE_INFO *create_info,
       create_info->was_encryption_key_id_set = true;
     }
   } else if (Encryption::is_master_key_encryption(encrypt_type->str) ||
-             Encryption::none_explicitly_specified(encrypt_type->str)) {
+             Encryption::is_none_explicitly_specified(encrypt_type->str)) {
     // if it is encrypted table with Master key encryption or marked as not to
     // be encrypted and alter table does not have ENCRYPTION_KEY_ID - mark
     // encryption key id as not set.
 
     push_warning_printf(current_thd, Sql_condition::SL_WARNING,
                         HA_WRONG_CREATE_OPTION,
-                        Encryption::none_explicitly_specified(encrypt_type->str)
+                        Encryption::is_none_explicitly_specified(encrypt_type->str)
                             ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
                               "encryption is disabled."
                             : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "

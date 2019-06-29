@@ -112,6 +112,9 @@ extern uint srv_background_scrub_data_check_interval;
 extern bool srv_background_scrub_data_uncompressed;
 extern bool srv_background_scrub_data_compressed;
 
+// Set to true when all server's components are initialized.
+// We need to wait for full server initialization to complete
+// before we start encryption threads.
 extern bool mysqld_server_started;
 
 uint get_global_default_encryption_key_id_value();
@@ -141,18 +144,15 @@ static_assert(KERYING_ENCRYPTION_INFO_MAX_SIZE < ENCRYPTION_INFO_MAX_SIZE,
               " header size");
 
 uchar *fil_space_crypt_t::get_key_currently_used_for_encryption() {
-  // ut_ad(mutex_own(&this->mutex));
   return get_cached_key(cached_encryption_key, encrypting_with_key_version);
 }
 
 uchar *fil_space_crypt_t::get_min_key_version_key() {
-  // ut_ad(mutex_own(&this->mutex));
   return get_cached_key(cached_min_key_version_key, min_key_version);
 }
 
 uchar *fil_space_crypt_t::get_cached_key(Cached_key &cached_key,
                                          uint key_version) {
-  // ut_ad(mutex_own(&this->mutex));
   ut_ad(key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
   if (cached_key.key_version == key_version) return cached_key.key;
 
@@ -234,8 +234,6 @@ fil_space_crypt_t::fil_space_crypt_t(
                // problem
   mutex_create(LATCH_ID_FIL_CRYPT_START_ROTATE_MUTEX, &start_rotate_mutex);
   mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
-  // locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie
-  // mogę znaleść jego definicji nawet w mariadb
   type = new_type;
 
   if (new_encryption == FIL_ENCRYPTION_OFF ||
@@ -267,9 +265,6 @@ fil_space_crypt_t::fil_space_crypt_t(
     }
     my_free(key);
   }
-
-  // found_key_version = min_key_version; // TODO:This does not make much sense
-  // now - always true
 }
 
 /**
@@ -715,7 +710,7 @@ byte *fil_parse_write_crypt_data(byte *ptr, const byte *end_ptr,
   /* Check is used key found from encryption plugin */
   if (crypt_data->should_encrypt() && !crypt_data->is_key_found()) {
     ib::error() << "Key cannot be read for space id = "
-                << space_id;  // TODO: To jest zmienione w MariaDB - zmienić!
+                << space_id;
     recv_sys->set_corrupt_log();
   }
 
@@ -1696,9 +1691,8 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
       /* statistics */
       state->crypt_stat.pages_modified++;
     } else if (mach_read_from_4(frame + FIL_PAGE_LSN) == 0) {
-      /* LSN == 0 means that the page was never flushed to disk. Thus it never
-       * had the key version assigned. We assign the key version to this page
-       * here, as it only exists in buffer */
+      /* LSN == 0 means that the page has not have its key version assigned.
+      We assign key version to this page here */
       mlog_write_ulint(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION,
                        crypt_data->encrypting_with_key_version, MLOG_4BYTES,
                        &mtr);
@@ -1814,488 +1808,18 @@ static void fil_crypt_rotate_pages(const key_state_t *key_state,
   }
 }
 
-/******************************************************************/ /**
- Callback that sets a hex formatted FTS table's flags2 in
- SYS_TABLES. The flags is stored in MIX_LEN column.
- @return FALSE if all OK */
-// static
-// ibool
-// fts_set_encrypted_flag_for_table(
-// void*		row,		// in: sel_node_t*
-// void*		user_arg) {	// in: bool set/unset flag
-
-// sel_node_t*	node = static_cast<sel_node_t*>(row);
-// dfield_t*	dfield = que_node_get_val(node->select_list);
-
-// ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-// ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-//[> There should be at most one matching record. So the value
-// must be the default value. */
-// ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-//== ULINT32_UNDEFINED);
-
-// ulint flags2 = mach_read_from_4(
-// static_cast<byte*>(dfield_get_data(dfield)));
-
-// flags2 |= DICT_TF2_ENCRYPTION;
-
-// mach_write_to_4(static_cast<byte*>(user_arg), flags2);
-
-// return(FALSE);
-//}
-
-// static
-// ibool
-// fts_unset_encrypted_flag_for_table(
-// void*		row,		// in: sel_node_t*
-// void*		user_arg) {	// in: bool set/unset flag
-
-// sel_node_t*	node = static_cast<sel_node_t*>(row);
-// dfield_t*	dfield = que_node_get_val(node->select_list);
-
-// ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-
-// ulint flags = mach_read_from_4(
-// static_cast<byte*>(dfield_get_data(dfield)));
-
-// flags &= ~DICT_TF2_ENCRYPTION;
-// mach_write_to_4(static_cast<byte*>(user_arg), flags);
-
-// return(FALSE);
-//}
-
-// static
-// dberr_t
-// fts_update_encrypted_tables_flag(
-// trx_t*		trx,		[> in/out: transaction that
-// covers the update */
-// table_id_t	table_id,
-// bool	set) {			[> in: Table for which we want
-// to set the root table->flags2 */
-// pars_info_t*		info;
-// ib_uint32_t		flags2;
-
-// static const char	sql[] =
-//"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-//"DECLARE FUNCTION my_func;\n"
-//"DECLARE CURSOR c IS\n"
-//" SELECT MIX_LEN"
-//" FROM SYS_TABLES"
-//" WHERE ID = :table_id FOR UPDATE;"
-//"\n"
-//"BEGIN\n"
-//"OPEN c;\n"
-//"WHILE 1 = 1 LOOP\n"
-//"  FETCH c INTO my_func();\n"
-//"  IF c % NOTFOUND THEN\n"
-//"    EXIT;\n"
-//"  END IF;\n"
-//"END LOOP;\n"
-//"UPDATE SYS_TABLES"
-//" SET MIX_LEN = :flags2"
-//" WHERE ID = :table_id;\n"
-//"CLOSE c;\n"
-//"END;\n";
-
-// flags2 = ULINT32_UNDEFINED;
-
-// info = pars_info_create();
-
-// pars_info_add_ull_literal(info, "table_id", table_id);
-// pars_info_bind_int4_literal(info, "flags2", &flags2);
-
-// pars_info_bind_function(
-// info, "my_func", set ? fts_set_encrypted_flag_for_table
-//: fts_unset_encrypted_flag_for_table, &flags2);
-
-// if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) {
-// trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
-//}
-
-// dberr_t err = que_eval_sql(info, sql, false, trx);
-
-// ut_a(flags2 != ULINT32_UNDEFINED);
-
-// return(err);
-//}
-
-// static
-// ibool
-// fts_unset_encrypted_flag_for_tablespace(
-// void*		row,		// in: sel_node_t*
-// void*		user_arg) {	// in: bool set/unset flag
-
-// sel_node_t*	node = static_cast<sel_node_t*>(row);
-// dfield_t*	dfield = que_node_get_val(node->select_list);
-
-// ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-// ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-//// There should be at most one matching record. So the value
-//// must be the default value.
-// ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-//== ULINT32_UNDEFINED);
-
-// ulint  flags = mach_read_from_4(
-// static_cast<byte*>(dfield_get_data(dfield)));
-
-// flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
-
-// mach_write_to_4(static_cast<byte*>(user_arg), flags);
-
-// return(FALSE);
-//}
-
-// static
-// ibool
-// fts_set_encrypted_flag_for_tablespace(
-// void*		row,		// in: sel_node_t*
-// void*		user_arg) {	// in: bool set/unset flag
-
-// sel_node_t*	node = static_cast<sel_node_t*>(row);
-// dfield_t*	dfield = que_node_get_val(node->select_list);
-
-// ut_ad(dtype_get_mtype(dfield_get_type(dfield)) == DATA_INT);
-// ut_ad(dfield_get_len(dfield) == sizeof(ib_uint32_t));
-//// There should be at most one matching record. So the value
-//// must be the default value.
-// ut_ad(mach_read_from_4(static_cast<byte*>(user_arg))
-//== ULINT32_UNDEFINED);
-
-// ulint  flags = mach_read_from_4(
-// static_cast<byte*>(dfield_get_data(dfield)));
-
-// flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
-
-// mach_write_to_4(static_cast<byte*>(user_arg), flags);
-
-// return(FALSE);
-//}
-
-// static
-// ibool
-// read_table_id(
-//[>============<]
-// void*		row,		[>!< in: sel_node_t* <]
-// void*		user_arg)	[>!< in: pointer to ib_vector_t <]
-//{
-// ib_vector_t*	tables_ids = static_cast<ib_vector_t*>(user_arg);
-
-// sel_node_t*	node = static_cast<sel_node_t*>(row);
-// dfield_t*	dfield = que_node_get_val(node->select_list);
-
-// ut_ad(dfield_get_len(dfield) == 8);
-
-// table_id_t *table_id = static_cast<table_id_t*>(ib_vector_push(tables_ids,
-// NULL));
-
-//*table_id = mach_read_from_8(static_cast<byte*>(dfield_get_data(dfield)));
-
-// return(TRUE);
-//}
-
-// static
-// dberr_t
-// fts_update_encrypted_flag_for_tablespace_sql(
-// trx_t*		trx,		// in/out: transaction that
-//// covers the update
-// ulint		space_id,
-// bool set) {
-
-// pars_info_t*		info;
-// ib_uint32_t		flags;
-
-// static const char	sql[] =
-//"PROCEDURE UPDATE_ENCRYPTED_FLAG() IS\n"
-//"DECLARE FUNCTION my_func;\n"
-//"DECLARE CURSOR c IS\n"
-//" SELECT FLAGS"
-//" FROM SYS_TABLESPACES"
-//" WHERE SPACE=:space_id FOR UPDATE;"
-//"\n"
-//"BEGIN\n"
-//"OPEN c;\n"
-//"WHILE 1 = 1 LOOP\n"
-//"  FETCH c INTO my_func();\n"
-//"  IF c % NOTFOUND THEN\n"
-//"    EXIT;\n"
-//"  END IF;\n"
-//"END LOOP;\n"
-//"UPDATE SYS_TABLESPACES"
-//" SET FLAGS=:flags"
-//" WHERE SPACE=:space_id;\n"
-//"CLOSE c;\n"
-//"END;\n";
-
-// flags = ULINT32_UNDEFINED;
-
-// info = pars_info_create();
-
-// pars_info_add_int4_literal(info, "space_id", space_id);
-// pars_info_bind_int4_literal(info, "flags", &flags);
-
-// pars_info_bind_function(
-// info, "my_func", set ? fts_set_encrypted_flag_for_tablespace
-//: fts_unset_encrypted_flag_for_tablespace, &flags);
-
-// if (trx_get_dict_operation(trx) == TRX_DICT_OP_NONE) { // TODO:Robert - is
-// this needed - I think not, they are not using it in
-//// fts_drop_orphaned tables for getting a list of tables
-//// może trx_set_dict_operation(trx, TRX_DICT_OP_TABLE); ?
-// trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
-//}
-
-// dberr_t err = que_eval_sql(info, sql, false, trx);
-
-// ut_a(flags != ULINT32_UNDEFINED);
-
-// if (flags == ULINT32_UNDEFINED)
-// return DB_ERROR;
-
-// return(err);
-//}
-
-// static
-// dberr_t
-// get_table_ids_in_space_sql(
-// trx_t*		trx,		// in/out: transaction that
-// fil_space_t *space,
-// ib_vector_t* tables_ids
-//) {
-// pars_info_t *info = pars_info_create();
-
-// static const char	sql[] =
-//"PROCEDURE GET_TABLES_IDS() IS\n"
-//"DECLARE FUNCTION my_func;\n"
-//"DECLARE CURSOR c IS"
-//" SELECT ID"
-//" FROM SYS_TABLES"
-//" WHERE SPACE=:space_id;\n"
-//"BEGIN\n"
-//"\n"
-//"OPEN c;\n"
-//"WHILE 1 = 1 LOOP\n"
-//"  FETCH c INTO my_func();\n"
-//"  IF c % NOTFOUND THEN\n"
-//"    EXIT;\n"
-//"  END IF;\n"
-//"END LOOP;\n"
-//"CLOSE c;\n"
-//"END;\n";
-
-// pars_info_bind_function(info, "my_func", read_table_id, tables_ids);
-// pars_info_add_int4_literal(info, "space_id", space->id);
-
-// dberr_t err = que_eval_sql(info, sql, false, trx);
-
-// return(err);
-//}
-/*
-static
-void
-fil_revert_encryption_flag_updates(ib_vector_t* tables_ids_to_revert_if_error,
-bool set) {
-
-        while (!ib_vector_is_empty(tables_ids_to_revert_if_error)) {
-                table_id_t *table_id = static_cast<table_id_t*>(
-                        ib_vector_pop(tables_ids_to_revert_if_error));
-
-                dict_table_t *table = dict_table_open_on_id(*table_id, TRUE,
-                                DICT_TABLE_OP_NORMAL);
-
-                ut_ad(table != NULL);
-
-                if (set) {
-                        DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION);
-                } else
-                        DICT_TF2_FLAG_UNSET(table, DICT_TF2_ENCRYPTION);
-
-                dict_table_close(table, TRUE, FALSE);
-        }
-}*/
-
-class TransactionAndHeapGuard {
- public:
-  TransactionAndHeapGuard()
-      : dict_operation_locked(false),
-        trx(NULL),
-        dict_sys_mutex_entered(false),
-        heap(NULL),
-        heap_alloc(NULL),
-        table_ids(NULL),
-        table_ids_to_revert(NULL),
-        do_rollback(true) {}
-
-  bool lock_x_dict_operation_lock(fil_space_t *space) {
-    ut_ad(!dict_operation_locked && trx == NULL && !dict_sys_mutex_entered &&
-          heap == NULL && heap_alloc == NULL && table_ids == NULL &&
-          table_ids_to_revert == NULL);
-
-    // This should only wait in rare cases
-    while (!rw_lock_x_lock_nowait(dict_operation_lock)) {
-      // os_thread_sleep(6000);
-      os_thread_sleep(6);
-      if (space->stop_new_ops)  // space is about to be dropped
-        return false;           // do not try to lock the DD
-    }
-    dict_operation_locked = true;
-    return true;
-  }
-
-  bool allocate_trx() {
-    ut_ad(dict_operation_locked && trx == NULL && !dict_sys_mutex_entered &&
-          heap == NULL && heap_alloc == NULL && table_ids == NULL &&
-          table_ids_to_revert == NULL);
-
-    trx = trx_allocate_for_background();
-    if (trx == NULL) return false;
-    trx->op_info = "setting encrypted flag";
-    trx->dict_operation_lock_mode = RW_X_LATCH;
-    return true;
-  }
-
-  void enter_dict_sys_mutex() {
-    ut_ad(dict_operation_locked && trx != NULL && !dict_sys_mutex_entered &&
-          heap == NULL && heap_alloc == NULL && table_ids == NULL &&
-          table_ids_to_revert == NULL);
-
-    dict_mutex_enter_for_mysql();
-    dict_sys_mutex_entered = true;
-  }
-
-  bool create_heap() {
-    ut_ad(dict_operation_locked && trx != NULL && dict_sys_mutex_entered &&
-          heap == NULL && heap_alloc == NULL && table_ids == NULL &&
-          table_ids_to_revert == NULL);
-
-    // TODO: consider moving expensive operation out of dict_sys->mutex
-    heap = mem_heap_create(1024);
-    return heap != NULL;
-  }
-
-  bool create_allocator() {
-    ut_ad(dict_operation_locked && trx != NULL && dict_sys_mutex_entered &&
-          heap != NULL && heap_alloc == NULL && table_ids == NULL &&
-          table_ids_to_revert == NULL);
-
-    heap_alloc = ib_heap_allocator_create(heap);
-    return heap_alloc != NULL;
-  }
-
-  bool create_table_ids_vector() {
-    ut_ad(dict_operation_locked && trx != NULL && dict_sys_mutex_entered &&
-          heap != NULL && heap_alloc != NULL && table_ids == NULL &&
-          table_ids_to_revert == NULL);
-
-    table_ids = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
-    return table_ids != NULL;
-  }
-
-  bool create_table_ids_to_revert_vector() {
-    ut_ad(dict_operation_locked && trx != NULL && dict_sys_mutex_entered &&
-          heap != NULL && heap_alloc != NULL && table_ids != NULL &&
-          table_ids_to_revert == NULL);
-
-    table_ids_to_revert = ib_vector_create(heap_alloc, sizeof(table_id_t), 128);
-    return table_ids_to_revert != NULL;
-  }
-
-  bool is_table_ids_empty() const {
-    ut_ad(dict_operation_locked && trx != NULL && dict_sys_mutex_entered &&
-          heap != NULL && heap_alloc != NULL && table_ids != NULL &&
-          table_ids_to_revert != NULL);
-
-    return ib_vector_is_empty(table_ids);
-  }
-
-  table_id_t pop_from_table_ids() {
-    ut_ad(table_ids != NULL);
-
-    return *static_cast<table_id_t *>(ib_vector_pop(table_ids));
-  }
-
-  void push_to_table_ids_to_revert(table_id_t table_id) {
-    ut_ad(table_ids_to_revert != NULL);
-
-    ib_vector_push(table_ids_to_revert, &table_id);
-  }
-
-  trx_t *get_trx() {
-    ut_ad(trx != NULL);
-    return trx;
-  }
-
-  ib_vector_t *get_table_ids() {
-    ut_ad(table_ids != NULL);
-    return table_ids;
-  }
-
-  ib_vector_t *get_table_ids_to_revert() {
-    ut_ad(table_ids_to_revert != NULL);
-    return table_ids_to_revert;
-  }
-
-  void commit() {
-    ut_ad(dict_operation_locked && trx != NULL && dict_sys_mutex_entered &&
-          heap != NULL && heap_alloc != NULL && table_ids != NULL &&
-          table_ids_to_revert != NULL);
-
-    fts_sql_commit(trx);
-    do_rollback = false;
-  }
-
-  ~TransactionAndHeapGuard() {
-    if (trx && do_rollback) fts_sql_rollback(trx);
-
-    /*
-    if (table_ids_to_revert != NULL)
-            ib_vector_free(table_ids_to_revert);
-
-    if (table_ids != NULL)
-            ib_vector_free(table_ids);
-
-    if (heap_alloc != NULL)
-            ib_heap_allocator_free(heap_alloc);
-    */
-
-    if (heap != NULL) mem_heap_free(heap);
-
-    if (dict_sys_mutex_entered) dict_mutex_exit_for_mysql();
-
-    if (dict_operation_locked) {
-      rw_lock_x_unlock(dict_operation_lock);
-      trx->dict_operation_lock_mode = 0;
-    }
-
-    if (trx != NULL) trx_free_for_background(trx);
-  }
-
- private:
-  TransactionAndHeapGuard(const TransactionAndHeapGuard &);
-  TransactionAndHeapGuard &operator=(const TransactionAndHeapGuard &);
-
-  bool dict_operation_locked;
-  trx_t *trx;
-  bool dict_sys_mutex_entered;
-  mem_heap_t *heap;
-  ib_alloc_t *heap_alloc;
-  ib_vector_t *table_ids;
-  ib_vector_t *table_ids_to_revert;
-
-  bool do_rollback;
-};
-
 enum class UpdateEncryptedFlagOperation : char { SET, CLEAR };
 
 static dberr_t fil_update_encrypted_flag(
     const char *space_name, UpdateEncryptedFlagOperation update_operation,
-    volatile bool *is_space_being_removed, THD *thd) {
+    THD *thd) {
   DBUG_EXECUTE_IF("fail_encryption_flag_update_on_t3",
                   if (strcmp(space_name, "test/t3") == 0) { return DB_ERROR; });
 
   bool failure =
       (update_operation == UpdateEncryptedFlagOperation::SET
-           ? dd_set_encryption_flag(thd, space_name, is_space_being_removed)
-           : dd_clear_encryption_flag(thd, space_name, is_space_being_removed));
+           ? dd_set_encryption_flag(thd, space_name)
+           : dd_clear_encryption_flag(thd, space_name));
 
   return (failure ? DB_ERROR : DB_SUCCESS);
 }
@@ -2358,7 +1882,6 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
           : UpdateEncryptedFlagOperation::SET;
 
   if (DB_SUCCESS != fil_update_encrypted_flag(space->name, update_enc_flag_op,
-                                              &space->stop_new_ops,
                                               state->thd)) {
     ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0) ||
           state->space->stop_new_ops);

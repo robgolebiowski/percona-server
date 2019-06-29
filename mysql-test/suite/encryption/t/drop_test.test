@@ -1,0 +1,2 @@
+create table innodb_normal (c1 int, b char(20)) engine=innodb;
+drop table innodb_normal;

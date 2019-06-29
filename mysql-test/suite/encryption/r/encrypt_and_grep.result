@@ -1,6 +1,5 @@
 SET GLOBAL innodb_encryption_threads=4;
 SET @@global.keyring_file_data="MYSQL_TMP_DIR/mysecret_keyring";
-SET GLOBAL innodb_file_per_table = ON;
 create table t1 (a varchar(255)) engine=innodb encryption='KEYRING';
 create table t2 (a varchar(255)) engine=innodb;
 show warnings;
@@ -9,14 +8,19 @@ create table t3 (a varchar(255)) engine=innodb encryption='N';
 create table t4 (a varchar(255)) engine=innodb encryption='KEYRING' encryption_key_id=5;
 CREATE TABLESPACE ts_encrypted ADD DATAFILE 'ts_encrypted.ibd' ENCRYPTION="Y" ENGINE="InnoDB";
 CREATE TABLE t5 (a varchar(255)) TABLESPACE ts_encrypted ENGINE="InnoDB";
-CREATE TABLESPACE ts_rk_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='KEYRING' ENGINE="InnoDB";
+CREATE TABLESPACE ts_k_encrypted ADD DATAFILE 'ts_rk_encrypted.ibd' ENCRYPTION='KEYRING' ENGINE="InnoDB";
 create table t6 (a varchar(255)) engine=innodb;
+SET GLOBAL innodb_file_per_table = OFF;
+CREATE TABLESPACE ts_k_encrypted_2 ADD DATAFILE 'ts_k_encrypted_2.ibd' ENCRYPTION="KEYRING" ENGINE="InnoDB";
+CREATE TABLE t7 (a varchar(255)) TABLESPACE ts_k_encrypted_2 ENGINE="InnoDB";
+SET GLOBAL innodb_file_per_table = ON;
 insert t1 values (repeat('foobarsecret', 12));
 insert t2 values (repeat('tempsecret', 12));
 insert t3 values (repeat('dummysecret', 12));
 insert t4 values (repeat('verysecret', 12));
 insert t5 values (repeat('moresecret', 12));
 insert t6 values (repeat('sooosecret', 12));
+insert t7 values (repeat('theesecret', 12));
 select * from t1;
 a
 foobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecretfoobarsecret
@@ -35,6 +39,9 @@ moresecretmoresecretmoresecretmoresecretmoresecretmoresecretmoresecretmoresecret
 select * from t6;
 a
 sooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecretsooosecret
+select * from t7;
+a
+theesecrettheesecrettheesecrettheesecrettheesecrettheesecrettheesecrettheesecrettheesecrettheesecrettheesecrettheesecret
 ALTER TABLE t4 ENCRYPTION='N', ALGORITHM=INPLACE;
 ALTER TABLE t4 ENCRYPTION='KEYRING', ALGORITHM=INPLACE;
 # ibdata1 expecting NOT_FOUND
@@ -81,9 +88,10 @@ include/assert.inc [All spaces apart from t1, t3, t4 and temporary tablespace sh
 # t4 no  on expecting FOUND
 # ibdata1 expecting NOT FOUND
 # restart:--early-plugin-load=keyring_file=keyring_file.so --loose-keyring_file_data=MYSQL_TMP_DIR/mysecret_keyring KEYRING_PLUGIN_OPT --innodb-encrypt-tables=ONLINE_TO_KEYRING --innodb-encryption-rotate-key-age=15 --innodb-encryption-threads=4
-drop table t1, t2, t3, t4, t5, t6;
+drop table t1, t2, t3, t4, t5, t6, t7;
 drop tablespace ts_encrypted;
-drop tablespace ts_rk_encrypted;
+drop tablespace ts_k_encrypted;
+drop tablespace ts_k_encrypted_2;
 SET GLOBAL innodb_encrypt_tables=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=4;
 SET GLOBAL innodb_encrypt_tables=ONLINE_TO_KEYRING;

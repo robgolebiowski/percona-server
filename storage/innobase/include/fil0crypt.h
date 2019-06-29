@@ -48,19 +48,11 @@ struct trx_t;
 static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {'s', 0xE, 0xC,
                                                     'R', 'E', 't'};
 
-// static const char ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX[] = "percona_innodb";
-
 #ifdef UNIV_INNOCHECKSUM  // TODO:Robert INNOCHECKSUM ENCRYPTION_KEY_LEN is not
                           // defined - and probably all of this file should not
                           // be
 static const ulint ENCRYPTION_KEY_LEN = 32;  // TODO:Robert kind of workaround
 #endif                                       // UNIV_INNOCHECKSUM
-
-/* This key will be used if nothing else is given */
-//#define FIL_DEFAULT_ENCRYPTION_KEY 0
-//#define ENCRYPTION_KEY_VERSION_INVALID        (~(unsigned int)0)
-//#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  (~(unsigned int)0) - 1
-//#define ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED  0
 
 extern os_event_t fil_crypt_threads_event;
 
@@ -77,13 +69,7 @@ extern os_event_t fil_crypt_threads_event;
  * lengths) L = AES_ECB(KEY, IV) CRYPT(PAGE) = xxx(KEY=L, IV=C, PAGE)
  */
 
-//#define CRYPT_SCHEME_1 1
 #define CRYPT_SCHEME_1_IV_LEN 16
-//#define CRYPT_SCHEME_UNENCRYPTED 0
-
-// TODO:Robert:Those are mine
-//#define MY_AES_MAX_KEY_LENGTH 16
-//#define ENCRYPTION_SCHEME_BLOCK_LENGTH 16
 
 /* Cached L or key for given key_version */
 struct key_struct {
@@ -93,18 +79,8 @@ struct key_struct {
                                           (that is L in CRYPT_SCHEME_1) */
 };
 
-// enum fil_encryption_t {
-//[>* Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) <]
-// FIL_ENCRYPTION_DEFAULT,
-//[>* Encrypted <]
-// FIL_ENCRYPTION_ON,
-//[>* Not encrypted <]
-// FIL_ENCRYPTION_OFF
-//};
-
 struct st_encryption_scheme_key {
   unsigned int version;
-  // unsigned char key[ENCRYPTION_SCHEME_BLOCK_LENGTH];
   uchar *key;
 };
 
@@ -360,16 +336,8 @@ void fil_space_merge_crypt_data(fil_space_crypt_t *dst,
 @param[in]	page		first page of the tablespace
 @return crypt data from page 0
 @retval	NULL	if not present or not valid */
-// UNIV_INTERN
-// fil_space_crypt_t*
-// fil_space_read_crypt_data(const page_size_t& page_size, const byte* page)
-// MY_ATTRIBUTE((nonnull, warn_unused_result));
-
 MY_NODISCARD fil_space_crypt_t *fil_space_read_crypt_data(
     const page_size_t &page_size, const byte *page);
-
-// bool fil_space_read_crypt_data(const page_size_t& page_size, const byte*
-// page, ulint space_id);
 
 /**
 Free a crypt data object
@@ -386,56 +354,6 @@ Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
 byte *fil_parse_write_crypt_data(byte *ptr, const byte *end_ptr,
                                  const buf_block_t *block, ulint len)
     MY_ATTRIBUTE((warn_unused_result));
-
-/** Encrypt a buffer.
-@param[in,out]		crypt_data	Crypt data
-@param[in]		space		space_id
-@param[in]		offset		Page offset
-@param[in]		lsn		Log sequence number
-@param[in]		src_frame	Page to encrypt
-@param[in]		page_size	Page size
-@param[in,out]		dst_frame	Output buffer
-@return encrypted buffer or NULL */
-byte *fil_encrypt_buf(fil_space_crypt_t *crypt_data, ulint space, ulint offset,
-                      lsn_t lsn, const byte *src_frame,
-                      const page_size_t &page_size, byte *dst_frame)
-    MY_ATTRIBUTE((warn_unused_result));
-
-/**
-Encrypt a page.
-
-@param[in]		space		Tablespace
-@param[in]		offset		Page offset
-@param[in]		lsn		Log sequence number
-@param[in]		src_frame	Page to encrypt
-@param[in,out]		dst_frame	Output buffer
-@return encrypted buffer or NULL */
-byte *fil_space_encrypt(const fil_space_t *space, ulint offset, lsn_t lsn,
-                        byte *src_frame, byte *dst_frame)
-    MY_ATTRIBUTE((warn_unused_result));
-
-/**
-Decrypt a page.
-@param[in,out]	crypt_data		crypt_data
-@param[in]	tmp_frame		Temporary buffer
-@param[in]	page_size		Page size
-@param[in,out]	src_frame		Page to decrypt
-@param[out]	err			DB_SUCCESS or error
-@return true if page decrypted, false if not.*/
-bool fil_space_decrypt(fil_space_crypt_t *crypt_data, byte *tmp_frame,
-                       const page_size_t &page_size, byte *src_frame,
-                       dberr_t *err);
-
-/******************************************************************
-Decrypt a page
-@param[in]	space			Tablespace
-@param[in]	tmp_frame		Temporary buffer used for decrypting
-@param[in,out]	src_frame		Page to decrypt
-@param[out]	decrypted		true if page was decrypted
-@return decrypted page, or original not encrypted page if decryption is
-not needed.*/
-MY_NODISCARD byte *fil_space_decrypt(const fil_space_t *space, byte *tmp_frame,
-                                     byte *src_frame, bool *decrypted);
 
 /******************************************************************
 Calculate post encryption checksum
