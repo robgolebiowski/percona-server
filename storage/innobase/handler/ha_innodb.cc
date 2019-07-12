@@ -12138,7 +12138,7 @@ bool create_table_info_t::create_option_tablespace_is_valid() {
           /* Temporary tablespace is being used for table */
           my_printf_error(
               ER_ILLEGAL_HA_CREATE_OPTION,
-              "InnoDB : ENCRYPTION=Y is not accepted"
+              "InnoDB : ENCRYPTION is not accepted"
               " for temporary tablespace. For temporary tablespace"
               " encryption please use innodb_temp_tablespace_encrypt"
               " variable.",
