@@ -6974,13 +6974,13 @@ bool Sys_var_enum_default_table_encryption::global_update(
 
   global_var(ulong) = var->save_result.ulonglong_value;
 
-  LEX_STRING innodb_engine{C_STRING_WITH_LEN("innodb")};
+  static const LEX_STRING innodb_engine{C_STRING_WITH_LEN("innodb")};
 
   plugin_ref plugin;
-  if ((plugin = ha_resolve_by_name(NULL, &innodb_engine, false))) {
+  if ((plugin = ha_resolve_by_name(nullptr, &innodb_engine, false))) {
     handlerton *hton = plugin_data<handlerton *>(plugin);
     hton->fix_default_table_encryption(var->save_result.ulonglong_value);
-    plugin_unlock(NULL, plugin);
+    plugin_unlock(nullptr, plugin);
   }
 
   return 0;

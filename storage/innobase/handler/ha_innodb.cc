@@ -11197,8 +11197,8 @@ dberr_t create_table_info_t::enable_master_key_encryption(dict_table_t *table) {
   const char *encrypt = m_create_info->encrypt_type.str;
 
   /* if table is part of tablespace - no need for retrieving
-   * master key as tablespace key was already decrypted
-   * either by validate_first_page or during tablespace creation */
+  master key as tablespace key was already decrypted
+  either by validate_first_page or during tablespace creation */
   if (Encryption::is_none(encrypt) || !(m_flags2 & DICT_TF2_USE_FILE_PER_TABLE))
     return (DB_SUCCESS);
 
@@ -12133,18 +12133,15 @@ bool create_table_info_t::create_option_tablespace_is_valid() {
 
   if (!m_use_shared_space) {
     if (!m_use_file_per_table) {
-      if (m_create_info->encrypt_type.str != nullptr) {
-        if (is_temp) {
-          /* Temporary tablespace is being used for table */
-          my_printf_error(
-              ER_ILLEGAL_HA_CREATE_OPTION,
-              "InnoDB : ENCRYPTION is not accepted"
-              " for temporary tablespace. For temporary tablespace"
-              " encryption please use innodb_temp_tablespace_encrypt"
-              " variable.",
-              MYF(0));
-          return false;
-        }
+      if (m_create_info->encrypt_type.str != nullptr && is_temp) {
+        /* Temporary tablespace is being used for table */
+        my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                        "InnoDB: ENCRYPTION is not accepted"
+                        " for temporary tablespace. For temporary tablespace"
+                        " encryption please use innodb_temp_tablespace_encrypt"
+                        " variable.",
+                        MYF(0));
+        return false;
       }
     }
     return (true);
@@ -12642,39 +12639,8 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
     return;
   }
 
-  // if (create_info->encrypt_type.length == 0 &&
-  // create_info->encrypt_type.str == nullptr) {
-  // switch (srv_default_table_encryption) {
-  // case DEFAULT_TABLE_ENC_ON:
-  // create_info->encrypt_type = yes_string;
-  // break;
-  // case DEFAULT_TABLE_ENC_KEYRING_ON:
-  // create_info->encrypt_type = keyring_string;
-  // break;
-  // case DEFAULT_TABLE_ENC_OFF:
-  // case DEFAULT_TABLE_ENC_ONLINE_FROM_KEYRING_TO_UNENCRYPTED:
-  // case DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING:
-  // break;
-  // default:
-  // ut_ad(0);
-  //}
-  //}
-
   adjust_encryption_key_id(create_info,
                            table_def ? &(table_def->options()) : nullptr);
-
-  /* Add encryption attribute only to file_per_table table */
-  // if (table_def && (create_info->tablespace == nullptr ||
-  // strcmp(create_info->tablespace,
-  // dict_sys_t::s_file_per_table_name) == 0)) {
-  // dd::Properties &table_options = table_def->options();
-  // if (create_info->encrypt_type.str != nullptr) {
-  // dd::String_type encrypt_type;
-  // encrypt_type.assign(create_info->encrypt_type.str,
-  // create_info->encrypt_type.length);
-  // table_options.set("encrypt_type", encrypt_type);
-  //}
-  //}
 }
 
 /** Update create_info.  Used in SHOW CREATE TABLE et al. */

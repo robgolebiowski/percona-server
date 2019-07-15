@@ -106,7 +106,7 @@ class DD_bootstrap_ctx {
     m_actual_dd_version = actual_dd_version;
   }
 
-  void set_system_tablespace_encrypted() {
+  void set_system_tablespace_encrypted() noexcept {
     m_system_tablespace_encrypted = true;
   }
 
@@ -177,7 +177,7 @@ class DD_bootstrap_ctx {
     return opt_initialize && (m_actual_dd_version == dd::DD_VERSION);
   }
 
-  bool is_system_tablespace_encrypted() {
+  bool is_system_tablespace_encrypted() const noexcept {
     return m_system_tablespace_encrypted;
   }
 };

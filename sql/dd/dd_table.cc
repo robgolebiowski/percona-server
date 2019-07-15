@@ -2693,7 +2693,7 @@ Encrypt_result is_system_tablespace_encrypted(THD *thd) {
   if (tsp->options().exists("encryption")) {
     String_type e;
     (void)tsp->options().get("encryption", &e);
-    DBUG_ASSERT(e.empty() == false);
+    DBUG_ASSERT(!e.empty());
     return {false, is_encrypted(e)};
   }
 

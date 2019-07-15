@@ -26,9 +26,9 @@ SELECT @@innodb_temp_tablespace_encrypt;
 0
 include/assert.inc [Temporary tablespace should be unencrypted]
 CREATE TEMPORARY TABLE t01 (a INT) ENGINE=InnoDB ENCRYPTION='Y';
-ERROR HY000: InnoDB : ENCRYPTION is not accepted for temporary tablespace. For temporary tablespace encryption please use innodb_temp_tablespace_encrypt variable.
+ERROR HY000: InnoDB: ENCRYPTION is not accepted for temporary tablespace. For temporary tablespace encryption please use innodb_temp_tablespace_encrypt variable.
 CREATE TEMPORARY TABLE t01 (a INT) ENGINE=InnoDB ENCRYPTION='N';
-ERROR HY000: InnoDB : ENCRYPTION is not accepted for temporary tablespace. For temporary tablespace encryption please use innodb_temp_tablespace_encrypt variable.
+ERROR HY000: InnoDB: ENCRYPTION is not accepted for temporary tablespace. For temporary tablespace encryption please use innodb_temp_tablespace_encrypt variable.
 SET GLOBAL innodb_fast_shutdown = 0;
 # restart: --innodb-read-only
 # in innodb_read_only mode, temp tablespace cannot be encrypted

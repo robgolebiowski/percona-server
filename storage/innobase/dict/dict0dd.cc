@@ -6099,23 +6099,23 @@ bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table) {
 @param[in]	name	name of table for which check is to be done
 @return true if it does. */
 bool dd_is_table_in_encrypted_tablespace(const char *name) {
-  space_id_t space_id = fil_space_get_id_by_name(name);
-  fil_space_t *space = fil_space_get(space_id);
+  auto space_id = fil_space_get_id_by_name(name);
+  auto space = fil_space_get(space_id);
   if (space != nullptr) {
     return (FSP_FLAGS_GET_ENCRYPTION(space->flags));
   } else {
     /* Its possible that tablespace flag is missing (for ex: after
     discard tablespace). In that case get tablespace flags from Data
     Dictionary/ */
-    THD *thd = current_thd;
-    dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+    auto thd = current_thd;
+    auto client = dd::get_dd_client(thd);
     dd::cache::Dictionary_client::Auto_releaser releaser(client);
     dd::Tablespace *dd_space = nullptr;
 
     if (!client->acquire_uncached_uncommitted<dd::Tablespace>(space_id,
                                                               &dd_space) &&
         dd_space != nullptr) {
-      uint32 flags;
+      uint32_t flags;
       dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
                                       &flags);
 

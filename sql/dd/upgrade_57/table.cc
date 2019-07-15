@@ -1467,8 +1467,8 @@ static bool fix_fk_parent_key_names(THD *thd, const String_type &schema_name,
 */
 
 bool is_tablespace_encrypted(const char *name) {
-  THD *thd = current_thd;
-  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  auto thd = current_thd;
+  auto client = dd::get_dd_client(thd);
   dd::cache::Dictionary_client::Auto_releaser releaser(client);
   const dd::Tablespace *dd_space = nullptr;
 
@@ -1628,8 +1628,8 @@ static bool migrate_table_to_dd(THD *thd, const String_type &schema_name,
       key_info->is_algorithm_explicit = true;
   }
 
-  // if table is part of tablespace - check if tablespace is encrypted
-  // if it is - assing encryption clause to the table
+  // If table is a part of a tablespace - check if the tablespace is encrypted
+  // If it is - assign encryption clause to the table
   if (((share.tablespace && is_tablespace_encrypted(share.tablespace)) ||
        (schema_name == "mysql" && bootstrap::DD_bootstrap_ctx::instance()
                                       .is_system_tablespace_encrypted())) &&

@@ -757,7 +757,7 @@ bool DDSE_dict_init(THD *thd, dict_init_mode_t dict_init_mode, uint version) {
     if (my_strcasecmp(system_charset_info, tablespace_encryption.c_str(),
                       "y") == 0) {
       bootstrap::DD_bootstrap_ctx::instance().set_system_tablespace_encrypted();
-      // from now on all system tablespaces will be created with encryption='y'
+      // From now on all system tablespaces will be created with encryption='y'
     }
   }
 
