@@ -231,9 +231,3 @@ encryption.percona_system_key_rotation : BUG#5772 8.0.16 encryption reconciliati
 encryption.rename_table : BUG#5772 8.0.16 encryption reconciliation
 encryption.uninstall_keyring : BUG#5772 8.0.16 encryption reconciliation
 
-# PS-5772 8.0.16 encryption reconciliation
-innodb.percona_force_encryption : BUG#5772 8.0.16 encryption reconciliation
-innodb.percona_session_temp_tablespaces_encrypt : BUG#5772 8.0.16 encryption reconciliation
-innodb.table_encrypt_3 : BUG#5772 8.0.16 encryption reconciliation
-main.mysqld--help-notwin : BUG#5772 8.0.16 encryption reconciliation
-innodb.percona_log_encrypt_failure : BUG#5772 8.0.16 encryption reconciliation
