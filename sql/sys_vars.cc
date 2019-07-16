@@ -6966,11 +6966,7 @@ static const char *default_table_encryption_names[] = {
     "ONLINE_FROM_KEYRING_TO_UNENCRYPTED"};
 
 bool Sys_var_enum_default_table_encryption::global_update(
-    THD *thd, set_var *var) {  // TODO: Test if it deos not overflow
-
-  if (thd->variables.default_table_encryption ==
-      var->save_result.ulonglong_value)
-    return 0;
+    THD *, set_var *var) {  // TODO: Test if it deos not overflow
 
   global_var(ulong) = var->save_result.ulonglong_value;
 
