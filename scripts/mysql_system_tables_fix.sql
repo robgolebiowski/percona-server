@@ -1085,127 +1085,127 @@ PREPARE stmt FROM @str;
 EXECUTE stmt;
 DROP PREPARE stmt;
 
-SET @str="ALTER TABLE mysql.func ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.func";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.func TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.plugin ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.plugin";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.plugin TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.servers ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.servers";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.servers TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.help_topic ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.help_topic";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.help_topic TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.help_category ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.help_category";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.help_category TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.help_relation ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.help_relation";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.help_relation TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.help_keyword ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.help_keyword";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.help_keyword TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.time_zone_name ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.time_zone_name";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.time_zone_name TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.time_zone ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.time_zone";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.time_zone TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.time_zone_transition ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.time_zone_transition";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.time_zone_transition TABLESPACE = mysql;
 
-SET @str ="ALTER TABLE mysql.time_zone_transition_type ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.time_zone_transition_type";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.time_zone_transition_type TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.time_zone_leap_second ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.time_zone_leap_second";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.time_zone_leap_second TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.slave_relay_log_info ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.slave_relay_log_info";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.slave_relay_log_info TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.slave_master_info ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.slave_master_info";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.slave_master_info TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.slave_worker_info ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.slave_worker_info";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.slave_worker_info TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.gtid_executed ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.gtid_executed";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.gtid_executed TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.server_cost ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.server_cost";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 ALTER TABLE mysql.server_cost TABLESPACE = mysql;
 
-SET @str="ALTER TABLE mysql.engine_cost ENCRYPTION='Y'";
-SET @cmd = IF(STRCMP(@is_mysql_encrypted,'Y'), 'SET @dummy = 0', @str);
+SET @str="ALTER TABLE mysql.engine_cost";
+SET @cmd = CONCAT(@str, " ENCRYPTION='", @is_mysql_encrypted, "'");
 PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
