@@ -76,7 +76,6 @@ Binlog_crypt_data& Binlog_crypt_data::operator=(Binlog_crypt_data b)
   key_length= b.key_length;
   memcpy(iv, b.iv, BINLOG_IV_LENGTH);
   memcpy(nonce, b.nonce, BINLOG_NONCE_LENGTH);
-  
   return *this;
 }
 

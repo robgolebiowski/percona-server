@@ -23,7 +23,7 @@ SELECT 2;
 --source include/assert.inc
 
 --echo # Make sure that new version of the percona_binlog key got generated
---let SEARCH_PATTERN=percona_binlog_$server_uuid:1
+--let SEARCH_PATTERN=percona_binlog-$server_uuid:1
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_FILE=$keyring_file
 --source include/search_pattern_in_file.inc
@@ -40,7 +40,7 @@ SELECT 4;
 --source include/assert.inc
 
 --echo # Make sure that new version of the percona_binlog key got generated
---let SEARCH_PATTERN=percona_binlog_$server_uuid:2
+--let SEARCH_PATTERN=percona_binlog-$server_uuid:2
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_FILE=$keyring_file
 --source include/search_pattern_in_file.inc
@@ -57,7 +57,7 @@ SELECT 6;
 --source include/assert.inc
 
 --echo # Make sure that new version of the percona_binlog key got generated
---let SEARCH_PATTERN=percona_binlog_$server_uuid:3
+--let SEARCH_PATTERN=percona_binlog-$server_uuid:3
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_FILE=$keyring_file
 --source include/search_pattern_in_file.inc

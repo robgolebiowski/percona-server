@@ -714,7 +714,7 @@ Datafile::validate_first_page(lsn_t*	flush_lsn,
 				m_encryption_key = NULL;
 				m_encryption_iv = NULL;
 			}
-		} else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {
+		} else if (crypt_data->key_found == false) {
 			ib::error() << "Table " << m_name << " in file " << m_filename << ' '
 				<< "is encrypted but encryption service or "
 				<< "used key_id " << crypt_data->key_id << " is not available. "

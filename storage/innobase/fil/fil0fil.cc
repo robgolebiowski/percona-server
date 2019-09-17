@@ -857,7 +857,7 @@ retry:
 		}
 
 		if (space->crypt_data && space->crypt_data->type == CRYPT_SCHEME_1 &&
-		    Encryption::tablespace_key_exists(space->crypt_data->key_id) == false &&
+		    !space->crypt_data->key_found &&
 		    !recv_recovery_is_on()) {
 			ib::error() << "There is no key for tablespace " << space->name;
 			return (false);
@@ -4009,7 +4009,8 @@ fil_ibd_create(
 	if (mode == FIL_ENCRYPTION_ON || mode == FIL_ENCRYPTION_OFF
 	    || (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING || create_info_encryption_key_id.was_encryption_key_id_set)) {
 		crypt_data = fil_space_create_crypt_data(mode,
-							 create_info_encryption_key_id.encryption_key_id);
+							 create_info_encryption_key_id.encryption_key_id,
+							 server_uuid);
 
 		if (crypt_data->should_encrypt() || create_info_encryption_key_id.was_encryption_key_id_set) {
 			crypt_data->encrypting_with_key_version = crypt_data->key_get_latest_version();
@@ -5859,7 +5860,8 @@ fil_io_set_keyring_encryption(IORequest& req_type,
 				key_version,
 				key_id,
 				tablespace_iv,
-				tablespace_key);
+				tablespace_key,
+				space->crypt_data->uuid);
 
 	req_type.encryption_rotation(space->crypt_data->encryption_rotation);
 
@@ -5938,7 +5940,7 @@ fil_io_set_encryption(
 						32,
 						false,
 						space->encryption_iv,
-						0, 0, NULL, NULL); // not relevant for Master Key encryption
+						0, 0, NULL, NULL, NULL); // not relevant for Master Key encryption
 
 			req_type.encryption_rotation(Encryption::NO_ROTATION);
 		}
@@ -6932,7 +6934,8 @@ fil_iterate(
 						    0,
 						    iter.encryption_key_id,
 						    encrypted_with_keyring ? iter.crypt_data->tablespace_iv : NULL,
-						    encrypted_with_keyring ? iter.crypt_data->tablespace_key : NULL);
+						    encrypted_with_keyring ? iter.crypt_data->tablespace_key : NULL,
+						    iter.crypt_data->uuid);
 
 			read_request.encryption_algorithm(iter.crypt_data ? Encryption::KEYRING
 									  : Encryption::AES);
@@ -6989,6 +6992,7 @@ fil_iterate(
 						     iter.encryption_key_version,
 						     iter.encryption_key_id,
 						     NULL,
+						     NULL,
 						     NULL);
 			write_request.encryption_algorithm(iter.crypt_data ? Encryption::KEYRING
                                                                            : Encryption::AES);
@@ -7000,7 +7004,8 @@ fil_iterate(
 						     iter.encryption_key_version,
 						     iter.crypt_data->key_id,
 						     NULL,
-						     NULL);
+						     NULL,
+						     iter.crypt_data->uuid);
 
 			write_request.encryption_algorithm(Encryption::KEYRING);
 
@@ -7160,7 +7165,8 @@ fil_tablespace_iterate(
 			ut_ad(FSP_FLAGS_GET_ENCRYPTION(space_flags));
 			iter.encryption_key_id = iter.crypt_data->key_id;
 
-			Encryption::get_latest_tablespace_key(iter.crypt_data->key_id, &iter.encryption_key_version, &iter.encryption_key);
+			Encryption::get_latest_tablespace_key(iter.crypt_data->key_id, iter.crypt_data->uuid,
+							      &iter.encryption_key_version, &iter.encryption_key);
 			if (iter.encryption_key == NULL)
 				err= DB_DECRYPTION_FAILED;
 		} else {
