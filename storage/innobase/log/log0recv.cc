@@ -4610,7 +4610,7 @@ recv_dblwr_t::decrypt_sys_dblwr_pages()
 			space->encryption_klen,
 			false,
 			space->encryption_iv,
-                        0, 0, NULL, NULL);
+                        0, 0, NULL, NULL, NULL);
 
 	decrypt_request.encryption_algorithm(
 		Encryption::AES);

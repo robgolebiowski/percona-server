@@ -462,7 +462,9 @@ struct Encryption {
 		m_key_id(0),
 		m_checksum(0),
 		m_encryption_rotation(NO_ROTATION)
-	{}
+	{
+		m_key_id_uuid[0] = '\0';
+	}
 
 	/** Specific constructor
 	@param[in]	type		Algorithm type */
@@ -479,6 +481,7 @@ struct Encryption {
 		m_checksum(0),
 		m_encryption_rotation(NO_ROTATION)
 	{
+		m_key_id_uuid[0] = '\0';
 #ifdef UNIV_DEBUG
 		switch (m_type) {
 		case NONE:
@@ -508,6 +511,7 @@ struct Encryption {
 			m_key = static_cast<byte *>(
 				my_memdup(PSI_NOT_INSTRUMENTED,
 					other.m_key, other.m_klen, MYF(0)));
+		memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
 	}
 
 	Encryption& operator = (const Encryption& other) {
@@ -528,6 +532,10 @@ struct Encryption {
 		std::swap(m_key_id, other.m_key_id);
 		std::swap(m_checksum, other.m_checksum);
 		std::swap(m_encryption_rotation, other.m_encryption_rotation);
+		char tmp[ENCRYPTION_SERVER_UUID_LEN];
+		memcpy(tmp, m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
+		memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
+		memcpy(other.m_key_id_uuid, tmp, ENCRYPTION_SERVER_UUID_LEN);
 	}
 
 	~Encryption() {
@@ -604,25 +612,28 @@ struct Encryption {
         @param[in,out]	master_key	master key */
 	static void create_master_key(byte** master_key);
 
-        static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id);
+        static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id, const char *uuid);
 
-        static bool tablespace_key_exists(uint key_id);
+        static bool tablespace_key_exists(uint key_id, const char* uuid);
 
         static bool is_encrypted_and_compressed(const byte *page);
 
-        static uint encryption_get_latest_version(uint key_id);
+        static uint encryption_get_latest_version(uint key_id, const char *uuid);
 
        //TODO:Robert: Te dwa są potrzebne.
         static void get_latest_tablespace_key(uint key_id,
+                           const char* uuid,
                            uint *tablespace_key_version,
-			   byte** tablespace_key);
+                           byte** tablespace_key);
 
 
         static void get_latest_tablespace_key_or_create_new_one(uint key_id,
+                                                                const char *uuid,
                                                                 uint *tablespace_key_version,
-			                                        byte** tablespace_key);
+                                                                byte** tablespace_key);
 
         static bool get_tablespace_key(uint key_id,
+                                       const char* uuid,
                                        uint tablespace_key_version,
                                        byte** tablespace_key,
                                        size_t *key_len);
@@ -792,6 +803,7 @@ struct Encryption {
 
         uint32                  m_checksum;
 
+        char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN]; // uuid that is part of the full key id of a percona system key
         //mutable bool            m_was_page_encrypted_when_read;
 
 	/** Current master key id */
@@ -808,9 +820,9 @@ private:
         static void get_latest_system_key(const char *system_key_name, byte **key, uint *key_version,
                                           size_t *key_length);
 
-        static void fill_key_name(char *key_name, uint key_id);
+        static void fill_key_name(char *key_name, uint key_id, const char *uuid);
 
-        static void fill_key_name(char* key_name, uint key_id, uint key_version);
+        static void fill_key_name(char* key_name, uint key_id, const char *uuid, uint key_version);
 };
 
 /** Types for AIO operations @{ */
@@ -1131,7 +1143,8 @@ public:
                             uint key_version,
                             uint key_id,
                             byte *tablespace_iv,
-                            byte *tablespace_key)
+                            byte *tablespace_key,
+                            const char *uuid)
 	{
                 //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
 		m_encryption.set_key(key, key_len, key_allocated);
@@ -1140,6 +1153,12 @@ public:
                 m_encryption.m_key_id = key_id;
                 m_encryption.m_tablespace_iv = tablespace_iv;
                 m_encryption.m_tablespace_key = tablespace_key;
+
+                if (uuid == NULL) {
+                  memset(m_encryption.m_key_id_uuid, '\0', ENCRYPTION_SERVER_UUID_LEN);
+                } else {
+                  memcpy(m_encryption.m_key_id_uuid, uuid, ENCRYPTION_SERVER_UUID_LEN);
+                }
 	}
 
         void encryption_rotation(Encryption::Encryption_rotation encryption_rotation)

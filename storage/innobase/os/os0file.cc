@@ -1828,7 +1828,8 @@ load_key_needed_for_decryption(
 		byte *key_read;
 
 		size_t key_len;
-		if (Encryption::get_tablespace_key(encryption.m_key_id, encryption.m_uuid, 
+		ut_ad(encryption.m_key_id_uuid[0] != '\0');
+		if (Encryption::get_tablespace_key(encryption.m_key_id, encryption.m_key_id_uuid,
 						   key_version_read_from_page,
 						   &key_read, &key_len) == false)
 		{
@@ -9400,26 +9401,26 @@ void Encryption::random_value(byte* value)
 }
 
 void
-Encryption::fill_key_name(char *key_name, uint key_id)
+Encryption::fill_key_name(char *key_name, uint key_id, const char *uuid)
 {
 #ifndef UNIV_INNOCHECKSUM
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    server_uuid, key_id);
+		    "%s-%u-%s", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    key_id, uuid);
 #endif
 }
 
 void
-Encryption::fill_key_name(char* key_name, const char* uuid, uint key_id, uint key_version)
+Encryption::fill_key_name(char* key_name, uint key_id, const char* uuid, uint key_version)
 {
 #ifndef UNIV_INNOCHECKSUM
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
-		    "%s-%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
-		    uuid, key_id, key_version);
+		    "%s-%u-%s:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    key_id, uuid, key_version);
 #endif
 }
 
@@ -9434,7 +9435,7 @@ Encryption::create_tablespace_key(byte** tablespace_key,
 	int	ret;
 
 
-	fill_key_name(key_name, key_id);
+	fill_key_name(key_name, key_id, server_uuid);
 
 	/* We call key ring API to generate tablespace key here. */
 	ret = my_key_generate(key_name, "AES",
@@ -9608,7 +9609,7 @@ Encryption::get_latest_tablespace_key(uint key_id,
 	size_t	key_len;
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-	fill_key_name(key_name, key_id);
+	fill_key_name(key_name, key_id, uuid);
 
 	get_latest_system_key(key_name, tablespace_key, tablespace_key_version, &key_len);
 
@@ -9623,12 +9624,12 @@ Encryption::get_latest_tablespace_key(uint key_id,
 #endif
 }
 
-bool Encryption::tablespace_key_exists(uint key_id)
+bool Encryption::tablespace_key_exists(uint key_id, const char *uuid)
 {
 	uint tablespace_key_version;
 	byte *tablespace_key; 
 
-	get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
+	get_latest_tablespace_key(key_id, uuid, &tablespace_key_version, &tablespace_key);
 
 	if(tablespace_key == NULL)
 		return false;
@@ -9637,12 +9638,12 @@ bool Encryption::tablespace_key_exists(uint key_id)
 	return true;
 }
 
-bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id)
+bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id, const char* uuid)
 {
 	uint tablespace_key_version;
 	byte *tablespace_key;
 
-	get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
+	get_latest_tablespace_key_or_create_new_one(key_id, uuid, &tablespace_key_version, &tablespace_key);
 
 	if (tablespace_key == NULL)
 		return false;
@@ -9653,10 +9654,11 @@ bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(uint 
 
 void
 Encryption::get_latest_tablespace_key_or_create_new_one(uint key_id,
+							const char *uuid,
 							uint *tablespace_key_version,
 							byte** tablespace_key)
 {
-	get_latest_tablespace_key(key_id, tablespace_key_version, tablespace_key);
+	get_latest_tablespace_key(key_id, uuid, tablespace_key_version, tablespace_key);
 	if (*tablespace_key == NULL) {
 		Encryption::create_tablespace_key(tablespace_key, key_id);
 		*tablespace_key_version = 1;
@@ -9665,7 +9667,10 @@ Encryption::get_latest_tablespace_key_or_create_new_one(uint key_id,
 
 bool Encryption::is_keyring_alive()
 {
-	return Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(0); //DEFAULT ENCRYPTION KEY
+#ifndef UNIV_INNOCHECKSUM
+	return Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(0, server_uuid); //DEFAULT ENCRYPTION KEY
+#endif
+  return false;
 }
 
 bool Encryption::can_page_be_keyring_encrypted(ulint page_type)
@@ -9688,13 +9693,13 @@ bool Encryption::can_page_be_keyring_encrypted(byte* page)
 }
 
 
-uint Encryption::encryption_get_latest_version(uint key_id)
+uint Encryption::encryption_get_latest_version(uint key_id, const char *uuid)
 {
 #ifndef UNIV_INNOCHECKSUM
 	uint tablespace_key_version;
 	byte *tablespace_key; 
 
-	get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
+	get_latest_tablespace_key(key_id, uuid, &tablespace_key_version, &tablespace_key);
 
 	if(tablespace_key == NULL)
 		return ENCRYPTION_KEY_VERSION_INVALID;
@@ -11095,7 +11100,7 @@ os_dblwr_encrypt_page(
 		space->encryption_klen,
 		false,
 		space->encryption_iv,
-		0, 0, NULL, NULL);
+		0, 0, NULL, NULL, NULL);
 	write_request.encryption_algorithm(
 		Encryption::AES);
 
@@ -11152,7 +11157,7 @@ os_dblwr_decrypt_page(
 			space->encryption_klen,
 			false,
 			space->encryption_iv,
-			0, 0, NULL, NULL);
+			0, 0, NULL, NULL, NULL);
 
 	decrypt_request.encryption_algorithm(
 		Encryption::AES);

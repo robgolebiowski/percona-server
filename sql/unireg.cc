@@ -279,8 +279,10 @@ bool mysql_create_frm(THD *thd, const char *file_name,
 
   create_info->extra_size+= 2 + create_info->encrypt_type.length;
 
-  if (create_info->was_encryption_key_id_set)
+  if (create_info->was_encryption_key_id_set) {
     create_info->extra_size += strlen("ENCRYPTION_KEY_ID") + 4;
+    create_info->extra_size += UUID_LENGTH;
+  }
 
   if ((file=create_frm(thd, file_name, db, table, reclength, fileinfo,
 		       create_info, keys, key_info)) < 0)
@@ -477,7 +479,9 @@ bool mysql_create_frm(THD *thd, const char *file_name,
 
       if (mysql_file_write(file, (uchar*) "ENCRYPTION_KEY_ID",
                            strlen("ENCRYPTION_KEY_ID"), MYF(MY_NABP)) ||
-          mysql_file_write(file, encryption_key_id_buff, 4, MYF(MY_NABP)))
+          mysql_file_write(file, encryption_key_id_buff, 4, MYF(MY_NABP)) ||
+          mysql_file_write(file, (uchar*) server_uuid,
+                           UUID_LENGTH, MYF(MY_NABP)))
         goto err;
   }
 

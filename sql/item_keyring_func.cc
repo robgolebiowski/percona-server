@@ -58,7 +58,7 @@ bool Item_func_rotate_system_key::calc_value(const String *arg)
     return false;
 
   std::ostringstream key_id_with_uuid_ss;
-  key_id_with_uuid_ss << arg->ptr() << '_' << server_uuid;
+  key_id_with_uuid_ss << arg->ptr() << '-' << server_uuid;
   std::string key_id_with_uuid = key_id_with_uuid_ss.str();
   return !(my_key_generate(key_id_with_uuid.c_str(), "AES", NULL, key_length));
 }
