@@ -748,7 +748,7 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
           m_encryption_iv = NULL;
         }
       }
-    } else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {
+    } else if (!crypt_data->key_found) {
       ut_ad(m_filename != nullptr);
       ib::warn(ER_XB_MSG_5, space_id, m_filename, crypt_data->key_id);
 

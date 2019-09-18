@@ -67,7 +67,7 @@ bool Binlog_event_data_istream::start_decryption(
   Start_encryption_log_event *sele =
       down_cast<Start_encryption_log_event *>(see);
   if (!sele->is_valid() ||
-      crypto_data.init(see->crypto_scheme, see->key_version, see->nonce)) {
+      crypto_data.init(see->crypto_scheme, see->key_version, see->nonce, see->uuid)) {
     m_error->set_type(Binlog_read_error::DECRYPT_PRE_8_0_14_INIT_FAILURE);
     return true;
   }

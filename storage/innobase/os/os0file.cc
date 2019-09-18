@@ -1779,7 +1779,7 @@ static bool load_key_needed_for_decryption(const IORequest &type,
     byte *key_read;
 
     size_t key_len;
-    if (Encryption::get_tablespace_key(encryption.m_key_id,
+    if (Encryption::get_tablespace_key(encryption.m_key_id, encryption.m_key_id_uuid,
                                        key_version_read_from_page, &key_read,
                                        &key_len) == false) {
       return false;
@@ -8315,6 +8315,7 @@ Encryption::Encryption(const Encryption &other) noexcept
   if (other.m_key_allocated && other.m_key != NULL)
     m_key = static_cast<byte *>(
         my_memdup(PSI_NOT_INSTRUMENTED, other.m_key, other.m_klen, MYF(0)));
+  memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
 }
 
 Encryption::~Encryption() {
@@ -8358,21 +8359,21 @@ void Encryption::random_value(byte *value) {
   my_rand_buffer(value, ENCRYPTION_KEY_LEN);
 }
 
-void Encryption::fill_key_name(char *key_name, uint key_id) {
+void Encryption::fill_key_name(char *key_name, uint key_id, const char *uuid) {
 #ifndef UNIV_INNOCHECKSUM
   memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
-  snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u",
-           ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX, key_id);
+  snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u-%s",
+           ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX, key_id, uuid);
 #endif
 }
 
-void Encryption::fill_key_name(char *key_name, uint key_id, uint key_version) {
+void Encryption::fill_key_name(char *key_name, uint key_id, const char* uuid, uint key_version) {
 #ifndef UNIV_INNOCHECKSUM
   memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
-  snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u:%u",
-           ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX, key_id, key_version);
+  snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%u-%s:%u",
+           ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX, key_id, uuid, key_version);
 #endif
 }
 
@@ -8444,13 +8445,13 @@ void Encryption::get_keyring_key(const char *key_name, byte **key,
 #endif
 }
 
-bool Encryption::get_tablespace_key(uint key_id, uint tablespace_key_version,
+bool Encryption::get_tablespace_key(uint key_id, const char* uuid, uint tablespace_key_version,
                                     byte **tablespace_key, size_t *key_len) {
   bool result = true;
 #ifndef UNIV_INNOCHECKSUM
   char key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-  fill_key_name(key_name, key_id, tablespace_key_version);
+  fill_key_name(key_name, key_id, uuid, tablespace_key_version);
 
   Encryption::get_keyring_key(key_name, tablespace_key, key_len);
 
@@ -8512,11 +8513,11 @@ void Encryption::get_latest_tablespace_key(uint key_id,
 #endif
 }
 
-bool Encryption::tablespace_key_exists(uint key_id) {
+bool Encryption::tablespace_key_exists(uint key_id, const char *uuid) {
   uint tablespace_key_version = 0;
   byte *tablespace_key = NULL;
 
-  get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
+  get_latest_tablespace_key(key_id, uuid, &tablespace_key_version, &tablespace_key);
 
   if (tablespace_key == NULL) {
     return false;
@@ -8527,11 +8528,11 @@ bool Encryption::tablespace_key_exists(uint key_id) {
 }
 
 bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
-    uint key_id) {
+    uint key_id, const char* uuid) {
   uint tablespace_key_version;
   byte *tablespace_key;
 
-  get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version,
+  get_latest_tablespace_key_or_create_new_one(key_id, uuid, &tablespace_key_version,
                                               &tablespace_key);
 
   if (tablespace_key == NULL) {
@@ -8543,8 +8544,8 @@ bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
 }
 
 void Encryption::get_latest_tablespace_key_or_create_new_one(
-    uint key_id, uint *tablespace_key_version, byte **tablespace_key) {
-  get_latest_tablespace_key(key_id, tablespace_key_version, tablespace_key);
+    uint key_id, const char *uuid, uint *tablespace_key_version, byte **tablespace_key) {
+  get_latest_tablespace_key(key_id, uuid, tablespace_key_version, tablespace_key);
   if (*tablespace_key == NULL) {
     Encryption::create_tablespace_key(tablespace_key, key_id);
     *tablespace_key_version = 1;
@@ -8553,7 +8554,7 @@ void Encryption::get_latest_tablespace_key_or_create_new_one(
 
 bool Encryption::is_keyring_alive() {
   return Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
-      0);  // DEFAULT ENCRYPTION KEY
+      0, server_uuid);  // DEFAULT ENCRYPTION KEY
 }
 
 bool Encryption::can_page_be_keyring_encrypted(ulint page_type) {
@@ -8573,12 +8574,12 @@ bool Encryption::can_page_be_keyring_encrypted(byte *page) {
   return can_page_be_keyring_encrypted(mach_read_from_2(page + FIL_PAGE_TYPE));
 }
 
-uint Encryption::encryption_get_latest_version(uint key_id) {
+uint Encryption::encryption_get_latest_version(uint key_id, const char *uuid) {
 #ifndef UNIV_INNOCHECKSUM
   uint tablespace_key_version = ENCRYPTION_KEY_VERSION_INVALID;
   byte *tablespace_key = nullptr;
 
-  get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
+  get_latest_tablespace_key(key_id, uuid, &tablespace_key_version, &tablespace_key);
 
   if (tablespace_key == NULL) return ENCRYPTION_KEY_VERSION_INVALID;
 
@@ -10059,7 +10060,14 @@ bool os_dblwr_encrypt_page(fil_space_t *space, page_t *in_page,
   write_request.encryption_key(space->encryption_key, space->encryption_klen,
                                false, space->encryption_iv, 0, 0, NULL, NULL);
 
-  write_request.encryption_algorithm(Encryption::AES);
+	write_request.encryption_key(
+		space->encryption_key,
+		space->encryption_klen,
+		false,
+		space->encryption_iv,
+		0, 0, NULL, NULL);
+	write_request.encryption_algorithm(
+		Encryption::AES);
 
   page_size_t page_size(space->flags);
 
@@ -10104,7 +10112,12 @@ dberr_t os_dblwr_decrypt_page(fil_space_t *space, page_t *page) {
   decrypt_request.encryption_key(space->encryption_key, space->encryption_klen,
                                  false, space->encryption_iv, 0, 0, NULL, NULL);
 
-  decrypt_request.encryption_algorithm(Encryption::AES);
+	decrypt_request.encryption_key(
+			space->encryption_key,
+			space->encryption_klen,
+			false,
+			space->encryption_iv,
+			0, 0, NULL, NULL);
 
   Encryption encryption(decrypt_request.encryption_algorithm());
 

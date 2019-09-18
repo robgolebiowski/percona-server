@@ -4595,8 +4595,9 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
                   none_explicitly_specified)) {
         // it is KEYRING encryption - check if old's table encryption key is
         // available
-        if (Encryption::tablespace_key_exists(
-                old_table->s->encryption_key_id) == false) {
+        if (!Encryption::tablespace_key_exists(
+                old_table->s->encryption_key_id,
+                old_table->s->encryption_key_id_uuid)) {
           my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
                           "Cannot find key to decrypt table to ALTER. Please "
                           "make sure that keyring is installed "
@@ -4623,7 +4624,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       // TODO: Add checking for error returned from keyring function, not only
       // checking if tablespace is null
       Encryption::get_latest_tablespace_key_or_create_new_one(
-          key_id, &tablespace_key_version, &tablespace_key);
+          key_id, server_uuid, &tablespace_key_version, &tablespace_key);
       if (tablespace_key == NULL) {
         dict_mem_table_free(ctx->new_table);
         my_printf_error(

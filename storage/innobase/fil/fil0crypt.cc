@@ -125,6 +125,7 @@ static constexpr uint KERYING_ENCRYPTION_INFO_MAX_SIZE =
     + 1                        // type
     + 4                        // min_key_version
     + 4                        // key_id
+    + ENCRYPTION_SERVER_UUID_LEN // server's UUID
     + 1                        // encryption
     + CRYPT_SCHEME_1_IV_LEN    // iv (16 bytes)
     + 4                        // encryption rotation type
@@ -163,7 +164,7 @@ uchar *fil_space_crypt_t::get_cached_key(Cached_key &cached_key,
   }
   cached_key.key_version = ENCRYPTION_KEY_VERSION_INVALID;
 
-  Encryption::get_tablespace_key(this->key_id, key_version, &cached_key.key,
+  Encryption::get_tablespace_key(this->key_id, this->uuid, key_version, &cached_key.key,
                                  &cached_key.key_len);
   ut_ad(cached_key.key == NULL || cached_key.key_len == ENCRYPTION_KEY_LEN);
 
@@ -280,7 +281,7 @@ uint fil_space_crypt_t::key_get_latest_version(void) {
 
   if (is_key_found()) {  // TODO:Robert:This blocks new version from being found
                          // - if it once read - it stays the same
-    key_version = Encryption::encryption_get_latest_version(key_id);
+    key_version = Encryption::encryption_get_latest_version(key_id, uuid);
     srv_stats.n_key_requests.inc();
     // found_key_version = key_version;
   }
@@ -326,12 +327,12 @@ Create a fil_space_crypt_t object
 
 static fil_space_crypt_t *fil_space_create_crypt_data(
     uint type, fil_encryption_t encrypt_mode, uint min_key_version, uint key_id,
-    Crypt_key_operation key_operation =
+    const char*	uuid, Crypt_key_operation key_operation =
         Crypt_key_operation::FETCH_OR_GENERATE_KEY) {
   fil_space_crypt_t *crypt_data = NULL;
   if (void *buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
     crypt_data = new (buf) fil_space_crypt_t(type, min_key_version, key_id,
-                                             encrypt_mode, key_operation);
+                                             uuid, encrypt_mode, key_operation);
   }
 
   return crypt_data;
@@ -366,10 +367,11 @@ Create a fil_space_crypt_t object
 @return crypt object */
 fil_space_crypt_t *fil_space_create_crypt_data(
     fil_encryption_t encrypt_mode, uint key_id,
+    const char* uuid,
     Crypt_key_operation key_operation) {
   return (fil_space_create_crypt_data(0, encrypt_mode,
                                       ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED,
-                                      key_id, key_operation));
+                                      key_id, uuid, key_operation));
 }
 
 /******************************************************************
@@ -449,16 +451,19 @@ fil_space_crypt_t *fil_space_read_crypt_data(const page_size_t &page_size,
   uint min_key_version = mach_read_from_4(page + offset + bytes_read);
   bytes_read += 4;
 
+  char uuid[ENCRYPTION_SERVER_UUID_LEN];
+  memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN);
+  memcpy(uuid, page + offset + bytes_read, ENCRYPTION_SERVER_UUID_LEN);
+  bytes_read += ENCRYPTION_SERVER_UUID_LEN;
+
   uint key_id = mach_read_from_4(page + offset + bytes_read);
   bytes_read += 4;
-
-  ut_ad(key_id != (uint)(~0));
 
   fil_encryption_t encryption =
       (fil_encryption_t)mach_read_from_1(page + offset + bytes_read);
   bytes_read += 1;
 
-  crypt_data = fil_space_create_crypt_data(encryption, key_id,
+  crypt_data = fil_space_create_crypt_data(encryption, key_id, uuid,
                                            Crypt_key_operation::FETCH_KEY);
 
   /* We need to overwrite these as above function will initialize
@@ -569,6 +574,8 @@ void fil_space_crypt_t::write_page0(
   ut_ad(key_id != (uint)(~0));
   mach_write_to_4(encrypt_info_ptr, key_id);
   encrypt_info_ptr += 4;
+  memcpy(encrypt_info_ptr, space->crypt_data->uuid, ENCRYPTION_SERVER_UUID_LEN);
+  encrypt_info_ptr += ENCRYPTION_SERVER_UUID_LEN;
   mach_write_to_1(encrypt_info_ptr, encryption);
   encrypt_info_ptr += 1;
 
@@ -677,11 +684,16 @@ byte *fil_parse_write_crypt_data(byte *ptr, const byte *end_ptr,
   uint key_id = mach_read_from_4(ptr);
   ptr += 4;
 
+  char uuid[ENCRYPTION_SERVER_UUID_LEN];
+  memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN);
+  memcpy(uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
+  ptr += ENCRYPTION_SERVER_UUID_LEN;
+
   fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(ptr);
   ptr += 1;
 
   fil_space_crypt_t *crypt_data = fil_space_create_crypt_data(
-      encryption, key_id, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
+      encryption, key_id, uuid, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
   /* Need to overwrite these as above will initialize fields. */
   crypt_data->page0_offset = offset;
   DBUG_ASSERT(min_key_version != ENCRYPTION_KEY_VERSION_INVALID);
@@ -871,7 +883,7 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
 
   crypt_data = fil_space_create_crypt_data(
       FIL_ENCRYPTION_DEFAULT, get_global_default_encryption_key_id_value(),
-      Crypt_key_operation::FETCH_OR_GENERATE_KEY);
+      server_uuid, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
 
   if (crypt_data == NULL || crypt_data->key_found == false) {
     mutex_exit(&fil_crypt_threads_mutex);

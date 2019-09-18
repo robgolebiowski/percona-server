@@ -1443,6 +1443,7 @@ class Query_log_event : public virtual binary_log::Query_event,
   data required to decrypt (except the actual key).
 
   For binlog cryptoscheme 1: key version, and nonce for iv generation.
+  For binlog cryptoscheme 2: key version, nonce for iv generation, server's uuid
 */
 
 static_assert(
@@ -1459,8 +1460,8 @@ class Start_encryption_log_event final
       : Start_encryption_event(crypto_scheme_arg, key_version_arg, nonce_arg),
         Log_event(header(), footer(), Log_event::EVENT_NO_CACHE,
                   Log_event::EVENT_IMMEDIATE_LOGGING) {
-    DBUG_ASSERT(crypto_scheme == 1);
-    common_header->set_is_valid(crypto_scheme == 1);
+    DBUG_ASSERT(crypto_scheme == 1 || crypto_scheme == 2);
+    common_header->set_is_valid(crypto_scheme == 1 || crypto_scheme == 2);
   }
 
 #else
@@ -1474,7 +1475,9 @@ class Start_encryption_log_event final
     return binary_log::START_5_7_ENCRYPTION_EVENT;
   }
 
-  size_t get_data_size() noexcept override { return EVENT_DATA_LENGTH; }
+  size_t get_data_size() noexcept override {
+    return get_data_size_based_on_scheme();
+  }
 
  protected:
 #ifdef MYSQL_SERVER

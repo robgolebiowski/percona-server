@@ -813,7 +813,7 @@ static int default_encryption_key_id_validate(
   }
 
   if (!Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
-          static_cast<uint>(intbuf))) {
+          static_cast<uint>(intbuf), servrer_uuid)) {
     push_warning_printf(thd, Sql_condition::SL_WARNING, HA_ERR_UNSUPPORTED,
                         "InnoDB: cannot enable encryption, "
                         "keyring plugin is not available");
@@ -5301,7 +5301,7 @@ static int innodb_init(void *p) {
 
   if (srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING &&
       !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
-          FIL_DEFAULT_ENCRYPTION_KEY)) {
+          FIL_DEFAULT_ENCRYPTION_KEY, server_uuid)) {
     sql_print_error(
         "InnoDB: cannot enable encryption, innodb_encrypt_tables is set to "
         "value different than OFF, but "
@@ -11233,6 +11233,9 @@ dberr_t create_table_info_t::enable_master_key_encryption(dict_table_t *table) {
 
 dberr_t create_table_info_t::enable_keyring_encryption(
     dict_table_t *table, fil_encryption_t &keyring_encryption_option) {
+
+  bool check_keyring_key{false};
+
   if (Encryption::none_explicitly_specified(m_create_info->used_fields,
                                             m_create_info->encrypt_type.str)) {
     keyring_encryption_option = FIL_ENCRYPTION_OFF;
@@ -11246,13 +11249,11 @@ dberr_t create_table_info_t::enable_keyring_encryption(
             ? FIL_ENCRYPTION_ON
             : FIL_ENCRYPTION_DEFAULT;
     DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION_FILE_PER_TABLE);
+    check_keyring_key = true;
+  }
 
-    uint tablespace_key_version;
-    byte *tablespace_key;
-    Encryption::get_latest_tablespace_key_or_create_new_one(
-        m_create_info->encryption_key_id, &tablespace_key_version,
-        &tablespace_key);
-    if (tablespace_key == NULL) {
+  if ((check_keyring_key || m_create_info->was_encryption_key_id_set) &&
+      !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(m_create_info->encryption_key_id)) {
       my_printf_error(
           ER_ILLEGAL_HA_CREATE_OPTION,
           "Seems that keyring is down. It is not possible to create encrypted "
@@ -11260,10 +11261,8 @@ dberr_t create_table_info_t::enable_keyring_encryption(
           " without keyring. Please install a keyring and try again.",
           MYF(0));
       return (DB_UNSUPPORTED);
-    } else
-      my_free(tablespace_key);
-  }
-  return DB_SUCCESS;
+    }
+    return DB_SUCCESS;
 }
 
 /** Create a table definition to an InnoDB database.

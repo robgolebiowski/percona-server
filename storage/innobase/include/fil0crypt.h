@@ -163,7 +163,7 @@ struct fil_space_crypt_t {
   The object is expected to be placed in a buffer that
   has been zero-initialized. */
   fil_space_crypt_t(uint new_type, uint new_min_key_version, uint new_key_id,
-                    fil_encryption_t new_encryption,
+                    const char *uuid, fil_encryption_t new_encryption,
                     Crypt_key_operation key_operation,
                     Encryption::Encryption_rotation encryption_rotation =
                         Encryption::NO_ROTATION);
@@ -259,6 +259,8 @@ struct fil_space_crypt_t {
 
   uchar *get_cached_key(Cached_key &cached_key, uint key_version);
 
+        bool only_fetch_key;
+
   ib_mutex_t
       start_rotate_mutex;  // mutex protecting starting of rotation of the space
   ib_mutex_t mutex;        // mutex protecting following variables
@@ -291,6 +293,8 @@ struct fil_space_crypt_t {
   unsigned int type;
 
   std::list<byte *> fetched_keys;  // TODO: temp for test
+        char uuid[ENCRYPTION_SERVER_UUID_LEN];
+
 };
 
 /** Status info about encryption */
@@ -397,6 +401,7 @@ Create a fil_space_crypt_t object
 @return crypt object */
 fil_space_crypt_t *fil_space_create_crypt_data(
     fil_encryption_t encrypt_mode, uint key_id,
+    const char*	uuid,
     Crypt_key_operation key_operation =
         Crypt_key_operation::FETCH_OR_GENERATE_KEY)
     MY_ATTRIBUTE((warn_unused_result));
