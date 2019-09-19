@@ -425,7 +425,6 @@ struct Encryption {
     memcpy(tmp, m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
     memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
     memcpy(other.m_key_id_uuid, tmp, ENCRYPTION_SERVER_UUID_LEN);
-
   }
 
   ~Encryption();
@@ -503,22 +502,23 @@ struct Encryption {
   static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(
       uint key_id, const char *uuid);
 
-  static bool tablespace_key_exists(uint key_id, const char* uuid);
+  static bool tablespace_key_exists(uint key_id, const char *uuid);
 
   static bool is_encrypted_and_compressed(const byte *page);
 
-  static uint encryption_get_latest_version(uint key_id);
+  static uint encryption_get_latest_version(uint key_id, const char *uuid);
 
   // TODO:Robert: Te dwa są potrzebne.
-  static void get_latest_tablespace_key(uint key_id,
-                                        const char* uuid,
+  static void get_latest_tablespace_key(uint key_id, const char *uuid,
                                         uint *tablespace_key_version,
                                         byte **tablespace_key);
 
   static void get_latest_tablespace_key_or_create_new_one(
-      uint key_id, const char *uuid, uint *tablespace_key_version, byte **tablespace_key);
+      uint key_id, const char *uuid, uint *tablespace_key_version,
+      byte **tablespace_key);
 
-  static bool get_tablespace_key(uint key_id, uint tablespace_key_version,
+  static bool get_tablespace_key(uint key_id, const char *uuid,
+                                 uint tablespace_key_version,
                                  byte **tablespace_key, size_t *key_len);
 
   /** Get master key by key id.
@@ -658,7 +658,9 @@ struct Encryption {
 
   byte *m_tablespace_key;
 
-        char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN]; // uuid that is part of the full key id of a percona system key
+  char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN];  // uuid that is part of the
+                                                   // full key id of a percona
+                                                   // system key
   uint m_key_version;
 
   uint m_key_id;
@@ -683,7 +685,8 @@ struct Encryption {
 
   static void fill_key_name(char *key_name, uint key_id, const char *uuid);
 
-  static void fill_key_name(char *key_name, uint key_id, const char *uuid, uint key_version);
+  static void fill_key_name(char *key_name, uint key_id, const char *uuid,
+                            uint key_version);
 };
 
 /** Types for AIO operations @{ */
@@ -916,8 +919,7 @@ class IORequest {
   @param[in] iv		The encryption iv to use */
   void encryption_key(byte *key, ulint key_len, bool key_allocated, byte *iv,
                       uint key_version, uint key_id, byte *tablespace_iv,
-                      byte *tablespace_key,
-                      const char *uuid) {
+                      byte *tablespace_key, const char *uuid) {
     m_encryption.set_key(key, key_len, key_allocated);
     m_encryption.m_iv = iv;
     m_encryption.m_key_version = key_version;

@@ -27,6 +27,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "fil0fil.h"
 #include "mach0data.h"
 #include "mtr0types.h"
+#include "mysqld.h"  // server_uuid
 #include "page0size.h"
 #include "page0zip.h"
 #include "system_key.h"
@@ -119,27 +120,35 @@ uint get_global_default_encryption_key_id_value();
 #define DEBUG_KEYROTATION_THROTTLING 0
 
 static constexpr uint KERYING_ENCRYPTION_INFO_MAX_SIZE =
-    ENCRYPTION_MAGIC_SIZE + 2  // length of iv
-    + 4                        // space id
-    + 2                        // offset
-    + 1                        // type
-    + 4                        // min_key_version
-    + 4                        // key_id
-    + ENCRYPTION_SERVER_UUID_LEN // server's UUID
-    + 1                        // encryption
-    + CRYPT_SCHEME_1_IV_LEN    // iv (16 bytes)
-    + 4                        // encryption rotation type
-    + ENCRYPTION_KEY_LEN       // tablespace key
-    + ENCRYPTION_KEY_LEN;      // tablespace iv
+    ENCRYPTION_MAGIC_SIZE + 2     // length of iv
+    + 4                           // space id
+    + 2                           // offset
+    + 1                           // type
+    + 4                           // min_key_version
+    + 4                           // key_id
+    + ENCRYPTION_SERVER_UUID_LEN  // server's UUID
+    + 1                           // encryption
+    + CRYPT_SCHEME_1_IV_LEN       // iv (16 bytes)
+    + 4                           // encryption rotation type
+    + ENCRYPTION_KEY_LEN          // tablespace key
+    + ENCRYPTION_KEY_LEN;         // tablespace iv
 
 /* The size of keyring key encrption header cannot cross the Master
 Key header. This is because the bytes followed by MK header are used
 by other features like SDI, encryption progress (MK) etc. If we cross
 the MK encryption header size ENCRYPTION_INFO_MAX_SIZE, we corrupt the
 header and other features will not work */
-static_assert(KERYING_ENCRYPTION_INFO_MAX_SIZE < ENCRYPTION_INFO_MAX_SIZE,
-              "Keyring key encryption header crosses Master Key encryption"
-              " header size");
+
+// static const std::string compilation_error_0{"Keyring key encryption header
+// crosses Master Key encryption" " header size"};
+
+// static const std::string compilation_error_1 =
+// KERYING_ENCRYPTION_INFO_MAX_SIZE +  compilation_error_0 +
+// ENCRYPTION_INFO_MAX_SIZE;
+
+// static_assert(KERYING_ENCRYPTION_INFO_MAX_SIZE < ENCRYPTION_INFO_MAX_SIZE,
+//"Keyring key encryption header crosses Master Key encryption"
+//" header size");
 
 uchar *fil_space_crypt_t::get_key_currently_used_for_encryption() {
   // ut_ad(mutex_own(&this->mutex));
@@ -164,8 +173,8 @@ uchar *fil_space_crypt_t::get_cached_key(Cached_key &cached_key,
   }
   cached_key.key_version = ENCRYPTION_KEY_VERSION_INVALID;
 
-  Encryption::get_tablespace_key(this->key_id, this->uuid, key_version, &cached_key.key,
-                                 &cached_key.key_len);
+  Encryption::get_tablespace_key(this->key_id, this->uuid, key_version,
+                                 &cached_key.key, &cached_key.key_len);
   ut_ad(cached_key.key == NULL || cached_key.key_len == ENCRYPTION_KEY_LEN);
 
   cached_key.key_version = key_version;
@@ -216,7 +225,7 @@ void fil_space_crypt_cleanup() {
 }
 
 fil_space_crypt_t::fil_space_crypt_t(
-    uint new_type, uint new_min_key_version, uint new_key_id,
+    uint new_type, uint new_min_key_version, uint new_key_id, const char *uuid,
     fil_encryption_t new_encryption, Crypt_key_operation key_operation,
     Encryption::Encryption_rotation encryption_rotation)
     : min_key_version(new_min_key_version),
@@ -253,9 +262,9 @@ fil_space_crypt_t::fil_space_crypt_t(
     uint key_version = 0;
     if (key_operation == FETCH_OR_GENERATE_KEY) {
       Encryption::get_latest_tablespace_key_or_create_new_one(
-          key_id, &key_version, &key);
+          key_id, uuid, &key_version, &key);
     } else if (key_operation == FETCH_KEY) {
-      Encryption::get_latest_tablespace_key(key_id, &key_version, &key);
+      Encryption::get_latest_tablespace_key(key_id, uuid, &key_version, &key);
     } else {
       ut_ad(0);
     }
@@ -327,7 +336,8 @@ Create a fil_space_crypt_t object
 
 static fil_space_crypt_t *fil_space_create_crypt_data(
     uint type, fil_encryption_t encrypt_mode, uint min_key_version, uint key_id,
-    const char*	uuid, Crypt_key_operation key_operation =
+    const char *uuid,
+    Crypt_key_operation key_operation =
         Crypt_key_operation::FETCH_OR_GENERATE_KEY) {
   fil_space_crypt_t *crypt_data = NULL;
   if (void *buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
@@ -366,8 +376,7 @@ Create a fil_space_crypt_t object
 @param[in]	key_id		Encryption key id
 @return crypt object */
 fil_space_crypt_t *fil_space_create_crypt_data(
-    fil_encryption_t encrypt_mode, uint key_id,
-    const char* uuid,
+    fil_encryption_t encrypt_mode, uint key_id, const char *uuid,
     Crypt_key_operation key_operation) {
   return (fil_space_create_crypt_data(0, encrypt_mode,
                                       ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED,

@@ -813,7 +813,7 @@ static int default_encryption_key_id_validate(
   }
 
   if (!Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
-          static_cast<uint>(intbuf), servrer_uuid)) {
+          static_cast<uint>(intbuf), server_uuid)) {
     push_warning_printf(thd, Sql_condition::SL_WARNING, HA_ERR_UNSUPPORTED,
                         "InnoDB: cannot enable encryption, "
                         "keyring plugin is not available");
@@ -11233,7 +11233,6 @@ dberr_t create_table_info_t::enable_master_key_encryption(dict_table_t *table) {
 
 dberr_t create_table_info_t::enable_keyring_encryption(
     dict_table_t *table, fil_encryption_t &keyring_encryption_option) {
-
   bool check_keyring_key{false};
 
   if (Encryption::none_explicitly_specified(m_create_info->used_fields,
@@ -11253,16 +11252,17 @@ dberr_t create_table_info_t::enable_keyring_encryption(
   }
 
   if ((check_keyring_key || m_create_info->was_encryption_key_id_set) &&
-      !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(m_create_info->encryption_key_id)) {
-      my_printf_error(
-          ER_ILLEGAL_HA_CREATE_OPTION,
-          "Seems that keyring is down. It is not possible to create encrypted "
-          "tables "
-          " without keyring. Please install a keyring and try again.",
-          MYF(0));
-      return (DB_UNSUPPORTED);
-    }
-    return DB_SUCCESS;
+      !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
+          m_create_info->encryption_key_id, server_uuid)) {
+    my_printf_error(
+        ER_ILLEGAL_HA_CREATE_OPTION,
+        "Seems that keyring is down. It is not possible to create encrypted "
+        "tables "
+        " without keyring. Please install a keyring and try again.",
+        MYF(0));
+    return (DB_UNSUPPORTED);
+  }
+  return DB_SUCCESS;
 }
 
 /** Create a table definition to an InnoDB database.

@@ -18,6 +18,7 @@
 #include <mysql/service_mysql_keyring.h>
 #include <algorithm>
 #include <cstring>
+#include "mysqld.h"
 #include "sql/auth/auth_acls.h"
 #include "sql/sql_lex.h"
 #include "sql_class.h"  // THD
@@ -50,8 +51,7 @@ bool Item_func_rotate_system_key::calc_value(const String *arg) {
   DBUG_ASSERT(strlen(server_uuid) != 0);
   size_t key_length = 0;
 
-  if (!is_valid_percona_system_key(arg->ptr(), &key_length))
-    return false;
+  if (!is_valid_percona_system_key(arg->ptr(), &key_length)) return false;
 
   std::ostringstream key_id_with_uuid_ss;
   key_id_with_uuid_ss << arg->ptr() << '-' << server_uuid;

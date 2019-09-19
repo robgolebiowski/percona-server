@@ -20,20 +20,18 @@
 #include "control_events.h"
 #include "my_crypt.h"
 
-class Binlog_crypt_data
-{
-public:
-  enum Binlog_crypt_consts
-  {
-    BINLOG_CRYPTO_SCHEME_LENGTH= 1,
-    BINLOG_KEY_VERSION_LENGTH= 4,
-    BINLOG_IV_LENGTH= MY_AES_BLOCK_SIZE,
-    BINLOG_IV_OFFS_LENGTH= 4,
-    BINLOG_NONCE_LENGTH= BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH,
+class Binlog_crypt_data {
+ public:
+  enum Binlog_crypt_consts {
+    BINLOG_CRYPTO_SCHEME_LENGTH = 1,
+    BINLOG_KEY_VERSION_LENGTH = 4,
+    BINLOG_IV_LENGTH = MY_AES_BLOCK_SIZE,
+    BINLOG_IV_OFFS_LENGTH = 4,
+    BINLOG_NONCE_LENGTH = BINLOG_IV_LENGTH - BINLOG_IV_OFFS_LENGTH,
     BINLOG_UUID_LENGTH = 36
   };
 
-  Binlog_crypt_data();
+  Binlog_crypt_data() noexcept;
   ~Binlog_crypt_data();
   Binlog_crypt_data(const Binlog_crypt_data &b);
   Binlog_crypt_data &operator=(Binlog_crypt_data b) noexcept;
@@ -45,17 +43,21 @@ public:
   uint get_key_version() const noexcept { return key_version; }
   uint32_t get_offs() const noexcept { return offs; }
 
-  void free_key(uchar *&key, size_t &key_length);
-  bool init(uint sch, uint kv, const uchar* nonce, const char* srv_uuid);
-  bool init_with_loaded_key(uint sch, const uchar* nonce);
+  void free_key(uchar *&key, size_t &key_length) noexcept;
+  bool init(uint sch, uint kv, const uchar *nonce, const char *srv_uuid);
+  bool init_with_loaded_key(uint sch, const uchar *nonce) noexcept;
   void set_iv(uchar *iv, uint32 offs) const;
 
-private:
-  std::string build_binlog_key_name(const uint sch, const uint kv, const char* srv_uuid);
+ private:
+#ifdef MYSQL_SERVER
+  std::string build_binlog_key_name(const uint sch, const uint kv,
+                                    const char *srv_uuid);
   std::string build_binlog_key_name(const uint sch, const char *srv_uuid);
-  void build_binlog_key_name(std::ostringstream &percona_binlog_key_name_oss, const uint sch, const char *srv_uuid);
+  void build_binlog_key_name(std::ostringstream &percona_binlog_key_name_oss,
+                             const uint sch, const char *srv_uuid);
+#endif
 
-private:
+ private:
   uint key_version;
   size_t key_length;
   uchar *key;

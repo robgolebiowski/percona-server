@@ -101,6 +101,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ha_innopart.h"
 #include "partition_info.h"
 
+extern char server_uuid[UUID_LENGTH + 1];
+
 /** Flags indicating if current operation can be done instantly */
 enum class Instant_Type : uint16_t {
   /** Impossible to alter instantly */
