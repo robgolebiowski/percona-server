@@ -8314,7 +8314,7 @@ Encryption::Encryption(const Encryption &other) noexcept
   if (other.m_key_allocated && other.m_key != NULL)
     m_key = static_cast<byte *>(
         my_memdup(PSI_NOT_INSTRUMENTED, other.m_key, other.m_klen, MYF(0)));
-  memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
+  memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN+1);
 }
 
 Encryption::~Encryption() {
@@ -10068,7 +10068,7 @@ bool os_dblwr_encrypt_page(fil_space_t *space, page_t *in_page,
 
   write_request.encryption_key(space->encryption_key, space->encryption_klen,
                                false, space->encryption_iv, 0, 0, nullptr,
-                               nullptr, nullptr);
+                               nullptr);
   write_request.encryption_algorithm(Encryption::AES);
 
   page_size_t page_size(space->flags);

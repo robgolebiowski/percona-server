@@ -247,8 +247,6 @@ struct fil_space_crypt_t {
 
   uchar *get_cached_key(Cached_key &cached_key, uint key_version);
 
-        bool only_fetch_key;
-
   ib_mutex_t
       start_rotate_mutex;  // mutex protecting starting of rotation of the space
   ib_mutex_t mutex;        // mutex protecting following variables
@@ -283,7 +281,7 @@ struct fil_space_crypt_t {
   unsigned int type;
 
   std::list<byte *> fetched_keys;  // TODO: temp for test
-        char uuid[ENCRYPTION_SERVER_UUID_LEN];
+  char uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 
 };
 

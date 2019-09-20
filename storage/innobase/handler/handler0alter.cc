@@ -4595,6 +4595,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
                  (old_table->s->encryption_key_id !=
                       ha_alter_info->create_info->encryption_key_id ||
                   none_explicitly_specified)) {
+        // TODO: W powyższym porównaniu trzeba jeszcze dodać uuid
         // it is KEYRING encryption - check if old's table encryption key is
         // available
         if (!Encryption::tablespace_key_exists(

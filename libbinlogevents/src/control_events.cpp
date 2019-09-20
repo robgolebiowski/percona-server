@@ -94,7 +94,7 @@ Start_encryption_event::Start_encryption_event(
     READER_THROW("Event is smaller or larger than expected");
 
   READER_TRY_SET(key_version, read_and_letoh<uint32_t>);
-  READER_TRY_CALL(memcpy<unsigned char *>, nonce, BINLOG_UUID_LENGTH);
+  READER_TRY_CALL(memcpy<unsigned char *>, nonce, NONCE_LENGTH);
   if (crypto_scheme == 2) {
     memset(uuid, 0, sizeof(uuid));
     READER_TRY_CALL(memcpy<char *>, uuid, BINLOG_UUID_LENGTH);

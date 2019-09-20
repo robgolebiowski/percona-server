@@ -8818,7 +8818,7 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
                                  : iter.m_encryption_key,
           ENCRYPTION_KEY_LEN, false,
           encrypted_with_keyring ? iter.m_crypt_data->iv : iter.m_encryption_iv,
-          0, iter.m_encryption_key_id,,
+          0, iter.m_encryption_key_id,
           encrypted_with_keyring ? iter.m_crypt_data->tablespace_key : nullptr,
           iter.m_crypt_data->uuid);
 

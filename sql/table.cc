@@ -1858,6 +1858,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
       share->was_encryption_key_id_set = true;
       next_chunk += 4 + strlen("ENCRYPTION_KEY_ID");
       memcpy(share->encryption_key_id_uuid, next_chunk, UUID_LENGTH);
+      share->encryption_key_id_uuid[UUID_LENGTH] = '\0';
       next_chunk += UUID_LENGTH;
     }
   }

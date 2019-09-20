@@ -40,7 +40,7 @@ Binlog_crypt_data::Binlog_crypt_data(const Binlog_crypt_data &b)
   if (b.key_length && b.key != nullptr) {
     key = reinterpret_cast<uchar *>(
         my_malloc(PSI_NOT_INSTRUMENTED, b.key_length, MYF(MY_WME)));
-    memcpy(key, b.key, b.key_length);
+      memcpy(key, b.key, b.key_length);
   } else
     key = nullptr;
 
