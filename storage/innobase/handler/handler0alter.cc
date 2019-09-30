@@ -658,7 +658,8 @@ static MY_ATTRIBUTE((warn_unused_result)) bool innobase_need_rebuild(
       (Encryption::is_keyring(ha_alter_info->create_info->encrypt_type.str) &&
        !Encryption::is_keyring(old_table->s->encrypt_type.str)) ||
       ha_alter_info->create_info->encryption_key_id !=
-          old_table->s->encryption_key_id)
+          old_table->s->encryption_key_id ||
+      old_table->s->encryption_key_id_uuid != server_uuid)
     return true;
 
   if (alter_inplace_flags == Alter_inplace_info::CHANGE_CREATE_OPTION &&
@@ -4594,13 +4595,15 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       } else if (Encryption::is_keyring(old_table->s->encrypt_type.str) &&
                  (old_table->s->encryption_key_id !=
                       ha_alter_info->create_info->encryption_key_id ||
+                  old_table->s->encryption_key_id_uuid !=
+                      server_uuid ||
                   none_explicitly_specified)) {
         // TODO: W powyższym porównaniu trzeba jeszcze dodać uuid
         // it is KEYRING encryption - check if old's table encryption key is
         // available
         if (!Encryption::tablespace_key_exists(
                 old_table->s->encryption_key_id,
-                old_table->s->encryption_key_id_uuid)) {
+                old_table->s->encryption_key_id_uuid.c_str())) {
           my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
                           "Cannot find key to decrypt table to ALTER. Please "
                           "make sure that keyring is installed "

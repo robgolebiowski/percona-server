@@ -2110,8 +2110,13 @@ static bool fill_dd_table_from_create_info(
     table_options->set("encrypt_type", encrypt_type);
   }
 
+  /* KEYRING encryption key_id and its uuid */
   if (create_info->was_encryption_key_id_set) {
     table_options->set("encryption_key_id", create_info->encryption_key_id);
+    dd::String_type encryption_key_id_uuid;
+    DBUG_ASSERT(strlen(server_uuid) > 0);
+    encryption_key_id_uuid.assign(server_uuid, UUID_LENGTH);
+    table_options->set("encryption_key_id_uuid", encryption_key_id_uuid);
   }
 
   // Storage media

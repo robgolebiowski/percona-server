@@ -1857,8 +1857,10 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
           uint4korr(next_chunk + strlen("ENCRYPTION_KEY_ID"));
       share->was_encryption_key_id_set = true;
       next_chunk += 4 + strlen("ENCRYPTION_KEY_ID");
-      memcpy(share->encryption_key_id_uuid, next_chunk, UUID_LENGTH);
-      share->encryption_key_id_uuid[UUID_LENGTH] = '\0';
+      char encryption_key_id_uuid[UUID_LENGTH + 1];
+      memcpy(encryption_key_id_uuid, next_chunk, UUID_LENGTH);
+      encryption_key_id_uuid[UUID_LENGTH] = '\0';
+      share->encryption_key_id_uuid.assign(encryption_key_id_uuid, UUID_LENGTH);
       next_chunk += UUID_LENGTH;
     }
   }

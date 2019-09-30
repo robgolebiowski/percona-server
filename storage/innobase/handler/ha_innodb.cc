@@ -12624,6 +12624,10 @@ void ha_innobase::adjust_encryption_key_id(HA_CREATE_INFO *create_info,
        strcmp(create_info->tablespace, dict_sys_t::s_file_per_table_name) ==
            0)) {
     options->set("encryption_key_id", create_info->encryption_key_id);
+    dd::String_type encryption_key_id_uuid;
+    DBUG_ASSERT(strlen(server_uuid) > 0);
+    encryption_key_id_uuid.assign(server_uuid, UUID_LENGTH);
+    options->set("encryption_key_id_uuid", encryption_key_id_uuid);
   }
 }
 
