@@ -1,11 +1,12 @@
-#include <string>
+#include "uuid.h"
+#include <sstream>
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 static boost::uuids::random_generator gen = boost::uuids::random_generator();
 
-static std::string generate_uuid()
+std::string generate_uuid()
 {
   boost::uuids::uuid uuid = gen();
   std::ostringstream uuid_ss;
@@ -13,8 +14,8 @@ static std::string generate_uuid()
   return uuid_ss.str();
 }
 
-static std::string get_key_signature(const std::string &uuid, const std::string &key_id,
-                                     const std::string &user)
+std::string get_key_signature(const std::string &uuid, const std::string &key_id,
+                              const std::string &user)
 {
   std::string id = uuid + key_id;
   std::ostringstream signature;

@@ -28,6 +28,7 @@
 #include "keyring.cc"
 #include "keyring_impl.cc"
 #include "mock_logger.h"
+#include "uuid.h"
 
 namespace keyring__api_unittest
 {
@@ -279,6 +280,42 @@ namespace keyring__api_unittest
     EXPECT_EQ(mysql_key_generate("percona_binlog", "AES", NULL, 16), 0);
 
     EXPECT_EQ(mysql_key_fetch("percona_binlog", &key_type, NULL, &key_ver2,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, static_cast<size_t>(18));
+    ASSERT_TRUE(memcmp(reinterpret_cast<char*>(key_ver2), "2:", 2) == 0);
+    my_free(key_type);
+    key_type= NULL;
+
+    // make sure that rotated key is different than the original one
+    ASSERT_TRUE(memcmp(reinterpret_cast<char*>(key_ver1) + 2, reinterpret_cast<char*>(key_ver2) + 2, 16) != 0);
+
+    my_free(key_ver1);
+    my_free(key_ver2);
+  }
+
+  TEST_F(Keyring_api_test, GeneratePBFetchPBRotatePBFetchPB_UUID_version)
+  {
+    std::string percona_binlog_key_id_with_uuid("percona_binlog_");
+    percona_binlog_key_id_with_uuid += generate_uuid();
+
+    EXPECT_EQ(mysql_key_generate(percona_binlog_key_id_with_uuid.c_str(), "AES", NULL, 16), 0);
+
+    char *key_type= NULL;
+    size_t key_len= 0;
+    void *key_ver1= NULL;
+    EXPECT_EQ(mysql_key_fetch(percona_binlog_key_id_with_uuid.c_str(), &key_type, NULL, &key_ver1,
+                              &key_len), 0);
+    EXPECT_STREQ("AES", key_type);
+    EXPECT_EQ(key_len, static_cast<size_t>(18));
+    ASSERT_TRUE(memcmp(reinterpret_cast<char*>(key_ver1), "1:", 2) == 0);
+    my_free(key_type);
+    key_type= NULL;
+
+    void *key_ver2= NULL;
+    EXPECT_EQ(mysql_key_generate(percona_binlog_key_id_with_uuid.c_str(), "AES", NULL, 16), 0);
+
+    EXPECT_EQ(mysql_key_fetch(percona_binlog_key_id_with_uuid.c_str(), &key_type, NULL, &key_ver2,
                               &key_len), 0);
     EXPECT_STREQ("AES", key_type);
     EXPECT_EQ(key_len, static_cast<size_t>(18));

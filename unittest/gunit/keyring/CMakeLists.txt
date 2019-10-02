@@ -70,6 +70,7 @@ IF (MERGE_UNITTESTS)
        ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
+       ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring/uuid.cc
        )
 
   IF(WIN32)
@@ -101,6 +102,7 @@ ENDIF(MERGE_UNITTESTS)
         ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
         ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
+        ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring/uuid.cc
         )
     IF(WIN32)
       LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)

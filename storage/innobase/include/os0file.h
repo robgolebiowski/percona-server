@@ -511,7 +511,7 @@ struct Encryption {
 			m_key = static_cast<byte *>(
 				my_memdup(PSI_NOT_INSTRUMENTED,
 					other.m_key, other.m_klen, MYF(0)));
-		memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
+		memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN+1);
 	}
 
 	Encryption& operator = (const Encryption& other) {
@@ -532,10 +532,10 @@ struct Encryption {
 		std::swap(m_key_id, other.m_key_id);
 		std::swap(m_checksum, other.m_checksum);
 		std::swap(m_encryption_rotation, other.m_encryption_rotation);
-		char tmp[ENCRYPTION_SERVER_UUID_LEN];
-		memcpy(tmp, m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
-		memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN);
-		memcpy(other.m_key_id_uuid, tmp, ENCRYPTION_SERVER_UUID_LEN);
+		char tmp[ENCRYPTION_SERVER_UUID_LEN+1];
+		memcpy(tmp, m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN+1);
+		memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN+1);
+		memcpy(other.m_key_id_uuid, tmp, ENCRYPTION_SERVER_UUID_LEN+1);
 	}
 
 	~Encryption() {
@@ -803,7 +803,7 @@ struct Encryption {
 
         uint32                  m_checksum;
 
-        char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN]; // uuid that is part of the full key id of a percona system key
+        char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN+1]; // uuid that is part of the full key id of a percona system key
         //mutable bool            m_was_page_encrypted_when_read;
 
 	/** Current master key id */
@@ -1155,9 +1155,10 @@ public:
                 m_encryption.m_tablespace_key = tablespace_key;
 
                 if (uuid == NULL) {
-                  memset(m_encryption.m_key_id_uuid, '\0', ENCRYPTION_SERVER_UUID_LEN);
+                  m_encryption.m_key_id_uuid[0] = '\0';
                 } else {
                   memcpy(m_encryption.m_key_id_uuid, uuid, ENCRYPTION_SERVER_UUID_LEN);
+                  m_encryption.m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN] = '\0';
                 }
 	}
 
