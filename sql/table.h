@@ -596,7 +596,7 @@ struct TABLE_SHARE
   LEX_STRING encrypt_type;		/* encryption algorithm */
   uint32_t encryption_key_id;
   bool was_encryption_key_id_set;
-  char encryption_key_id_uuid[UUID_LENGTH];
+  char encryption_key_id_uuid[UUID_LENGTH+1];
   const CHARSET_INFO *table_charset;	/* Default charset of string fields */
 
   MY_BITMAP all_set;

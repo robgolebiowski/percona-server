@@ -164,6 +164,7 @@ struct fil_space_rotate_state_t
 
 #ifndef UNIV_INNOCHECKSUM
 
+enum Crypt_key_operation { FETCH_KEY, FETCH_OR_GENERATE_KEY };
 
 struct fil_space_crypt_t
 {
@@ -175,10 +176,10 @@ struct fil_space_crypt_t
 		uint new_type,
 		uint new_min_key_version,
 		uint new_key_id,
-                const char *uuid,
+		const char *uuid,
 		fil_encryption_t new_encryption,
-                bool only_fetch_key, // is used when we read crypto from page0
-                Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION
+		Crypt_key_operation key_operation,
+		Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION
         );
 
 	/** Destructor */
@@ -285,8 +286,6 @@ struct fil_space_crypt_t
 	ulint page0_offset;   // byte offset on page 0 for crypt data //TODO:Robert: po co to ?
 	fil_encryption_t encryption; // Encryption setup
 
-        bool only_fetch_key;
-
         // key being used for encryption
         Cached_key cached_encryption_key;
         // in normal situation the only key needed to decrypt the tablespace
@@ -326,7 +325,7 @@ struct fil_space_crypt_t
 
         std::list<byte*> fetched_keys; // TODO: temp for test
 
-        char uuid[ENCRYPTION_SERVER_UUID_LEN];
+        char uuid[ENCRYPTION_SERVER_UUID_LEN+1];
 
 };
 
@@ -388,7 +387,7 @@ fil_space_create_crypt_data(
 	fil_encryption_t	encrypt_mode,
 	uint			key_id,
 	const char*		uuid,
-	bool			only_fetch_key = false)
+	Crypt_key_operation key_operation = FETCH_OR_GENERATE_KEY)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /******************************************************************

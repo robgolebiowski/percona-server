@@ -398,7 +398,8 @@ innobase_need_rebuild(
 		Encryption::is_keyring(ha_alter_info->create_info->encrypt_type.str) &&
 		!Encryption::is_keyring(old_table->s->encrypt_type.str)
 	    ) ||
-		ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
+		(ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id ||
+		memcmp(old_table->s->encryption_key_id_uuid, server_uuid, UUID_LENGTH) != 0)
 
 	)
 		return true;
@@ -4659,7 +4660,9 @@ prepare_inplace_alter_table_dict(
 					my_free(master_key);
 				}
 			} else if (Encryption::is_keyring(old_table->s->encrypt_type.str) &&
-				   (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt))) {
+				   ((old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id
+				     || memcmp(old_table->s->encryption_key_id_uuid, server_uuid, UUID_LENGTH) != 0)
+				    || Encryption::is_no(encrypt))) {
 				// it is KEYRING encryption - check if old's table encryption key is available 
 				if (!Encryption::tablespace_key_exists(old_table->s->encryption_key_id, old_table->s->encryption_key_id_uuid)) {
 					my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
