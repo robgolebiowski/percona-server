@@ -1,4 +1,4 @@
-# Check that only percona_binlog and percona_redo key can be rotated 
+# Check that only percona_binlog and percona_redo key can be rotated
 # with rotate_system_key. This part of the test needs updating
 # each time a new system key is added.
 include/assert.inc [It should not be possible to rotate key percona_binlog:]

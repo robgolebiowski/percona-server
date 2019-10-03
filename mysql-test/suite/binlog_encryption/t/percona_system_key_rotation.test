@@ -1,4 +1,4 @@
---echo # Check that only percona_binlog and percona_redo key can be rotated 
+--echo # Check that only percona_binlog and percona_redo key can be rotated
 --echo # with rotate_system_key. This part of the test needs updating
 --echo # each time a new system key is added.
 
