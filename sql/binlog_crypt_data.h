@@ -19,6 +19,9 @@
 
 #include "my_global.h"
 #include "my_crypt.h"
+#ifdef MYSQL_SERVER
+#include <string>
+#endif
 
 class Binlog_crypt_data
 {
