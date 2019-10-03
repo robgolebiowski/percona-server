@@ -120,7 +120,7 @@ uint fil_get_encrypt_info_size(const uint iv_len) {
 		+ 1	//type 
 		+ 4	//min_key_version
 		+ 4	//key_id
-        + ENCRYPTION_SERVER_UUID_LEN // server's UUID
+		+ ENCRYPTION_SERVER_UUID_LEN // server's UUID
 		+ 1	//encryption
 		+ iv_len	//iv
 		+ 4	//encryption rotation type
