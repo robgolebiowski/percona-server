@@ -129,7 +129,7 @@ void Binlog_crypt_data::build_binlog_key_name(std::ostringstream &percona_binlog
   percona_binlog_key_name_oss << PERCONA_BINLOG_KEY_NAME;
   if (sch == 2) {
     DBUG_ASSERT(strlen(srv_uuid) != 0);
-    percona_binlog_key_name_oss << '_' << (srv_uuid ? srv_uuid : srv_uuid);
+    percona_binlog_key_name_oss << '-' << (srv_uuid ? srv_uuid : srv_uuid);
   }
 }
 
