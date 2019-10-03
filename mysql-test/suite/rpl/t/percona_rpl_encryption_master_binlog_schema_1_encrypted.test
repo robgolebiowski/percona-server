@@ -94,6 +94,10 @@ DROP TABLE t1;
 
 --echo ########################### 3rd scenario ############################################
 
+--connection slave
+--source include/stop_slave.inc
+
+--connection master
 # Restart the master with binlog encryption turned on
 --let $rpl_server_number= 1
 --let $rpl_server_parameters= $master_keyring_parameters --encrypt-binlog=ON --master-verify-checksum=ON
@@ -101,7 +105,6 @@ DROP TABLE t1;
 --source include/rpl_restart_server.inc
 
 --connection slave
---source include/stop_slave.inc
 RESET SLAVE;
 
 --connection master
