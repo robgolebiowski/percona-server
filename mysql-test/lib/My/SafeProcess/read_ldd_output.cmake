@@ -25,7 +25,7 @@ STRING(REPLACE "\n" ";" LDD_FILE_LINES ${LDD_FILE_CONTENTS})
 
 SET(ASAN_LIBRARY_NAME)
 FOREACH(LINE ${LDD_FILE_LINES})
-  STRING(REGEX MATCH "^[\t ]*(libasan.so.[0-9]) => ([/a-z0-9.]+)" XXX ${LINE})
+  STRING(REGEX MATCH "^[\t ]*(libasan.so.[0-9]) => ([/a-z0-9._-]+)" XXX ${LINE})
   IF(CMAKE_MATCH_1)
 #    MESSAGE(STATUS "LINE ${LINE}")
 #    MESSAGE(STATUS "XXX ${XXX}")

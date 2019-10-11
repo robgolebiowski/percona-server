@@ -63,7 +63,17 @@ IF(HAVE_ASAN AND TIRPC_FOUND)
     -P ${CMAKE_CURRENT_SOURCE_DIR}/read_ldd_output.cmake
     )
 
-  ADD_DEPENDENCIES(mysqltest_safe_process extract_asan_library_name)
+  ADD_CUSTOM_COMMAND(
+    OUTPUT tirpc_library_name.h
+    COMMAND ${CMAKE_COMMAND} -E echo "const char *tirpc_library_name=\"${TIRPC_LIBDIR}/lib${TIRPC_LIBRARIES}.so\";" > tirpc_library_name.h
+    VERBATIM
+    )
+  SET_SOURCE_FILES_PROPERTIES(tirpc_library_name.h PROPERTIES GENERATED TRUE)
+  ADD_CUSTOM_TARGET(extract_tirpc_library_name
+    DEPENDS tirpc_library_name.h
+    )
+
+  ADD_DEPENDENCIES(mysqltest_safe_process extract_asan_library_name extract_tirpc_library_name)
 ENDIF()
 
 IF(INSTALL_MYSQLTESTDIR)
