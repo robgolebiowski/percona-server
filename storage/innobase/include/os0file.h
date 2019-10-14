@@ -367,43 +367,24 @@ struct Encryption {
         m_key_version(0),
         m_key_id(0),
         m_checksum(0),
-        m_encryption_rotation(Encryption_rotation::NO_ROTATION) {}
+        m_encryption_rotation(Encryption_rotation::NO_ROTATION) {
+    m_key_id_uuid[0] = '\0';
+  }
 
-		/** Version in > 5.7.11 */
-		ENCRYPTION_VERSION_2 = 1,
-	};
-
-	/** Default constructor */
-	Encryption():
-		m_type(NONE),
-		m_key(NULL),
-		m_klen(0),
-		m_key_allocated(false),
-		m_iv(NULL),
-		m_tablespace_iv(NULL),
-		m_tablespace_key(NULL),
-		m_key_version(0),
-		m_key_id(0),
-		m_checksum(0),
-		m_encryption_rotation(NO_ROTATION)
-	{}
-
-	/** Specific constructor
-	@param[in]	type		Algorithm type */
-	explicit Encryption(Type type):
-		m_type(type),
-		m_key(NULL),
-		m_klen(0),
-		m_key_allocated(false),
-		m_iv(NULL),
-		m_tablespace_iv(NULL),
-		m_tablespace_key(NULL),
-		m_key_version(0),
-		m_key_id(0),
-		m_checksum(0),
-		m_encryption_rotation(NO_ROTATION)
-	{
-		m_key_id_uuid[0] = '\0';
+  /** Specific constructor
+  @param[in]	type		Algorithm type */
+  explicit Encryption(Type type)
+      : m_type(type),
+        m_key(nullptr),
+        m_klen(0),
+        m_key_allocated(false),
+        m_iv(nullptr),
+        m_tablespace_key(nullptr),
+        m_key_version(0),
+        m_key_id(0),
+        m_checksum(0),
+        m_encryption_rotation(Encryption_rotation::NO_ROTATION) {
+    m_key_id_uuid[0] = '\0';
 #ifdef UNIV_DEBUG
     switch (m_type) {
       case NONE:
@@ -415,25 +396,8 @@ struct Encryption {
 #endif /* UNIV_DEBUG */
   }
 
-	/** Copy constructor */
-	Encryption(const Encryption& other):
-		m_type(other.m_type),
-		m_key(other.m_key),
-		m_klen(other.m_klen),
-		m_key_allocated(other.m_key_allocated),
-		m_iv(other.m_iv),
-		m_tablespace_iv(other.m_tablespace_iv),
-		m_tablespace_key(other.m_tablespace_key),
-		m_key_version(other.m_key_version),
-		m_key_id(other.m_key_id),
-		m_checksum(other.m_checksum),
-		m_encryption_rotation(other.m_encryption_rotation)
-	{
-		if (other.m_key_allocated && other.m_key != NULL)
-			m_key = static_cast<byte *>(
-				my_memdup(PSI_NOT_INSTRUMENTED,
-					other.m_key, other.m_klen, MYF(0)));
-	}
+  /** Copy constructor */
+  Encryption(const Encryption &other) noexcept;
 
   Encryption &operator=(const Encryption &other) {
     Encryption tmp(other);
@@ -441,19 +405,22 @@ struct Encryption {
     return *this;
   }
 
-	void swap(Encryption& other) {
-		std::swap(m_type, other.m_type);
-		std::swap(m_key, other.m_key);
-		std::swap(m_klen, other.m_klen);
-		std::swap(m_key_allocated, other.m_key_allocated);
-		std::swap(m_iv, other.m_iv);
-		std::swap(m_tablespace_iv, other.m_tablespace_iv);
-		std::swap(m_tablespace_key, other.m_tablespace_key);
-		std::swap(m_key_version, other.m_key_version);
-		std::swap(m_key_id, other.m_key_id);
-		std::swap(m_checksum, other.m_checksum);
-		std::swap(m_encryption_rotation, other.m_encryption_rotation);
-	}
+  void swap(Encryption &other) {
+    std::swap(m_type, other.m_type);
+    std::swap(m_key, other.m_key);
+    std::swap(m_klen, other.m_klen);
+    std::swap(m_key_allocated, other.m_key_allocated);
+    std::swap(m_iv, other.m_iv);
+    std::swap(m_tablespace_key, other.m_tablespace_key);
+    std::swap(m_key_version, other.m_key_version);
+    std::swap(m_key_id, other.m_key_id);
+    std::swap(m_checksum, other.m_checksum);
+    std::swap(m_encryption_rotation, other.m_encryption_rotation);
+    char tmp[ENCRYPTION_SERVER_UUID_LEN + 1];
+    memcpy(tmp, m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN + 1);
+    memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN + 1);
+    memcpy(other.m_key_id_uuid, tmp, ENCRYPTION_SERVER_UUID_LEN + 1);
+  }
 
   ~Encryption();
 
@@ -521,36 +488,39 @@ struct Encryption {
                                           const char *algorithm)
       MY_ATTRIBUTE((warn_unused_result));
 
-        static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id);
+  /** Generate random encryption value for key and iv.
+  @param[in,out]	value	Encryption value */
+  static void random_value(byte *value);
 
-        static bool tablespace_key_exists(uint key_id);
+  /** Create tablespace key
+  @param[in,out]	tablespace_key	tablespace key - null if failure
+  @param[in]		key_id		tablespace key id */
+  static void create_tablespace_key(byte **tablespace_key, uint key_id);
 
   /** Create new master key for key rotation.
   @param[in,out]	master_key	master key */
   static void create_master_key(byte **master_key);
 
-        static uint encryption_get_latest_version(uint key_id);
+  static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(
+      uint key_id, const char *uuid);
 
-       //TODO:Robert: Te dwa są potrzebne.
-        static void get_latest_tablespace_key(uint key_id,
-                           uint *tablespace_key_version,
-			   byte** tablespace_key);
+  static bool tablespace_key_exists(uint key_id, const char *uuid);
 
   static bool is_encrypted_and_compressed(const byte *page);
 
-        static void get_latest_tablespace_key_or_create_new_one(uint key_id,
-                                                                uint *tablespace_key_version,
-			                                        byte** tablespace_key);
+  static uint encryption_get_latest_version(uint key_id, const char *uuid);
 
-        static bool get_tablespace_key(uint key_id,
-                                       uint tablespace_key_version,
-                                       byte** tablespace_key,
-                                       size_t *key_len);
+  // TODO:Robert: Te dwa są potrzebne.
+  static void get_latest_tablespace_key(uint key_id, const char *uuid,
+                                        uint *tablespace_key_version,
+                                        byte **tablespace_key);
 
   static void get_latest_tablespace_key_or_create_new_one(
-      uint key_id, uint *tablespace_key_version, byte **tablespace_key);
+      uint key_id, const char *uuid, uint *tablespace_key_version,
+      byte **tablespace_key);
 
-  static bool get_tablespace_key(uint key_id, uint tablespace_key_version,
+  static bool get_tablespace_key(uint key_id, const char *uuid,
+                                 uint tablespace_key_version,
                                  byte **tablespace_key, size_t *key_len);
 
   /** Create tablespace key
@@ -688,9 +658,12 @@ struct Encryption {
   /** Encrypt initial vector */
   byte *m_iv;
 
-        char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN+1]; // uuid that is part of the full key id of a percona system key
   byte *m_tablespace_key;
 
+  char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN +
+                     1];  // uuid that is part of the
+                          // full key id of a percona
+                          // system key
   uint m_key_version;
 
   uint m_key_id;
@@ -700,9 +673,23 @@ struct Encryption {
   /** Current master key id */
   static ulint s_master_key_id;
 
-        static void fill_key_name(char *key_name, uint key_id);
+  /** Current uuid of server instance */
+  static char s_uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 
-        static void fill_key_name(char* key_name, uint key_id, uint key_version);
+  Encryption_rotation m_encryption_rotation;
+
+ private:
+  // TODO: Robert: Is it needed here?
+  static void get_keyring_key(const char *key_name, byte **key,
+                              size_t *key_len);
+
+  static void get_latest_system_key(const char *system_key_name, byte **key,
+                                    uint *key_version, size_t *key_length);
+
+  static void fill_key_name(char *key_name, uint key_id, const char *uuid);
+
+  static void fill_key_name(char *key_name, uint key_id, const char *uuid,
+                            uint key_version);
 };
 
 /** Types for AIO operations @{ */
@@ -934,12 +921,19 @@ class IORequest {
   @param[in] key_len	length of the encryption key
   @param[in] iv		The encryption iv to use */
   void encryption_key(byte *key, ulint key_len, bool key_allocated, byte *iv,
-                      uint key_version, uint key_id, byte *tablespace_key) {
+                      uint key_version, uint key_id, byte *tablespace_key,
+                      const char *uuid) {
     m_encryption.set_key(key, key_len, key_allocated);
     m_encryption.m_iv = iv;
     m_encryption.m_key_version = key_version;
     m_encryption.m_key_id = key_id;
     m_encryption.m_tablespace_key = tablespace_key;
+    if (uuid == nullptr) {
+      m_encryption.m_key_id_uuid[0] = '\0';
+    } else {
+      memcpy(m_encryption.m_key_id_uuid, uuid, ENCRYPTION_SERVER_UUID_LEN);
+      m_encryption.m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN] = '\0';
+    }
   }
 
   void encryption_rotation(Encryption_rotation encryption_rotation) {
@@ -962,27 +956,10 @@ class IORequest {
     return (m_encryption);
   }
 
-	/** Set encryption key and iv
-	@param[in] key		The encryption key to use
-	@param[in] key_len	length of the encryption key
-	@param[in] iv		The encryption iv to use */
-	void encryption_key(byte* key,
-			    ulint key_len,
-			    bool key_allocated,
-			    byte* iv,
-                            uint key_version,
-                            uint key_id,
-                            byte *tablespace_iv,
-                            byte *tablespace_key)
-	{
-                //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
-		m_encryption.set_key(key, key_len, key_allocated);
-		m_encryption.m_iv = iv;
-                m_encryption.m_key_version = key_version;
-                m_encryption.m_key_id = key_id;
-                m_encryption.m_tablespace_iv = tablespace_iv;
-                m_encryption.m_tablespace_key = tablespace_key;
-	}
+  /** @return true if the page should be encrypted. */
+  bool is_encrypted() const MY_ATTRIBUTE((warn_unused_result)) {
+    return (m_encryption.m_type != Encryption::NONE);
+  }
 
   /** Clear all encryption related flags */
   void clear_encrypted() {

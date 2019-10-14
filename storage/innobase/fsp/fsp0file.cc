@@ -728,20 +728,29 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
             << " can't be decrypted, please confirm the "
             << "keyfile is match and keyring plugin is loaded.";
 
-			if (recv_recovery_is_on()
-			    && memcmp(m_encryption_key,
-				      m_encryption_iv,
-				      ENCRYPTION_KEY_LEN) == 0) {
-				ut_free(m_encryption_key);
-				ut_free(m_encryption_iv);
-				m_encryption_key = NULL;
-				m_encryption_iv = NULL;
-			}
-		} else if (Encryption::tablespace_key_exists(crypt_data->key_id) == false) {
-			ib::error() << "Table " << m_name << " in file " << m_filename << ' '
-				<< "is encrypted but encryption service or "
-				<< "used key_id " << crypt_data->key_id << " is not available. "
-				<< "Can't continue reading table.";
+        m_is_valid = false;
+        free_first_page();
+        ut_free(m_encryption_key);
+        ut_free(m_encryption_iv);
+        m_encryption_key = NULL;
+        m_encryption_iv = NULL;
+        output.error = DB_INVALID_ENCRYPTION_META;
+        return (output);
+      } else {
+        ib::info(ER_IB_MSG_402) << "Read encryption metadata from "
+                                << m_filepath << " successfully, encryption"
+                                << " of this tablespace enabled.";
+        if (recv_recovery_is_on() && memcmp(m_encryption_key, m_encryption_iv,
+                                            ENCRYPTION_KEY_LEN) == 0) {
+          ut_free(m_encryption_key);
+          ut_free(m_encryption_iv);
+          m_encryption_key = NULL;
+          m_encryption_iv = NULL;
+        }
+      }
+    } else if (!crypt_data->key_found) {
+      ut_ad(m_filename != nullptr);
+      ib::warn(ER_XB_MSG_5, space_id, m_filename, crypt_data->key_id);
 
       m_is_valid = false;
       free_first_page();

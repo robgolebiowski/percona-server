@@ -61,6 +61,17 @@ Rotate_event::Rotate_event(const char *buf, const Format_description_event *fde)
   BAPI_VOID_RETURN;
 }
 
+size_t Start_encryption_event::get_data_size_based_on_scheme() {
+  // Make sure crypto_scheme was alread read
+  DBUG_ASSERT(crypto_scheme == 1 || crypto_scheme == 2);
+
+  size_t size{CRYPTO_SCHEME_LENGTH + KEY_VERSION_LENGTH + NONCE_LENGTH};
+  if (crypto_scheme == 2) {
+    size += BINLOG_UUID_LENGTH;
+  }
+  return size;
+}
+
 Start_encryption_event::Start_encryption_event(
     const char *buf, const Format_description_event *fde)
     : Binary_log_event(&buf, fde) {
@@ -69,16 +80,22 @@ Start_encryption_event::Start_encryption_event(
   READER_TRY_INITIALIZATION;
   READER_ASSERT_POSITION(fde->common_header_len);
   const auto remaining_length = READER_CALL(available_to_read);
-  if (unlikely(remaining_length != EVENT_DATA_LENGTH))
-    READER_THROW("Event is smaller or larger than expected");
-
+  if (unlikely(remaining_length < CRYPTO_SCHEME_LENGTH)) {
+    READER_THROW("Event is smaller than expected");
+  }
   READER_TRY_SET(crypto_scheme, read<uint8_t>);
-  if (unlikely(crypto_scheme != 1))
+  if (unlikely(crypto_scheme != 1 && crypto_scheme != 2))
     READER_THROW("Unknown crypto scheme version");
+
+  if (unlikely(remaining_length != get_data_size_based_on_scheme()))
+    READER_THROW("Event is smaller or larger than expected");
 
   READER_TRY_SET(key_version, read_and_letoh<uint32_t>);
   READER_TRY_CALL(memcpy<unsigned char *>, nonce, NONCE_LENGTH);
-
+  if (crypto_scheme == 2) {
+    memset(uuid, 0, sizeof(uuid));
+    READER_TRY_CALL(memcpy<char *>, uuid, BINLOG_UUID_LENGTH);
+  }
   READER_CATCH_ERROR;
   BAPI_VOID_RETURN;
 }

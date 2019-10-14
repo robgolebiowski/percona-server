@@ -27,6 +27,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "fil0fil.h"
 #include "mach0data.h"
 #include "mtr0types.h"
+#include "mysqld.h"  // server_uuid
 #include "page0size.h"
 #include "page0zip.h"
 #include "system_key.h"
@@ -118,20 +119,15 @@ EncryptionKeyId get_global_default_encryption_key_id_value();
 
 #define DEBUG_KEYROTATION_THROTTLING 0
 
-uint fil_get_encrypt_info_size(const uint iv_len) {
-	return ENCRYPTION_MAGIC_SIZE
-		+ 2	//length of iv
-		+ 4	//space id
-		+ 2	//offset
-		+ 1	//type 
-		+ 4	//min_key_version
-		+ 4	//key_id
-		+ 1	//encryption
-		+ iv_len	//iv
-		+ 4	//encryption rotation type
-		+ ENCRYPTION_KEY_LEN	//tablespace key
-		+ ENCRYPTION_KEY_LEN;	//tablespace iv
-}
+static constexpr uint KERYING_ENCRYPTION_INFO_MAX_SIZE =
+    ENCRYPTION_MAGIC_SIZE + 1     // type
+    + 4                           // min_key_version
+    + 4                           // key_id
+    + ENCRYPTION_SERVER_UUID_LEN  // server's UUID
+    + 1                           // encryption
+    + CRYPT_SCHEME_1_IV_LEN       // iv (16 bytes)
+    + 1                           // encryption rotation type
+    + ENCRYPTION_KEY_LEN;         // tablespace key
 
 /* The size of keyring key encrption header cannot cross the Master
 Key header. This is because the bytes followed by MK header are used
@@ -165,10 +161,9 @@ uchar *fil_space_crypt_t::get_cached_key(Cached_key &cached_key,
   }
   cached_key.key_version = ENCRYPTION_KEY_VERSION_INVALID;
 
-	Encryption::get_tablespace_key(this->key_id, key_version, &cached_key.key,
-				       &cached_key.key_len);
-	ut_ad(cached_key.key == NULL ||
-	      cached_key.key_len == ENCRYPTION_KEY_LEN);
+  Encryption::get_tablespace_key(this->key_id, this->uuid, key_version,
+                                 &cached_key.key, &cached_key.key_len);
+  ut_ad(cached_key.key == NULL || cached_key.key_len == ENCRYPTION_KEY_LEN);
 
   cached_key.key_version = key_version;
 
@@ -217,53 +212,68 @@ void fil_space_crypt_cleanup() {
   mutex_free(&crypt_stat_mutex);
 }
 
-fil_space_crypt_t::fil_space_crypt_t(
-		uint new_type,
-		uint new_min_key_version,
-		uint new_key_id,
-		fil_encryption_t new_encryption,
-		bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
-		Encryption::Encryption_rotation encryption_rotation)
-		: min_key_version(new_min_key_version),
-		page0_offset(0),
-		encryption(new_encryption),
-		key_found(false),
-		rotate_state(),
-		encryption_rotation(encryption_rotation),
-		tablespace_key(NULL)
-	{
-		key_id = new_key_id;
-		if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can return error and because of that it should not be in constructor
-			type = 0; //TODO:Robert: This is temporary to get rid of unused variable problem
-		mutex_create(LATCH_ID_FIL_CRYPT_START_ROTATE_MUTEX, &start_rotate_mutex);
-		mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
-		//locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie mogę znaleść jego definicji nawet w mariadb
-		type = new_type;
+fil_space_crypt_t::fil_space_crypt_t(uint new_type, uint new_min_key_version,
+                                     uint new_key_id, const char *new_uuid,
+                                     fil_encryption_t new_encryption,
+                                     Crypt_key_operation key_operation,
+                                     Encryption_rotation encryption_rotation)
+    : min_key_version(new_min_key_version),
+      encryption(new_encryption),
+      key_found(false),
+      rotate_state(),
+      encryption_rotation(encryption_rotation),
+      tablespace_key(NULL) {
+  ut_ad(strlen(new_uuid) > 0);
 
-		if (new_encryption == FIL_ENCRYPTION_OFF ||
-			(is_online_encryption_on() == false &&
-			 new_encryption == FIL_ENCRYPTION_DEFAULT)) {
-			type = CRYPT_SCHEME_UNENCRYPTED;
-			min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-			key_found = true;
-		} else {
-			type = CRYPT_SCHEME_1;
-			//key_found = true; // cheat key_get_latest_version that the key exists - if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
-			uchar *key = NULL;
-			uint key_version = 0;
-			Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &key_version, &key);
-			if (key == NULL) {
-				key_found = false;
-				min_key_version = ENCRYPTION_KEY_VERSION_INVALID;
-			} else {
-				key_found = true;
-				min_key_version = key_version;
-			}
-			my_free(key);
-		}
+  key_id = new_key_id;
+  if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can
+                                                     // return error and because
+                                                     // of that it should not be
+                                                     // in constructor
+    type = 0;  // TODO:Robert: This is temporary to get rid of unused variable
+               // problem
+  memcpy(uuid, new_uuid, ENCRYPTION_SERVER_UUID_LEN);
+  uuid[ENCRYPTION_SERVER_UUID_LEN] = '\0';
+  mutex_create(LATCH_ID_FIL_CRYPT_START_ROTATE_MUTEX, &start_rotate_mutex);
+  mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
+  // locker = crypt_data_scheme_locker; // TODO:Robert: Co to za locker, nie
+  // mogę znaleść jego definicji nawet w mariadb
+  type = new_type;
 
-		//found_key_version = min_key_version; // TODO:This does not make much sense now - always true
-	}
+  if (new_encryption == FIL_ENCRYPTION_OFF ||
+      (Encryption::is_online_encryption_on() == false &&
+       new_encryption == FIL_ENCRYPTION_DEFAULT)) {
+    type = CRYPT_SCHEME_UNENCRYPTED;
+    min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+    key_found = key_operation == FETCH_OR_GENERATE_KEY
+                  ? Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(key_id, uuid)
+                  : Encryption::tablespace_key_exists(key_id, uuid);
+      //uint key_id, const char *uuid);
+  //Encryption::tablespace_key_exists(key_id, uuid);
+  } else {
+    type = CRYPT_SCHEME_1;
+    // key_found = true; // cheat key_get_latest_version that the key exists -
+    // if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
+    uchar *key = nullptr;
+    uint key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
+    if (key_operation == FETCH_OR_GENERATE_KEY) {
+      Encryption::get_latest_tablespace_key_or_create_new_one(
+          key_id, uuid, &key_version, &key);
+    } else if (key_operation == FETCH_KEY) {
+      Encryption::get_latest_tablespace_key(key_id, uuid, &key_version, &key);
+    } else {
+      ut_ad(0);
+    }
+    if (key == nullptr) {
+      key_found = false;
+      min_key_version = ENCRYPTION_KEY_VERSION_INVALID;
+    } else {
+      key_found = true;
+      min_key_version = key_version;
+    }
+    my_free(key);
+  }
+}
 
 /**
 Get latest key version from encryption plugin.
@@ -271,11 +281,11 @@ Get latest key version from encryption plugin.
 uint fil_space_crypt_t::key_get_latest_version(void) {
   uint key_version = ENCRYPTION_KEY_VERSION_INVALID;
 
-	if (is_key_found()) { //TODO:Robert:This blocks new version from being found - if it once read - it stays the same
-		key_version = Encryption::encryption_get_latest_version(key_id);
-		srv_stats.n_key_requests.inc();
-		//found_key_version = key_version;
-	}
+  if (is_key_found()) {  // TODO:Robert:This blocks new version from being found
+                         // - if it once read - it stays the same
+    key_version = Encryption::encryption_get_latest_version(key_id, uuid);
+    srv_stats.n_key_requests.inc();
+  }
 
   return key_version;
 }
@@ -316,24 +326,16 @@ Create a fil_space_crypt_t object
 @param[in]	key_id		Used key id
 @return crypt object */
 
-static
-fil_space_crypt_t*
-fil_space_create_crypt_data(
-	uint			type,
-	fil_encryption_t	encrypt_mode,
-	uint			min_key_version,
-	uint			key_id,
-	bool			create_key = true) {
-	fil_space_crypt_t* crypt_data = NULL;
-	if (void* buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
-		crypt_data = new(buf)
-			fil_space_crypt_t(
-				type,
-				min_key_version,
-				key_id,
-				encrypt_mode,
-                                create_key);
-	}
+static fil_space_crypt_t *fil_space_create_crypt_data(
+    uint type, fil_encryption_t encrypt_mode, uint min_key_version, uint key_id,
+    const char *uuid,
+    Crypt_key_operation key_operation =
+        Crypt_key_operation::FETCH_OR_GENERATE_KEY) {
+  fil_space_crypt_t *crypt_data = NULL;
+  if (void *buf = ut_zalloc_nokey(sizeof(fil_space_crypt_t))) {
+    crypt_data = new (buf) fil_space_crypt_t(type, min_key_version, key_id,
+                                             uuid, encrypt_mode, key_operation);
+  }
 
   return crypt_data;
 }
@@ -365,13 +367,12 @@ Create a fil_space_crypt_t object
 
 @param[in]	key_id		Encryption key id
 @return crypt object */
-fil_space_crypt_t*
-fil_space_create_crypt_data(
-	fil_encryption_t	encrypt_mode,
-	uint			key_id,
-	bool			create_key) {
-
-	return (fil_space_create_crypt_data(0, encrypt_mode, ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED, key_id, create_key));
+fil_space_crypt_t *fil_space_create_crypt_data(
+    fil_encryption_t encrypt_mode, uint key_id, const char *uuid,
+    Crypt_key_operation key_operation) {
+  return (fil_space_create_crypt_data(0, encrypt_mode,
+                                      ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED,
+                                      key_id, uuid, key_operation));
 }
 
 /******************************************************************
@@ -448,16 +449,18 @@ fil_space_crypt_t *fil_space_read_crypt_data(const page_size_t &page_size,
   uint key_id = mach_read_from_4(page + offset + bytes_read);
   bytes_read += 4;
 
-	char uuid[ENCRYPTION_SERVER_UUID_LEN+1];
-	memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN+1);
-	memcpy(uuid, page + offset + bytes_read, ENCRYPTION_SERVER_UUID_LEN);
-	bytes_read += ENCRYPTION_SERVER_UUID_LEN;
-
   ut_ad(key_id != (uint)(~0));
 
-	crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
+  char uuid[ENCRYPTION_SERVER_UUID_LEN];
+  memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN);
+  memcpy(uuid, page + offset + bytes_read, ENCRYPTION_SERVER_UUID_LEN);
+  bytes_read += ENCRYPTION_SERVER_UUID_LEN;
 
-  crypt_data = fil_space_create_crypt_data(encryption, key_id,
+  fil_encryption_t encryption =
+      (fil_encryption_t)mach_read_from_1(page + offset + bytes_read);
+  bytes_read += 1;
+
+  crypt_data = fil_space_create_crypt_data(encryption, key_id, uuid,
                                            Crypt_key_operation::FETCH_KEY);
 
   /* We need to overwrite these as above function will initialize
@@ -549,21 +552,18 @@ void fil_space_crypt_t::write_page0(
   ut_ad(key_id != (uint)(~0));
   mach_write_to_4(encrypt_info_ptr, key_id);
   encrypt_info_ptr += 4;
+  ut_ad(strlen(space->crypt_data->uuid) > 0);
+  memcpy(encrypt_info_ptr, space->crypt_data->uuid, ENCRYPTION_SERVER_UUID_LEN);
+  encrypt_info_ptr += ENCRYPTION_SERVER_UUID_LEN;
   mach_write_to_1(encrypt_info_ptr, encryption);
   encrypt_info_ptr += 1;
 
   memcpy(encrypt_info_ptr, iv, CRYPT_SCHEME_1_IV_LEN);
   encrypt_info_ptr += CRYPT_SCHEME_1_IV_LEN;
 
-	mach_write_to_1(encrypt_info_ptr, a_type);
-	encrypt_info_ptr += 1;
-	mach_write_to_4(encrypt_info_ptr, a_min_key_version);
-	encrypt_info_ptr += 4;
-	ut_ad(key_id != (uint)(~0));
-	mach_write_to_4(encrypt_info_ptr, key_id);
-	encrypt_info_ptr += 4;
-	mach_write_to_1(encrypt_info_ptr, encryption);
-	encrypt_info_ptr += 1;
+  mach_write_to_1(encrypt_info_ptr,
+                  static_cast<byte>(current_encryption_rotation));
+  encrypt_info_ptr += 1;
 
   if (tablespace_key == nullptr) {
     memset(encrypt_info_ptr, 0, ENCRYPTION_KEY_LEN);
@@ -625,6 +625,10 @@ byte *fil_parse_write_crypt_data(space_id_t space_id, byte *ptr,
                                  const byte *end_ptr, ulint len) {
   ptr += 4;  // skip offset and len
 
+#ifdef UNIV_DEBUG
+  byte *start_ptr = ptr;
+#endif
+
   if (len != KERYING_ENCRYPTION_INFO_MAX_SIZE) {
     recv_sys->set_corrupt_log();
     return NULL;
@@ -650,11 +654,16 @@ byte *fil_parse_write_crypt_data(space_id_t space_id, byte *ptr,
   uint key_id = mach_read_from_4(ptr);
   ptr += 4;
 
+  char uuid[ENCRYPTION_SERVER_UUID_LEN];
+  memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN);
+  memcpy(uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
+  ptr += ENCRYPTION_SERVER_UUID_LEN;
+
   fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(ptr);
   ptr += 1;
 
   fil_space_crypt_t *crypt_data = fil_space_create_crypt_data(
-      encryption, key_id, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
+      encryption, key_id, uuid, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
   /* Need to overwrite these as above will initialize fields. */
   DBUG_ASSERT(min_key_version != ENCRYPTION_KEY_VERSION_INVALID);
   crypt_data->min_key_version = min_key_version;
@@ -674,7 +683,6 @@ byte *fil_parse_write_crypt_data(space_id_t space_id, byte *ptr,
       tablespace_key) {  // tablespace_key is all zeroes which means there is no
                          // tablepsace in mtr log
     crypt_data->set_tablespace_key(nullptr);
-    ptr += ENCRYPTION_KEY_LEN;
   } else {
     crypt_data->set_tablespace_key(tablespace_key);
   }
@@ -685,11 +693,6 @@ byte *fil_parse_write_crypt_data(space_id_t space_id, byte *ptr,
     recv_sys->set_corrupt_log();
   }
 
-	char uuid[ENCRYPTION_SERVER_UUID_LEN];
-	memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN);
-	memcpy(uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
-	ptr += ENCRYPTION_SERVER_UUID_LEN;
-
   /* update fil_space memory cache with crypt_data */
   if (fil_space_t *space = fil_space_acquire_silent(space_id)) {
     crypt_data = fil_space_set_crypt_data(space, crypt_data);
@@ -698,49 +701,9 @@ byte *fil_parse_write_crypt_data(space_id_t space_id, byte *ptr,
     fil_space_destroy_crypt_data(&crypt_data);
   }
 
-	fil_space_crypt_t* crypt_data = fil_space_create_crypt_data(encryption, key_id, false);
-	/* Need to overwrite these as above will initialize fields. */
-	crypt_data->page0_offset = offset;
-	crypt_data->min_key_version = min_key_version;
-	crypt_data->encryption = encryption;
-	memcpy(crypt_data->iv, ptr, iv_len);
-	ptr += iv_len;
-        crypt_data->encryption_rotation = (Encryption::Encryption_rotation) mach_read_from_4(ptr);
-        ptr += 4;
-        uchar tablespace_key[ENCRYPTION_KEY_LEN];
-        memcpy(tablespace_key, ptr, ENCRYPTION_KEY_LEN);
-        ptr += ENCRYPTION_KEY_LEN;
+  ut_ad((ulint)(ptr - start_ptr) == len);
 
-	if (std::search_n(tablespace_key, tablespace_key + ENCRYPTION_KEY_LEN, ENCRYPTION_KEY_LEN,
-			  0) == tablespace_key)	{	// tablespace_key is all zeroes which means there is no
-							// tablepsace in mtr log
-		crypt_data->set_tablespace_key(NULL);
-		crypt_data->set_tablespace_iv(NULL); // No tablespace_key => no iv
-		ptr += ENCRYPTION_KEY_LEN;
-	} else  {
-		crypt_data->set_tablespace_key(tablespace_key);
-		uchar tablespace_iv[ENCRYPTION_KEY_LEN];
-		memcpy(tablespace_iv, ptr, ENCRYPTION_KEY_LEN);
-		ptr += ENCRYPTION_KEY_LEN;
-		crypt_data->set_tablespace_iv(tablespace_iv);
-	}
-
-	/* update fil_space memory cache with crypt_data */
-	if (fil_space_t* space = fil_space_acquire_silent(space_id)) {
-
-		crypt_data = fil_space_set_crypt_data(space, crypt_data);
-		fil_space_release(space);
-		/* Check is used key found from encryption plugin */
-		if (crypt_data->should_encrypt()
-		    && !crypt_data->is_key_found()) {
-			ib::error() << "Key cannot be read for SPACE ID = " << space_id; //TODO: To jest zmienione w MariaDB - zmienić!
-			recv_sys->set_corrupt_log();
-		}
-	} else {
-		fil_space_destroy_crypt_data(&crypt_data);
-	}
-
-	return ptr;
+  return ptr;
 }
 
 /***********************************************************************/
@@ -884,9 +847,12 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
 
   crypt_data = fil_space_create_crypt_data(
       FIL_ENCRYPTION_DEFAULT, get_global_default_encryption_key_id_value(),
-      Crypt_key_operation::FETCH_OR_GENERATE_KEY);
+      server_uuid, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
 
-	crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_DEFAULT,  get_global_default_encryption_key_id_value(), false); // TODO:Robert : zmiana na zero key_id - będzie to trzeba zmienić
+  if (crypt_data == nullptr || crypt_data->key_found == false) {
+    mutex_exit(&fil_crypt_threads_mutex);
+    return false;
+  }
 
   crypt_data->type = CRYPT_SCHEME_UNENCRYPTED;
   crypt_data->min_key_version =

@@ -4912,46 +4912,8 @@ bool MYSQL_BIN_LOG::open_binlog(
   if (!s.is_valid()) goto err;
   s.dont_set_created = null_created_arg;
   /* Set LOG_EVENT_RELAY_LOG_F flag for relay log's FD */
-  if (is_relay_log)
-    s.set_relay_log_event();
-  if (s.write(&log_file))
-    goto err;
-  bytes_written+= s.common_header->data_written;
-
-  if (encrypt_binlog)
-  {
-    if (crypto.load_latest_binlog_key())
-    {
-      sql_print_error("Failed to fetch or create percona_binlog key from/in keyring and thus "
-                      "failed to initialize %s encryption. Have you enabled "
-                      "keyring plugin?", log_to_encrypt);
-      goto err;
-    }
-    DBUG_EXECUTE_IF("check_consecutive_binlog_key_versions",
-                    { static uint next_key_version = 1;
-                      DBUG_ASSERT(crypto.get_key_version() == next_key_version++);});
-
-    uchar nonce[Binlog_crypt_data::BINLOG_NONCE_LENGTH];
-    memset(nonce, 0, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
-    if (my_rand_buffer(nonce, sizeof(nonce)))
-      goto err;
-
-    Start_encryption_log_event sele(1, crypto.get_key_version(), nonce);
-    sele.common_footer->checksum_alg= s.common_footer->checksum_alg;
-    if (write_to_file(&sele))
-    {
-      sql_print_error("Failed to write Start_encryption event to binary log and thus "
-                      "failed to initialize %s encryption.", log_to_encrypt);
-      goto err;
-    }
-    bytes_written+= sele.common_header->data_written;
-
-    if (crypto.init_with_loaded_key(sele.crypto_scheme, nonce))
-    {
-      sql_print_error("Failed to initialize %s encryption.", log_to_encrypt);
-      goto err;
-    }
-  }
+  if (is_relay_log) s.set_relay_log_event();
+  if (write_event_to_binlog(&s)) goto err;
 
   /*
     We need to revisit this code and improve it.

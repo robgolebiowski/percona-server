@@ -812,13 +812,13 @@ static int default_encryption_key_id_validate(
     DBUG_RETURN(1);
   }
 
-	if(!Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(static_cast<uint>(intbuf))) {
-		push_warning_printf(thd, Sql_condition::SL_WARNING,
-				    HA_ERR_UNSUPPORTED,
-				    "InnoDB: cannot enable encryption, "
-				    "keyring plugin is not available");
-		DBUG_RETURN(1);
-	}
+  if (!Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
+          static_cast<uint>(intbuf), server_uuid)) {
+    push_warning_printf(thd, Sql_condition::SL_WARNING, HA_ERR_UNSUPPORTED,
+                        "InnoDB: cannot enable encryption, "
+                        "keyring plugin is not available");
+    DBUG_RETURN(1);
+  }
 
   *reinterpret_cast<ulong *>(save) = static_cast<ulong>(intbuf);
 
@@ -4673,10 +4673,9 @@ static int innodb_log_file_size_init() {
       if (source != COMPILED) {
         double server_mem = get_sys_mem();
 
-	if ((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING || srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)
-	    && !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(FIL_DEFAULT_ENCRYPTION_KEY)) {
-		sql_print_error("InnoDB: cannot enable encryption, innodb_encrypt_tables is set to value different than OFF, but "
-				"keyring plugin is not available");
+#ifdef UNIV_DEBUG_DEDICATED
+        server_mem = srv_debug_system_mem_size / GB;
+#endif /* UNIV_DEBUG_DEDICATED */
 
         if (server_mem < 1.0) {
           ;
@@ -5315,7 +5314,7 @@ static int innodb_init(void *p) {
 
   if (srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING &&
       !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
-          FIL_DEFAULT_ENCRYPTION_KEY)) {
+          FIL_DEFAULT_ENCRYPTION_KEY, server_uuid)) {
     sql_print_error(
         "InnoDB: cannot enable encryption, innodb_encrypt_tables is set to "
         "value different than OFF, but "
@@ -11267,11 +11266,8 @@ static fil_encryption_t get_encryption_mode(const char *encrypt_type,
 
 dberr_t create_table_info_t::check_tablespace_key(
     const EncryptionKeyId encryption_key_id) {
-  uint tablespace_key_version;
-  byte *tablespace_key;
-  Encryption::get_latest_tablespace_key_or_create_new_one(
-      encryption_key_id, &tablespace_key_version, &tablespace_key);
-  if (tablespace_key == nullptr) {
+  if (!Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
+          encryption_key_id, server_uuid)) {
     my_printf_error(
         ER_ILLEGAL_HA_CREATE_OPTION,
         "Seems that keyring is down. It is not possible to create encrypted "
@@ -11280,11 +11276,8 @@ dberr_t create_table_info_t::check_tablespace_key(
         MYF(0));
     return (DB_UNSUPPORTED);
   }
-  my_free(tablespace_key);
   return DB_SUCCESS;
 }
-
-	bool check_keyring_key = false;
 
 /** Enable keyring encryption for table
 @param[in,out]	table           table to have its encryption flag set
@@ -11299,25 +11292,17 @@ dberr_t create_table_info_t::enable_keyring_encryption(
       get_encryption_mode(m_create_info->encrypt_type.str,
                           m_create_info->used_fields & HA_CREATE_USED_ENCRYPT);
 
-  if (keyring_encryption_mode == FIL_ENCRYPTION_ON ||
-      (keyring_encryption_mode == FIL_ENCRYPTION_DEFAULT &&
-       Encryption::is_online_encryption_on())) {
-    DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION_FILE_PER_TABLE);
-		check_keyring_key = true;
-	}
+  bool is_encrypted = keyring_encryption_mode == FIL_ENCRYPTION_ON ||
+                      (keyring_encryption_mode == FIL_ENCRYPTION_DEFAULT &&
+                       Encryption::is_online_encryption_on());
 
-		uint tablespace_key_version;
-		byte *tablespace_key;
-		Encryption::get_latest_tablespace_key_or_create_new_one(m_create_info->encryption_key_id, &tablespace_key_version, &tablespace_key);
-		if (tablespace_key == NULL) {
-			my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-				"Seems that keyring is down. It is not possible to create encrypted tables "
-				" without keyring. Please install a keyring and try again.", MYF(0));
-			return(DB_UNSUPPORTED);
-		} else
-			my_free(tablespace_key);
-	}
-	return DB_SUCCESS;
+  if (is_encrypted)
+    DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION_FILE_PER_TABLE);
+
+  if (is_encrypted || m_create_info->was_encryption_key_id_set)
+    return check_tablespace_key(m_create_info->encryption_key_id);
+
+  return DB_SUCCESS;
 }
 
 /** Create a table definition to an InnoDB database.
@@ -12679,6 +12664,10 @@ void ha_innobase::adjust_encryption_key_id(HA_CREATE_INFO *create_info,
        strcmp(create_info->tablespace, dict_sys_t::s_file_per_table_name) ==
            0)) {
     options->set("encryption_key_id", create_info->encryption_key_id);
+    dd::String_type encryption_key_id_uuid;
+    DBUG_ASSERT(strlen(server_uuid) > 0);
+    encryption_key_id_uuid.assign(server_uuid, UUID_LENGTH);
+    options->set("encryption_key_id_uuid", encryption_key_id_uuid);
   }
 }
 
