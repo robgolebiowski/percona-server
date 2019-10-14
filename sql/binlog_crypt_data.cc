@@ -23,6 +23,7 @@
 #include <sstream>
 #include "log.h"
 #include "mysql/service_mysql_keyring.h"
+#include "mysqld.h"
 #include "system_key.h"
 #endif
 
@@ -78,14 +79,14 @@ bool Binlog_crypt_data::load_latest_binlog_key() {
 
   DBUG_EXECUTE_IF("binlog_encryption_error_on_key_fetch", { return true; });
 
-  if (my_key_fetch(PERCONA_BINLOG_KEY_NAME, &system_key_type, nullptr,
-                   reinterpret_cast<void **>(&system_key), &system_key_len) ||
-      (system_key == nullptr &&
-       (my_key_generate(PERCONA_BINLOG_KEY_NAME, "AES", nullptr, 16) ||
-        my_key_fetch(PERCONA_BINLOG_KEY_NAME, &system_key_type, nullptr,
-                     reinterpret_cast<void **>(&system_key), &system_key_len) ||
-        system_key == nullptr)))
-    return true;
+  if (my_key_fetch(PERCONA_BINLOG_KEY_NAME, &system_key_type, NULL,
+                   reinterpret_cast<void**>(&system_key), &system_key_len) ||
+      (system_key == NULL &&
+       (my_key_generate(PERCONA_BINLOG_KEY_NAME, "AES", NULL, 16) ||
+        my_key_fetch(PERCONA_BINLOG_KEY_NAME, &system_key_type, NULL,
+                     reinterpret_cast<void**>(&system_key), &system_key_len) ||
+        system_key == NULL)))
+         return true;
 
   DBUG_ASSERT(strncmp(system_key_type, "AES", 3) == 0);
   my_free(system_key_type);
@@ -109,17 +110,43 @@ bool Binlog_crypt_data::init_with_loaded_key(
   return false;
 }
 
-bool Binlog_crypt_data::init(uint sch MY_ATTRIBUTE((unused)),
-                             uint kv MY_ATTRIBUTE((unused)),
-                             const uchar *nonce MY_ATTRIBUTE((unused))) {
+bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce)
+{
+  percona_binlog_key_name_oss << PERCONA_BINLOG_KEY_NAME;
+  if (sch == 2) {
+    DBUG_ASSERT(strlen(srv_uuid) != 0);
+    percona_binlog_key_name_oss << '-' << (srv_uuid ? srv_uuid : srv_uuid);
+  }
+}
+
+std::string Binlog_crypt_data::build_binlog_key_name(const uint sch, const char *srv_uuid)
+{
+  std::ostringstream percona_binlog_key_name_oss;
+  build_binlog_key_name(percona_binlog_key_name_oss, sch, srv_uuid);
+  return percona_binlog_key_name_oss.str();
+}
+
+std::string Binlog_crypt_data::build_binlog_key_name(const uint sch, const uint kv, const char *srv_uuid)
+{
+  std::ostringstream percona_binlog_key_name_oss;
+  build_binlog_key_name(percona_binlog_key_name_oss, sch, srv_uuid);
+  percona_binlog_key_name_oss << ':' << kv;
+  return percona_binlog_key_name_oss.str();
+}
+#endif
+
+bool Binlog_crypt_data::init(uint sch, uint kv, const uchar* nonce, char* srv_uuid)
+{
+  DBUG_ASSERT(sch == 1 || strlen(srv_uuid) != 0);
+
   free_key(key, key_length);
 #ifdef MYSQL_SERVER
   char *key_type = nullptr;
   std::ostringstream percona_binlog_with_ver_ss;
   percona_binlog_with_ver_ss << PERCONA_BINLOG_KEY_NAME << ':' << kv;
-  if (my_key_fetch(percona_binlog_with_ver_ss.str().c_str(), &key_type, nullptr,
-                   reinterpret_cast<void **>(&key), &key_length) ||
-      key == nullptr)
+  if (my_key_fetch(percona_binlog_with_ver_ss.str().c_str(), &key_type, NULL,
+                   reinterpret_cast<void**>(&key), &key_length) ||
+      key == NULL)
     return true;
   DBUG_ASSERT(strncmp(key_type, "AES", 3) == 0);
   my_free(key_type);

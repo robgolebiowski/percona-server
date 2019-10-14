@@ -22,6 +22,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "uuid.h"
 
 #include "lex_string.h"
 #include "my_inttypes.h"

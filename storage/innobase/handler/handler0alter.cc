@@ -462,6 +462,48 @@ static bool innobase_spatial_exist(const TABLE *table) {
   return (false);
 }
 
+/*******************************************************************//**
+Determine if ALTER TABLE needs to rebuild the table.
+@param ha_alter_info the DDL operation
+@return whether it is necessary to rebuild the table */
+static MY_ATTRIBUTE((warn_unused_result))
+bool
+innobase_need_rebuild(
+/*==================*/
+	const Alter_inplace_info*	ha_alter_info,
+	const TABLE*			old_table)
+
+{
+	Alter_inplace_info::HA_ALTER_FLAGS alter_inplace_flags =
+		ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE);
+
+	if ((
+		Encryption::is_no(ha_alter_info->create_info->encrypt_type.str) &&
+		(Encryption::is_keyring(old_table->s->encrypt_type.str) || Encryption::is_empty(old_table->s->encrypt_type.str))
+	    ) ||
+	    (
+		Encryption::is_keyring(ha_alter_info->create_info->encrypt_type.str) &&
+		!Encryption::is_keyring(old_table->s->encrypt_type.str)
+	    ) ||
+		ha_alter_info->create_info->encryption_key_id != old_table->s->encryption_key_id
+
+	)
+		return true;
+
+	if (alter_inplace_flags
+	    == Alter_inplace_info::CHANGE_CREATE_OPTION
+	    && !(ha_alter_info->create_info->used_fields
+		 & (HA_CREATE_USED_ROW_FORMAT
+		    | HA_CREATE_USED_KEY_BLOCK_SIZE
+		    | HA_CREATE_USED_TABLESPACE))) {
+		/* Any other CHANGE_CREATE_OPTION than changing
+		ROW_FORMAT, KEY_BLOCK_SIZE or TABLESPACE can be done
+		without rebuilding the table. */
+		return(false);
+	}
+
+	return(!!(ha_alter_info->handler_flags & INNOBASE_ALTER_REBUILD));
+}
 /** Check if virtual column in old and new table are in order, excluding
 those dropped column. This is needed because when we drop a virtual column,
 ALTER_VIRTUAL_COLUMN_ORDER is also turned on, so we can't decide if this
@@ -4636,22 +4678,25 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
         my_free(tablespace_key);
       }
 
-      if (mode == FIL_ENCRYPTION_ON ||
-          (mode == FIL_ENCRYPTION_DEFAULT &&
-           srv_default_table_encryption ==
-               DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING)) {
-        DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_ENCRYPTION_FILE_PER_TABLE);
-      }
-    } else if (!(ctx->new_table->flags2 & DICT_TF2_USE_FILE_PER_TABLE) &&
-               ha_alter_info->create_info->encrypt_type.length > 0 &&
-               Encryption::is_master_key_encryption(encrypt) &&
-               !DICT_TF2_FLAG_SET(ctx->old_table,
-                                  DICT_TF2_ENCRYPTION_FILE_PER_TABLE)) {
-      dict_mem_table_free(ctx->new_table);
-      my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
-      goto new_clustered_failed;
-    } else if (Encryption::is_master_key_encryption(encrypt)) {
-      /* Set the encryption flag. */
+				if (master_key == NULL) {
+					dict_mem_table_free(ctx->new_table);
+					my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+					MYF(0));
+						goto new_clustered_failed;
+				} else {
+					my_free(master_key);
+				}
+			} else if (Encryption::is_keyring(old_table->s->encrypt_type.str) &&
+				   (old_table->s->encryption_key_id != ha_alter_info->create_info->encryption_key_id || Encryption::is_no(encrypt))) {
+				// it is KEYRING encryption - check if old's table encryption key is available 
+				if (Encryption::tablespace_key_exists(old_table->s->encryption_key_id) == false) {
+					my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+							"Cannot find key to decrypt table to ALTER. Please make sure that keyring is installed "
+							" and key used to encrypt table is available.", MYF(0));
+					goto new_clustered_failed;
+				}
+			}
+		}
 
       /* Check if keyring is ready. */
       if (!Encryption::check_keyring()) {
@@ -4665,7 +4710,16 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
       }
     }
 
-    mutex_exit(&dict_sys->mutex);
+		//TODO: Add checking for error returned from keyring function, not only checking if tablespace is null
+		Encryption::get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
+		if (tablespace_key == NULL) {
+			dict_mem_table_free(ctx->new_table);
+			my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+					"Seems that keyring is down. It is not possible to encrypt table"
+					" without keyring. Please install a keyring and try again.", MYF(0));
+			goto new_clustered_failed;
+		} else
+			my_free(tablespace_key);
 
     keyring_encryption_key_id.was_encryption_key_id_set =
         ha_alter_info->create_info->was_encryption_key_id_set;

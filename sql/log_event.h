@@ -1443,6 +1443,7 @@ class Query_log_event : public virtual binary_log::Query_event,
   data required to decrypt (except the actual key).
 
   For binlog cryptoscheme 1: key version, and nonce for iv generation.
+  For binlog cryptoscheme 2: key version, nonce for iv generation, server's uuid
 */
 
 static_assert(
@@ -1455,14 +1456,27 @@ class Start_encryption_log_event final
  public:
 #ifdef MYSQL_SERVER
   Start_encryption_log_event(uint crypto_scheme_arg, uint key_version_arg,
-                             const uchar *nonce_arg) noexcept
-      : Start_encryption_event(crypto_scheme_arg, key_version_arg, nonce_arg),
-        Log_event(header(), footer(), Log_event::EVENT_NO_CACHE,
-                  Log_event::EVENT_IMMEDIATE_LOGGING) {
+                             const uchar* nonce_arg)
+  : Binary_log_event(binary_log::START_ENCRYPTION_EVENT),
+    Log_event(header(), footer(), Log_event::EVENT_NO_CACHE, Log_event::EVENT_IMMEDIATE_LOGGING),
+    crypto_scheme(crypto_scheme_arg), key_version(key_version_arg)
+  {
     DBUG_ASSERT(crypto_scheme == 1);
-    common_header->set_is_valid(crypto_scheme == 1);
+    is_valid_param= crypto_scheme == 1;
+    memcpy(nonce, nonce_arg, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
+    memset(uuid, 0, sizeof(uuid));
+    memcpy(uuid, srv_uuid, Binlog_crypt_data::BINLOG_UUID_LENGTH);
   }
 
+  bool write_data_body(IO_CACHE* file)
+  {
+    uchar scheme_buf= crypto_scheme;
+    uchar key_version_buf[Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH];
+    int4store(key_version_buf, key_version);
+    return wrapper_my_b_safe_write(file, (uchar*)&scheme_buf, sizeof(scheme_buf)) || 
+           wrapper_my_b_safe_write(file, (uchar*)key_version_buf, sizeof(key_version_buf)) ||
+           wrapper_my_b_safe_write(file, (uchar*)nonce, Binlog_crypt_data::BINLOG_NONCE_LENGTH);
+  }
 #else
   void print(FILE *file, PRINT_EVENT_INFO *print_event_info) const override;
 #endif
@@ -1470,11 +1484,17 @@ class Start_encryption_log_event final
   Start_encryption_log_event(const char *buf,
                              const Format_description_event *description_event);
 
-  Log_event_type get_type_code() noexcept {
-    return binary_log::START_5_7_ENCRYPTION_EVENT;
+  Log_event_type get_type_code() { return binary_log::START_ENCRYPTION_EVENT; }
+
+  size_t get_data_size()
+  {
+    return Binlog_crypt_data::BINLOG_CRYPTO_SCHEME_LENGTH +
+           Binlog_crypt_data::BINLOG_KEY_VERSION_LENGTH +
+           Binlog_crypt_data::BINLOG_NONCE_LENGTH;
   }
 
   size_t get_data_size() noexcept override { return EVENT_DATA_LENGTH; }
+  char uuid[Binlog_crypt_data::BINLOG_UUID_LENGTH + 1];
 
  protected:
 #ifdef MYSQL_SERVER

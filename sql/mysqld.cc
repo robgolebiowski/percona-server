@@ -5903,6 +5903,20 @@ static int init_server_components() {
 
   /*
     Each server should have one UUID. We will create it automatically, if it
+    does not exist.
+   */
+
+  if (init_server_auto_options())
+  {
+    sql_print_error("Initialization of the server's UUID failed because it could"
+                    " not be read from the auto.cnf file. If this is a new"
+                    " server, the initialization failed because it was not"
+                    " possible to generate a new UUID.");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  /*
+    Each server should have one UUID. We will create it automatically, if it
     does not exist. It should be initialized before opening binlog file. Because
     server's uuid will be stored into the new binlog file.
   */
@@ -6608,8 +6622,18 @@ int mysqld_main(int argc, char **argv)
 
   if (init_server_components()) unireg_abort(MYSQLD_ABORT_EXIT);
 
-  if (!server_id_supplied)
-    LogErr(INFORMATION_LEVEL, ER_WARN_NO_SERVERID_SPECIFIED);
+  /*
+    Each server should have one UUID. We will create it automatically, if it
+    does not exist.
+   */
+  if (init_server_auto_options())
+  {
+    sql_print_error("Initialization of the server's UUID failed because it could"
+                    " not be read from the auto.cnf file. If this is a new"
+                    " server, the initialization failed because it was not"
+                    " possible to generate a new UUID.");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
 
   /* Server generates uuid after innodb is initialized. But during
   initialization, if tablespaces like system, redo, temporary are encrypted,

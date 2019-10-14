@@ -1779,12 +1779,14 @@ static bool load_key_needed_for_decryption(const IORequest &type,
 
     byte *key_read;
 
-    size_t key_len;
-    if (Encryption::get_tablespace_key(encryption.m_key_id,
-                                       key_version_read_from_page, &key_read,
-                                       &key_len) == false) {
-      return false;
-    }
+		size_t key_len;
+		if (Encryption::get_tablespace_key(encryption.m_key_id,
+						   key_version_read_from_page,
+						   &key_read, &key_len) == false)
+		{
+			return false;
+			ut_ad(0);
+		}
 
     // For test
     if (key_version_read_from_page == encryption.m_key_version) {
@@ -8580,17 +8582,28 @@ bool Encryption::can_page_be_keyring_encrypted(byte *page) {
   return can_page_be_keyring_encrypted(mach_read_from_2(page + FIL_PAGE_TYPE));
 }
 
-uint Encryption::encryption_get_latest_version(uint key_id) {
+void
+Encryption::fill_key_name(char *key_name, uint key_id)
+{
 #ifndef UNIV_INNOCHECKSUM
   uint tablespace_key_version = ENCRYPTION_KEY_VERSION_INVALID;
   byte *tablespace_key = nullptr;
 
-  get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
+	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    "%s-%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    key_id);
+#endif
+}
 
-  if (tablespace_key == NULL) return ENCRYPTION_KEY_VERSION_INVALID;
+void
+Encryption::fill_key_name(char* key_name, uint key_id, uint key_version)
+{
+#ifndef UNIV_INNOCHECKSUM
+	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
-  my_free(tablespace_key);
-  return tablespace_key_version;
+	ut_snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN,
+		    "%s-%u:%u", ENCRYPTION_PERCONA_SYSTEM_KEY_PREFIX,
+		    key_id, key_version);
 #endif
   return ENCRYPTION_KEY_VERSION_INVALID;
 }
@@ -8609,9 +8622,7 @@ void Encryption::create_master_key(byte **master_key) {
     memcpy(s_uuid, server_uuid, sizeof(s_uuid) - 1);
   }
 
-  /* Generate new master key */
-  snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%s-" ULINTPF,
-           ENCRYPTION_MASTER_KEY_PRIFIX, s_uuid, s_master_key_id + 1);
+	fill_key_name(key_name, key_id);
 
   /* We call key ring API to generate master key here. */
   int ret = my_key_generate(key_name, "AES", nullptr, ENCRYPTION_KEY_LEN);
@@ -8692,11 +8703,17 @@ void Encryption::get_master_key(ulint master_key_id, char *srv_uuid,
 #endif /* UNIV_ENCRYPT_DEBUG */
 }
 
-/** Current master key id */
-ulint Encryption::s_master_key_id = 0;
+bool
+Encryption::get_tablespace_key(uint key_id,
+			       uint tablespace_key_version,
+			       byte** tablespace_key,
+			       size_t *key_len)
+{
+	bool result = true;
+#ifndef UNIV_INNOCHECKSUM
+	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-/** Current uuid of server instance */
-char Encryption::s_uuid[ENCRYPTION_SERVER_UUID_LEN + 1] = {0};
+	fill_key_name(key_name, key_id, tablespace_key_version);
 
 /** Get current master key and master key id
 @param[in,out]	master_key_id	master key id
@@ -8725,12 +8742,17 @@ void Encryption::get_master_key(ulint *master_key_id, byte **master_key) {
     and store it to key ring. */
     memcpy(s_uuid, server_uuid, sizeof(s_uuid) - 1);
 
-    /* Prepare the server s_uuid. */
-    snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%s-1",
-             ENCRYPTION_MASTER_KEY_PRIFIX, s_uuid);
+// tablespace_key_version as output parameter
+void
+Encryption::get_latest_tablespace_key(uint key_id,
+				      uint *tablespace_key_version,
+				      byte** tablespace_key)
+{
+#ifndef UNIV_INNOCHECKSUM
+	size_t	key_len;
+	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 
-    /* We call key ring API to generate master key here. */
-    ret = my_key_generate(key_name, "AES", nullptr, ENCRYPTION_KEY_LEN);
+	fill_key_name(key_name, key_id);
 
     /* We call key ring API to get master key here. */
     ret = my_key_fetch(key_name, &key_type, nullptr,
@@ -8746,15 +8768,12 @@ void Encryption::get_master_key(ulint *master_key_id, byte **master_key) {
 
       ut_print_buf(msg, *master_key, key_len);
 
-      ib::info(ER_IB_MSG_834)
-          << "Generated new master key: {" << msg.str() << "}";
-    }
-#endif /* UNIV_ENCRYPT_DEBUG */
-  } else {
-    *master_key_id = s_master_key_id;
+bool Encryption::tablespace_key_exists(uint key_id)
+{
+	uint tablespace_key_version;
+	byte *tablespace_key; 
 
-    snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%s-" ULINTPF,
-             ENCRYPTION_MASTER_KEY_PRIFIX, s_uuid, *master_key_id);
+	get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
 
     /* We call key ring API to get master key here. */
     ret = my_key_fetch(key_name, &key_type, nullptr,
@@ -8768,12 +8787,12 @@ void Encryption::get_master_key(ulint *master_key_id, byte **master_key) {
         my_free(key_type);
       }
 
-      snprintf(key_name, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN, "%s-%lu-" ULINTPF,
-               ENCRYPTION_MASTER_KEY_PRIFIX, server_id, *master_key_id);
+bool Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(uint key_id)
+{
+	uint tablespace_key_version;
+	byte *tablespace_key;
 
-      ret = my_key_fetch(key_name, &key_type, nullptr,
-                         reinterpret_cast<void **>(master_key), &key_len);
-    }
+	get_latest_tablespace_key_or_create_new_one(key_id, &tablespace_key_version, &tablespace_key);
 
 #ifdef UNIV_ENCRYPT_DEBUG
     if (ret == 0 && *master_key != nullptr) {
@@ -8781,17 +8800,22 @@ void Encryption::get_master_key(ulint *master_key_id, byte **master_key) {
 
       ut_print_buf(msg, *master_key, key_len);
 
-      ib::info(ER_IB_MSG_835) << "Fetched master key: " << *master_key_id
-                              << ": {" << msg.str() << "}";
-    }
-#endif /* UNIV_ENCRYPT_DEBUG */
-  }
+void
+Encryption::get_latest_tablespace_key_or_create_new_one(uint key_id,
+							uint *tablespace_key_version,
+							byte** tablespace_key)
+{
+	get_latest_tablespace_key(key_id, tablespace_key_version, tablespace_key);
+	if (*tablespace_key == NULL) {
+		Encryption::create_tablespace_key(tablespace_key, key_id);
+		*tablespace_key_version = 1;
+	}
+}
 
-  if (ret != 0) {
-    *master_key = nullptr;
-    ib::error(ER_IB_MSG_836) << "Encryption can't find master key, please check"
-                             << " the keyring plugin is loaded.";
-  }
+bool Encryption::is_keyring_alive()
+{
+	return Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(0); //DEFAULT ENCRYPTION KEY
+}
 
   if (key_type != nullptr) {
     my_free(key_type);
@@ -8815,12 +8839,13 @@ bool Encryption::fill_encryption_info(byte *key, byte *iv, byte *encrypt_info,
   byte *master_key = nullptr;
   ulint master_key_id;
 
-  /* Get master key from key ring. For bootstrap, we use a default
-  master key which master_key_id is 0. */
-  if (is_boot) {
-    master_key_id = 0;
+uint Encryption::encryption_get_latest_version(uint key_id)
+{
+#ifndef UNIV_INNOCHECKSUM
+	uint tablespace_key_version;
+	byte *tablespace_key; 
 
-    master_key = static_cast<byte *>(ut_zalloc_nokey(ENCRYPTION_KEY_LEN));
+	get_latest_tablespace_key(key_id, &tablespace_key_version, &tablespace_key);
 
     ut_ad(ENCRYPTION_KEY_LEN >= sizeof(ENCRYPTION_DEFAULT_MASTER_KEY));
 
@@ -10066,7 +10091,14 @@ bool os_dblwr_encrypt_page(fil_space_t *space, page_t *in_page,
   write_request.encryption_key(space->encryption_key, space->encryption_klen,
                                false, space->encryption_iv, 0, 0, nullptr);
 
-  write_request.encryption_algorithm(Encryption::AES);
+	write_request.encryption_key(
+		space->encryption_key,
+		space->encryption_klen,
+		false,
+		space->encryption_iv,
+		0, 0, NULL, NULL);
+	write_request.encryption_algorithm(
+		Encryption::AES);
 
   page_size_t page_size(space->flags);
 
@@ -10111,7 +10143,12 @@ dberr_t os_dblwr_decrypt_page(fil_space_t *space, page_t *page) {
   decrypt_request.encryption_key(space->encryption_key, space->encryption_klen,
                                  false, space->encryption_iv, 0, 0, nullptr);
 
-  decrypt_request.encryption_algorithm(Encryption::AES);
+	decrypt_request.encryption_key(
+			space->encryption_key,
+			space->encryption_klen,
+			false,
+			space->encryption_iv,
+			0, 0, NULL, NULL);
 
   Encryption encryption(decrypt_request.encryption_algorithm());
 

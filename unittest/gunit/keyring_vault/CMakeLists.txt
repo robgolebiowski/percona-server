@@ -71,8 +71,29 @@ ADD_DEPENDENCIES(keyring_vault_test GenError)
 
 SET(ALL_KEYRING_VAULT_TESTS)
 FOREACH(test ${TESTS})
-  LIST(APPEND ALL_KEYRING_VAULT_TESTS ${test}-t.cc)
-ENDFOREACH()
+    SET(SRC_FILES ${test}-t.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_iterator.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_key_adapter.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_keys_list.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_key.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_io.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_base64.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_curl.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_parser.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_credentials.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_credentials_parser.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring_vault/vault_keys_container.cc
+            ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
+            ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring_vault/vault_mount.cc
+            ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring/uuid.cc
+            )
+    IF(WIN32)
+        LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
+    ENDIF()
+    ADD_EXECUTABLE(${test}-t ${SRC_FILES})
 
 IF (MERGE_UNITTESTS)
 

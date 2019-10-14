@@ -698,20 +698,13 @@ struct TABLE_SHARE {
   KEY *key_info{nullptr};    /* data of keys defined for the table */
   uint *blob_field{nullptr}; /* Index to blobs in Field arrray*/
 
-  uchar *default_values{nullptr};      /* row with default values */
-  LEX_STRING comment{nullptr, 0};      /* Comment about table */
-  LEX_STRING compress{nullptr, 0};     /* Compression algorithm */
-  LEX_STRING encrypt_type{nullptr, 0}; /* encryption algorithm */
-
-  /** Secondary storage engine. */
-  LEX_STRING secondary_engine{nullptr, 0};
-
-  uint32_t encryption_key_id{0};
-  bool was_encryption_key_id_set{false};
-  bool explicit_encryption{false};
-
-  const CHARSET_INFO *table_charset{
-      nullptr}; /* Default charset of string fields */
+  uchar	*default_values;		/* row with default values */
+  LEX_STRING comment;			/* Comment about table */
+  LEX_STRING compress;			/* Compression algorithm */
+  LEX_STRING encrypt_type;		/* encryption algorithm */
+  uint32_t encryption_key_id;
+  bool was_encryption_key_id_set;
+  const CHARSET_INFO *table_charset;	/* Default charset of string fields */
 
   MY_BITMAP all_set;
   /*

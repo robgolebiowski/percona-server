@@ -55,19 +55,11 @@ LIST(APPEND SRC_FILES
   ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_iterator.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_key_adapter.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/converter.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/digest.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/checker/checker.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/checker/checker_factory.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/checker/checker_ver_1_0.cc
-  ${CMAKE_SOURCE_DIR}/plugin/keyring/checker/checker_ver_2_0.cc
-  ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring/buffered_file_io_10.cc
-  ${CMAKE_SOURCE_DIR}/unittest/gunit/keyring/psi_memory_key.cc
-  )
+       ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
+       ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
+       ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
+       ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
+       )
 
 IF(WIN32)
   LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
@@ -106,9 +98,21 @@ IF (MERGE_UNITTESTS)
 
 ENDIF(MERGE_UNITTESTS)
 
-FOREACH(test ${TESTS})
-  MYSQL_ADD_EXECUTABLE(${test}-t ${test}-t.cc SKIP_INSTALL ${EXCLUDE_FROM_ALL})
-  TARGET_LINK_LIBRARIES(${test}-t keyring_test)
+  FOREACH(test ${TESTS})
+    SET(SRC_FILES ${test}-t.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keyring_key.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/keys_container.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_keys_container.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/common/system_key_adapter.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/buffered_file_io.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/file_io.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/buffer.cc
+        ${CMAKE_SOURCE_DIR}/plugin/keyring/hash_to_buffer_serializer.cc
+        )
+    IF(WIN32)
+      LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
+    ENDIF()
+    ADD_EXECUTABLE(${test}-t ${SRC_FILES})
 
   TARGET_LINK_LIBRARIES(${test}-t
     gunit_large strings dbug mysys sql_main sql_gis sql_dd)

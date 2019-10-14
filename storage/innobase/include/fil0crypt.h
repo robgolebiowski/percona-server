@@ -159,14 +159,16 @@ enum Crypt_key_operation { FETCH_KEY, FETCH_OR_GENERATE_KEY };
 
 struct fil_space_crypt_t {
  public:
-  /** Constructor. Does not initialize the members!
-  The object is expected to be placed in a buffer that
-  has been zero-initialized. */
-  fil_space_crypt_t(uint new_type, uint new_min_key_version, uint new_key_id,
-                    fil_encryption_t new_encryption,
-                    Crypt_key_operation key_operation,
-                    Encryption_rotation encryption_rotation =
-                        Encryption_rotation::NO_ROTATION);
+	/** Constructor. Does not initialize the members!
+	The object is expected to be placed in a buffer that
+	has been zero-initialized. */
+	fil_space_crypt_t(
+		uint new_type,
+		uint new_min_key_version,
+		uint new_key_id,
+		fil_encryption_t new_encryption,
+                bool create_key, // is used when we have a new tablespace to encrypt and is not used when we read a crypto from page0
+                Encryption::Encryption_rotation encryption_rotation = Encryption::NO_ROTATION);
 
   /** Destructor */
   ~fil_space_crypt_t() {
@@ -281,6 +283,8 @@ struct fil_space_crypt_t {
   unsigned int type;
 
   std::list<byte *> fetched_keys;  // TODO: temp for test
+        char uuid[ENCRYPTION_SERVER_UUID_LEN+1];
+
 };
 
 /** Status info about encryption */
@@ -385,11 +389,12 @@ Create a fil_space_crypt_t object
 
 @param[in]	key_id		Encryption key id
 @return crypt object */
-fil_space_crypt_t *fil_space_create_crypt_data(
-    fil_encryption_t encrypt_mode, uint key_id,
-    Crypt_key_operation key_operation =
-        Crypt_key_operation::FETCH_OR_GENERATE_KEY)
-    MY_ATTRIBUTE((warn_unused_result));
+fil_space_crypt_t*
+fil_space_create_crypt_data(
+	fil_encryption_t	encrypt_mode,
+	uint			key_id,
+        bool                    create_key = true)
+	MY_ATTRIBUTE((warn_unused_result));
 
 /******************************************************************
 Merge fil_space_crypt_t object

@@ -22,6 +22,7 @@
 #include "plugin/keyring/common/keyring_key.h"
 #include "plugin/keyring/common/system_keys_container.h"
 #include "system_key.h"
+#include "uuid.h"
 
 namespace keyring__system_keys_container_unittest {
 using namespace keyring;
