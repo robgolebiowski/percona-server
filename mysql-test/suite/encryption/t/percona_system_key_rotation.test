@@ -52,6 +52,9 @@ UNINSTALL PLUGIN keyring_file;
 
 DROP TABLE t1;
 
+# create a fresh keyring on restart
+--remove_file $MYSQL_TMP_DIR/mysecret_keyring
+
 # cleanup, restore keyring_file and keyring_file_data variable
 --let $restart_parameters=restart:
 --source include/restart_mysqld.inc
