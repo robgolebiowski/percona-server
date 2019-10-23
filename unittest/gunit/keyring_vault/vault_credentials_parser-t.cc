@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include "mock_logger.h"
 #include "vault_credentials_parser.h"
+#include "vault_credentials.h"
 #include <fstream>
 #include "test_utils.h"
 #include "i_keys_container.h"
@@ -59,10 +60,10 @@ namespace keyring__vault_credentials_parser_unittest
     std::string file_url = "/.there_no_such_file";
     Vault_credentials vault_credentials;
     EXPECT_TRUE(vault_credentials_parser.parse(file_url, &vault_credentials));
-    EXPECT_TRUE(vault_credentials["vault_url"].empty());
-    EXPECT_TRUE(vault_credentials["token"].empty());
-    EXPECT_TRUE(vault_credentials["secret_mount_point"].empty());
-    EXPECT_TRUE(vault_credentials["vault_ca"].empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_url").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("token").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("secret_mount_point").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_ca").empty());
 
     ASSERT_TRUE(token.empty());
   }
@@ -83,10 +84,10 @@ namespace keyring__vault_credentials_parser_unittest
 
     Vault_credentials vault_credentials;
     EXPECT_TRUE(vault_credentials_parser.parse(file_url, &vault_credentials));
-    EXPECT_TRUE(vault_credentials["vault_url"].empty());
-    EXPECT_TRUE(vault_credentials["token"].empty());
-    EXPECT_TRUE(vault_credentials["secret_mount_point"].empty());
-    EXPECT_TRUE(vault_credentials["vault_ca"].empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_url").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("token").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("secret_mount_point").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_ca").empty());
   }
 
   TEST_F(Vault_credentials_parser_test, ParseFileWithoutSecretMountPoint)
@@ -109,10 +110,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_TRUE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_TRUE(vault_credentials["vault_url"].empty());
-    EXPECT_TRUE(vault_credentials["token"].empty());
-    EXPECT_TRUE(vault_credentials["secret_mount_point"].empty());
-    EXPECT_TRUE(vault_credentials["vault_ca"].empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_url").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("token").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("secret_mount_point").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_ca").empty());
   }
 
   TEST_F(Vault_credentials_parser_test, ParseFileWithoutVaultURL)
@@ -135,10 +136,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_TRUE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_TRUE(vault_credentials["vault_url"].empty());
-    EXPECT_TRUE(vault_credentials["token"].empty());
-    EXPECT_TRUE(vault_credentials["secret_mount_point"].empty());
-    EXPECT_TRUE(vault_credentials["vault_ca"].empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_url").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("token").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("secret_mount_point").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_ca").empty());
   }
 
   TEST_F(Vault_credentials_parser_test, ParseFileWithoutToken)
@@ -161,10 +162,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_TRUE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_TRUE(vault_credentials["vault_url"].empty());
-    EXPECT_TRUE(vault_credentials["token"].empty());
-    EXPECT_TRUE(vault_credentials["secret_mount_point"].empty());
-    EXPECT_TRUE(vault_credentials["vault_ca"].empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_url").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("token").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("secret_mount_point").empty());
+    EXPECT_TRUE(vault_credentials.get_credential("vault_ca").empty());
   }
 
   TEST_F(Vault_credentials_parser_test, ParseFileWithoutVaultCA)
@@ -185,10 +186,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_FALSE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
-    EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
-    EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
-    EXPECT_TRUE(vault_credentials["vault_ca"].empty());
+    EXPECT_STREQ(vault_credentials.get_credential("vault_url").c_str(), "http://127.0.0.1:8200");
+    EXPECT_STREQ(vault_credentials.get_credential("secret_mount_point").c_str(), "secret");
+    EXPECT_STREQ(vault_credentials.get_credential("token").c_str(), "123-123-123");
+    EXPECT_TRUE(vault_credentials.get_credential("vault_ca").empty());
   }
 
   TEST_F(Vault_credentials_parser_test, ParseFileWithCorrectCredentials)
@@ -209,10 +210,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_FALSE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
-    EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
-    EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
-    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/path");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_url").c_str(), "http://127.0.0.1:8200");
+    EXPECT_STREQ(vault_credentials.get_credential("secret_mount_point").c_str(), "secret");
+    EXPECT_STREQ(vault_credentials.get_credential("token").c_str(), "123-123-123");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_ca").c_str(), "/some/path");
   }
 
   TEST_F(Vault_credentials_parser_test, ParseFileWithCorrectCredentialsSpaces)
@@ -233,10 +234,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_FALSE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
-    EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
-    EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
-    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/path");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_url").c_str(), "http://127.0.0.1:8200");
+    EXPECT_STREQ(vault_credentials.get_credential("secret_mount_point").c_str(), "secret");
+    EXPECT_STREQ(vault_credentials.get_credential("token").c_str(), "123-123-123");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_ca").c_str(), "/some/path");
   }
 
   TEST_F(Vault_credentials_parser_test, ParseFileWithCorrectCredentialsTrailingSpaces)
@@ -257,10 +258,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_FALSE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http://127.0.0.1:8200");
-    EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "secret");
-    EXPECT_STREQ(vault_credentials["token"].c_str(), "123-123-123");
-    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/path");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_url").c_str(), "http://127.0.0.1:8200");
+    EXPECT_STREQ(vault_credentials.get_credential("secret_mount_point").c_str(), "secret");
+    EXPECT_STREQ(vault_credentials.get_credential("token").c_str(), "123-123-123");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_ca").c_str(), "/some/path");
   }
 
   TEST_F(Vault_credentials_parser_test,ParseFileWithValuesWithSpacesInIt)
@@ -281,10 +282,10 @@ namespace keyring__vault_credentials_parser_unittest
     Vault_credentials vault_credentials;
     EXPECT_FALSE(vault_credentials_parser.parse(file_url, &vault_credentials));
 
-    EXPECT_STREQ(vault_credentials["vault_url"].c_str(), "http: //127 .0.0.1: 8200");
-    EXPECT_STREQ(vault_credentials["secret_mount_point"].c_str(), "s-e c-r -e t");
-    EXPECT_STREQ(vault_credentials["token"].c_str(), "12000 3-10  23- 123");
-    EXPECT_STREQ(vault_credentials["vault_ca"].c_str(), "/some/  path");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_url").c_str(), "http: //127 .0.0.1: 8200");
+    EXPECT_STREQ(vault_credentials.get_credential("secret_mount_point").c_str(), "s-e c-r -e t");
+    EXPECT_STREQ(vault_credentials.get_credential("token").c_str(), "12000 3-10  23- 123");
+    EXPECT_STREQ(vault_credentials.get_credential("vault_ca").c_str(), "/some/  path");
   }
 }
 

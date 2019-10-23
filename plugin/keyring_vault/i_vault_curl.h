@@ -29,9 +29,11 @@ public:
   virtual bool init(const Vault_credentials &vault_credentials) = 0;
 
   virtual bool list_keys(Secure_string *response) = 0;
+  virtual bool list_mount_points(Secure_string *response) = 0;
   virtual bool write_key(const Vault_key &key, Secure_string *response) = 0;
   virtual bool read_key(const Vault_key &key, Secure_string *response) = 0;
   virtual bool delete_key(const Vault_key &key, Secure_string *response) = 0;
+  virtual void set_vault_version_2() = 0;
   virtual void set_timeout(uint timeout) = 0;
 
   virtual ~IVault_curl() {};

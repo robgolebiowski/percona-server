@@ -149,11 +149,44 @@ std::string Vault_curl::get_error_from_curl(CURLcode curl_code)
   return ss.str();
 }
 
+void Vault_curl::setup_url_v2(const Vault_credentials &vault_credentials) {
+  //Secure_string secret_mount_point_path = get_credential(vault_credentials, "secret_mount_point");
+  Secure_string vault_url = vault_credentials.get_credential("vault_url");
+  //std::size_t slash_separator = secret_mount_point_path.find('/');
+  //Secure_string mount_point = secret_mount_point_path.substr(0, slash_separator); 
+  //Secure_string directory = secret_mount_point_path.substr(slash_separator);
+
+  //Secure_string mount_point = vault_credentials.get_raw_secret_mount_point();
+  //Secure_string directory = secret_mount_point_path.substr(slash_separator);
+  Secure_ostringstream oss_metadata, oss_data;
+  oss_metadata << vault_url << vault_credentials.get_raw_secret_mount_point() << "/metadata/"
+               << vault_credentials.get_raw_directory();
+  oss_data << vault_url << vault_credentials.get_raw_secret_mount_point() << "/data/"
+           << vault_credentials.get_raw_directory();
+
+  secret_url_v2.secret_url_metadata = oss_metadata.str();
+  secret_url_v2.secret_url_data = oss_data.str();
+
+
+  //oss_data << vau
+
+    //secret_url_v2.secret_url_metadata = vault_url + vault_credentials.get_raw_secret() + "/metadata/" + directory;
+    //secret_url_v2.secret_url_data = vault_url + mount_point + "/data/" + directory;
+  //}
+  //secret_url_v2.secret_url_metadata = vault_url + secret_mount_point_path + "/metadata";
+  //secret_url_v2.secret_url_data = vault_url + secret_mount_point_path + "/data";
+}
+
 bool Vault_curl::init(const Vault_credentials &vault_credentials)
 {
-  this->token_header = "X-Vault-Token:" + get_credential(vault_credentials, "token");
-  this->vault_url = get_credential(vault_credentials, "vault_url") + "/v1/" + get_credential(vault_credentials, "secret_mount_point");
-  this->vault_ca = get_credential(vault_credentials, "vault_ca");
+  this->token_header = "X-Vault-Token:" + vault_credentials.get_credential("token");
+  this->vault_url = vault_credentials.get_credential("vault_url");
+  this->secret_url_data = vault_credentials.get_credential("vault_url") + "/v1/" + vault_credentials.get_credential("secret_mount_point");
+  this->secret_url_metadata = this->secret_url_data;
+  setup_url_v2(vault_credentials);
+  
+  //this->vault_mounts_url = get_credential(vault_credentials, "secret_url") + "/v1/sys/mounts";
+  this->vault_ca = vault_credentials.get_credential("vault_ca");
   if (this->vault_ca.empty())
   {
     logger->log(MY_WARNING_LEVEL, "There is no vault_ca specified in keyring_vault's configuration file. "
@@ -161,7 +194,47 @@ bool Vault_curl::init(const Vault_credentials &vault_credentials)
                                   "which you intend to connect to Vault."); 
   }
   my_timer_init(&curl_timer_info);
+
+  //get_kv_version()
+
   return false;
+}
+
+void Vault_curl::set_vault_version_2() {
+  this->secret_url_data = secret_url_v2.secret_url_data;
+  this->secret_url_metadata = secret_url_v2.secret_url_metadata;
+}
+
+bool Vault_curl::list_mount_points(Secure_string *response) {
+
+  CURLcode curl_res = CURLE_OK;
+  long http_code = 0;
+
+  Thd_wait_end_guard thd_wait_end_guard;
+  (void)thd_wait_end_guard; // silence unused variable error
+
+  CURL *curl = curl_easy_init();
+  if (curl == NULL) {
+    logger->log(MY_ERROR_LEVEL, "Cannot initialize curl session");
+    return true;
+  }
+  Curl_session_guard curl_session_guard(curl);
+
+  if (setup_curl_session(curl) ||
+      //(curl_res = curl_easy_setopt(curl, CURLOPT_URL, (secret_url + "?list=true").c_str())) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + "/v1/sys/mounts").c_str())) != CURLE_OK ||
+      (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
+      (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code)) != CURLE_OK) {
+    logger->log(MY_ERROR_LEVEL,
+                get_error_from_curl(curl_res).c_str());
+    return true;
+  }
+  if (http_code == 404) {
+    *response = ""; // no mount points found
+    return false; 
+  }
+  *response = read_data_ss.str();
+  return http_code / 100 != 2; // 2** are success return codes
 }
 
 bool Vault_curl::setup_curl_session(CURL *curl)
@@ -233,7 +306,7 @@ bool Vault_curl::list_keys(Secure_string *response)
   Curl_session_guard curl_session_guard(curl);
 
   if (setup_curl_session(curl) ||
-      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (vault_url + "?list=true").c_str())) != CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (secret_url_metadata + "?list=true").c_str())) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
       (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code)) != CURLE_OK)
   {
@@ -266,7 +339,7 @@ bool Vault_curl::get_key_url(const Vault_key &key, Secure_string *key_url)
   Secure_string encoded_key_signature;
   if (encode_key_signature(key, &encoded_key_signature))
     return true;
-  *key_url = vault_url + '/' + encoded_key_signature.c_str();
+  *key_url = secret_url_data + '/' + encoded_key_signature.c_str();
   return false;
 }
 

@@ -48,6 +48,7 @@ public:
 
   virtual bool init(const Vault_credentials &vault_credentials);
   virtual bool list_keys(Secure_string *response);
+  virtual bool list_mount_points(Secure_string *response);
   virtual bool write_key(const Vault_key &key, Secure_string *response);
   virtual bool read_key(const Vault_key &key, Secure_string *response);
   virtual bool delete_key(const Vault_key &key, Secure_string *response);
@@ -55,6 +56,7 @@ public:
   {
     this->timeout = timeout; 
   }
+  virtual void set_vault_version_2();
 
 private:
 
@@ -63,9 +65,18 @@ private:
   bool encode_key_signature(const Vault_key &key, Secure_string *encoded_key_signature);
   bool get_key_url(const Vault_key &key, Secure_string *key_url);
 
+  void setup_url_v2(const Vault_credentials &vault_credentials);
+
   ILogger *logger;
   Secure_string token_header;
   Secure_string vault_url;
+  Secure_string secret_url_data;
+  Secure_string secret_url_metadata;
+  struct {
+    Secure_string secret_url_data;
+    Secure_string secret_url_metadata;
+  } secret_url_v2;
+  //Secure_string vault_mounts_url;
   char curl_errbuf[CURL_ERROR_SIZE]; //error from CURL
   Secure_ostringstream read_data_ss;
   struct curl_slist *list;

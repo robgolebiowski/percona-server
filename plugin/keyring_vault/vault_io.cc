@@ -12,13 +12,31 @@ my_bool Vault_io::init(std::string *keyring_storage_url)
   Vault_credentials_parser vault_credentials_parser(logger);
   Vault_credentials vault_credentials;
   return vault_credentials_parser.parse(*keyring_storage_url, &vault_credentials) ||
-         vault_curl->init(vault_credentials);
+         vault_curl->init(vault_credentials) ||
+         adjust_vault_version(vault_credentials);
 }
 
 Vault_io::~Vault_io()
 {
   delete vault_curl;
   delete vault_parser;
+}
+
+bool Vault_io::adjust_vault_version(const Vault_credentials &vault_credentials) {
+  static Secure_string err_msg("Could not determine version of Vault Server.");
+  Secure_string json_response;
+  vault_curl->list_mount_points(&json_response);
+  int vault_version = 0;
+  if (vault_parser->get_vault_version(vault_credentials, json_response, vault_version)) {
+    logger->log(MY_ERROR_LEVEL, (err_msg +
+                get_errors_from_response(json_response)).c_str());
+    return true;
+  }
+  if (vault_version != 1 && vault_version != 2)
+    return true;
+  if (vault_version == 2)
+    vault_curl->set_vault_version_2();
+  return false;
 }
 
 Secure_string Vault_io::get_errors_from_response(const Secure_string &json_response)

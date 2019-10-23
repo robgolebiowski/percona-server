@@ -14,9 +14,9 @@ namespace keyring
 {
   const size_t Vault_credentials_parser::max_file_size = 10000;
 
-  void Vault_credentials_parser::reset_vault_credentials(Vault_credentials *vault_credentials)
+  void Vault_credentials_parser::reset_vault_credentials(Vault_credentials::Map *vault_credentials)
   {
-    for (Vault_credentials::iterator iter = vault_credentials->begin();
+    for (Vault_credentials::Map::iterator iter = vault_credentials->begin();
         iter != vault_credentials->end(); ++iter)
       iter->second.clear();
   }
@@ -26,7 +26,7 @@ namespace keyring
     return vault_credentials_in_progress.count(option) != 0;
   }
 
-  bool Vault_credentials_parser::parse_line(uint line_number, const Secure_string& line, Vault_credentials *vault_credentials)
+  bool Vault_credentials_parser::parse_line(uint line_number, const Secure_string& line, Vault_credentials::Map *vault_credentials)
   {
     if (line.empty())
       return false;
@@ -126,7 +126,7 @@ namespace keyring
         return true;
       }
 
-    for (Vault_credentials::const_iterator iter = vault_credentials_in_progress.begin();
+    for (Vault_credentials::Map::const_iterator iter = vault_credentials_in_progress.begin();
          iter != vault_credentials_in_progress.end(); ++iter)
     {
       if (iter->second.empty() && optional_value.count(iter->first) == 0)
@@ -137,7 +137,8 @@ namespace keyring
         return true;
       }
     }
-    *vault_credentials = vault_credentials_in_progress;
+    vault_credentials->init(vault_credentials_in_progress);
+    //*vault_credentials = vault_credentials_in_progress;
     return false;
   }
 } // namespace keyring

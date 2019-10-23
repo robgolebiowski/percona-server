@@ -302,10 +302,12 @@ namespace keyring__vault_io_unittest
   public:
     MOCK_METHOD1(init, bool(const Vault_credentials &vault_credentials));
     MOCK_METHOD1(list_keys, bool(Secure_string *response));
+    MOCK_METHOD1(list_mount_points, bool(Secure_string *response));
     MOCK_METHOD2(write_key, bool(const Vault_key &key, Secure_string *response));
     MOCK_METHOD2(read_key, bool(const Vault_key &key, Secure_string *response));
     MOCK_METHOD2(delete_key, bool(const Vault_key &key, Secure_string *response));
     MOCK_METHOD1(set_timeout, void(uint timeout));
+    MOCK_METHOD0(set_vault_version_2, void());
   };
 
   TEST_F(Vault_io_test, ErrorFromVaultCurlOnVaultIOInit)
@@ -516,6 +518,8 @@ namespace keyring__vault_io_unittest
     MOCK_METHOD2(parse_key_data, bool(const Secure_string &payload, IKey *key));
     MOCK_METHOD2(parse_key_signature, bool(const Secure_string &key_signature, KeyParameters *key_parameters));
     MOCK_METHOD2(parse_errors, bool(const Secure_string &payload, Secure_string *errors));
+    MOCK_METHOD3(get_vault_version, bool(const Vault_credentials &vault_credentials, const Secure_string &mount_points_payload,
+                                         int &vault_version));
   };
 
   TEST_F(Vault_io_test, ErrorFromParseKeysOnGetSerializedObject)

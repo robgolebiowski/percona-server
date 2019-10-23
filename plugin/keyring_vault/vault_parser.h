@@ -21,6 +21,7 @@
 #include "i_vault_parser.h"
 #include "logger.h"
 #include "secure_string.h"
+//#include "vault_credentials.h"
 
 namespace keyring
 {
@@ -36,6 +37,8 @@ public:
   virtual bool parse_key_data(const Secure_string &payload, IKey *key);
   virtual bool parse_key_signature(const Secure_string &base64_key_signature, KeyParameters *key_parameters);
   virtual bool parse_errors(const Secure_string &payload, Secure_string *errors);
+  virtual bool get_vault_version(const Vault_credentials &vault_credentials, const Secure_string &mount_points_payload,
+                                 int &vault_version);
 
 private:
   typedef std::vector<Secure_string> Tokens;
@@ -47,6 +50,9 @@ private:
   bool retrieve_tokens_from_list(const Secure_string &list, Tokens *tokens);
   bool retrieve_value_from_map(const Secure_string &map, const Secure_string &key,
                                Secure_string *value);
+
+  bool is_null_tag(Secure_string tag);
+  bool is_empty_map(Secure_string map);
 
   ILogger *logger;
   const static size_t start_tag_length;

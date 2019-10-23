@@ -26,12 +26,12 @@ namespace keyring
     bool parse(const std::string &file_url, Vault_credentials *vault_credentials);
 
   private:
-    void reset_vault_credentials(Vault_credentials *vault_credentials);
+    void reset_vault_credentials(Vault_credentials::Map *vault_credentials);
 
-    bool parse_line(uint line_number, const Secure_string& line, Vault_credentials *vault_credentials);
+    bool parse_line(uint line_number, const Secure_string& line, Vault_credentials::Map *vault_credentials_map);
 
     bool is_valid_option(const Secure_string &option) const;
-    Vault_credentials vault_credentials_in_progress;
+    Vault_credentials::Map vault_credentials_in_progress;
     std::set<Secure_string> optional_value;
 
     ILogger *logger;

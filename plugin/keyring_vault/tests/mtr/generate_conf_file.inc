@@ -16,7 +16,7 @@ let SERVER_UUID= query_get_value(SELECT @@SERVER_UUID, @@SERVER_UUID, 1);
   while (my $row = <CONF_TEMPLATE_FILE>)
   {
     $row =~ s/MYSQL_TEST_DIR/$mysql_test_dir/g;
-    $row =~ s/SECRET_MOUNT_POINT_TAG/cicd\/$server_uuid/g;
+    $row =~ s/SECRET_MOUNT_POINT_TAG/$server_uuid/g;
     $row =~ s/MTR_VAULT_TOKEN_TAG/$mtr_vault_token/g;
     print CONF_FILE $row;
   }
