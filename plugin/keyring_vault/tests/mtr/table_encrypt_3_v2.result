@@ -1,4 +1,4 @@
-# Using kv v1
+Using kv v2.
 # Create encrypt table before loading keyring plugin
 SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;
@@ -1409,3 +1409,4 @@ ALTER INSTANCE ROTATE INNODB MASTER KEY;
 ERROR HY000: InnoDB is in read only mode.
 # restart:
 SET GLOBAL innodb_file_per_table=1;
+Using kv v2.

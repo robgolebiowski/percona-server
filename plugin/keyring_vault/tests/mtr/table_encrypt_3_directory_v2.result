@@ -1,4 +1,4 @@
-# Using kv v1
+# Using kv v2
 # Create encrypt table before loading keyring plugin
 SET GLOBAL innodb_file_per_table = 1;
 SELECT @@innodb_file_per_table;

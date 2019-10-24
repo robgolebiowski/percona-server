@@ -9,6 +9,7 @@
 let KEYRING_CONF_FILE=$KEYRING_CONF_FILE;
 let SERVER_UUID= query_get_value(SELECT @@SERVER_UUID, @@SERVER_UUID, 1);
 let MOUNT_POINT_SERVICE_OP=$MOUNT_POINT_SERVICE_OP;
+let USE_KV_V_TWO=$USE_KV_V2;
 
 --perl
   use strict;
@@ -16,6 +17,7 @@ let MOUNT_POINT_SERVICE_OP=$MOUNT_POINT_SERVICE_OP;
   my $keyring_conf_file= $ENV{'KEYRING_CONF_FILE'} or die("KEYRING_CONF_FILE not set\n");
   my $server_uuid= $ENV{'SERVER_UUID'} or die("SERVER_UUID not set\n");
   my $mount_point_service_op=$ENV{'MOUNT_POINT_SERVICE_OP'};
+  my $use_kv_v2= $ENV{'USE_KV_V_TWO'};
   my $token;
   my $vault_url;
   my $secret_mount_point;
@@ -57,9 +59,19 @@ let MOUNT_POINT_SERVICE_OP=$MOUNT_POINT_SERVICE_OP;
     $vault_ca_cert_opt= "--cacert $vault_ca";
   }
 
+  my $postdata= "";
+  if ($use_kv_v2 == 1)
+  {
+    print "Using kv v2.\n"; 
+    $postdata= "{\"type\":\"kv\",\"options\":{\"version\":\"2\"}}";
+  } else {
+    print "Using kv v1.\n"; 
+    $postdata= "{\"type\":\"generic\"}";
+  }
+
   if ($mount_point_service_op eq 'CREATE')
   {
-    system(qq#curl -L -H "X-Vault-Token: $token" $vault_ca_cert_opt --data '{"type":"generic"}' --request POST $vault_url/v1/sys/mounts/$secret_mount_point#);
+    system(qq#curl -L -H "X-Vault-Token: $token" $vault_ca_cert_opt --data '$postdata' --request POST $vault_url/v1/sys/mounts/$secret_mount_point#);
   }
   elsif ($mount_point_service_op eq 'DELETE')
   {

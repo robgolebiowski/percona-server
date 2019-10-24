@@ -1,3 +1,5 @@
+Using kv v1.
+Using kv v1.
 call mtr.add_suppression("\\[ERROR\\] Function 'keyring_vault' already exists");
 call mtr.add_suppression("\\[ERROR\\] Couldn't load plugin named 'keyring_vault' with soname 'keyring_vault.*'.");
 call mtr.add_suppression("Plugin keyring_vault reported");
@@ -140,3 +142,5 @@ c1	c2
 4	NULL
 DROP DATABASE tde_db;
 SET GLOBAL innodb_file_per_table=1;
+Using kv v1.
+Using kv v1.

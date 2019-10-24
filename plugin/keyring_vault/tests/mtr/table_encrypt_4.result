@@ -1,3 +1,4 @@
+Using kv v1.
 # restart:<hidden args>
 DROP TABLE IF EXISTS t1;
 SET GLOBAL innodb_file_per_table = 1;
@@ -151,3 +152,4 @@ ALTER TABLE test.t1 IMPORT TABLESPACE;
 ERROR HY000: Got error 168 from storage engine
 Warnings:
 Note	1051	Unknown table 'test.t1'
+Using kv v1.

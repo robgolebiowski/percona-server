@@ -1,3 +1,3 @@
---let $USE_KV_V2= 0
+--let $USE_KV_V2= 1
 --source table_encrypt_2_mount.inc
 

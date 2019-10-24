@@ -1,4 +1,4 @@
-# Using kv v1
+# Using kv v2
 # restart:<hidden args>
 DROP TABLE IF EXISTS t1;
 SET GLOBAL innodb_file_per_table = 1;

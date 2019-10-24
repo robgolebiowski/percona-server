@@ -149,41 +149,69 @@ std::string Vault_curl::get_error_from_curl(CURLcode curl_code)
   return ss.str();
 }
 
-void Vault_curl::setup_url_v2(const Vault_credentials &vault_credentials) {
-  //Secure_string secret_mount_point_path = get_credential(vault_credentials, "secret_mount_point");
-  Secure_string vault_url = vault_credentials.get_credential("vault_url");
-  //std::size_t slash_separator = secret_mount_point_path.find('/');
-  //Secure_string mount_point = secret_mount_point_path.substr(0, slash_separator); 
-  //Secure_string directory = secret_mount_point_path.substr(slash_separator);
-
-  //Secure_string mount_point = vault_credentials.get_raw_secret_mount_point();
-  //Secure_string directory = secret_mount_point_path.substr(slash_separator);
-  Secure_ostringstream oss_metadata, oss_data;
-  oss_metadata << vault_url << vault_credentials.get_raw_secret_mount_point() << "/metadata/"
-               << vault_credentials.get_raw_directory();
-  oss_data << vault_url << vault_credentials.get_raw_secret_mount_point() << "/data/"
-           << vault_credentials.get_raw_directory();
-
-  secret_url_v2.secret_url_metadata = oss_metadata.str();
-  secret_url_v2.secret_url_data = oss_data.str();
-
-
-  //oss_data << vau
-
-    //secret_url_v2.secret_url_metadata = vault_url + vault_credentials.get_raw_secret() + "/metadata/" + directory;
-    //secret_url_v2.secret_url_data = vault_url + mount_point + "/data/" + directory;
-  //}
-  //secret_url_v2.secret_url_metadata = vault_url + secret_mount_point_path + "/metadata";
-  //secret_url_v2.secret_url_data = vault_url + secret_mount_point_path + "/data";
+Secure_string Vault_curl::get_secret_url_metadata() {
+  static Secure_string secret_url_metadata;
+  if (secret_url_metadata.empty()) {
+    if (is_kv_v2) {
+      Secure_ostringstream oss_metadata;
+      DBUG_ASSERT(!vault_url.empty());
+      oss_metadata << vault_url << "/v1/" << vault_credentials.get_raw_secret_mount_point() << "/metadata";
+      if (!vault_credentials.get_raw_directory().empty()) {
+        oss_metadata << '/' << vault_credentials.get_raw_directory();
+      }
+      secret_url_metadata = oss_metadata.str();
+    } else {
+      secret_url_metadata = vault_credentials.get_credential("vault_url") + "/v1/" +
+                            vault_credentials.get_credential("secret_mount_point");
+    }
+  }
+  return secret_url_metadata;
 }
+
+// TODO: refactor those two functions as they should be together, they are too similar
+
+Secure_string Vault_curl::get_secret_url_data() {
+  static Secure_string secret_url_data;
+  if (secret_url_data.empty()) {
+    if (is_kv_v2) {
+      Secure_ostringstream oss_data;
+      DBUG_ASSERT(!vault_url.empty());
+      oss_data << vault_url << "/v1/" << vault_credentials.get_raw_secret_mount_point() << "/data/";
+      if (!vault_credentials.get_raw_directory().empty()) {
+        oss_data << vault_credentials.get_raw_directory() << '/';
+      }
+      secret_url_data = oss_data.str();
+    } else {
+      secret_url_data = vault_credentials.get_credential("vault_url") + "/v1/" +
+                            vault_credentials.get_credential("secret_mount_point") + '/';
+    }
+  }
+  return secret_url_data;
+}
+
+
+
+//void Vault_curl::setup_url_v2(const Vault_credentials &vault_credentials) {
+  //Secure_string vault_url = vault_credentials.get_credential("vault_url");
+  //Secure_ostringstream oss_metadata, oss_data;
+  //oss_metadata << vault_url << "/v1/" << vault_credentials.get_raw_secret_mount_point() << "/metadata/"
+               //<< vault_credentials.get_raw_directory();
+  //oss_data << vault_url << "/v1/" << vault_credentials.get_raw_secret_mount_point() << "/data/"
+           //<< vault_credentials.get_raw_directory();
+
+  //secret_url_v2.secret_url_metadata = oss_metadata.str();
+  //secret_url_v2.secret_url_data = oss_data.str();
+
+//}
 
 bool Vault_curl::init(const Vault_credentials &vault_credentials)
 {
   this->token_header = "X-Vault-Token:" + vault_credentials.get_credential("token");
   this->vault_url = vault_credentials.get_credential("vault_url");
-  this->secret_url_data = vault_credentials.get_credential("vault_url") + "/v1/" + vault_credentials.get_credential("secret_mount_point");
-  this->secret_url_metadata = this->secret_url_data;
-  setup_url_v2(vault_credentials);
+  this->vault_credentials = vault_credentials;
+  //this->secret_url_data = vault_credentials.get_credential("vault_url") + "/v1/" + vault_credentials.get_credential("secret_mount_point");
+  //this->secret_url_metadata = this->secret_url_data;
+  //setup_url_v2(vault_credentials);
   
   //this->vault_mounts_url = get_credential(vault_credentials, "secret_url") + "/v1/sys/mounts";
   this->vault_ca = vault_credentials.get_credential("vault_ca");
@@ -201,8 +229,9 @@ bool Vault_curl::init(const Vault_credentials &vault_credentials)
 }
 
 void Vault_curl::set_vault_version_2() {
-  this->secret_url_data = secret_url_v2.secret_url_data;
-  this->secret_url_metadata = secret_url_v2.secret_url_metadata;
+  is_kv_v2 = true;
+  //this->secret_url_data = secret_url_v2.secret_url_data;
+  //this->secret_url_metadata = secret_url_v2.secret_url_metadata;
 }
 
 bool Vault_curl::list_mount_points(Secure_string *response) {
@@ -304,6 +333,7 @@ bool Vault_curl::list_keys(Secure_string *response)
     return true;
   }
   Curl_session_guard curl_session_guard(curl);
+  const Secure_string secret_url_metadata = get_secret_url_metadata();
 
   if (setup_curl_session(curl) ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, (secret_url_metadata + "?list=true").c_str())) != CURLE_OK ||
@@ -339,8 +369,26 @@ bool Vault_curl::get_key_url(const Vault_key &key, Secure_string *key_url)
   Secure_string encoded_key_signature;
   if (encode_key_signature(key, &encoded_key_signature))
     return true;
-  *key_url = secret_url_data + '/' + encoded_key_signature.c_str();
+  *key_url = get_secret_url_data() + encoded_key_signature.c_str();
   return false;
+}
+
+Secure_string Vault_curl::get_write_key_postdata(const Vault_key &key, Secure_string &encoded_key_data) {
+  Secure_ostringstream postdata;
+  if (is_kv_v2) {
+    postdata << "{\"data\":";
+  }
+  postdata << "{\"type\":\"" << key.get_key_type()->c_str()
+            << "\",\"" << "value\":\"" + encoded_key_data << "\"}";
+  if (is_kv_v2) {
+    postdata << "}";
+  }
+  return postdata.str();
+
+  //Secure_string postdata="{\"data\":{\"type\":\"";
+  //postdata += key.get_key_type()->c_str();
+  //postdata += "\",\"";
+  //postdata += "value\":\"" + encoded_key_data + "\"}}";
 }
 
 bool Vault_curl::write_key(const Vault_key &key, Secure_string *response)
@@ -353,10 +401,12 @@ bool Vault_curl::write_key(const Vault_key &key, Secure_string *response)
     return true;
   }
   CURLcode curl_res = CURLE_OK;
-  Secure_string postdata="{\"type\":\"";
-  postdata += key.get_key_type()->c_str();
-  postdata += "\",\"";
-  postdata += "value\":\"" + encoded_key_data + "\"}";
+  Secure_string postdata = get_write_key_postdata(key, encoded_key_data);
+ 
+  //Secure_string postdata="{\"data\":{\"type\":\"";
+  //postdata += key.get_key_type()->c_str();
+  //postdata += "\",\"";
+  //postdata += "value\":\"" + encoded_key_data + "\"}}";
 
   Secure_string key_url;
   if (get_key_url(key, &key_url))

@@ -39,8 +39,9 @@ Secure_string Vault_credentials::get_raw_secret_mount_point() const {
 Secure_string Vault_credentials::get_raw_directory() const {
   Secure_string secret_mount_point_path = get_credential("secret_mount_point");
   std::size_t slash_separator = secret_mount_point_path.find('/');
-  return slash_separator != std::string::npos ? secret_mount_point_path.substr(slash_separator)
-                                              : "";
+  return slash_separator != std::string::npos && (slash_separator + 1) < secret_mount_point_path.length()
+    ? secret_mount_point_path.substr(slash_separator + 1)
+    : "";
 }
 
 } // namespace keyring

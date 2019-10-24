@@ -1,4 +1,4 @@
-# Using kv v1
+# Using kv v2
 call mtr.add_suppression("\\[ERROR\\] Function 'keyring_vault' already exists");
 call mtr.add_suppression("\\[ERROR\\] Couldn't load plugin named 'keyring_vault' with soname 'keyring_vault.*'.");
 call mtr.add_suppression("Plugin keyring_vault reported");

@@ -1,8 +1,7 @@
 call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'Could not open file with credentials.'");
 call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'keyring_vault initialization failure.");
 call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File '' not found");
-Using kv v1.
-Using kv v1.
+# Using kv v2
 # Starting server with keyring plugin  
 # restart:<hidden args>
 DROP DATABASE IF EXISTS tde_db;
@@ -1041,5 +1040,3 @@ DROP DATABASE tde_db;
 # Starting server without keyring
 # restart: 
 SET GLOBAL innodb_file_per_table=1;
-Using kv v1.
-Using kv v1.
