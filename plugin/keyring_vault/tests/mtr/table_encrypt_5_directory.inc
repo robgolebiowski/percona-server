@@ -14,3 +14,10 @@ call mtr.add_suppression("\\[ERROR\\] Plugin keyring_vault reported: 'File '' no
 --let $select_keyring_variable_statement=SELECT @@global.keyring_vault_config
 --let $set_keyring_variable_to_keyring1=SET @@global.keyring_vault_config='$KEYRING_CONF_FILE_1'
 --source include/table_encrypt_5.inc
+
+# Remove all secrets in directories used by this test. When all secrets are removed from directory
+# in Vault Server, the directory is removed automatically. 
+--let $KEYRING_CONF_FILE=$KEYRING_CONF_FILE_1
+--source vault_cleanup.inc
+--let $KEYRING_CONF_FILE=$KEYRING_CONF_FILE_2
+--source vault_cleanup.inc

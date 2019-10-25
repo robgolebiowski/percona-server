@@ -21,7 +21,6 @@
 #include "i_vault_parser.h"
 #include "logger.h"
 #include "secure_string.h"
-//#include "vault_credentials.h"
 
 namespace keyring
 {
@@ -37,6 +36,12 @@ public:
   virtual bool parse_key_data(const Secure_string &payload, IKey *key);
   virtual bool parse_key_signature(const Secure_string &base64_key_signature, KeyParameters *key_parameters);
   virtual bool parse_errors(const Secure_string &payload, Secure_string *errors);
+
+  /** Retrieve kv version from list mount points payload
+  @param[in]  vault_credentials credentials used to access vault server
+  @param[in]  mount_points_payload payload being a result of listing mount points on a Vault server
+  @param[out] vault_version version of the vault server, either 1 or 2
+  @return true on error, false on success */
   virtual bool get_vault_version(const Vault_credentials &vault_credentials, const Secure_string &mount_points_payload,
                                  int &vault_version);
 

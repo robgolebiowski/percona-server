@@ -11,3 +11,7 @@
 --let $number_of_MK_rotations=100
 --source include/table_encrypt_3.inc
 
+# Remove all secrets in directories used by this test. When all secrets are removed from directory
+# in Vault Server, the directory is removed automatically. 
+--let $KEYRING_CONF_FILE=$KEYRING_CONF_FILE_1
+--source vault_cleanup.inc

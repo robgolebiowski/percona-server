@@ -138,7 +138,6 @@ namespace keyring
       }
     }
     vault_credentials->init(vault_credentials_in_progress);
-    //*vault_credentials = vault_credentials_in_progress;
     return false;
   }
 } // namespace keyring

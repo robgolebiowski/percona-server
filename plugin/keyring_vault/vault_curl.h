@@ -66,22 +66,16 @@ private:
   std::string get_error_from_curl(CURLcode curl_code);
   bool encode_key_signature(const Vault_key &key, Secure_string *encoded_key_signature);
   bool get_key_url(const Vault_key &key, Secure_string *key_url);
+  bool do_list(const Secure_string &url_to_list, Secure_string *response);
 
-  //void setup_url_v2(const Vault_credentials &vault_credentials);
   Secure_string get_secret_url_metadata();
   Secure_string get_secret_url_data();
+  Secure_string get_secret_url(const Secure_string &type_of_data);
   Secure_string get_write_key_postdata(const Vault_key &key, Secure_string &encoded_key_data);
 
   ILogger *logger;
   Secure_string token_header;
   Secure_string vault_url;
-  //Secure_string secret_url_data;
-  //Secure_string secret_url_metadata;
-  //struct {
-    //Secure_string secret_url_data;
-    //Secure_string secret_url_metadata;
-  //} secret_url_v2;
-  //Secure_string vault_mounts_url;
   char curl_errbuf[CURL_ERROR_SIZE]; //error from CURL
   Secure_ostringstream read_data_ss;
   struct curl_slist *list;

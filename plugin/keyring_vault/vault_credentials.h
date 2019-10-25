@@ -40,10 +40,6 @@ namespace keyring
     private:
       Vault_credentials::Map vault_credentials; 
   };
-  //typedef std::map<Secure_string, Secure_string> Vault_credentials;
-  //const Secure_string& get_credential(const Vault_credentials &credentials, const Secure_string &key);
-  //Secure_string get_raw_secret_mount_point() const;
-  //Secure_string get_raw_directory() const;
 } // namespace keyring
 
 #endif // MYSQL_VAULT_CREDENTIALS

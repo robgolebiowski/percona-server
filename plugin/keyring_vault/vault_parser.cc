@@ -24,27 +24,6 @@
 namespace keyring
 {
 
-//bool Vault_parser::retrive_vault_version(const Secure_string &payload, const Secure_string &secret_mount_point,
-                                         //Secure_string *value) const {
-
-  //size_t options_tag, secret_mount_point_pos = payload.find(secret_mount_point + '/');
-  //if (secret_mount_point_pos == Secure_string::npos) {
-    //value->clear();
-    //return true;
-  //}
-
-  //Secure_string secret_mount_point_payload = payload.substr(secret_mount_point_pos, payload.length() - secret_mount_point_pos);
-  //DBUG_ASSERT(secret_mount_point_payload.length() > 0);
-  //Secure_string secret_map, options_map, value;
-
-  //if (retrieve_map(secret_mount_point_payload, "options", &options_map) ||
-      //retrieve_value_from_map(options_map, "version", &value))
-    //return true;
-
-      
-  //Secure_string options = payload.substr(
-//}
-
 bool Vault_parser::retrieve_tag_value(const Secure_string &payload, const Secure_string &tag, const char opening_bracket,
                                       const char closing_bracket, Secure_string *value)
 {
@@ -107,15 +86,12 @@ bool Vault_parser::retrieve_value_from_map(const Secure_string &map, const Secur
   size_t key_tag_pos = Secure_string::npos, value_start_pos = Secure_string::npos, 
          value_end_pos = Secure_string::npos, start_tag_pos = Secure_string::npos;
   bool was_error = false;
-  //std::string start_tag(":");
-  //const size_t start_tag_length = strlen(":\"");
 
   if ((key_tag_pos = map.find(key)) != Secure_string::npos &&
       (start_tag_pos = map.find(':', key_tag_pos)) != Secure_string::npos &&
       (value_start_pos = map.find("\"", start_tag_pos)) != Secure_string::npos &&
       (value_end_pos = map.find("\"", value_start_pos + 1)) != Secure_string::npos)
   {
-    //value_start_pos += start_tag_length;
     ++value_start_pos; // skip starting "
     DBUG_ASSERT(value_end_pos > 0);
     value_end_pos--; // due to closing "
@@ -156,11 +132,7 @@ bool Vault_parser::get_vault_version(const Vault_credentials &vault_credentials,
   Secure_string secret_mount_point_payload(mount_points_payload.substr(secret_mount_point_pos, mount_points_payload.length() -
                                                                        secret_mount_point_pos));
   DBUG_ASSERT(secret_mount_point_payload.length() > 0);
-  //Secure_string value;
-
-  //if (retrieve_value_from_map(secret_mount_point_payload, "version", &value))
-    //return true;
-
+  
   static std::string options_tag("\"options\"");
   size_t options_pos(secret_mount_point_payload.find(options_tag.c_str()));
   if (options_pos == std::string::npos)
@@ -173,39 +145,17 @@ bool Vault_parser::get_vault_version(const Vault_credentials &vault_credentials,
                                                           //(options_pos + options_tag.length())));
 
   if (is_null_tag(options) || is_empty_map(options)) {
-    vault_version = 1; // version == null means we are using version 1
+    vault_version = 1; // version == null or empty map means we are using version 1
     return false;
   }
 
   Secure_string value;
-  // if version is not null it means it is a map
   if (retrieve_value_from_map(options, "version", &value))
     return true;
 
-  //vault_version = value == "null" ? 1 : atoi(value.c_str());
   vault_version = atoi(value.c_str());
 
-  //DBUG_ASSERT(vault_version == 1);
-
   return vault_version <= 0 || vault_version > 2;
-
-
-
-
-  //Secure_string secret_map, options_map, value, raw_mount_point = vault_credentials.get_raw_secret_mount_point();
-  //if (raw_mount_point.empty() ||
-      //retrieve_map(mount_points_payload, (raw_mount_point + '/').c_str(), &secret_map) ||
-      //retrieve_map(secret_map, "options", &options_map) ||
-      //retrieve_value_from_map(options_map, "version", &value))
-    //return true;
-
-  //Secure_string secret_map, options_map, value;
-  //if (retrieve_map(mount_points_payload, "options", &options_map) ||
-      //retrieve_value_from_map(options_map, "version", &value))
-    //return true;
-
-  //vault_version = atoi(value.c_str());
-  //return vault_version <= 0;
 }
 
 bool Vault_parser::parse_errors(const Secure_string &payload, Secure_string *errors)

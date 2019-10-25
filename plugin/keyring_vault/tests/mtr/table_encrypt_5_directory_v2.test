@@ -1,2 +1,2 @@
---let use_kv_v2= 1
+--let USE_KV_V2= 1
 --source table_encrypt_5_directory.inc
