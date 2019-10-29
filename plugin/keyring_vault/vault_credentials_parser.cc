@@ -8,6 +8,8 @@
 #include "boost/algorithm/string/trim.hpp"
 #include "boost/move/unique_ptr.hpp"
 #include "boost/scope_exit.hpp"
+#include "boost/lexical_cast.hpp"
+#include "boost/optional/optional_io.hpp"
 #include "file_io.h"
 
 namespace keyring
@@ -73,6 +75,122 @@ namespace keyring
     return false;
   }
 
+  bool Vault_credentials_parser::Value_options::process_value_options(const Secure_string &option_name, Secure_string &value, ILogger *logger)
+  {
+    if (value.empty())
+    {
+      if (!is_optional)
+      {
+        std::ostringstream err_ss;
+        err_ss << "Could not read " << option_name << " from the configuration file.";
+        logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+        return true;
+      }
+      if (default_value)
+      {
+        value = *default_value;
+      }
+    }
+    return false; 
+  }
+
+  bool Vault_credentials_parser::Value_int_options::process_value_options(const Secure_string &option_name, Secure_string &value, ILogger *logger)
+  {
+    if (Value_options::process_value_options(option_name, value, logger))
+      return true; 
+
+    if (value == "AUTO")
+      return false;
+
+    //Value_int_options *int_value_options = dynamic_cast<Value_int_options*>(value_options[value]);
+    //DBUG_ASSERT(int_value_options != NULL);
+    //if (value.empty() && default_value) {
+      //value = *default_value;
+      //return false; // default value assigned, so we know it is legit and we do not have to check constrains for it.
+    //}
+    if (min_value || max_value) {
+      int int_value = -1;
+      try
+      {
+        int_value = boost::lexical_cast<int>(value);
+      }
+      catch (const boost::bad_lexical_cast &)
+      {
+        std::ostringstream err_ss;
+        err_ss << "Could not parse value for " << option_name << " from the configuration file.";
+        logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+        return true;
+      }
+      if (int_value < min_value)
+      {
+        std::ostringstream err_ss;
+        err_ss << "Incorrect value for " << option_name << ". It is smaller than min value =" << min_value << '.';
+        logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+        return true;
+      }
+      if (int_value > max_value)
+      {
+        std::ostringstream err_ss;
+        err_ss << "Incorrect value for " << option_name << ". It is greater than max value =" << max_value << '.';
+        logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+        return true;
+      }
+    }
+    return false;
+  }
+
+  //bool Vault_credentials_parser::process_value_options(const Secure_string &option, Secure_string &value, ILogger *logger)
+  //{
+    //if (value.empty() && (value_options.count(value) == 0 || !value_options[value]->is_optional))
+    //{
+      //std::ostringstream err_ss;
+      //err_ss << "Could not read " << value << " from the configuration file.";
+      //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+      //return true;
+    //}
+    //if (value_options.count(value) != 0) 
+    //{
+      //if (value_options[value]->get_value_type() == INT)
+      //{
+        //Value_int_options *int_value_options = dynamic_cast<Value_int_options*>(value_options[value]);
+        //DBUG_ASSERT(int_value_options != NULL);
+        //if (value.empty() && int_value_options->default_value) {
+          //value = *(int_value_options->default_value);
+          //return false; // default value assigned, so we know it is legit and we do not have to check constrains for it.
+        //}
+        //if (int_value_options->min_value || int_value_options->max_value) {
+          //int value = -1;
+          //try
+          //{
+            //value = boost::lexical_cast<int>(value);
+          //}
+          //catch (const boost::bad_lexical_cast &)
+          //{
+            //std::ostringstream err_ss;
+            //err_ss << "Could not parse value for " << value << " from the configuration file.";
+            //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+            //return true;
+          //}
+          //if (value < *int_value_options->min_value)
+          //{
+            //std::ostringstream err_ss;
+            //err_ss << "Value for " << value << " is smaller than " << int_value_options->min_value;
+            //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+            //return true;
+          //}
+          //if (value > *int_value_options->max_value)
+          //{
+            //std::ostringstream err_ss;
+            //err_ss << "Value for " << value << " is greater than " << int_value_options->max_value;
+            //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+            //return true;
+          //}
+        //}
+      //}
+    //}
+    //return false;
+  //}
+  
   bool Vault_credentials_parser::parse(const std::string &file_url, Vault_credentials *vault_credentials)
   {
     reset_vault_credentials(&vault_credentials_in_progress);
@@ -126,16 +244,62 @@ namespace keyring
         return true;
       }
 
-    for (Vault_credentials::Map::const_iterator iter = vault_credentials_in_progress.begin();
+    for (Vault_credentials::Map::iterator iter = vault_credentials_in_progress.begin();
          iter != vault_credentials_in_progress.end(); ++iter)
     {
-      if (iter->second.empty() && optional_value.count(iter->first) == 0)
-      {
-        std::ostringstream err_ss;
-        err_ss << "Could not read " << iter->first << " from the configuration file.";
-        logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
-        return true;
-      }
+      DBUG_ASSERT(value_options.count(iter->first) != 0);
+
+      if (value_options[iter->first]->process_value_options(iter->first, iter->second, logger))
+          return true;
+
+      //if (iter->second.empty() && optional_value.count(iter->first) == 0)
+      //if (iter->second.empty() && (value_options.count(iter->first) == 0 || !value_options[iter->first]->is_optional))
+      //{
+        //std::ostringstream err_ss;
+        //err_ss << "Could not read " << iter->first << " from the configuration file.";
+        //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+        //return true;
+      //}
+      //if (value_options.count(iter->first) != 0) 
+      //{
+        //if (value_options[iter->first]->get_value_type() == INT)
+        //{
+          //Value_int_options *int_value_options = dynamic_cast<Value_int_options*>(value_options[iter->first]);
+          //DBUG_ASSERT(int_value_options != NULL);
+          //if (iter->second.empty() && int_value_options->default_value) {
+            //iter->second = *(int_value_options->default_value);
+            //continue; // default value assigned, so we know it is legit and we do not have to check constrains for it.
+          //}
+          //if (int_value_options->min_value || int_value_options->max_value) {
+            //int value = -1;
+            //try
+            //{
+              //value = boost::lexical_cast<int>(iter->second);
+            //}
+            //catch (const boost::bad_lexical_cast &)
+            //{
+              //std::ostringstream err_ss;
+              //err_ss << "Could not parse value for " << iter->first << " from the configuration file.";
+              //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+              //return true;
+            //}
+            //if (value < *int_value_options->min_value)
+            //{
+              //std::ostringstream err_ss;
+              //err_ss << "Value for " << iter->first << " is smaller than " << int_value_options->min_value;
+              //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+              //return true;
+            //}
+            //if (value > *int_value_options->max_value)
+            //{
+              //std::ostringstream err_ss;
+              //err_ss << "Value for " << iter->first << " is greater than " << int_value_options->max_value;
+              //logger->log(MY_ERROR_LEVEL, err_ss.str().c_str());
+              //return true;
+            //}
+          //}
+        //}
+      //}
     }
     vault_credentials->init(vault_credentials_in_progress);
     return false;

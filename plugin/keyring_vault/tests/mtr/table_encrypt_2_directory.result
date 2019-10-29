@@ -141,3 +141,5 @@ c1	c2
 4	NULL
 DROP DATABASE tde_db;
 SET GLOBAL innodb_file_per_table=1;
+Using kv v1.
+Using kv v1.

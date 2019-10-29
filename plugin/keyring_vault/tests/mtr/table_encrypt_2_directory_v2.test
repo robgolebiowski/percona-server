@@ -1,2 +1,4 @@
+# This test is using version 2 of the Vault KV. In configuration file user specified the correct version
+# i.e. secret_mount_point_verion = 2.
 --let USE_KV_V2= 1
 --source table_encrypt_2_directory.inc

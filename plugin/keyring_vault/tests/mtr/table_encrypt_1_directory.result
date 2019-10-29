@@ -267,3 +267,4 @@ t1	CREATE TABLE `t1` (
 Pattern "Sydney" not found
 SET GLOBAL innodb_file_per_table=1;
 DROP TABLE t1;
+Using kv v1.

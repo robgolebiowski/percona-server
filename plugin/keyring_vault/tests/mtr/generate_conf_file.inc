@@ -3,8 +3,6 @@ let KEYRING_CONF_TEMPLATE_FILE=$KEYRING_CONF_TEMPLATE_FILE;
 let MYSQL_TEST_DIR=$MYSQL_TEST_DIR;
 let SERVER_UUID= query_get_value(SELECT @@SERVER_UUID, @@SERVER_UUID, 1);
 
---echo $SERVER_UUID
-
 --perl
   use strict;
   # Vaults' credentials from ENV variables

@@ -5,6 +5,7 @@ let KEYRING_CONF_FILE=$KEYRING_CONF_FILE;
 let CURL_OUTPUT_FILE=$MYSQL_TMP_DIR/curl_output.txt;
 let SERVER_UUID= query_get_value(SELECT @@SERVER_UUID, @@SERVER_UUID, 1);
 let USE_KV_V_TWO=$USE_KV_V2;
+let USE_KV_V2_WITH_SECRET_VERSION_SET_TO_TWO=$USE_KV_V2_WITH_SECRET_VERSION_SET_TO_2;
 
 --perl
   use strict;
@@ -13,6 +14,7 @@ let USE_KV_V_TWO=$USE_KV_V2;
   my $curl_output_file= $ENV{'CURL_OUTPUT_FILE'} or die("CURL_OUTPUT_FILE not set\n");
   my $server_uuid= $ENV{'SERVER_UUID'} or die("SERVER_UUID not set\n");
   my $use_kv_v2= $ENV{'USE_KV_V_TWO'};
+  my $use_kv_v2_with_secret_version_set_to_2= $ENV{'USE_KV_V2_WITH_SECRET_VERSION_SET_TO_TWO'};
   my $token;
   my $vault_url;
   my $secret_mount_point;
@@ -53,7 +55,7 @@ let USE_KV_V_TWO=$USE_KV_V2;
     die("Could not read vault credentials from configuration file.\n");
   }
 
-  if ($use_kv_v2 == 1)
+  if ($use_kv_v2 == 1 || $use_kv_v2_with_secret_version_set_to_2 == 1)
   {
     print "Using kv v2.\n"; 
     system(qq#curl -H "X-Vault-Token: $token" --cacert $vault_ca -X GET $vault_url/v1/$secret_mount_point/metadata/$secret_directory?list=true > $curl_output_file#);
@@ -88,7 +90,7 @@ let USE_KV_V_TWO=$USE_KV_V2;
         #print "$vault_url/v1/$secret_mount_point/$_";
         #print qq#curl -H "X-Vault-Token: $token" --cacert $vault_ca -X DELETE $vault_url/v1/$secret_mount_point/$_ &#;
         #system(qq#curl -H "X-Vault-Token: $token" --cacert $vault_ca -X DELETE $vault_url/v1/$secret_mount_point/$_ &#);
-        if ($use_kv_v2 == 1)
+        if ($use_kv_v2 == 1 || $use_kv_v2_with_secret_version_set_to_2 == 1)
         {
           #print "Using kv v2.\n"; 
           #print qq#curl -H "X-Vault-Token: $token" -X DELETE $vault_url/v1/$secret_mount_point/metadata/$secret_directory/$_ &#;

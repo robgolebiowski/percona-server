@@ -10,6 +10,7 @@ let KEYRING_CONF_FILE=$KEYRING_CONF_FILE;
 let SERVER_UUID= query_get_value(SELECT @@SERVER_UUID, @@SERVER_UUID, 1);
 let MOUNT_POINT_SERVICE_OP=$MOUNT_POINT_SERVICE_OP;
 let USE_KV_V_TWO=$USE_KV_V2;
+let USE_KV_V2_WITH_SECRET_VERSION_SET_TO_TWO=$USE_KV_V2_WITH_SECRET_VERSION_SET_TO_2;
 
 --perl
   use strict;
@@ -18,6 +19,7 @@ let USE_KV_V_TWO=$USE_KV_V2;
   my $server_uuid= $ENV{'SERVER_UUID'} or die("SERVER_UUID not set\n");
   my $mount_point_service_op=$ENV{'MOUNT_POINT_SERVICE_OP'};
   my $use_kv_v2= $ENV{'USE_KV_V_TWO'};
+  my $use_kv_v2_with_secret_version_set_to_2= $ENV{'USE_KV_V2_WITH_SECRET_VERSION_SET_TO_TWO'};
   my $token;
   my $vault_url;
   my $secret_mount_point;
@@ -60,7 +62,7 @@ let USE_KV_V_TWO=$USE_KV_V2;
   }
 
   my $postdata= "";
-  if ($use_kv_v2 == 1)
+  if ($use_kv_v2 == 1 || $use_kv_v2_with_secret_version_set_to_2 == 1)
   {
     print "Using kv v2.\n"; 
     $postdata= "{\"type\":\"kv\",\"options\":{\"version\":\"2\"}}";

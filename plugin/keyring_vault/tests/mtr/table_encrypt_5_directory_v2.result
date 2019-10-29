@@ -1040,3 +1040,5 @@ DROP DATABASE tde_db;
 # Starting server without keyring
 # restart: 
 SET GLOBAL innodb_file_per_table=1;
+Using kv v2.
+Using kv v2.
