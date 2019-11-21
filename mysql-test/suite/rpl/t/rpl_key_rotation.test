@@ -2,6 +2,7 @@
 # Testing ALTER INSTANCE ROTATE INNODB MASTER KEY with replication
 # and keyring installing/uninstalling scenarios on master/slave.
 
+--source include/have_keyring_udf_plugin.inc
 --source include/master-slave.inc
 call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Function 'keyring_file' already exists");
 call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Couldn't load plugin named 'keyring_file' with soname 'keyring_file.so'.");
@@ -11,6 +12,20 @@ call mtr.add_suppression("Error 'Can't find master key from keyring, please chec
 call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Slave: Can't find master key from keyring, please check in the server log if a keyring plugin is loaded and initialized successfully.");
 call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Can't generate new master key for tablespace encryption, please check the keyring plugin is loaded.");
 call mtr.add_suppression("The slave coordinator and worker threads are stopped");
+
+if ($KEYRING_UDF_DIR != $KEYRING_PLUGIN_DIR)
+{
+  --replace_regex /\.dll/.so/
+  --error 0,1
+  --remove_file $KEYRING_PLUGIN_DIR/$KEYRING_UDF
+  #--remove_file $KEYRING_UDF_DIR/$KEYRING_PLUGIN
+  --replace_regex /\.dll/.so/
+  --copy_file $KEYRING_UDF_DIR/$KEYRING_UDF $KEYRING_PLUGIN_DIR/$KEYRING_UDF
+}
+
+--replace_regex /\.dll/.so/
+eval INSTALL PLUGIN keyring_udf SONAME '$KEYRING_UDF';
+
 
 --connection master
 --echo [On Master]

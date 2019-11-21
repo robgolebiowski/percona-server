@@ -4,6 +4,8 @@
 --source include/have_keyring_vault_plugin.inc
 --source include/master-slave.inc
 --source include/not_repeat.inc
+--source include/have_keyring_udf_plugin.inc
+--source include/force_binlog_format_statement.inc
 
 call mtr.add_suppression("Plugin keyring_vault reported: 'Could not open file with credentials.'");
 call mtr.add_suppression("Plugin keyring_vault reported: 'keyring_vault initialization failure.");
@@ -17,6 +19,27 @@ call mtr.add_suppression("Plugin keyring_vault reported: 'File '' not found");
 call mtr.add_suppression("keyring_vault initialization failure");
 call mtr.add_suppression("A message intended for a client cannot be sent there as no client-session is attached");
 
+# We need both plugins - keyring_vault and keyring_udf in one place - to be able to load both plugins
+if ($KEYRING_UDF_DIR != $KEYRING_PLUGIN_DIR)
+{
+  --replace_regex /\.dll/.so/
+  --error 0,1
+  #--remove_file $KEYRING_UDF_DIR/$KEYRING_VAULT_PLUGIN
+  --remove_file $KEYRING_VAULT_DIR/$KEYRING_UDF_PLUGIN
+  --replace_regex /\.dll/.so/
+  #--copy_file $KEYRING_VAULT_PLUGIN_DIR/$KEYRING_VAULT_PLUGIN $KEYRING_UDF_DIR/$KEYRING_VAULT_PLUGIN
+  --copy_file $KEYRING_UDF_DIR/$KEYRING_UDF_PLUGIN $KEYRING_VAULT_PLUGIN_DIR/$KEYRING_UDF_PLUGIN
+}
+
+--replace_regex /\.dll/.so/
+eval INSTALL PLUGIN keyring_udf SONAME '$KEYRING_UDF';
+--echo # Check if keys are available after server restart
+--replace_regex /\.dll/.so/
+eval create function keyring_key_generate returns integer soname '$KEYRING_UDF';
+#--replace_result $key_id key_id
+--replace_regex /\.dll/.so/
+eval create function keyring_key_store returns integer soname '$KEYRING_UDF';
+
 --source generate_default_mount_conf_files.inc
 --source is_vault_server_up.inc
 
@@ -24,12 +47,12 @@ call mtr.add_suppression("A message intended for a client cannot be sent there a
 --let MOUNT_POINT_SERVICE_OP=CREATE
 --let $KEYRING_CONF_FILE=$KEYRING_CONF_FILE_1
 --source mount_point_service.inc
---let $KEYRING_CONF_FILE=$KEYRING_CONF_FILE_2
---source mount_point_service.inc
+#--let $KEYRING_CONF_FILE=$KEYRING_CONF_FILE_2
+#--source mount_point_service.inc
 
 --connection slave
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
-eval SET @@global.keyring_vault_config='$KEYRING_CONF_FILE_2';
+eval SET @@global.keyring_vault_config='$KEYRING_CONF_FILE_1';
 
 --connection master
 --echo [On Master]
@@ -56,8 +79,33 @@ ALTER INSTANCE ROTATE INNODB MASTER KEY;
 
 SELECT * FROM t1;
 
+#select keyring_key_store('ROB_1','AES',"0123456789012345");
+#--replace_regex /\.dll/.so/
+#eval create function keyring_key_fetch returns string soname '$KEYRING_UDF';
+select keyring_key_store('ROB_1','AES',"123456789012345");
+#select keyring_key_generate('ROB_1','AES',16);
+#select keyring_key_fetch('ROB_1') into @x;
+#select @x;
+
+#--sleep 120
+
 --source include/sync_slave_sql_with_master.inc
+
+#--die
+
 --echo [On Slave]
+
+--replace_regex /\.dll/.so/
+eval INSTALL PLUGIN keyring_udf SONAME '$KEYRING_UDF';
+#--echo # Check if keys are available after server restart
+#--replace_regex /\.dll/.so/
+#eval create function keyring_key_generate returns integer soname '$KEYRING_UDF';
+
+select keyring_key_store('ROB_1','AES',"543210987654321");
+
+#select keyring_key_generate('ROB_1','AES',16);
+
+--die
 
 SELECT COUNT(*) FROM t2;
 SELECT * FROM t1;
@@ -98,7 +146,7 @@ START SLAVE SQL_THREAD;
 --replace_regex /\.dll/.so/
 eval INSTALL PLUGIN keyring_vault SONAME '$KEYRING_VAULT_PLUGIN';
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
-eval SET @@global.keyring_vault_config='$KEYRING_CONF_FILE_2';
+eval SET @@global.keyring_vault_config='$KEYRING_CONF_FILE_1';
 query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
 FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
 --source include/start_slave_sql.inc
