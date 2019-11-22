@@ -1,0 +1,111 @@
+--let $number_of_records = 10000
+--let MYSQLD_DATADIR = `SELECT @@datadir`
+
+--let DB_NAME = `SELECT DATABASE()`
+--let $t1_ibd = $MYSQLD_DATADIR/$DB_NAME/t1.ibd
+--let $t2_ibd = $MYSQLD_DATADIR/$DB_NAME/t2.ibd
+--let $t3_ibd = $MYSQLD_DATADIR/$DB_NAME/t3.ibd
+--let $t4_ibd = $MYSQLD_DATADIR/$DB_NAME/t4.ibd
+--let $t4_dup_ibd = $MYSQLD_DATADIR/$DB_NAME/t4_dup.ibd
+
+CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB ENCRYPTION='KEYRING';
+CREATE TABLE t2 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB COMPRESSION="zlib";
+CREATE TABLE t3 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB;
+CREATE TABLE t4 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB ENCRYPTION='N';
+CREATE TABLE t4_dup LIKE t4;
+
+SHOW CREATE TABLE t4_dup;
+
+delimiter //;
+CREATE PROCEDURE innodb_insert_proc(repeat_count INT)
+BEGIN
+  DECLARE current_num INT;
+  SET current_num = 0;
+  WHILE current_num < repeat_count DO
+    INSERT INTO t1 VALUES (current_num, REPEAT('foobar', 42));
+    INSERT INTO t2 VALUES (current_num, REPEAT('temp'  , 42));
+    INSERT INTO t3 VALUES (current_num, REPEAT('barfoo', 42));
+    INSERT INTO t4 VALUES (current_num, REPEAT('secret', 42));
+    INSERT INTO t4_dup VALUES (current_num, REPEAT('fbar', 42));
+    SET current_num = current_num + 1;
+  END WHILE;
+END//
+delimiter ;//
+COMMIT;
+
+SET autocommit = 0;
+eval CALL innodb_insert_proc($number_of_records);
+COMMIT;
+SET autocommit = 1;
+
+--let $tables_count = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES`
+
+--echo # Wait max 2 min for key encryption threads to encrypt all spaces
+--let $wait_timeout = 120
+# All tables should get encrypted, apart from temporary tablespace, t4 and t4_dup
+--let $wait_condition = SELECT COUNT(*) = $tables_count - 3 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+--let $assert_text = Make sure t4 is not encrypted
+--let $assert_cond = [SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME = "$DB_NAME/t4"] = 1
+--source include/assert.inc
+
+--let $assert_text = Make sure t4_dup is not encrypted
+--let $assert_cond = [SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME = "$DB_NAME/t4_dup"] = 1
+--source include/assert.inc
+
+ALTER TABLE t1 ENGINE InnoDB;
+SHOW CREATE TABLE t1;
+ALTER TABLE t2 ENGINE InnoDB;
+SHOW CREATE TABLE t2;
+ALTER TABLE t3 ENGINE InnoDB;
+SHOW CREATE TABLE t3;
+# before bug fix this would get t4 encrypted
+ALTER TABLE t4 ENGINE InnoDB;
+SHOW CREATE TABLE t4;
+ALTER TABLE t4_dup ENGINE InnoDB;
+SHOW CREATE TABLE t4_dup;
+
+
+--let $assert_text = Make sure t1 is encrypted
+--let $assert_cond = [SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME = "$DB_NAME/t1"] = 1
+--source include/assert.inc
+--let $assert_text = Make sure t2 is encrypted
+--let $assert_cond = [SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME = "$DB_NAME/t2"] = 1
+--source include/assert.inc
+--let $assert_text = Make sure t3 is encrypted
+--let $assert_cond = [SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1 AND NAME = "$DB_NAME/t3"] = 1
+--source include/assert.inc
+--let $assert_text = Make sure t4 is not encrypted, before bug fix this would fail, because t4 would get encrypted
+--let $assert_cond = [SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME = "$DB_NAME/t4"] = 1
+--source include/assert.inc
+--let $assert_text = Make sure t4_dup is not encrypted
+--let $assert_cond = [SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0 AND NAME = "$DB_NAME/t4_dup"] = 1
+--source include/assert.inc
+
+
+--echo # Tablespaces, apart from t4 should be encrypted after restart
+--let ABORT_ON = FOUND
+--let SEARCH_PATTERN = foobar
+--let SEARCH_FILE = $t1_ibd
+--source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN = temp
+--let SEARCH_FILE = $t2_ibd
+--source include/search_pattern_in_file.inc
+--let SEARCH_PATTERN = barfoo
+--let SEARCH_FILE = $t3_ibd
+--source include/search_pattern_in_file.inc
+# t4 should stay unenecrypted, before the bug fix this would fail
+# as t4 would get encrypted
+--let ABORT_ON = NOT_FOUND
+--let SEARCH_PATTERN = secret
+--let SEARCH_FILE = $t4_ibd
+--source include/search_pattern_in_file.inc
+--let ABORT_ON = NOT_FOUND
+--let SEARCH_PATTERN = fbar
+--let SEARCH_FILE = $t4_dup_ibd
+--source include/search_pattern_in_file.inc
+
+
+DROP TABLE t1,t2,t3,t4,t4_dup;
+DROP PROCEDURE innodb_insert_proc;

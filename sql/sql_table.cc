@@ -10376,15 +10376,6 @@ bool mysql_create_like_table(THD *thd, TABLE_LIST *table, TABLE_LIST *src_table,
   }
 
   /*
-    Do not keep ENCRYPTION clause for unencrypted table.
-    We raise error if we are creating encrypted temporary table later.
-  */
-  if (local_create_info.encrypt_type.str &&
-      !dd::is_encrypted(local_create_info.encrypt_type)) {
-    local_create_info.encrypt_type = {nullptr, 0};
-  }
-
-  /*
     Lock the FK children, in case the new table introduces a missing parent.
   */
   if (!(table->table || table->is_view()) &&

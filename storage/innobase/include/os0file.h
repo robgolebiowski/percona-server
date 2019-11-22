@@ -470,7 +470,7 @@ struct Encryption {
   @param[in]      algorithm       Encryption algorithm to check
   @return true if no algorithm explicitly requested */
   static bool none_explicitly_specified(
-      ulong create_info_used_fields,
+      bool explicit_encryption,
       const char *algorithm) noexcept MY_ATTRIBUTE((warn_unused_result));
 
   static bool is_master_key_encryption(const char *algorithm)
@@ -484,7 +484,7 @@ struct Encryption {
 
   static bool is_online_encryption_on() MY_ATTRIBUTE((warn_unused_result));
 
-  static bool should_be_keyring_encrypted(ulong create_info_used_fields,
+  static bool should_be_keyring_encrypted(bool explicit_encryption,
                                           const char *algorithm)
       MY_ATTRIBUTE((warn_unused_result));
 
