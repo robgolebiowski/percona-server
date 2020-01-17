@@ -259,7 +259,7 @@ bool mysql_create_db(THD *thd, const char *db, HA_CREATE_INFO *create_info) {
   if (create_info->encrypt_type.str) {
     encrypt_schema = dd::is_encrypted(create_info->encrypt_type);
   } else {
-    encrypt_schema = thd->variables.default_table_encryption;
+    encrypt_schema = thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON;
   }
   if (opt_table_encryption_privilege_check &&
       encrypt_schema != thd->variables.default_table_encryption &&

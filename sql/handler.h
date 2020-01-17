@@ -1901,6 +1901,8 @@ using fix_tablespaces_empty_uuid_t = bool (*)(void);
 */
 using fix_default_table_encryption_t = void (*)(ulong);
 
+using check_mk_and_keyring_encrypt_exclusion_for_online_enc_t = bool (*)(THD*);
+
 using compression_dict_data_vec_t =
     std::vector<std::pair<std::string, std::string>>;
 
@@ -2458,6 +2460,7 @@ struct handlerton {
   rotate_encryption_master_key_t rotate_encryption_master_key;
   fix_tablespaces_empty_uuid_t fix_tablespaces_empty_uuid;
   fix_default_table_encryption_t fix_default_table_encryption;
+  check_mk_and_keyring_encrypt_exclusion_for_online_enc_t check_mk_and_keyring_encrypt_exclusion_for_online_enc;
   upgrade_get_compression_dict_data_t upgrade_get_compression_dict_data;
 
   get_table_statistics_t get_table_statistics;
