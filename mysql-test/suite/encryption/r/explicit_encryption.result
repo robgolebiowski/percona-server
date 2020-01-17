@@ -35,6 +35,10 @@ t4_dup	CREATE TABLE `t4_dup` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 CREATE DATABASE test_enc_n DEFAULT ENCRYPTION='N';
+ERROR HY000: Database default encryption cannot be set to N (explicitly request for tables in database to be unencrypted) while default_table_encryption is set to ONLINE_TO_KEYRING. If you want to exclude table from being encrypted by encryption threads you can still do it while creating table. For that you need to explicitly specify ENCRYPTION='N' while creating a table.
+SET GLOBAL default_table_encryption=OFF;
+CREATE DATABASE test_enc_n DEFAULT ENCRYPTION='N';
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 USE test_enc_n;
 CREATE TABLE t6 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255));
 USE test;
