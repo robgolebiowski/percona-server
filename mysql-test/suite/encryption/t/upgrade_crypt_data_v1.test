@@ -47,7 +47,9 @@ call mtr.add_suppression("db.opt file not found for test database. Using default
 call mtr.add_suppression("Skip re-populating collations and character sets tables in InnoDB read-only mode");
 call mtr.add_suppression("Skipped updating resource group metadata in InnoDB read only mode");
 call mtr.add_suppression("file './test/t1.ibd' is missing!");
-#TODO : This warning is caused by bug#
+# The rotation of std_data/data_8017_crypt_v1 was not fully completed when preparing this data dir for test.
+# Thus we need to ignore these warnings.
+call mtr.add_suppression("Table encryption flag is OFF in the data dictionary but the encryption flag in file ./test/t3.ibd is ON.");
 call mtr.add_suppression("Table encryption flag is OFF in the data dictionary but the encryption flag in file ./test/t6.ibd is ON.");
 --enable_query_log
 
