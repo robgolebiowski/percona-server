@@ -15,7 +15,55 @@ CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
 SET GLOBAL innodb_undo_log_encrypt=ON;
 SHOW WARNINGS;
 
+--echo # First create a tablespace ONLINE keyring encrypted and then try to ALTER it 
+--echo # to MK encryption (should fail). Next decrypt the table and ALTER it to 
+--echo # MK encryption (should be successful).
+CREATE TABLESPACE `ts0` ADD DATAFILE 'ts0.ibd';
+
+--let $assert_text= Make sure ENCRYPTION is set to Y in INFORMATION_SCHEMA.INNODB_TABLESPACES
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts0\\' AND ENCRYPTION=\\'Y\\']" = 1
+--source include/assert.inc
+
+--let $assert_text= Make sure MIN_KEY_VERSION is set to 1 in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts0\\' AND MIN_KEY_VERSION=1]" = 1
+--source include/assert.inc
+
 SET GLOBAL default_table_encryption=OFF;
+--error ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION
+ALTER TABLESPACE ts0 ENCRYPTION='Y';
+
+SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=2;
+
+--echo # Wait max 10 min for key encryption threads to decrypt all spaces
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+--let $assert_text= Make sure ENCRYPTION is set to N in INFORMATION_SCHEMA.INNODB_TABLESPACES
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts0\\' AND ENCRYPTION=\\'N\\']" = 1
+--source include/assert.inc
+
+#SET GLOBAL default_table_encryption=OFF;
+#SET GLOBAL innodb_encryption_threads=0;
+
+# Now it should be possible to encrypt ts0 with MK encryption,
+ALTER TABLESPACE ts0 ENCRYPTION='Y';
+
+--let $assert_text= Make sure ENCRYPTION is set to Y in INFORMATION_SCHEMA.INNODB_TABLESPACES
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts0\\' AND ENCRYPTION=\\'Y\\']" = 1
+--source include/assert.inc
+
+SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
+
+--let $assert_text= Make sure ts0 deos not exist in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION as it is MK encrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts0\\']" = 0
+--source include/assert.inc
+
+DROP TABLESPACE ts0;
+
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 
 --echo # It should be now possible to turn on above encryptions
 
@@ -249,6 +297,17 @@ SET GLOBAL innodb_undo_log_encrypt=ON;
 --replace_result $MYSQLD_DATADIR1 MYSQLD_DATADIR1
 --let $restart_parameters="restart: --datadir=$MYSQLD_DATADIR1 --innodb-sys-tablespace-encrypt=RE_ENCRYPTING_TO_KEYRING --default-table-encryption=OFF --innodb-undo-log-encrypt=ON"
 --source include/start_mysqld.inc
+
+#--echo # Altering tablespace with online encrypted to keyring to 'N'
+
+#--error ER_WRONG_VALUE_FOR_VAR
+#SET GLOBAL default_table_encryption = ONLINE_TO_KEYRING;
+#SHOW WARNINGS;
+
+#--die
+#CREATE TABLESPACE `ts2` ADD DATAFILE 'ts2.ibd'; 
+#SELECT * from INFORMATION_SCHEMA.INNODB_TABLESPACES;
+#SET GLOBAL default_table_encryption=OFF;
 
 --source include/shutdown_mysqld.inc
 

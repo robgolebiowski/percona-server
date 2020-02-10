@@ -1398,6 +1398,10 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
   return false;
 }
 
+void fil_crypt_exclude_from_rotation(fil_space_t *space) {
+  if (space->crypt_data)
+}
+
 /***********************************************************************
 Update global statistics with thread statistics
 @param[in,out]	state		key rotation statistics */

@@ -2757,6 +2757,8 @@ dberr_t Encryption::set_algorithm(const char *option, Encryption *encryption) {
 
   } else if (innobase_strcasecmp(option, "KEYRING") == 0) {
     encryption->m_type = KEYRING;
+  } else if (innobase_strcasecmp(option, "ONLINE_TO_KEYRING") == 0) {
+    encryption->m_type = KEYRING;
   } else {
     return (DB_UNSUPPORTED);
   }
@@ -15851,9 +15853,17 @@ static int innodb_create_tablespace(handlerton *hton, THD *thd,
       goto error_exit;
     }
 
-    /* Validate that encryption is not MK encryption if online encryption is ON
-     */
+    bool explicit_encryption{false};
+    if (dd_space->options().exists("explicit_encryption")) {
+      (void)dd_space->options().get("explicit_encryption", &explicit_encryption);
+    }
+    /* Validate that encryption is not MK encryption if online encryption is ON.
+       encrypt_type is set to Y for both MK encryption and ONLINE_TO_KEYRING encryption.
+       However, when d_t_e=ONLINE_TO_KEYRING is set it is only possible to specify MK encryption
+       by explicitly specifying ENCRYPTION='Y'. We use this information here.
+    */
     if (Encryption::is_master_key_encryption(encrypt.c_str()) &&
+        explicit_encryption &&
         Encryption::is_online_encryption_on()) {
       my_printf_error(
           ER_ILLEGAL_HA_CREATE_OPTION,
@@ -16020,9 +16030,10 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
     }
     return error;
   } else if (!is_old_encrypted && is_new_encrypted) {
-    // TODO: PS-5323 should disallow reaching this code if encryption threads
+    // PS-5323 should disallow reaching this code if encryption threads
     // are enabled. Thus it should be safe to remove the crypt_data here. Here
     // we encrypt with MK, the tablespace was previously excluded from rotation.
+    ut_ad(srv_default_table_encryption != DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING);
     if (space->crypt_data != nullptr) {
       ut_ad(space->crypt_data->type == CRYPT_SCHEME_UNENCRYPTED);
       fil_space_destroy_crypt_data(&space->crypt_data);
@@ -16042,6 +16053,12 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
     /* Unencrypt tablespace */
     to_encrypt = false;
   } else {
+    // If tablespace is encrypted by encryption threads - it cannot be re-encrypted
+    // with Master Key encryption. It must first decrypted with encryption threads.
+    if (space->crypt_data != nullptr) {
+      my_error(ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION, MYF(0), space->name);
+      return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
+    }
     // TODO: Needs to be addressed by PS-5323. What to do when user requested
     // re-encryption from online-threads encrypted tablespace to MK encrypted
     // tablespace.
