@@ -1,3 +1,5 @@
+--source include/have_debug.inc
+
 let $MYSQLD_BASEDIR= `select @@basedir`;
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
@@ -43,9 +45,6 @@ SET GLOBAL innodb_encryption_threads=2;
 --let $assert_text= Make sure ENCRYPTION is set to N in INFORMATION_SCHEMA.INNODB_TABLESPACES
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts0\\' AND ENCRYPTION=\\'N\\']" = 1
 --source include/assert.inc
-
-#SET GLOBAL default_table_encryption=OFF;
-#SET GLOBAL innodb_encryption_threads=0;
 
 # Now it should be possible to encrypt ts0 with MK encryption,
 ALTER TABLESPACE ts0 ENCRYPTION='Y';
@@ -543,6 +542,18 @@ SET GLOBAL innodb_undo_log_encrypt=ON;
 --echo # Start default MTR instance
 --let $restart_parameters=
 --source include/start_mysqld.inc
+
+--echo # Decrypt all the tables
+SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
+
+--echo # Wait max 10 min for key encryption threads to decrypt all spaces
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+SET GLOBAL default_table_encryption=OFF;
+SET GLOBAL innodb_encryption_threads=0;
 
 --force-rmdir $MYSQL_TMP_DIR/datadir1
 --remove_file $RESTART_LOG

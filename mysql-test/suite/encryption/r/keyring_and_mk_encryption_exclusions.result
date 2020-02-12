@@ -266,3 +266,9 @@ SET GLOBAL innodb_undo_log_encrypt=ON;
 # restart: --datadir=MYSQLD_DATADIR1 --innodb-sys-tablespace-encrypt=RE_ENCRYPTING_TO_KEYRING --default-table-encryption=OFF --innodb-undo-log-encrypt=ON
 # Start default MTR instance
 # restart
+# Decrypt all the tables
+SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
+# Wait max 10 min for key encryption threads to decrypt all spaces
+SET GLOBAL default_table_encryption=OFF;
+SET GLOBAL innodb_encryption_threads=0;
