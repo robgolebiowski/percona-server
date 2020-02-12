@@ -16,7 +16,7 @@ SHOW CREATE TABLE t1;
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'db_1/t1\\' AND MIN_KEY_VERSION=1]" = 1
 --source include/assert.inc
 
-# It should not be possible to create a database with DEFAULT_ENCRYPTION=Y while default_table_encryption is
+# It should not be possible to create a database with DEFAULT_ENCRYPTION=Y/N while default_table_encryption is
 # equal to ONLINE_TO_KEYRING
 --error ER_DATABASE_ENCRYPTION_MK_KEYRING_MISMATCH
 CREATE DATABASE db_2 DEFAULT ENCRYPTION='Y';
@@ -97,6 +97,7 @@ CREATE TABLE t1 (a varchar(255));
 --let $assert_text= Make sure db_5/t1 is not included in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'db_5/t1\\']" = 0
 --source include/assert.inc
+
 
 # cleanup
 SET GLOBAL default_table_encryption=OFF;

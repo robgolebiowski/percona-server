@@ -9252,6 +9252,9 @@ ER_DATABASE_ENCRYPTION_MK_KEYRING_MISMATCH
 ER_DATABASE_ENCRYPTION_N_KEYRING_MISMATCH
   eng "Database default encryption cannot be set to N (explicitly request for tables in database to be unencrypted) while default_table_encryption is set to ONLINE_TO_KEYRING. If you want to exclude table from being encrypted by encryption threads you can still do it while creating table. For that you need to explicitly specify ENCRYPTION='N' while creating a table." 
 
+ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING
+  eng "Tablespace %s cannot have its ENCRYPTION altered as it is being currently encrypted/decrypted by encryption threads. Please try again later."
+
 #
 # End of Percona Server 8.0 client messages
 #

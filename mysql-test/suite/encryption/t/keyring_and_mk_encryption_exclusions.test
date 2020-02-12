@@ -15,8 +15,8 @@ CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
 SET GLOBAL innodb_undo_log_encrypt=ON;
 SHOW WARNINGS;
 
---echo # First create a tablespace ONLINE keyring encrypted and then try to ALTER it 
---echo # to MK encryption (should fail). Next decrypt the table and ALTER it to 
+--echo # First create a tablespace ONLINE keyring encrypted and then try to ALTER it
+--echo # to MK encryption (should fail). Next decrypt the table and ALTER it to
 --echo # MK encryption (should be successful).
 CREATE TABLESPACE `ts0` ADD DATAFILE 'ts0.ibd';
 
@@ -62,8 +62,7 @@ SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 
 DROP TABLESPACE ts0;
 
-SET GLOBAL innodb_encryption_threads=0;
-SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL default_table_encryption=OFF;
 
 --echo # It should be now possible to turn on above encryptions
 
@@ -71,15 +70,256 @@ CREATE TABLE t1 (a varchar(255)) ENGINE=INNODB ENCRYPTION='Y';
 CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
 SET GLOBAL innodb_undo_log_encrypt=ON;
 
-DROP TABLE t1;
-DROP TABLESPACE ts1;
-
 --echo # It should not be possible to turn on online to keyring encryption with
 --echo # undo log encryption turned on.
 
 --error ER_WRONG_VALUE_FOR_VAR
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 SHOW WARNINGS;
+
+DROP TABLE t1;
+DROP TABLESPACE ts1;
+SET GLOBAL innodb_undo_log_encrypt=OFF;
+
+--echo # Now we check General tablespace MK and KEYRING encryption exclusions.
+--echo # 1. Altering online encrypted tablespace to 'N'
+
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd';
+SET GLOBAL default_table_encryption=OFF;
+--error ER_EXPLICIT_DECRYPTION_OF_ONLINE_ENCRYPTED_TABLESPACE
+ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N';
+
+--echo # 2. Altering online encrypted tablespace to 'Y'
+--error ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION
+ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='Y';
+
+--echo # We have checked ALTER ENCRYPTION while ONLINE_TO_KEYRING is ON. Next we need to check a following race
+--echo # condition:
+--echo # connection default: requests ALTER general tablespace (call it X) ENCRYPTION=Y while encryption threads are off.
+--echo # connection con1: turns on encryption threads and encryption threads start to process X.
+--echo # The ALTER from connection default should be blocked if encryption threads start to process X.
+--echo # In case when ALTER will be first and start ALTERing ENCRYPTION - the encryption threads
+--echo # should be dissallowed from processing X till ALTER finishes off.
+--echo # The same checks need to be done when ATLER TABLESPACE X ENCRYPTION='N'
+SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=2;
+
+--echo # Wait max 10 min for key encryption threads to decrypt all spaces
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=OFF;
+
+--echo # First we check if ALTER ENCRYPTION will be blocked if encryption threads start to process tablespace first.
+
+SET DEBUG_SYNC = 'alter_encryption_to_y SIGNAL before_tablespace_mk_encryption WAIT_FOR go_alter_encryption_to_y';
+--send ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='Y'
+
+connect (con1,localhost,root,,);
+--connection con1
+SET DEBUG_SYNC = 'now WAIT_FOR before_tablespace_mk_encryption';
+SET GLOBAL debug="+d,hang_on_ts_with_encryption_key_id_rotation";
+
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+# CURRENT_KEY_ID=10 is a marker that we have reached the hang_on_ts_with_encryption_key_id_rotation
+# Can be only one encryption threads - in other case artifical CURRENT_KEY_ID=10 will cause asserts to fail
+SET GLOBAL innodb_encryption_threads=1;
+
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID=10
+--source include/wait_condition.inc
+
+SET GLOBAL default_table_encryption=OFF;
+
+SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_y';
+
+--connection default
+--error ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING
+--reap
+
+--connection con1
+SET GLOBAL debug="-d,hang_on_ts_with_encryption_key_id_rotation";
+DROP TABLESPACE ts_with_encryption_key_id;
+
+--echo # Now check when TABLESPACE ENCRYPTION is ALTERED to 'N' while encryption threads start to process
+--echo # tablespace first.
+
+--connection default
+CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd' ENCRYPTION='Y';
+
+SET DEBUG_SYNC = 'alter_encryption_to_n SIGNAL before_tablespace_mk_decryption WAIT_FOR go_alter_encryption_to_n';
+--send ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N'
+
+--connection con1
+SET DEBUG_SYNC = 'now WAIT_FOR before_tablespace_mk_decryption';
+SET GLOBAL debug="+d,hang_on_ts_with_encryption_key_id_rotation";
+
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+# CURRENT_KEY_ID=10 is a marker that we have reached the hang_on_ts_with_encryption_key_id_rotation
+# Can be only one encryption threads - in other case artifical CURRENT_KEY_ID=10 will cause asserts to fail
+SET GLOBAL innodb_encryption_threads=1;
+
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID=10
+--source include/wait_condition.inc
+
+SET GLOBAL default_table_encryption=OFF;
+
+SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_n';
+
+--connection default
+--error ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING
+--reap
+
+--connection con1
+SET GLOBAL debug="-d,hang_on_ts_with_encryption_key_id_rotation";
+DROP TABLESPACE ts_with_encryption_key_id;
+
+--echo # Here we check that encryption threads are dissallowed from running on a tablespace for which
+--echo # ALTER ENCRYPTION='Y' is in progress.
+
+--connection default
+
+--echo # Wait for system tablespace to get encrypted. We will use its CURRENT_KEY_ID in
+--echo # INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION for synchronization with this MTR
+
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=1;
+
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE SPACE=0 AND MIN_KEY_VERSION=1
+--source include/wait_condition.inc
+
+SET GLOBAL default_table_encryption=OFF;
+SET GLOBAL innodb_encryption_threads=0;
+
+CREATE TABLESPACE ts1 ADD DATAFILE 'ts1.ibd';
+
+SET DEBUG_SYNC = 'alter_encryption_to_y_tablespace_excluded SIGNAL t1_excluded WAIT_FOR t1_was_considered_for_rotation';
+--send ALTER TABLESPACE ts1 ENCRYPTION='Y'
+
+--connection con1
+SET DEBUG_SYNC = 'now WAIT_FOR t1_excluded';
+SET GLOBAL debug="+d,wait_for_ts1_to_be_considered_for_rotation";
+
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=1;
+
+--echo # We use CURRENT_KEY_ID == 10 for system space to communicate from server that ts1 was already considered
+--echo # for rotation.
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID=10 AND SPACE=0
+--source include/wait_condition.inc
+
+--echo # Now we check that encryption by encryption threads did not start for ts1
+--let $assert_text= Make sure encryption by encryption threads did not start for ts1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts1\\']" = 0
+--source include/assert.inc
+
+SET GLOBAL debug="-d,wait_for_ts1_to_be_considered_for_rotation";
+
+SET GLOBAL default_table_encryption=OFF;
+SET GLOBAL innodb_encryption_threads=0;
+
+--echo # Now we allow ALTER TABLESPACE ts1 ENCRYPTION='Y' to finish.
+SET DEBUG_SYNC = 'now SIGNAL t1_was_considered_for_rotation';
+
+--connection default
+--reap
+--let $assert_text= Make sure encryption ts1 was encrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts1\\' AND ENCRYPTION=\\'Y\\']" = 1
+--source include/assert.inc
+
+--echo # Check that now we can encrypt ts1 with encryption threads
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=4;
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
+
+--echo # Wait max 10 min for key encryption threads to encrypt all spaces, apart from
+--echo # temporary tablespace
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+--let $assert_text= Make sure encryption ts1 was encrypted by encryption threads
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts1\\' AND MIN_KEY_VERSION=1]" = 1
+--source include/assert.inc
+
+DROP TABLESPACE ts1;
+
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=OFF;
+
+--echo # Here we check that encryption threads are dissallowed from running on a tablespace for which
+--echo # ALTER ENCRYPTION='Y' is in progress.
+
+--connection default
+
+CREATE TABLESPACE ts1 ADD DATAFILE 'ts1.ibd' ENCRYPTION='Y';
+
+# Make sure system tablespace is encrypted by encryption threads and its CURRENT_KEY_ID != 10. We use CURRENT_KEY_ID = 10
+# for synchronization with this MTR test.
+--let $assert_text= Make sure system tablespace is encrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE SPACE=0 AND MIN_KEY_VERSION=1 AND CURRENT_KEY_ID <> 10]" = 1
+--source include/assert.inc
+
+SET DEBUG_SYNC = 'alter_encryption_to_n_tablespace_excluded SIGNAL ts1_excluded WAIT_FOR ts1_was_considered_for_rotation';
+--send ALTER TABLESPACE ts1 ENCRYPTION='N'
+
+--connection con1
+SET DEBUG_SYNC = 'now WAIT_FOR ts1_excluded';
+SET GLOBAL debug="+d,wait_for_ts1_to_be_considered_for_rotation";
+
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=1;
+
+--echo # We use CURRENT_KEY_ID == 10 for system space to communicate from server that ts1 was already considered
+--echo # for rotation.
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID=10 AND SPACE=0
+--source include/wait_condition.inc
+
+--echo # Now we check that encryption by encryption threads did not start for ts1
+--let $assert_text= Make sure encryption by encryption threads did not start for ts1
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts1\\']" = 0
+--source include/assert.inc
+
+SET GLOBAL debug="-d,wait_for_ts1_to_be_considered_for_rotation";
+
+SET GLOBAL default_table_encryption=OFF;
+SET GLOBAL innodb_encryption_threads=0;
+
+--echo # Now we allow ALTER TABLESPACE ts1 ENCRYPTION='N' to finish.
+SET DEBUG_SYNC = 'now SIGNAL ts1_was_considered_for_rotation';
+
+--connection default
+--reap
+--let $assert_text= Make sure encryption ts1 was decrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts1\\' AND ENCRYPTION=\\'N\\']" = 1
+--source include/assert.inc
+
+--echo # Check that now we can encrypt ts1 with encryption threads
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=4;
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
+
+--echo # Wait max 10 min for key encryption threads to encrypt all spaces, apart from
+--echo # temporary tablespace
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+--let $assert_text= Make sure encryption ts1 was encrypted by encryption threads
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts1\\' AND MIN_KEY_VERSION=1]" = 1
+--source include/assert.inc
+
+DROP TABLESPACE ts1;
+--disconnect con1
+
+--echo # End of checks for general tablespaces encryption exclusions
 
 --echo # Stop the instance which was created by MTR
 --source include/shutdown_mysqld.inc
@@ -297,17 +537,6 @@ SET GLOBAL innodb_undo_log_encrypt=ON;
 --replace_result $MYSQLD_DATADIR1 MYSQLD_DATADIR1
 --let $restart_parameters="restart: --datadir=$MYSQLD_DATADIR1 --innodb-sys-tablespace-encrypt=RE_ENCRYPTING_TO_KEYRING --default-table-encryption=OFF --innodb-undo-log-encrypt=ON"
 --source include/start_mysqld.inc
-
-#--echo # Altering tablespace with online encrypted to keyring to 'N'
-
-#--error ER_WRONG_VALUE_FOR_VAR
-#SET GLOBAL default_table_encryption = ONLINE_TO_KEYRING;
-#SHOW WARNINGS;
-
-#--die
-#CREATE TABLESPACE `ts2` ADD DATAFILE 'ts2.ibd'; 
-#SELECT * from INFORMATION_SCHEMA.INNODB_TABLESPACES;
-#SET GLOBAL default_table_encryption=OFF;
 
 --source include/shutdown_mysqld.inc
 

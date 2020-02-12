@@ -492,8 +492,8 @@ bool Sql_cmd_create_tablespace::execute(THD *thd) {
   // Innodb for tablespaces.
   if (opt_table_encryption_privilege_check &&
       m_options->encryption.str &&
-      ((encrypt_type == "Y" && thd->variables.default_table_encryption != DEFAULT_TABLE_ENC_ON) ||
-       (encrypt_type == "N" && thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON)) &&
+      (((encrypt_type == "Y" || encrypt_type == "y") && thd->variables.default_table_encryption != DEFAULT_TABLE_ENC_ON) ||
+       ((encrypt_type == "N" || encrypt_type == "n") && thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON)) &&
       //encrypt_tablespace != (thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON ||
                              //thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) &&
       check_table_encryption_admin_access(thd)) {

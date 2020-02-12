@@ -23,7 +23,7 @@ CREATE TABLE t8 (a varchar(255)) ENCRYPTION_KEY_ID=3;
 --let $assert_cond= "[SELECT EXCLUDED FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE name=\\'test/t3\\']" = "Y"
 --source include/assert.inc
 
---let $assert_text= TABLE ts_not_encrypted should have EXCLUDED set to Y in INNODB_TABLESPACES_ENCRYPTION
+--let $assert_text= TABLESPACE ts_not_encrypted should have EXCLUDED set to Y in INNODB_TABLESPACES_ENCRYPTION
 --let $assert_cond= "[SELECT EXCLUDED FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE name=\\'ts_not_encrypted\\']" = "Y"
 --source include/assert.inc
 

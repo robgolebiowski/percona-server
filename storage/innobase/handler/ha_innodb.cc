@@ -16024,16 +16024,18 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
   // if it is not already encrypted.
   if (!is_old_encrypted && !is_new_encrypted &&
       alter_info->explicit_encryption) {
-    if (!fil_crypt_exclude_tablespace_from_rotation(space)) {
+    if (!fil_crypt_exclude_tablespace_from_rotation_permanently(space)) {
       my_error(ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
       return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
     }
     return error;
   } else if (!is_old_encrypted && is_new_encrypted) {
-    // PS-5323 should disallow reaching this code if encryption threads
-    // are enabled. Thus it should be safe to remove the crypt_data here. Here
-    // we encrypt with MK, the tablespace was previously excluded from rotation.
-    ut_ad(srv_default_table_encryption != DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING);
+    DEBUG_SYNC_C("alter_encryption_to_y");
+    if (!fil_crypt_exclude_tablespace_from_rotation_temporarily(space)) {
+      my_error(ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
+      return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
+    }
+    DEBUG_SYNC_C("alter_encryption_to_y_tablespace_excluded");
     if (space->crypt_data != nullptr) {
       ut_ad(space->crypt_data->type == CRYPT_SCHEME_UNENCRYPTED);
       fil_space_destroy_crypt_data(&space->crypt_data);
@@ -16050,18 +16052,21 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
                space->name);
       return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
     }
+    DEBUG_SYNC_C("alter_encryption_to_n");
+    if (!fil_crypt_exclude_tablespace_from_rotation_temporarily(space)) {
+      my_error(ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
+      return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
+    }
+    DEBUG_SYNC_C("alter_encryption_to_n_tablespace_excluded");
     /* Unencrypt tablespace */
     to_encrypt = false;
   } else {
     // If tablespace is encrypted by encryption threads - it cannot be re-encrypted
     // with Master Key encryption. It must first decrypted with encryption threads.
-    if (space->crypt_data != nullptr) {
+    if (space->crypt_data != nullptr && alter_info->explicit_encryption) {
       my_error(ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION, MYF(0), space->name);
       return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
     }
-    // TODO: Needs to be addressed by PS-5323. What to do when user requested
-    // re-encryption from online-threads encrypted tablespace to MK encrypted
-    // tablespace.
     /* Nothing to do */
     return error;
   }

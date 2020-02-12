@@ -69,9 +69,12 @@ CREATE TABLE t1_in_ts_encryption_n (id INT NOT NULL PRIMARY KEY, a VARCHAR(255))
 
 SHOW CREATE TABLE t4_dup;
 
-# TODO: Setting DEFAULT ENCRYPTION with D_T_E=ONLINE_TO_KEYRING should not be possible
-# once PS-5323 is implemented
+--error ER_DATABASE_ENCRYPTION_N_KEYRING_MISMATCH
 CREATE DATABASE test_enc_n DEFAULT ENCRYPTION='N';
+SET GLOBAL default_table_encryption=OFF;
+CREATE DATABASE test_enc_n DEFAULT ENCRYPTION='N';
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+
 USE test_enc_n;
 CREATE TABLE t6 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255));
 USE test;
