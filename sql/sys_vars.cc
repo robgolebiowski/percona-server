@@ -7111,6 +7111,28 @@ static Sys_var_uint Sys_immediate_server_version(
     BLOCK_SIZE(1), NO_MUTEX_GUARD, IN_BINLOG,
     ON_CHECK(check_session_admin_or_replication_applier));
 
+static bool check_set_default_table_encryption_exclusions(THD *thd,
+                                                          set_var *var) {
+  longlong val = (longlong)var->save_result.ulonglong_value;
+
+  if (val == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
+    static const LEX_CSTRING innodb_engine{STRING_WITH_LEN("innodb")};
+
+    bool is_online_enc_disallowed = false;
+
+    plugin_ref plugin;
+    if ((plugin = ha_resolve_by_name(nullptr, &innodb_engine, false))) {
+      handlerton *hton = plugin_data<handlerton *>(plugin);
+      is_online_enc_disallowed =
+          hton->check_mk_and_keyring_encrypt_exclusion_for_online_enc(thd);
+      plugin_unlock(nullptr, plugin);
+    }
+
+    if (is_online_enc_disallowed) return true;
+  }
+  return false;
+}
+
 static bool check_set_default_table_encryption_access(
     sys_var *self MY_ATTRIBUTE((unused)), THD *thd, set_var *var) {
   DBUG_EXECUTE_IF("skip_table_encryption_admin_check_for_set",
@@ -7124,32 +7146,11 @@ static bool check_set_default_table_encryption_access(
     return true;
   }
 
-  //This needs to go to a separate function,
-  //this function is named check_set_default_table_encryption_access - needs
-  //to be changed.
-
-  longlong previous_val = thd->variables.default_table_encryption;
-  longlong val = (longlong)var->save_result.ulonglong_value;
-
-  if (val == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
-    static const LEX_CSTRING innodb_engine{STRING_WITH_LEN("innodb")};
-
-    bool is_online_enc_disallowed = false;
-
-    plugin_ref plugin;
-    if ((plugin = ha_resolve_by_name(nullptr, &innodb_engine, false))) {
-      handlerton *hton = plugin_data<handlerton *>(plugin);
-      is_online_enc_disallowed = hton->check_mk_and_keyring_encrypt_exclusion_for_online_enc(thd);
-      plugin_unlock(nullptr, plugin);
-    }
-
-    if (is_online_enc_disallowed)
-      return true;
-  }
-
   // Should own one of SUPER or both (SYSTEM_VARIABLES_ADMIN and
   // TABLE_ENCRYPTION_ADMIN), unless this is the session option and
   // the value is unchanged.
+  longlong previous_val = thd->variables.default_table_encryption;
+  longlong val = (longlong)var->save_result.ulonglong_value;
   if ((!var->is_global_persist() && val == previous_val) ||
       thd->security_context()->check_access(SUPER_ACL) ||
       (thd->security_context()
@@ -7164,6 +7165,12 @@ static bool check_set_default_table_encryption_access(
   my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
            "SUPER or SYSTEM_VARIABLES_ADMIN and TABLE_ENCRYPTION_ADMIN");
   return true;
+}
+
+static bool check_set_default_table_encryption(
+    sys_var *self MY_ATTRIBUTE((unused)), THD *thd, set_var *var) {
+  return check_set_default_table_encryption_access(self, thd, var) ||
+         check_set_default_table_encryption_exclusions(thd, var);
 }
 
 static const char *default_table_encryption_type_names[] = {
@@ -7191,8 +7198,7 @@ static Sys_var_enum_default_table_encryption Sys_default_table_encryption(
     "unless the user specifies an explicit encryption property.",
     HINT_UPDATEABLE SESSION_VAR(default_table_encryption), CMD_LINE(OPT_ARG),
     default_table_encryption_type_names, DEFAULT(DEFAULT_TABLE_ENC_OFF),
-    NO_MUTEX_GUARD, IN_BINLOG,
-    ON_CHECK(check_set_default_table_encryption_access));
+    NO_MUTEX_GUARD, IN_BINLOG, ON_CHECK(check_set_default_table_encryption));
 
 static bool check_set_table_encryption_privilege_access(sys_var *, THD *thd,
                                                         set_var *) {

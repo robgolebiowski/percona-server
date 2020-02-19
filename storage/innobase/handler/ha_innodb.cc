@@ -4373,9 +4373,7 @@ void innobase_fix_default_table_encryption(ulong encryption_option) {
   }
 }
 
-
 bool innobase_check_mk_and_keyring_encrypt_exclusion_for_online_enc(THD *thd) {
-
   if (srv_undo_log_encrypt == true) {
     push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
                         "Online encryption to KEYRING cannot be turned ON"
@@ -15855,16 +15853,17 @@ static int innodb_create_tablespace(handlerton *hton, THD *thd,
 
     bool explicit_encryption{false};
     if (dd_space->options().exists("explicit_encryption")) {
-      (void)dd_space->options().get("explicit_encryption", &explicit_encryption);
+      (void)dd_space->options().get("explicit_encryption",
+                                    &explicit_encryption);
     }
     /* Validate that encryption is not MK encryption if online encryption is ON.
-       encrypt_type is set to Y for both MK encryption and ONLINE_TO_KEYRING encryption.
-       However, when d_t_e=ONLINE_TO_KEYRING is set it is only possible to specify MK encryption
-       by explicitly specifying ENCRYPTION='Y'. We use this information here.
+       encrypt_type is set to Y for both MK encryption and ONLINE_TO_KEYRING
+       encryption. However, when d_t_e=ONLINE_TO_KEYRING is set it is only
+       possible to specify MK encryption by explicitly specifying
+       ENCRYPTION='Y'. We use this information here.
     */
     if (Encryption::is_master_key_encryption(encrypt.c_str()) &&
-        explicit_encryption &&
-        Encryption::is_online_encryption_on()) {
+        explicit_encryption && Encryption::is_online_encryption_on()) {
       my_printf_error(
           ER_ILLEGAL_HA_CREATE_OPTION,
           "InnoDB: ENCRYPTED='Y' not supported for tablespace because "
@@ -16061,8 +16060,9 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
     /* Unencrypt tablespace */
     to_encrypt = false;
   } else {
-    // If tablespace is encrypted by encryption threads - it cannot be re-encrypted
-    // with Master Key encryption. It must first decrypted with encryption threads.
+    // If tablespace is encrypted by encryption threads - it cannot be
+    // re-encrypted with Master Key encryption. It must first decrypted with
+    // encryption threads.
     if (space->crypt_data != nullptr && alter_info->explicit_encryption) {
       my_error(ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION, MYF(0), space->name);
       return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
@@ -21881,45 +21881,6 @@ is registered as a callback with MySQL.
 @param[in]	save      possibly updated variable value
 @param[in]	value     current variable value
 @return error code */
-
-//static int innodb_undo_log_encryption_validate(THD *thd, SYS_VAR *var,
-                                               //void *save,
-                                               //struct st_mysql_value *value) {
-  //const char *undo_log_encryption_input;
-  //char buff[4];
-  //int len = sizeof(buff);
-
-  //ut_a(save != nullptr);
-  //ut_a(value != nullptr);
-
-  //undo_log_encryption_input = value->val_str(value, buff, &len);
-
-  //if (len > 3) return 1;
-
-  //bool is_undo_log_encryption_on =
-      //!innobase_strcasecmp(undo_log_encryption_input, "ON") ||
-      //!innobase_strcasecmp(undo_log_encryption_input, "1");
-
-  //if (!is_undo_log_encryption_on) {
-    //if (innobase_strcasecmp(undo_log_encryption_input, "OFF") != 0 &&
-        //innobase_strcasecmp(undo_log_encryption_input, "0") != 0) {
-      //return 1;
-    //}
-  //} else if (Encryption::is_online_encryption_on()) {
-    //push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
-                        //"Undo log cannot be"
-                        //" encrypted with Master Key encryption"
-                        //" when online to KEYRING encryption is turned ON.");
-    //return 1;
-  //} else if (check_mk_and_keyring_encrypt_exclusion_for_undo(true, thd) !=
-             //DB_SUCCESS) {
-    //return 1;
-  //}
-
-  //*reinterpret_cast<bool *>(save) = is_undo_log_encryption_on;
-  //return 0;
-//}
-
 static int validate_innodb_undo_log_encrypt(THD *thd, SYS_VAR *var, void *save,
                                             struct st_mysql_value *value) {
   /* Call the default check function first. */
@@ -21938,14 +21899,14 @@ static int validate_innodb_undo_log_encrypt(THD *thd, SYS_VAR *var, void *save,
   }
 
   if (target) {
-    if(Encryption::is_online_encryption_on()) {
+    if (Encryption::is_online_encryption_on()) {
       push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
                           "Undo log cannot be"
                           " encrypted with Master Key encryption"
                           " when online to KEYRING encryption is turned ON.");
       return 1;
     } else if (check_mk_and_keyring_encrypt_exclusion_for_undo(true, thd) !=
-             DB_SUCCESS) {
+               DB_SUCCESS) {
       return 1;
     }
   }
@@ -22083,52 +22044,6 @@ static int validate_innodb_redo_log_encrypt(THD *thd, SYS_VAR *var, void *save,
 
   return 0;
 }
-
-/** Check if it is a valid value of innodb_undo_log_encryption_validate.
-Undo log encryption can be turned ON only if online to keyring
-encryption is disabled.
-@param[in]	thd	thread handle
-@param[in]	var	pointer to system variable
-@param[out]	save	immediate result for update function
-@param[in]	value	incoming bool
-@return 0 for valid innodb_track_changed_pages */
-//static int innodb_undo_log_encryption_validate(THD *thd, SYS_VAR *var,
-                                               //void *save,
-                                               //struct st_mysql_value *value) {
-  //const char *undo_log_encryption_input;
-  //char buff[4];
-  //int len = sizeof(buff);
-
-  //ut_a(save != nullptr);
-  //ut_a(value != nullptr);
-
-  //undo_log_encryption_input = value->val_str(value, buff, &len);
-
-  //if (len > 3) return 1;
-
-  //bool is_undo_log_encryption_on =
-      //!innobase_strcasecmp(undo_log_encryption_input, "ON") ||
-      //!innobase_strcasecmp(undo_log_encryption_input, "1");
-
-  //if (!is_undo_log_encryption_on) {
-    //if (innobase_strcasecmp(undo_log_encryption_input, "OFF") != 0 &&
-        //innobase_strcasecmp(undo_log_encryption_input, "0") != 0) {
-      //return 1;
-    //}
-  //} else if (Encryption::is_online_encryption_on()) {
-    //push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
-                        //"Undo log cannot be"
-                        //" encrypted with Master Key encryption"
-                        //" when online to KEYRING encryption is turned ON.");
-    //return 1;
-  //} else if (check_mk_and_keyring_encrypt_exclusion_for_undo(true, thd) !=
-             //DB_SUCCESS) {
-    //return 1;
-  //}
-
-  //*reinterpret_cast<bool *>(save) = is_undo_log_encryption_on;
-  //return 0;
-//}
 
 static int innodb_sys_tablespace_encyption_validate(
     THD *thd, SYS_VAR *var, void *save, struct st_mysql_value *value) {

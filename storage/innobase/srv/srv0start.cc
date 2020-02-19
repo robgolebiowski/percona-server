@@ -2007,11 +2007,10 @@ static dberr_t check_online_to_keyring_and_mk_encrypt_exclusions(
     return (DB_ERROR);
   }
   if (srv_undo_log_encrypt) {
-    ib::error()
-        << "Online encryption to keyring cannot be turned ON "
-           "as Undo log Master Key encryption is turned ON. "
-           "You can encrypt Undo log with either Master key encryption "
-           "or with KEYRING encryption, but you have to choose one.";
+    ib::error() << "Online encryption to keyring cannot be turned ON "
+                   "as Undo log Master Key encryption is turned ON. "
+                   "You can encrypt Undo log with either Master key encryption "
+                   "or with KEYRING encryption, but you have to choose one.";
     return (DB_ERROR);
   }
   return (DB_SUCCESS);
@@ -2436,11 +2435,10 @@ dberr_t srv_start(bool create_new_db, const std::string &scan_directories) {
   as part of InnoDB initialization. So we directly use the server
   global variable structure */
 
-  srv_default_table_encryption = static_cast<enum_default_table_encryption>(global_system_variables.default_table_encryption);
-
-  //if (global_system_variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING && 
-  if (srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING && 
-      check_online_to_keyring_and_mk_encrypt_exclusions(create_new_db) == DB_ERROR) {
+  if (global_system_variables.default_table_encryption ==
+          DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING &&
+      check_online_to_keyring_and_mk_encrypt_exclusions(create_new_db) ==
+          DB_ERROR) {
     return (srv_init_abort(DB_ERROR));
   }
 

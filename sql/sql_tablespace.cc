@@ -470,34 +470,25 @@ bool Sql_cmd_create_tablespace::execute(THD *thd) {
     encrypt_tablespace = dd::is_encrypted(m_options->encryption);
     encrypt_type = dd::make_string_type(m_options->encryption);
   } else {
-    //if (thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON) {
-      //encrypt_tablespace = true;
-      //encrypt_type = "Y";
-    //} else if (thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
-      //encrypt_tablespace = true;
-      //encrypt_type = "Y";
-    //}
     encrypt_tablespace =
         thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON ||
         global_system_variables.default_table_encryption ==
             DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING;
-    // We set encrypt_type, which is later assigned to tablespace's DD encryption
-    // option to Y for online KEYRING encryption. This field is designed so the user
-    // could check if given table is encrypted or not. The details on how it is encrypted
-    // (KEYRING in this case) are left in SE.
+    // We set encrypt_type, which is later assigned to tablespace's DD
+    // encryption option to Y for online KEYRING encryption. This field is
+    // designed so the user could check if given table is encrypted or not. The
+    // details on how it is encrypted (KEYRING in this case) are left in SE.
     encrypt_type = encrypt_tablespace ? "Y" : "N";
   }
 
-  // check if default has been overwrriten. Note that ENCRYPTION='KEYRING' will be blocked by
-  // Innodb for tablespaces.
-  if (opt_table_encryption_privilege_check &&
-      m_options->encryption.str &&
-      (((encrypt_type == "Y" || encrypt_type == "y") && thd->variables.default_table_encryption != DEFAULT_TABLE_ENC_ON) ||
-       ((encrypt_type == "N" || encrypt_type == "n") && thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON)) &&
-      //encrypt_tablespace != (thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON ||
-                             //thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) &&
+  // check if default has been overwrriten. Note that ENCRYPTION='KEYRING' will
+  // be blocked by Innodb for tablespaces.
+  if (opt_table_encryption_privilege_check && m_options->encryption.str &&
+      (((encrypt_type == "Y" || encrypt_type == "y") &&
+        thd->variables.default_table_encryption != DEFAULT_TABLE_ENC_ON) ||
+       ((encrypt_type == "N" || encrypt_type == "n") &&
+        thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON)) &&
       check_table_encryption_admin_access(thd)) {
-    //DBUG_ASSERT(m_options->encryption.str); // it is only possible if ENCRYPTION were explicitly assigned
     my_error(ER_CANNOT_SET_TABLESPACE_ENCRYPTION, MYF(0));
     return true;
   }
