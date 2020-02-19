@@ -258,7 +258,8 @@ bool mysql_create_db(THD *thd, const char *db, HA_CREATE_INFO *create_info) {
   bool encrypt_schema = false;
   if (create_info->encrypt_type.str) {
     encrypt_schema = dd::is_encrypted(create_info->encrypt_type);
-    if (global_system_variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
+    if (global_system_variables.default_table_encryption ==
+        DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
       if (encrypt_schema) {
         my_error(ER_DATABASE_ENCRYPTION_MK_KEYRING_MISMATCH, MYF(0));
         return true;
@@ -268,7 +269,8 @@ bool mysql_create_db(THD *thd, const char *db, HA_CREATE_INFO *create_info) {
       }
     }
   } else {
-    encrypt_schema = thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON;
+    encrypt_schema =
+        thd->variables.default_table_encryption == DEFAULT_TABLE_ENC_ON;
   }
   if (opt_table_encryption_privilege_check &&
       encrypt_schema != thd->variables.default_table_encryption &&
