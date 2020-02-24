@@ -82,19 +82,19 @@ SET GLOBAL innodb_undo_log_encrypt=OFF;
 --echo # 1. Altering online encrypted tablespace to 'N'
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd';
+CREATE TABLESPACE ts_hang ADD DATAFILE 'ts_hang.ibd';
 
---let $assert_text= Check that ts_with_encryption_key_id is encrypted
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts_with_encryption_key_id\\' AND MIN_KEY_VERSION=1]" = 1
+--let $assert_text= Check that ts_hang is encrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts_hang\\' AND MIN_KEY_VERSION=1]" = 1
 --source include/assert.inc
 
 SET GLOBAL default_table_encryption=OFF;
 --error ER_EXPLICIT_DECRYPTION_OF_ONLINE_ENCRYPTED_TABLESPACE
-ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N';
+ALTER TABLESPACE ts_hang ENCRYPTION='N';
 
 --echo # 2. Altering online encrypted tablespace to 'Y'
 --error ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION
-ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='Y';
+ALTER TABLESPACE ts_hang ENCRYPTION='Y';
 
 --echo # We have checked ALTER ENCRYPTION while ONLINE_TO_KEYRING is ON. Next we need to check a following race
 --echo # condition:
@@ -118,15 +118,15 @@ SET GLOBAL default_table_encryption=OFF;
 --echo # First we check if ALTER ENCRYPTION will be blocked if encryption threads start to process tablespace first.
 
 SET DEBUG_SYNC = 'alter_encryption_to_y SIGNAL before_tablespace_mk_encryption WAIT_FOR go_alter_encryption_to_y';
---send ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='Y'
+--send ALTER TABLESPACE ts_hang ENCRYPTION='Y'
 
 connect (con1,localhost,root,,);
 --connection con1
 SET DEBUG_SYNC = 'now WAIT_FOR before_tablespace_mk_encryption';
-SET GLOBAL debug="+d,hang_on_ts_with_encryption_key_id_rotation";
+SET GLOBAL debug="+d,hang_on_ts_hang_rotation";
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-# CURRENT_KEY_ID=10 is a marker that we have reached the hang_on_ts_with_encryption_key_id_rotation
+# CURRENT_KEY_ID=10 is a marker that we have reached the hang_on_ts_hang_rotation
 # Can be only one encryption threads - in other case artifical CURRENT_KEY_ID=10 will cause asserts to fail
 SET GLOBAL innodb_encryption_threads=1;
 
@@ -143,24 +143,24 @@ SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_y';
 --reap
 
 --connection con1
-SET GLOBAL debug="-d,hang_on_ts_with_encryption_key_id_rotation";
-DROP TABLESPACE ts_with_encryption_key_id;
+SET GLOBAL debug="-d,hang_on_ts_hang_rotation";
+DROP TABLESPACE ts_hang;
 
 --echo # Now check when TABLESPACE ENCRYPTION is ALTERED to 'N' while encryption threads start to process
 --echo # tablespace first.
 
 --connection default
-CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd' ENCRYPTION='Y';
+CREATE TABLESPACE ts_hang ADD DATAFILE 'ts_hang.ibd' ENCRYPTION='Y';
 
 SET DEBUG_SYNC = 'alter_encryption_to_n SIGNAL before_tablespace_mk_decryption WAIT_FOR go_alter_encryption_to_n';
---send ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N'
+--send ALTER TABLESPACE ts_hang ENCRYPTION='N'
 
 --connection con1
 SET DEBUG_SYNC = 'now WAIT_FOR before_tablespace_mk_decryption';
-SET GLOBAL debug="+d,hang_on_ts_with_encryption_key_id_rotation";
+SET GLOBAL debug="+d,hang_on_ts_hang_rotation";
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-# CURRENT_KEY_ID=10 is a marker that we have reached the hang_on_ts_with_encryption_key_id_rotation
+# CURRENT_KEY_ID=10 is a marker that we have reached the hang_on_ts_hang_rotation
 # Can be only one encryption threads - in other case artifical CURRENT_KEY_ID=10 will cause asserts to fail
 SET GLOBAL innodb_encryption_threads=1;
 
@@ -177,8 +177,8 @@ SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_n';
 --reap
 
 --connection con1
-SET GLOBAL debug="-d,hang_on_ts_with_encryption_key_id_rotation";
-DROP TABLESPACE ts_with_encryption_key_id;
+SET GLOBAL debug="-d,hang_on_ts_hang_rotation";
+DROP TABLESPACE ts_hang;
 
 --echo # Here we check that encryption threads are dissallowed from running on a tablespace for which
 --echo # ALTER ENCRYPTION='Y' is in progress.

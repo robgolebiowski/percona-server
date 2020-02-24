@@ -1826,14 +1826,13 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
   mutex_exit(&crypt_data->start_rotate_mutex);
 
   DBUG_EXECUTE_IF(
-      "hang_on_ts_with_encryption_key_id_rotation",
-      if (strcmp(state->space->name, "ts_with_encryption_key_id") == 0) {
+      "hang_on_ts_hang_rotation",
+      if (strcmp(state->space->name, "ts_hang") == 0) {
         // artifical key_id = 10 to let MTR test know that we are
         // hanging
         static EncryptionKeyId key_id = crypt_data->key_id;
         crypt_data->key_id = 10;
-        while (DBUG_EVALUATE_IF("hang_on_ts_with_encryption_key_id_rotation",
-                                true, false))
+        while (DBUG_EVALUATE_IF("hang_on_ts_hang_rotation", true, false))
           os_thread_sleep(1000);
         crypt_data->key_id = key_id;
       });

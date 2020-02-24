@@ -48,14 +48,14 @@ SET GLOBAL innodb_undo_log_encrypt=OFF;
 # Now we check General tablespace MK and KEYRING encryption exclusions.
 # 1. Altering online encrypted tablespace to 'N'
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd';
-include/assert.inc [Check that ts_with_encryption_key_id is encrypted]
+CREATE TABLESPACE ts_hang ADD DATAFILE 'ts_hang.ibd';
+include/assert.inc [Check that ts_hang is encrypted]
 SET GLOBAL default_table_encryption=OFF;
-ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N';
-ERROR HY000: Tablespace ts_with_encryption_key_id is encrypted by encryption threads and cannot be explicitly decrypted. Please use default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENECRYPTED to decypt the tablespace.
+ALTER TABLESPACE ts_hang ENCRYPTION='N';
+ERROR HY000: Tablespace ts_hang is encrypted by encryption threads and cannot be explicitly decrypted. Please use default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENECRYPTED to decypt the tablespace.
 # 2. Altering online encrypted tablespace to 'Y'
-ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='Y';
-ERROR HY000: Tablespace ts_with_encryption_key_id is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads.
+ALTER TABLESPACE ts_hang ENCRYPTION='Y';
+ERROR HY000: Tablespace ts_hang is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads.
 # We have checked ALTER ENCRYPTION while ONLINE_TO_KEYRING is ON. Next we need to check a following race
 # condition:
 # connection default: requests ALTER general tablespace (call it X) ENCRYPTION=Y while encryption threads are off.
@@ -71,30 +71,30 @@ SET GLOBAL innodb_encryption_threads=0;
 SET GLOBAL default_table_encryption=OFF;
 # First we check if ALTER ENCRYPTION will be blocked if encryption threads start to process tablespace first.
 SET DEBUG_SYNC = 'alter_encryption_to_y SIGNAL before_tablespace_mk_encryption WAIT_FOR go_alter_encryption_to_y';
-ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='Y';
+ALTER TABLESPACE ts_hang ENCRYPTION='Y';
 SET DEBUG_SYNC = 'now WAIT_FOR before_tablespace_mk_encryption';
-SET GLOBAL debug="+d,hang_on_ts_with_encryption_key_id_rotation";
+SET GLOBAL debug="+d,hang_on_ts_hang_rotation";
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 SET GLOBAL innodb_encryption_threads=1;
 SET GLOBAL default_table_encryption=OFF;
 SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_y';
-ERROR HY000: Tablespace ts_with_encryption_key_id cannot have its ENCRYPTION altered as it is being currently encrypted/decrypted by encryption threads. Please try again later.
-SET GLOBAL debug="-d,hang_on_ts_with_encryption_key_id_rotation";
-DROP TABLESPACE ts_with_encryption_key_id;
+ERROR HY000: Tablespace ts_hang cannot have its ENCRYPTION altered as it is being currently encrypted/decrypted by encryption threads. Please try again later.
+SET GLOBAL debug="-d,hang_on_ts_hang_rotation";
+DROP TABLESPACE ts_hang;
 # Now check when TABLESPACE ENCRYPTION is ALTERED to 'N' while encryption threads start to process
 # tablespace first.
-CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd' ENCRYPTION='Y';
+CREATE TABLESPACE ts_hang ADD DATAFILE 'ts_hang.ibd' ENCRYPTION='Y';
 SET DEBUG_SYNC = 'alter_encryption_to_n SIGNAL before_tablespace_mk_decryption WAIT_FOR go_alter_encryption_to_n';
-ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N';
+ALTER TABLESPACE ts_hang ENCRYPTION='N';
 SET DEBUG_SYNC = 'now WAIT_FOR before_tablespace_mk_decryption';
-SET GLOBAL debug="+d,hang_on_ts_with_encryption_key_id_rotation";
+SET GLOBAL debug="+d,hang_on_ts_hang_rotation";
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 SET GLOBAL innodb_encryption_threads=1;
 SET GLOBAL default_table_encryption=OFF;
 SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_n';
-ERROR HY000: Tablespace ts_with_encryption_key_id cannot have its ENCRYPTION altered as it is being currently encrypted/decrypted by encryption threads. Please try again later.
-SET GLOBAL debug="-d,hang_on_ts_with_encryption_key_id_rotation";
-DROP TABLESPACE ts_with_encryption_key_id;
+ERROR HY000: Tablespace ts_hang cannot have its ENCRYPTION altered as it is being currently encrypted/decrypted by encryption threads. Please try again later.
+SET GLOBAL debug="-d,hang_on_ts_hang_rotation";
+DROP TABLESPACE ts_hang;
 # Here we check that encryption threads are dissallowed from running on a tablespace for which
 # ALTER ENCRYPTION='Y' is in progress.
 # Wait for system tablespace to get encrypted. We will use its CURRENT_KEY_ID in
