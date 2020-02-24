@@ -1901,6 +1901,12 @@ using fix_tablespaces_empty_uuid_t = bool (*)(void);
 */
 using fix_default_table_encryption_t = void (*)(ulong);
 
+/**
+ @brief
+ This is used by encryption threads. It checks if requested
+ encryption is compliant with current encryption used in
+ innodb.
+*/
 using check_mk_and_keyring_encrypt_exclusion_for_online_enc_t = bool (*)(THD *);
 
 using compression_dict_data_vec_t =

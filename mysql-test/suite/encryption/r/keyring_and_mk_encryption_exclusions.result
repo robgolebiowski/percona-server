@@ -20,16 +20,14 @@ include/assert.inc [Make sure ENCRYPTION is set to Y in INFORMATION_SCHEMA.INNOD
 include/assert.inc [Make sure MIN_KEY_VERSION is set to 1 in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION]
 SET GLOBAL default_table_encryption=OFF;
 ALTER TABLESPACE ts0 ENCRYPTION='Y';
-ERROR HY000: Tablespace ts0 is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads
+ERROR HY000: Tablespace ts0 is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads.
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=2;
 # Wait max 10 min for key encryption threads to decrypt all spaces
 include/assert.inc [Make sure ENCRYPTION is set to N in INFORMATION_SCHEMA.INNODB_TABLESPACES]
 ALTER TABLESPACE ts0 ENCRYPTION='Y';
 include/assert.inc [Make sure ENCRYPTION is set to Y in INFORMATION_SCHEMA.INNODB_TABLESPACES]
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-SPACE	NAME	EXCLUDED	ENCRYPTION_SCHEME	KEYSERVER_REQUESTS	MIN_KEY_VERSION	CURRENT_KEY_VERSION	KEY_ROTATION_PAGE_NUMBER	KEY_ROTATION_MAX_PAGE_NUMBER	CURRENT_KEY_ID	ROTATING_OR_FLUSHING
-include/assert.inc [Make sure ts0 deos not exist in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION as it is MK encrypted]
+include/assert.inc [Make sure ts0 is marked as unencrypted in INNODB_TABLESPACES_ENCRYPTION]
 DROP TABLESPACE ts0;
 SET GLOBAL default_table_encryption=OFF;
 # It should be now possible to turn on above encryptions
@@ -51,12 +49,13 @@ SET GLOBAL innodb_undo_log_encrypt=OFF;
 # 1. Altering online encrypted tablespace to 'N'
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd';
+include/assert.inc [Check that ts_with_encryption_key_id is encrypted]
 SET GLOBAL default_table_encryption=OFF;
 ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N';
-ERROR HY000: Tablespace ts_with_encryption_key_id is encrypted by encryption threads and cannot be explicitly decrypted. Please use default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENECRYPTED to decypt the tablespace
+ERROR HY000: Tablespace ts_with_encryption_key_id is encrypted by encryption threads and cannot be explicitly decrypted. Please use default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENECRYPTED to decypt the tablespace.
 # 2. Altering online encrypted tablespace to 'Y'
 ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='Y';
-ERROR HY000: Tablespace ts_with_encryption_key_id is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads
+ERROR HY000: Tablespace ts_with_encryption_key_id is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads.
 # We have checked ALTER ENCRYPTION while ONLINE_TO_KEYRING is ON. Next we need to check a following race
 # condition:
 # connection default: requests ALTER general tablespace (call it X) ENCRYPTION=Y while encryption threads are off.

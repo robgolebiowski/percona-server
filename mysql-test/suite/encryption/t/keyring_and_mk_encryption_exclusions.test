@@ -53,10 +53,8 @@ ALTER TABLESPACE ts0 ENCRYPTION='Y';
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts0\\' AND ENCRYPTION=\\'Y\\']" = 1
 --source include/assert.inc
 
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
---let $assert_text= Make sure ts0 deos not exist in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION as it is MK encrypted
---let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts0\\']" = 0
+--let $assert_text= Make sure ts0 is marked as unencrypted in INNODB_TABLESPACES_ENCRYPTION
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts0\\' AND MIN_KEY_VERSION=0]" = 1
 --source include/assert.inc
 
 DROP TABLESPACE ts0;
@@ -85,6 +83,11 @@ SET GLOBAL innodb_undo_log_encrypt=OFF;
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 CREATE TABLESPACE ts_with_encryption_key_id ADD DATAFILE 'ts_with_encryption_key_id.ibd';
+
+--let $assert_text= Check that ts_with_encryption_key_id is encrypted
+--let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'ts_with_encryption_key_id\\' AND MIN_KEY_VERSION=1]" = 1
+--source include/assert.inc
+
 SET GLOBAL default_table_encryption=OFF;
 --error ER_EXPLICIT_DECRYPTION_OF_ONLINE_ENCRYPTED_TABLESPACE
 ALTER TABLESPACE ts_with_encryption_key_id ENCRYPTION='N';
@@ -136,7 +139,7 @@ SET GLOBAL default_table_encryption=OFF;
 SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_y';
 
 --connection default
---error ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING
+--error ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING
 --reap
 
 --connection con1
@@ -170,7 +173,7 @@ SET GLOBAL default_table_encryption=OFF;
 SET DEBUG_SYNC = 'now SIGNAL go_alter_encryption_to_n';
 
 --connection default
---error ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING
+--error ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING
 --reap
 
 --connection con1

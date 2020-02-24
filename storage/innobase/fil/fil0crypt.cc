@@ -1049,6 +1049,13 @@ bool fil_crypt_exclude_tablespace_from_rotation_temporarily(
   // exclude it from rotation.
   if (crypt_data->rotate_state.active_threads != 0 ||
       crypt_data->rotate_state.starting || crypt_data->rotate_state.flushing) {
+    my_error(ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
+    return false;
+  }
+
+  // it is only possible to exclude tablespace that is unencrypted
+  if (crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
+    my_error(ER_EXCLUDE_ENCRYPTION_TABLE_ENCRYPTED, MYF(0), space->name);
     return false;
   }
 
@@ -1087,10 +1094,15 @@ bool fil_crypt_exclude_tablespace_from_rotation_permanently(
   // exclude it from rotation.
   if (crypt_data->rotate_state.active_threads != 0 ||
       crypt_data->rotate_state.starting || crypt_data->rotate_state.flushing) {
+    my_error(ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
     return false;
   }
 
-  ut_ad(crypt_data->type == CRYPT_SCHEME_UNENCRYPTED);
+  // it is only possible to exclude tablespace that is unencrypted
+  if (crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
+    my_error(ER_EXCLUDE_ENCRYPTION_TABLE_ENCRYPTED, MYF(0), space->name);
+    return false;
+  }
 
   crypt_data->encryption = FIL_ENCRYPTION_OFF;
   crypt_data->key_id = FIL_DEFAULT_ENCRYPTION_KEY;
@@ -1388,8 +1400,9 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
       break;
     }
 
-    /* No need to rotate space if encryption is disabled */
-    if (crypt_data->is_encryption_disabled()) {
+    /* No need to rotate space if encryption is disabled
+     * permanently or temporarily */
+    if (crypt_data->is_encryption_disabled() || space->exclude_from_rotation) {
       break;
     }
 
@@ -1761,7 +1774,7 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
   // threads to interfere with that.
 
   if (crypt_data->is_encryption_disabled() ||
-      state->space->exclude_from_rotation == true) {
+      state->space->exclude_from_rotation) {
     mutex_exit(&crypt_data->mutex);
     crypt_data->rotate_state.destroy_flush_observer();
     mutex_exit(&crypt_data->start_rotate_mutex);

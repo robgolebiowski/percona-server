@@ -16018,42 +16018,49 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
       !(oldenc.empty() || Encryption::is_none(oldenc.data()));
   /* If new tablespace definition says it's encrypted */
   bool is_new_encrypted = !Encryption::is_none(newenc.data());
+  fil_space_crypt_t *crypt_data = space->crypt_data;
 
   // It is only possible to mark tablespace to be skipped by encryption threads
   // if it is not already encrypted.
   if (!is_old_encrypted && !is_new_encrypted &&
       alter_info->explicit_encryption) {
     if (!fil_crypt_exclude_tablespace_from_rotation_permanently(space)) {
-      my_error(ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
       return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
     }
     return error;
   } else if (!is_old_encrypted && is_new_encrypted) {
     DEBUG_SYNC_C("alter_encryption_to_y");
     if (!fil_crypt_exclude_tablespace_from_rotation_temporarily(space)) {
-      my_error(ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
       return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
     }
     DEBUG_SYNC_C("alter_encryption_to_y_tablespace_excluded");
-    if (space->crypt_data != nullptr) {
-      ut_ad(space->crypt_data->type == CRYPT_SCHEME_UNENCRYPTED);
-      fil_space_destroy_crypt_data(&space->crypt_data);
-      space->crypt_data = nullptr;
-      rw_lock_x_lock(&space->latch);
-      space->encryption_type = Encryption::NONE;
-      rw_lock_x_unlock(&space->latch);
+    if (crypt_data != nullptr) {
+      mutex_enter(&crypt_data->mutex);
+      ut_ad(crypt_data->type == CRYPT_SCHEME_UNENCRYPTED);
+      ut_ad(crypt_data->min_key_version ==
+            ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+      // setting it to default - it could have been FIL_ENCRYPTION_N
+      // however, now that it gets encrypted with Master Key encryption
+      // the user will have a chance to re-encrypt it with KEYRING
+      crypt_data->encryption = FIL_ENCRYPTION_DEFAULT;
+      mutex_exit(&space->crypt_data->mutex);
     }
     /* Encrypt tablespace */
     to_encrypt = true;
   } else if (is_old_encrypted && !is_new_encrypted) {
-    if (space->crypt_data) {
-      my_error(ER_EXPLICIT_DECRYPTION_OF_ONLINE_ENCRYPTED_TABLESPACE, MYF(0),
-               space->name);
-      return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
+    if (crypt_data) {
+      mutex_enter(&crypt_data->mutex);
+      bool is_keyring_encrypted{crypt_data->type != CRYPT_SCHEME_UNENCRYPTED};
+      mutex_exit(&crypt_data->mutex);
+      if (is_keyring_encrypted) {
+        my_error(ER_EXPLICIT_DECRYPTION_OF_ONLINE_ENCRYPTED_TABLESPACE, MYF(0),
+                 space->name);
+        return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
+      }
     }
     DEBUG_SYNC_C("alter_encryption_to_n");
+    // do not want master key decryption to get into way of encryption threads
     if (!fil_crypt_exclude_tablespace_from_rotation_temporarily(space)) {
-      my_error(ER_TEMP_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
       return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
     }
     DEBUG_SYNC_C("alter_encryption_to_n_tablespace_excluded");
@@ -16064,8 +16071,13 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
     // re-encrypted with Master Key encryption. It must first decrypted with
     // encryption threads.
     if (space->crypt_data != nullptr && alter_info->explicit_encryption) {
-      my_error(ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION, MYF(0), space->name);
-      return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
+      mutex_enter(&crypt_data->mutex);
+      bool is_keyring_encrypted{crypt_data->type != CRYPT_SCHEME_UNENCRYPTED};
+      mutex_exit(&crypt_data->mutex);
+      if (is_keyring_encrypted) {
+        my_error(ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION, MYF(0), space->name);
+        return convert_error_code_to_mysql(DB_ERROR, 0, NULL);
+      }
     }
     /* Nothing to do */
     return error;
