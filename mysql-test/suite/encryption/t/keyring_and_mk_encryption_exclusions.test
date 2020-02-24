@@ -392,12 +392,9 @@ EOF
 --let $restart_parameters="restart: --datadir=$MYSQLD_DATADIR1 --innodb-sys-tablespace-encrypt=ON"
 --source include/start_mysqld.inc
 
---echo # It should not be possible to turn on ONLINE_TO_KEYRING* encryption
+--echo # It should not be possible to turn on ONLINE_TO_KEYRING encryption
 --error ER_WRONG_VALUE_FOR_VAR
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-SHOW WARNINGS;
---error ER_WRONG_VALUE_FOR_VAR
-SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING_FORCE;
 SHOW WARNINGS;
 
 --echo # It should not be possible to disable Master Key encryption by

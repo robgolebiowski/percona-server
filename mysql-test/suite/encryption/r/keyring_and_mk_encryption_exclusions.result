@@ -170,18 +170,13 @@ DROP TABLESPACE ts1;
 # startup option when system tablespace is encrypted
 # Start the instance with encrypted system tablespace
 # restart: --datadir=MYSQLD_DATADIR1 --innodb-sys-tablespace-encrypt=ON
-# It should not be possible to turn on ONLINE_TO_KEYRING* encryption
+# It should not be possible to turn on ONLINE_TO_KEYRING encryption
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'ONLINE_TO_KEYRING'
 SHOW WARNINGS;
 Level	Code	Message
 Warning	1210	Online encryption to KEYRING cannot be turned ON as system tablespace is encrypted with Master Key encryption. In case you want system tablespace to get re-encrypted with KEYRING encryption set --innodb-sys_tablespace_encrypt to RE_ENCRYPTING_TO_KEYRING
 Error	1231	Variable 'default_table_encryption' can't be set to the value of 'ONLINE_TO_KEYRING'
-SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING_FORCE;
-ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'ONLINE_TO_KEYRING_FORCE'
-SHOW WARNINGS;
-Level	Code	Message
-Error	1231	Variable 'default_table_encryption' can't be set to the value of 'ONLINE_TO_KEYRING_FORCE'
 # It should not be possible to disable Master Key encryption by
 # setting sys_tablespace_encrypt to OFF
 SET GLOBAL innodb_sys_tablespace_encrypt=OFF;
