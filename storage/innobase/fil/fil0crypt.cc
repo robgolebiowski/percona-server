@@ -191,35 +191,44 @@ void fil_space_crypt_t::unload_keys_from_local_cache() {
   local_keys_cache.clear();
 }
 
-bool fil_space_crypt_t::load_keys_to_local_cache() {
+bool fil_space_crypt_t::load_keys_to_local_cache(const uint from_key_version, const uint to_key_version) {
 
-  // min_key_version might be 0 - which is a marker that space is unencrypted,
-  // but it's not a valid key version
-  uint start_version = std::max(min_key_version,static_cast<uint>(1));
-  // in case space is not encrypted we need to only load max_key_version
-  // min_key_version will be just unencrypted
-  if (type == CRYPT_SCHEME_UNENCRYPTED)
-    start_version = max_key_version;
-
-  if (start_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
-    return true; // not encrypted - no keys to fetch
-
-  for (uint key_version = start_version; key_version <= max_key_version;
+  for (uint key_version = from_key_version; key_version <= to_key_version;
        ++key_version) {
   
-    ut_ad(key_version != ENCRYPTION_KEY_VERSION_INVALID);
+    ut_ad(key_version != ENCRYPTION_KEY_VERSION_INVALID &&
+          key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
 
     byte *local_cache_key = local_keys_cache[key_version];
-    size_t key_length{0};
-
-    Encryption::get_tablespace_key(this->key_id, this->uuid, key_version,
-                                   &local_cache_key, &key_length);
     if (local_cache_key == nullptr) {
-      unload_keys_from_local_cache();
-      return false;
+      size_t key_length{0};
+
+      Encryption::get_tablespace_key(this->key_id, this->uuid, key_version,
+                                     &local_cache_key, &key_length);
+      if (local_cache_key == nullptr) {
+        return false;
+      }
     }
   }
   return true;
+}
+
+bool fil_space_crypt_t::load_keys_to_local_cache() {
+
+  if (min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED &&
+      max_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)
+    return true; // tablespace not encrypted - no keys to fetch
+
+  // in case space is not encrypted we need to only load max_key_version,
+  // min_key_version will be just unencrypted. In case it is encrypted
+  // min_key_version might be 0, but it's not a valid key version - just
+  // a marker that some pages are unencrypted.
+  uint start_version = (type == CRYPT_SCHEME_UNENCRYPTED) ? max_key_version
+                         : std::max(min_key_version, static_cast<uint>(1));
+
+  ut_ad(start_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+
+  return load_keys_to_local_cache(start_version, max_key_version);
 }
 
 //bool fil_space_crypt_t::load_needed_keys_into_local_cache() {
@@ -295,6 +304,9 @@ fil_space_crypt_t::fil_space_crypt_t(uint new_min_key_version, uint new_key_id,
       tablespace_key(NULL) {
   mutex_create(LATCH_ID_FIL_CRYPT_START_ROTATE_MUTEX, &start_rotate_mutex);
   mutex_create(LATCH_ID_FIL_CRYPT_DATA_MUTEX, &mutex);
+
+  memcpy(encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
+         ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
 
   key_id = new_key_id;
   if (my_random_bytes(iv, sizeof(iv)) != MY_AES_OK)  // TODO:Robert: This can
@@ -1398,20 +1410,6 @@ bool fil_crypt_exclude_tablespace_from_rotation(fil_space_t *space) {
   return true;
 }
 
-static bool encrypt_validation_tag(const byte *secret, const size_t secret_size,
-    const byte* key, byte *encrypted_secret) {
-
-  auto elen =
-    my_aes_encrypt(secret, secret_size, encrypted_secret, key,
-                   ENCRYPTION_KEY_LEN, my_aes_256_ecb, nullptr, true);
-
-  if (elen == MY_AES_BAD_DATA) {
-    return false;
-  }
- 
-  return true;
-}
-
 static bool decrypt_validation_tag(const byte *encrypted_validation_tag, 
     const byte* key, byte *decrypted_validation_tag) {
 
@@ -2095,7 +2093,10 @@ static bool fil_crypt_find_space_to_rotate(key_state_t *key_state,
   return false;
 }
 
-fil_space_crypt_t::re_encrypt_validation_tag(const uint from_key_version, const uint to_key_version) {
+bool fil_space_crypt_t::re_encrypt_validation_tag(const uint from_key_version, const uint to_key_version) {
+
+  if (from_key_version > to_key_version)
+    return true; //re-encryption not needed
 
   // load key_versions that we might be missing in the cache
   if (load_keys_to_local_cache(from_key_version, to_key_version) == false) {
@@ -2117,35 +2118,7 @@ fil_space_crypt_t::re_encrypt_validation_tag(const uint from_key_version, const 
     }
     memcpy(re_encrypted_validation_tag, encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
   }
-}
 
-// I need to make it a part of crypt_data
-static bool re_encrypt_validation_tag(fil_space_crypt_t *crypt_data, uint old_max_key_version, uint new_max_key_version) {
-  // encrypted validation tag should be already encrypted with keys between 1..old_max_key_version
-  for (uint key_version = old_max_key_version + 1; key_version <= new_max_key_version;
-       ++key_version) {
-    if (crypt_data->local_keys_cache[key_version] == nullptr) {
-      size_t key_len{0};
-      Encryption::get_tablespace_key(crypt_data->key_id, crypt_data->uuid, key_version,
-                                     &crypt_data->local_keys_cache[key_version],
-                                     &key_len);
-      ut_ad(crypt_data->local_keys_cache[key_version] == nullptr || key_len == ENCRYPTION_KEY_LEN);
-      if (crypt_data->local_keys_cache[key_version] == nullptr) {
-        // generate error
-        return false;
-      }
-    }
-
-    byte encrypted_validation_tag[ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE] = {0};
-//static bool encrypt_validation_tag(const byte *secret, const size_t secret_size,
-    //const byte* key, byte *encrypted_secret) {
-    if (encrypt_validation_tag(crypt_data->encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
-                               crypt_data->local_keys_cache[key_version], encrypted_validation_tag) == false) {
-      // generate error
-      return false;
-    }
-    memcpy(encrypted_validation_tag, crypt_data->encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
-  }
   return true;
 }
 
@@ -2182,10 +2155,8 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
   if (crypt_data->rotate_state.active_threads == 0) {
     bool validation_tag_re_encryption_failure{false};
     if (key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
-      //uint old_max_key_version = crypt_data->max_key_version;
-      //crypt_data->max_key_version = key_state->key_version;
-      if (re_encrypt_validation_tag(crypt_data, crypt_data->max_key_version,
-                                key_state->key_version) == false) {
+      if (crypt_data->re_encrypt_validation_tag(crypt_data->max_key_version + 1, 
+                                                key_state->key_version) == false) {
         validation_tag_re_encryption_failure = true;
       } else {
         crypt_data->max_key_version = key_state->key_version;

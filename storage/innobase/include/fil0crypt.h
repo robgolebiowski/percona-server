@@ -303,6 +303,11 @@ struct fil_space_crypt_t {
   byte encrypted_validation_tag[MY_AES_BLOCK_SIZE];
 
   bool validate_encryption_key_versions();
+  bool re_encrypt_validation_tag(const uint from_key_version, const uint to_key_version);
+
+private:
+  bool load_keys_to_local_cache(const uint from_key_version, const uint to_key_version);
+
 };
 
 /** Status info about encryption */
