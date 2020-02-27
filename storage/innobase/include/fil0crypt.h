@@ -174,11 +174,13 @@ struct fil_space_crypt_t {
     mutex_free(&start_rotate_mutex);
     if (tablespace_key != nullptr) ut_free(tablespace_key);
 
-    for (std::list<byte *>::iterator iter = fetched_keys.begin();
-         iter != fetched_keys.end(); iter++) {
-      memset_s(*iter, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
-      my_free(*iter);
-    }
+    unload_keys_from_local_cache();
+
+    //for (std::list<byte *>::iterator iter = fetched_keys.begin();
+         //iter != fetched_keys.end(); iter++) {
+      //memset_s(*iter, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
+      //my_free(*iter);
+    //}
     rotate_state.destroy_flush_observer();
   }
 
@@ -218,7 +220,7 @@ struct fil_space_crypt_t {
   @param[in,out]	page0	first page of the tablespace
   @param[in,out]	mtr	mini-transaction */
   void write_page0(const fil_space_t *space, byte *page0, mtr_t *mtr,
-                   uint a_min_key_version, uint a_type,
+                   uint a_min_key_version, uint a_max_key_version, uint a_type,
                    Encryption_rotation current_encryption_rotation);
 
   void set_tablespace_key(const uchar *tablespace_key) {
@@ -234,17 +236,24 @@ struct fil_space_crypt_t {
 
   void set_iv(const uchar *iv) { memcpy(this->iv, iv, CRYPT_SCHEME_1_IV_LEN); }
 
-  bool load_needed_keys_into_local_cache();
+  //bool load_needed_keys_into_local_cache();
   uchar *get_min_key_version_key();
   uchar *get_key_currently_used_for_encryption();
 
   uint min_key_version;         // min key version for this space
+  uint max_key_version;         // max key version for this space
   fil_encryption_t encryption;  // Encryption setup
 
   // key being used for encryption
   Cached_key cached_encryption_key;
   // in normal situation the only key needed to decrypt the tablespace
   Cached_key cached_min_key_version_key;
+
+  using Key_map = std::map<uint, byte*>;
+  Key_map local_keys_cache;
+
+  bool load_keys_to_local_cache();
+  void unload_keys_from_local_cache();
 
   uchar *get_cached_key(Cached_key &cached_key, uint key_version);
 
@@ -283,12 +292,17 @@ struct fil_space_crypt_t {
 
   std::list<byte *> fetched_keys;  // TODO: temp for test
 
-  // Internally we have two versions of crypt_data written to page 0.
-  // One starting with magic PSA and the second one starting with PSB.
-  // Here we store which magic we read : 1 - PSA, 2 - PSB.
+  // Internally we have three versions of crypt_data written to page 0.
+  // One starting with magic PSA, the second one starting with PSB and
+  // the last onw tih PSC.
+  // Here we store which magic we read : 1 - PSA, 2 - PSB, 3 - PSC
   size_t private_version{2};
 
   char uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
+
+  byte encrypted_validation_tag[MY_AES_BLOCK_SIZE];
+
+  bool validate_encryption_key_versions();
 };
 
 /** Status info about encryption */
@@ -463,6 +477,16 @@ byte *fil_parse_write_crypt_data_v1(space_id_t space_id, byte *ptr,
 @param[in]  len  Log entry length
 @return position on log buffer */
 byte *fil_parse_write_crypt_data_v2(space_id_t space_id, byte *ptr,
+                                    const byte *end_ptr, ulint len)
+    MY_ATTRIBUTE((warn_unused_result));
+
+/** Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
+@param[in]  space_id  id of space that this log entry refers to
+@param[in]  ptr  Log entry start
+@param[in]  end_ptr  Log entry end
+@param[in]  len  Log entry length
+@return position on log buffer */
+byte *fil_parse_write_crypt_data_v3(space_id_t space_id, byte *ptr,
                                     const byte *end_ptr, ulint len)
     MY_ATTRIBUTE((warn_unused_result));
 

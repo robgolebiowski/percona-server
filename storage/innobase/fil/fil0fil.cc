@@ -5554,9 +5554,10 @@ static dberr_t fil_create_tablespace(
                                              server_uuid);
 
     if (crypt_data->should_encrypt()) {
-      crypt_data->encrypting_with_key_version =
+      // crypt_data->max_key_version should go to crypt_data_t constructor ?
+      crypt_data->max_key_version =
           crypt_data->key_get_latest_version();
-      crypt_data->load_needed_keys_into_local_cache();
+      crypt_data->load_keys_to_local_cache();
     }
   }
 

@@ -286,6 +286,8 @@ static const char ENCRYPTION_KEY_MAGIC_PS_V1[] = "PSA";
 
 static const char ENCRYPTION_KEY_MAGIC_PS_V2[] = "PSB";
 
+static const char ENCRYPTION_KEY_MAGIC_PS_V3[] = "PSC";
+
 /** Encryption master key prifix */
 static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
 
