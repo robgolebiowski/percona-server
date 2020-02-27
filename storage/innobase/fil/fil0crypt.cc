@@ -1076,6 +1076,12 @@ static void fil_crypt_write_crypt_data_to_page0(fil_space_t *space) {
 
 bool fil_crypt_exclude_tablespace_from_rotation_temporarily(
     fil_space_t *space) {
+
+  if (space->exclude_from_rotation) {
+    // nothing to do
+    return true;
+  }
+
   // We acquire fil_crypt_threads_mutex to stop encryption threads from
   // generating crypt_data for tablespaces that they are about to encrypt.
   // Generating crypt_data is the fist step in encryption process.
@@ -1093,11 +1099,6 @@ bool fil_crypt_exclude_tablespace_from_rotation_temporarily(
   fil_space_crypt_t *crypt_data = space->crypt_data;
   // take a lock on crypt_data to block rotation from starting
   IB_mutex_guard crypt_data_mutex_guard(&crypt_data->mutex);
-
-  if (space->exclude_from_rotation) {
-    // nothing to do
-    return true;
-  }
 
   // if there are any encryption threads "running" on this tablespace we cannot
   // exclude it from rotation.
