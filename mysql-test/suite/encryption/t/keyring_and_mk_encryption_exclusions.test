@@ -1,6 +1,6 @@
 --source include/have_debug.inc
 
-let $MYSQLD_BASEDIR= `select @@basedir`;
+let $MYSQLD_BASEDIR= `SELECT @@basedir`;
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 
@@ -10,7 +10,7 @@ SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 CREATE TABLE t1 (a varchar(255)) ENGINE=INNODB ENCRYPTION='Y';
 
 --error ER_ILLEGAL_HA_CREATE_OPTION
-CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
+CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION='Y' Engine=InnoDB;
 
 --echo # It should not be possible to turn on undo-tablespace-encrypt
 --error ER_WRONG_VALUE_FOR_VAR
@@ -46,7 +46,7 @@ SET GLOBAL innodb_encryption_threads=2;
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME=\\'ts0\\' AND ENCRYPTION=\\'N\\']" = 1
 --source include/assert.inc
 
-# Now it should be possible to encrypt ts0 with MK encryption,
+--echo # Now it should be possible to encrypt ts0 with MK encryption,
 ALTER TABLESPACE ts0 ENCRYPTION='Y';
 
 --let $assert_text= Make sure ENCRYPTION is set to Y in INFORMATION_SCHEMA.INNODB_TABLESPACES
@@ -64,7 +64,7 @@ SET GLOBAL default_table_encryption=OFF;
 --echo # It should be now possible to turn on above encryptions
 
 CREATE TABLE t1 (a varchar(255)) ENGINE=INNODB ENCRYPTION='Y';
-CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
+CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION='Y' Engine=InnoDB;
 SET GLOBAL innodb_undo_log_encrypt=ON;
 
 --echo # It should not be possible to turn on online to keyring encryption with

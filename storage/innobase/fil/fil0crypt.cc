@@ -1534,40 +1534,6 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
   return false;
 }
 
-bool fil_crypt_exclude_from_rotation(fil_space_t *space) {
-  // We acquire fil_crypt_threads_mutex to stop encryption threads from
-  // generating crypt_data for tablespaces that they are about to encrypt.
-  // Generating crypt_data is the fist step in encryption process.
-  mutex_enter(&fil_crypt_threads_mutex);
-
-  if (space->crypt_data == nullptr) {
-    space->exclude_from_rotation = true;
-  }
-
-  mutex_exit(&fil_crypt_threads_mutex);
-
-  // crypt_data already existed.
-  fil_space_crypt_t *crypt_data = space->crypt_data;
-  // take a lock on crypt_data to block rotation from starting
-  IB_mutex_guard crypt_data_mutex_guard(&crypt_data->mutex);
-
-  if (space->exclude_from_rotation) {
-    // nothing to do
-    return true;
-  }
-
-  // if there are any encryption threads "running" on this tablespace we cannot
-  // exclude it from rotation.
-  if (crypt_data->rotate_state.active_threads != 0 ||
-      crypt_data->rotate_state.starting || crypt_data->rotate_state.flushing) {
-    return false;
-  }
-
-  space->exclude_from_rotation = true;
-
-  return true;
-}
-
 /***********************************************************************
 Update global statistics with thread statistics
 @param[in,out]	state		key rotation statistics */

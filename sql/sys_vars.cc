@@ -7113,7 +7113,7 @@ static Sys_var_uint Sys_immediate_server_version(
 
 static bool check_set_default_table_encryption_exclusions(THD *thd,
                                                           set_var *var) {
-  longlong val = (longlong)var->save_result.ulonglong_value;
+  longlong val = static_cast<longlong>(var->save_result.ulonglong_value);
 
   if (val == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
     static const LEX_CSTRING innodb_engine{STRING_WITH_LEN("innodb")};

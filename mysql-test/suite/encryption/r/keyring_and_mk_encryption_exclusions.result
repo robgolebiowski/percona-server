@@ -3,7 +3,7 @@ SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 # MK encrypted table or MK encrypted general tablespace.
 CREATE TABLE t1 (a varchar(255)) ENGINE=INNODB ENCRYPTION='Y';
 ERROR HY000: InnoDB: ENCRYPTED='Y' not supported for table because online encryption to KEYRING is turned ON.
-CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
+CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION='Y' Engine=InnoDB;
 ERROR HY000: InnoDB: ENCRYPTED='Y' not supported for tablespace because online encryption to KEYRING is turned ON.
 # It should not be possible to turn on undo-tablespace-encrypt
 SET GLOBAL innodb_undo_log_encrypt=ON;
@@ -25,6 +25,7 @@ SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=2;
 # Wait max 10 min for key encryption threads to decrypt all spaces
 include/assert.inc [Make sure ENCRYPTION is set to N in INFORMATION_SCHEMA.INNODB_TABLESPACES]
+# Now it should be possible to encrypt ts0 with MK encryption,
 ALTER TABLESPACE ts0 ENCRYPTION='Y';
 include/assert.inc [Make sure ENCRYPTION is set to Y in INFORMATION_SCHEMA.INNODB_TABLESPACES]
 include/assert.inc [Make sure ts0 is marked as unencrypted in INNODB_TABLESPACES_ENCRYPTION]
@@ -32,7 +33,7 @@ DROP TABLESPACE ts0;
 SET GLOBAL default_table_encryption=OFF;
 # It should be now possible to turn on above encryptions
 CREATE TABLE t1 (a varchar(255)) ENGINE=INNODB ENCRYPTION='Y';
-CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
+CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION='Y' Engine=InnoDB;
 SET GLOBAL innodb_undo_log_encrypt=ON;
 # It should not be possible to turn on online to keyring encryption with
 # undo log encryption turned on.
