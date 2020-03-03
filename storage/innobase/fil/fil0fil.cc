@@ -7538,6 +7538,10 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
     // based and just leave space->crypt_data->max_key_version != 0
     if (space->crypt_data->should_encrypt() &&
         space->crypt_data->max_key_version != 0) {
+
+      if (space->crypt_data->local_keys_cache.size() == 0)
+        space->crypt_data->load_keys_to_local_cache();
+
       ut_ad(space->crypt_data->local_keys_cache[space->crypt_data->max_key_version] != nullptr);
 
       key = space->crypt_data->local_keys_cache[space->crypt_data->max_key_version]; //get_key_currently_used_for_encryption();
@@ -7552,6 +7556,9 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
   }
 
   if (req_type.is_read()) {
+    if (space->crypt_data->local_keys_cache.size() == 0)
+      space->crypt_data->load_keys_to_local_cache();
+
     tablespace_key = space->crypt_data->tablespace_key;
     ut_ad(space->crypt_data->encryption_rotation !=
               Encryption_rotation::MASTER_KEY_TO_KEYRING ||
@@ -7565,6 +7572,7 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
             ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED &&
         space->crypt_data->encryption != FIL_ENCRYPTION_OFF) {
       //key = space->crypt_data->get_min_key_version_key();
+      ut_ad(space->crypt_data->local_keys_cache[space->crypt_data->min_key_version] != nullptr);
       key = space->crypt_data->local_keys_cache[space->crypt_data->min_key_version];
       memcpy(key_min, key, 32);
       set_min_key_version = true;

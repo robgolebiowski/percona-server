@@ -282,12 +282,17 @@ static bool encrypt_validation_tag(const byte *secret, const size_t secret_size,
 
   auto elen =
     my_aes_encrypt(secret, secret_size, encrypted_secret, key,
-                   ENCRYPTION_KEY_LEN, my_aes_256_ecb, nullptr, true);
+                   ENCRYPTION_KEY_LEN, my_aes_256_ecb, nullptr, false);
 
   if (elen == MY_AES_BAD_DATA) {
     return false;
   }
  
+  fprintf(stderr,
+          "encrypting validation tag with key: ");
+
+  ut_print_buf(stderr, key, 32);
+
   return true;
 }
 
@@ -809,6 +814,11 @@ static fil_space_crypt_t *fil_space_read_crypt_data_v3(
          ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
   bytes_read += ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE;
 
+  fprintf(stderr,
+          "read encrypted validation tag: ");
+
+  ut_print_buf(stderr, crypt_data->encrypted_validation_tag, 16);
+
   memcpy(crypt_data->iv, page + offset + bytes_read, CRYPT_SCHEME_1_IV_LEN);
   bytes_read += CRYPT_SCHEME_1_IV_LEN;
 
@@ -940,6 +950,11 @@ void fil_space_crypt_t::write_page0(
          ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
   encrypt_info_ptr += ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE;
 
+  fprintf(stderr,
+          "written encrypted validation tag: ");
+
+  ut_print_buf(stderr, space->crypt_data->encrypted_validation_tag, 16);
+
   memcpy(encrypt_info_ptr, iv, CRYPT_SCHEME_1_IV_LEN);
   encrypt_info_ptr += CRYPT_SCHEME_1_IV_LEN;
 
@@ -1018,7 +1033,7 @@ byte *fil_parse_write_crypt_data_v3(space_id_t space_id, byte *ptr,
     return nullptr;
   }
 
-  // We should only enter this function if ENCRYPTION_KEY_MAGIC_PS_V2 is set
+  // We should only enter this function if ENCRYPTION_KEY_MAGIC_PS_V3 is set
   ut_ad((memcmp(ptr, ENCRYPTION_KEY_MAGIC_PS_V3, ENCRYPTION_MAGIC_SIZE) == 0));
   ptr += ENCRYPTION_MAGIC_SIZE;
 
@@ -1469,7 +1484,7 @@ static bool decrypt_validation_tag(const byte *encrypted_validation_tag,
 
   auto len =
       my_aes_decrypt(encrypted_validation_tag, MY_AES_BLOCK_SIZE, decrypted_validation_tag, key,
-                     ENCRYPTION_KEY_LEN, my_aes_256_ecb, nullptr, true);
+                     ENCRYPTION_KEY_LEN, my_aes_256_ecb, nullptr, false);
 
   /* If decryption failed, return error. */
   if (len == MY_AES_BAD_DATA) {
@@ -1509,11 +1524,17 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
        key_version >= std::max(min_key_version,static_cast<uint>(1));
        --key_version) {
 
+    fprintf(stderr, "decrypting with key version: %i", key_version);
+
+    ut_print_buf(stderr, local_keys_cache[key_version], 32);
+
     ut_ad(local_keys_cache[key_version] != nullptr);
     
     if (!decrypt_validation_tag(current_validation_tag, local_keys_cache[key_version],
-                                decrypted_validation_tag))
+                                decrypted_validation_tag)) {
+      ut_ad(false);
       return false;
+    }
 
     memcpy(current_validation_tag, decrypted_validation_tag,
            ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
@@ -1560,6 +1581,9 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
    * risk of finding encrypted pages without having
    * crypt data in page 0 */
 
+
+  fprintf(stderr, "encrypting for space: %s", space->name);
+
   crypt_data = fil_space_create_crypt_data(
       FIL_ENCRYPTION_DEFAULT, get_global_default_encryption_key_id_value(),
       server_uuid, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
@@ -1573,6 +1597,8 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
   crypt_data->min_key_version =
       ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;  // all pages are unencrypted
   crypt_data->max_key_version = crypt_data->key_get_latest_version();
+  // TODO:Muszę jakoś upewnić się, że wersja nie zmieni się pomiędzy start rotating
+  // bo jeżeli tak to min_key_version będzie = 0, a space, cholera potrzebuje min_encryption_key, albo, żeby min_key_version != 0
   ut_ad(crypt_data->max_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
   ut_ad(crypt_data->max_key_version !=
         ENCRYPTION_KEY_VERSION_INVALID);
@@ -1614,31 +1640,22 @@ static bool fil_crypt_start_encrypting_space(fil_space_t *space) {
     fil_space_destroy_crypt_data(&crypt_data);
     return false;
   }
-//static bool encrypt_validation_tag(const uchar *secret, const size_t secret_size,
-    //const uchar* key, byte *encrypted_secret) {
 
-  //auto elen =
-    //my_aes_encrypt(secret, secret_size, encrypted_secret, key,
-                   //ENCRYPTION_KEY_LEN, my_aes_256_ecb, nullptr, true);
 
-  //if (elen == MY_AES_BAD_DATA) {
+  //fprintf(stderr, "encrypting for space: %s", space->name);
+
+  //if (encrypt_validation_tag(ENCRYPTION_KEYRING_VALIDATION_TAG, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
+                             //crypt_data->local_keys_cache[crypt_data->max_key_version],
+                             //crypt_data->encrypted_validation_tag) == false) {
+    //ib::error() << "Encryption thread could not encrypt validation tag for tablespace "
+                //<< space->name
+                //<< " . Removing space from encrypting. Please make sure "
+                   //"keyring is functional and try restarting the server";
+    //space->exclude_from_rotation = true;
+    //mutex_exit(&fil_crypt_threads_mutex);
+    //fil_space_destroy_crypt_data(&crypt_data);
     //return false;
   //}
- 
-  //return true;
-//}
-  if (encrypt_validation_tag(ENCRYPTION_KEYRING_VALIDATION_TAG, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
-                             crypt_data->local_keys_cache[crypt_data->max_key_version],
-                             crypt_data->encrypted_validation_tag) == false) {
-    ib::error() << "Encryption thread could not encrypt validation tag for tablespace "
-                << space->name
-                << " . Removing space from encrypting. Please make sure "
-                   "keyring is functional and try restarting the server";
-    space->exclude_from_rotation = true;
-    mutex_exit(&fil_crypt_threads_mutex);
-    fil_space_destroy_crypt_data(&crypt_data);
-    return false;
-  }
 
   mutex_enter(&crypt_data->mutex);
   crypt_data = fil_space_set_crypt_data(space, crypt_data);
@@ -2170,8 +2187,14 @@ bool fil_space_crypt_t::re_encrypt_validation_tag(const uint from_key_version, c
 
   for (uint key_version = from_key_version; key_version <= to_key_version;
        ++key_version) {
+
+    //ut_ad(false); //TODO: re-encryption is not currently needed - can be needed for decrypted->encrypted
  
     ut_ad(local_keys_cache[key_version] != nullptr);
+
+    fprintf(stderr, "re-encrypting with key:");
+
+    ut_print_buf(stderr, local_keys_cache[key_version], 32);
 
     if (encrypt_validation_tag(encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
                                local_keys_cache[key_version], re_encrypted_validation_tag) == false) {
@@ -2218,6 +2241,8 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
 
     bool validation_tag_re_encryption_failure{false};
     bool load_key_failure{false};
+
+    fprintf(stderr, "re-encrypting for space: %s", state->space->name);
 
     if (crypt_data->load_keys_to_local_cache() == false) {
       load_key_failure = true;
