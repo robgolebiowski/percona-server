@@ -7534,10 +7534,14 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
   key_id = space->crypt_data->key_id;
 
   if (req_type.is_write()) {
+    // TODO: I should remove should_encrypt from here as it is srv_default_table_encryption
+    // based and just leave space->crypt_data->max_key_version != 0
     if (space->crypt_data->should_encrypt() &&
-        space->crypt_data->encrypting_with_key_version != 0) {
-      key = space->crypt_data->get_key_currently_used_for_encryption();
-      key_version = space->crypt_data->encrypting_with_key_version;
+        space->crypt_data->max_key_version != 0) {
+      ut_ad(space->crypt_data->local_keys_cache[space->crypt_data->max_key_version] != nullptr);
+
+      key = space->crypt_data->local_keys_cache[space->crypt_data->max_key_version]; //get_key_currently_used_for_encryption();
+      key_version = space->crypt_data->max_key_version;
       key_len = 32;
     } else {
       key = NULL;
@@ -7560,7 +7564,8 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
     if (space->crypt_data->min_key_version !=
             ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED &&
         space->crypt_data->encryption != FIL_ENCRYPTION_OFF) {
-      key = space->crypt_data->get_min_key_version_key();
+      //key = space->crypt_data->get_min_key_version_key();
+      key = space->crypt_data->local_keys_cache[space->crypt_data->min_key_version];
       memcpy(key_min, key, 32);
       set_min_key_version = true;
       char testblock[32];
@@ -7576,7 +7581,8 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
   }
 
   req_type.encryption_key(key, key_len, false, iv, key_version, key_id,
-                          tablespace_key, space->crypt_data->uuid);
+                          tablespace_key, space->crypt_data->uuid,
+                          &space->crypt_data->local_keys_cache);
 
   req_type.encryption_rotation(space->crypt_data->encryption_rotation);
 
@@ -7594,7 +7600,7 @@ static void fil_io_set_mk_encryption(IORequest &req_type, fil_space_t *space) {
                      ? space->encryption_redo_key->version
                      : space->encryption_key_version;
   req_type.encryption_key(key, 32, false, space->encryption_iv, version, 0,
-                          nullptr, space->encryption_redo_key_uuid.get());
+                          nullptr, space->encryption_redo_key_uuid.get(), nullptr);
 
   req_type.encryption_rotation(Encryption_rotation::NO_ROTATION);
 }
@@ -8844,7 +8850,8 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
           encrypted_with_keyring ? iter.m_crypt_data->iv : iter.m_encryption_iv,
           0, iter.m_encryption_key_id,
           encrypted_with_keyring ? iter.m_crypt_data->tablespace_key : nullptr,
-          encrypted_with_keyring ? iter.m_crypt_data->uuid : nullptr);
+          encrypted_with_keyring ? iter.m_crypt_data->uuid : nullptr,
+          nullptr);
 
       read_request.encryption_algorithm(iter.m_crypt_data ? Encryption::KEYRING
                                                           : Encryption::AES);
@@ -8895,13 +8902,15 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
       write_request.encryption_key(iter.m_encryption_key, ENCRYPTION_KEY_LEN,
                                    false, iter.m_encryption_iv,
                                    iter.m_encryption_key_version,
-                                   iter.m_encryption_key_id, nullptr, nullptr);
+                                   iter.m_encryption_key_id, nullptr, nullptr,
+                                   nullptr);
       write_request.encryption_algorithm(Encryption::AES);
     } else if (offset != 0 && iter.m_crypt_data) {
       write_request.encryption_key(
           iter.m_encryption_key, ENCRYPTION_KEY_LEN, false,
           iter.m_encryption_iv, iter.m_encryption_key_version,
-          iter.m_crypt_data->key_id, nullptr, iter.m_crypt_data->uuid);
+          iter.m_crypt_data->key_id, nullptr, iter.m_crypt_data->uuid,
+          nullptr);
 
       write_request.encryption_algorithm(Encryption::KEYRING);
 

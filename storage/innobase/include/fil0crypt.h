@@ -237,17 +237,17 @@ struct fil_space_crypt_t {
   void set_iv(const uchar *iv) { memcpy(this->iv, iv, CRYPT_SCHEME_1_IV_LEN); }
 
   //bool load_needed_keys_into_local_cache();
-  uchar *get_min_key_version_key();
-  uchar *get_key_currently_used_for_encryption();
+  //uchar *get_min_key_version_key();
+  //uchar *get_key_currently_used_for_encryption();
 
   uint min_key_version;         // min key version for this space
   uint max_key_version;         // max key version for this space
   fil_encryption_t encryption;  // Encryption setup
 
   // key being used for encryption
-  Cached_key cached_encryption_key;
+  //Cached_key cached_encryption_key;
   // in normal situation the only key needed to decrypt the tablespace
-  Cached_key cached_min_key_version_key;
+  //Cached_key cached_min_key_version_key;
 
   using Key_map = std::map<uint, byte*>;
   Key_map local_keys_cache;
@@ -255,7 +255,7 @@ struct fil_space_crypt_t {
   bool load_keys_to_local_cache();
   void unload_keys_from_local_cache();
 
-  uchar *get_cached_key(Cached_key &cached_key, uint key_version);
+  //uchar *get_cached_key(Cached_key &cached_key, uint key_version);
 
   ib_mutex_t
       start_rotate_mutex;  // mutex protecting starting of rotation of the space
@@ -285,12 +285,12 @@ struct fil_space_crypt_t {
   // pages and encrypt pages with KEYRING.
   unsigned char iv[CRYPT_SCHEME_1_IV_LEN];
 
-  uint encrypting_with_key_version;
+  //uint encrypting_with_key_version;
   unsigned int keyserver_requests;
   unsigned int key_id;
   unsigned int type;
 
-  std::list<byte *> fetched_keys;  // TODO: temp for test
+  //std::list<byte *> fetched_keys;  // TODO: temp for test
 
   // Internally we have three versions of crypt_data written to page 0.
   // One starting with magic PSA, the second one starting with PSB and

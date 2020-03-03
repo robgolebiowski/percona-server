@@ -1772,30 +1772,12 @@ static bool load_key_needed_for_decryption(const IORequest &type,
     ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID);
     ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
 
-    // in rare cases - when (re-)encryption was aborted there can be pages
-    // encrypted with different key versions in a given tablespace - retrieve
-    // needed key here
+    ut_ad(encryption.m_key_versions_cache != nullptr);
 
-    byte *key_read;
-
-    size_t key_len;
-    if (Encryption::get_tablespace_key(
-            encryption.m_key_id, encryption.m_key_id_uuid,
-            key_version_read_from_page, &key_read, &key_len) == false) {
-      return false;
+    if (encryption.m_key_version != key_version_read_from_page) {
+      encryption.set_key((*encryption.m_key_versions_cache)[key_version_read_from_page],
+                         ENCRYPTION_KEY_LEN, false);
     }
-
-    // For test
-    if (key_version_read_from_page == encryption.m_key_version) {
-      ut_ad(memcmp(key_read, encryption.m_key, key_len) == 0);
-    }
-
-    // TODO: Allocated or not depends on whether key was taken from cache or
-    // keyring
-    encryption.set_key(key_read, static_cast<ulint>(key_len), true);
-    // encryption.m_key = key_read;
-    //******
-
     encryption.m_key_version = key_version_read_from_page;
   } else {
     ut_ad(encryption.m_type == Encryption::AES);
@@ -1811,6 +1793,62 @@ static bool load_key_needed_for_decryption(const IORequest &type,
 
   return true;
 }
+
+//static bool load_key_needed_for_decryption(const IORequest &type,
+                                           //Encryption &encryption, byte *buf) {
+  //if (encryption.m_type == Encryption::KEYRING) {
+    //ulint key_version_read_from_page = ENCRYPTION_KEY_VERSION_INVALID;
+    //ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
+    //if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED) {
+      //key_version_read_from_page = mach_read_from_4(buf + FIL_PAGE_DATA + 4);
+    //} else {
+      //ut_ad(page_type == FIL_PAGE_ENCRYPTED);
+      //key_version_read_from_page =
+          //mach_read_from_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+    //}
+
+    //ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID);
+    //ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
+
+    //// in rare cases - when (re-)encryption was aborted there can be pages
+    //// encrypted with different key versions in a given tablespace - retrieve
+    //// needed key here
+
+    //byte *key_read;
+
+    //size_t key_len;
+    //if (Encryption::get_tablespace_key(
+            //encryption.m_key_id, encryption.m_key_id_uuid,
+            //key_version_read_from_page, &key_read, &key_len) == false) {
+      //return false;
+    //}
+
+    //// For test
+    //if (key_version_read_from_page == encryption.m_key_version) {
+      //ut_ad(memcmp(key_read, encryption.m_key, key_len) == 0);
+    //}
+
+    //// TODO: Allocated or not depends on whether key was taken from cache or
+    //// keyring
+    //encryption.set_key(key_read, static_cast<ulint>(key_len), true);
+    //// encryption.m_key = key_read;
+    ///[>*****
+
+    //encryption.m_key_version = key_version_read_from_page;
+  //} else {
+    //ut_ad(encryption.m_type == Encryption::AES);
+    //if (encryption.m_encryption_rotation == Encryption_rotation::NO_ROTATION)
+      //return true;  // we are all set - needed key was alread loaded into
+                    //// encryption module
+
+    //ut_ad(encryption.m_encryption_rotation ==
+              //Encryption_rotation::MASTER_KEY_TO_KEYRING &&
+          //encryption.m_tablespace_key != nullptr);
+    //encryption.set_key(encryption.m_tablespace_key, ENCRYPTION_KEY_LEN, false);
+  //}
+
+  //return true;
+//}
 
 /** Decompress after a read and punch a hole in the file if it was a write
 @param[in]	type		IO context
@@ -8398,7 +8436,8 @@ Encryption::Encryption(const Encryption &other) noexcept
       m_key_version(other.m_key_version),
       m_key_id(other.m_key_id),
       m_checksum(other.m_checksum),
-      m_encryption_rotation(other.m_encryption_rotation) {
+      m_encryption_rotation(other.m_encryption_rotation),
+      m_key_versions_cache(other.m_key_versions_cache) {
   if (other.m_key_allocated && other.m_key != NULL)
     m_key = static_cast<byte *>(
         my_memdup(PSI_NOT_INSTRUMENTED, other.m_key, other.m_klen, MYF(0)));
@@ -8412,6 +8451,8 @@ Encryption::~Encryption() {
 }
 
 void Encryption::set_key(byte *key, ulint key_len, bool allocated) {
+  //TODO: since now keys are comming from local cache - maybe I can get rid
+  //of allocated?
   if (m_key_allocated && m_key != NULL) {
     my_free(m_key);
   }
@@ -10233,9 +10274,14 @@ bool os_dblwr_encrypt_page(fil_space_t *space, page_t *in_page,
   }
 
   IORequest write_request(IORequest::WRITE);
+// TODO: the same - should it just not use void encryption_key(byte *key, ulint key_len, byte *iv) {
+    //m_encryption.m_key = key;
+    //m_encryption.m_klen = key_len;
+    //m_encryption.m_iv = iv;
+  //}
   write_request.encryption_key(space->encryption_key, space->encryption_klen,
                                false, space->encryption_iv, 0, 0, nullptr,
-                               nullptr);
+                               nullptr, nullptr);
   write_request.encryption_algorithm(Encryption::AES);
 
   page_size_t page_size(space->flags);
@@ -10278,9 +10324,14 @@ dberr_t os_dblwr_decrypt_page(fil_space_t *space, page_t *page) {
 
   IORequest decrypt_request;
 
+// TODO: the same - should it just not use void encryption_key(byte *key, ulint key_len, byte *iv) {
+    //m_encryption.m_key = key;
+    //m_encryption.m_klen = key_len;
+    //m_encryption.m_iv = iv;
+  //}
   decrypt_request.encryption_key(space->encryption_key, space->encryption_klen,
                                  false, space->encryption_iv, 0, 0, nullptr,
-                                 nullptr);
+                                 nullptr, nullptr);
 
   decrypt_request.encryption_algorithm(Encryption::AES);
 

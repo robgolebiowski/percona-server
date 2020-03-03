@@ -384,7 +384,8 @@ struct Encryption {
         m_key_version(0),
         m_key_id(0),
         m_checksum(0),
-        m_encryption_rotation(Encryption_rotation::NO_ROTATION) {
+        m_encryption_rotation(Encryption_rotation::NO_ROTATION),
+        m_key_versions_cache(nullptr) {
     m_key_id_uuid[0] = '\0';
   }
 
@@ -437,6 +438,7 @@ struct Encryption {
     memcpy(tmp, m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN + 1);
     memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN + 1);
     memcpy(other.m_key_id_uuid, tmp, ENCRYPTION_SERVER_UUID_LEN + 1);
+    std::swap(m_key_versions_cache, other.m_key_versions_cache);
   }
 
   ~Encryption();
@@ -707,6 +709,9 @@ struct Encryption {
 
   Encryption_rotation m_encryption_rotation;
 
+  //TODO:: try fil_space_crypt_t::Key_map;
+  std::map<uint, byte*>* m_key_versions_cache;
+
  private:
   // TODO: Robert: Is it needed here?
   static void get_keyring_key(const char *key_name, byte **key,
@@ -951,8 +956,9 @@ class IORequest {
   @param[in] iv		The encryption iv to use */
   void encryption_key(byte *key, ulint key_len, bool key_allocated, byte *iv,
                       uint key_version, uint key_id, byte *tablespace_key,
-                      const char *uuid) {
+                      const char *uuid, std::map<uint, byte*> *key_versions_cache) {
     m_encryption.set_key(key, key_len, key_allocated);
+    m_encryption.m_key_versions_cache = key_versions_cache;
     m_encryption.m_iv = iv;
     m_encryption.m_key_version = key_version;
     m_encryption.m_key_id = key_id;
@@ -994,6 +1000,7 @@ class IORequest {
   void clear_encrypted() {
     m_encryption.set_key(nullptr, 0, false);
     m_encryption.m_iv = nullptr;
+    m_encryption.m_key_versions_cache = nullptr;
     m_encryption.m_type = Encryption::NONE;
     m_encryption.m_encryption_rotation = Encryption_rotation::NO_ROTATION;
     m_encryption.m_key_id = 0;

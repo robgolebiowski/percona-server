@@ -757,6 +757,7 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
       if (crypt_data->private_version == 2 && (!crypt_data->key_found ||
           !crypt_data->validate_encryption_key_versions())) {
         ut_ad(m_filename != nullptr);
+        ut_ad(false); //TODO: Temp for tests
         ib::warn(ER_XB_MSG_5, space_id, m_filename, crypt_data->key_id);
 
         m_is_valid = false;
