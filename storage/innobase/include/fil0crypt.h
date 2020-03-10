@@ -270,6 +270,11 @@ struct fil_space_crypt_t {
   // uint found_key_version;
   bool key_found;
 
+  // false if we are holding a mutex in backgroud thread
+  // TODO:musze to zmienic na lock, bo przeciez nie bede aktualizował
+  // tej funkcji za każdym razem gdy zrobie mutex_enter
+  bool mutex_lock_needed{false};
+
   fil_space_rotate_state_t rotate_state;
 
   Encryption_rotation encryption_rotation;

@@ -2229,7 +2229,7 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
   // It is possible that tablespace was excluded from rotation in the meantime.
   // I.e. fil_crypt_exclude_tablespace_from_rotation was called. Check it here.
   if (crypt_data->is_encryption_disabled()) {
-    mutex_exit(&crypt_data->mutex);
+    mutex_exit(&crypt_data->mutex); //TODO:Consider IB_MUTEX_GUARD or something like this and adding there release function
     crypt_data->rotate_state.destroy_flush_observer();
     mutex_exit(&crypt_data->start_rotate_mutex);
     return false;
@@ -2241,6 +2241,7 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
 
     bool validation_tag_re_encryption_failure{false};
     bool load_key_failure{false};
+    uint org_max_key_version = crypt_data->max_key_version;
 
     fprintf(stderr, "re-encrypting for space: %s", state->space->name);
 
@@ -2262,10 +2263,36 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
                   << " . Removing space from encrypting. Please make sure "
                      "keyring is functional and try restarting the server";
       state->space->exclude_from_rotation = true;
+      crypt_data->max_key_version = org_max_key_version;
       mutex_exit(&crypt_data->mutex);
       crypt_data->rotate_state.destroy_flush_observer();
       mutex_exit(&crypt_data->start_rotate_mutex);
       return false;
+    }
+
+    // TODO: I need to think whether there is a better way of doing this
+    // checking if this is unencrypt => encrypted rotation, or the
+    // online_encryption flag is not yet set.
+    if (crypt_data->min_key_version == 0) {
+      // let know the i/o layer that it shouldn't obtain mutex lock.
+      crypt_data->mutex_lock_needed = false;
+
+      if (dd_set_online_encryption(state->thd, state->space->name,
+                                   &state->space->stop_new_ops)) {
+         // should not happen
+         ib::error() << "Could not update DD for tablespace "
+                     << state->space->name
+                     << " with information on online encryption."
+                     << " Removing space from online encryption.";
+        state->space->exclude_from_rotation = true;
+        crypt_data->max_key_version = org_max_key_version;
+        mutex_exit(&crypt_data->mutex);
+        crypt_data->rotate_state.destroy_flush_observer();
+        mutex_exit(&crypt_data->start_rotate_mutex);
+        return false;
+      }
+
+      crypt_data->mutex_lock_needed = true;
     }
 
     /* only first thread needs to init */
@@ -3123,10 +3150,12 @@ static dberr_t fil_update_encrypted_flag(
       "fail_encryption_flag_update_on_t3",
       if (strcmp(space_name, "test/t3") == 0) { return DB_ERROR; });
 
+  // we set DD's online_encryption flag to N in case we have decrypted
   bool failure =
       (update_operation == UpdateEncryptedFlagOperation::SET
            ? dd_set_encryption_flag(thd, space_name, is_space_being_removed)
-           : dd_clear_encryption_flag(thd, space_name, is_space_being_removed));
+           : dd_clear_encryption_flag(thd, space_name, is_space_being_removed,
+                                      update_operation == UpdateEncryptedFlagOperation::CLEAR));
 
   return (failure ? DB_ERROR : DB_SUCCESS);
 }
@@ -3183,31 +3212,36 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
                           ? CRYPT_SCHEME_UNENCRYPTED
                           : crypt_data->type;
 
-  //if (current_type == CRYPT_SCHEME_UNENCRYPTED) {
-    //crypt_data->max_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
-  //}
+  // update DD flags in case we are doing rotation unencrypted => encrypted
+  // or encrypted => unnecrypted. For encrypted => encrypted rotation
+  // i.e. re-encryption, DD flags do not need to be updated.
+  if ((current_type == CRYPT_SCHEME_1 &&
+       crypt_data->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) ||
+      (current_type == CRYPT_SCHEME_UNENCRYPTED &&
+       crypt_data->min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED)) {
 
-  UpdateEncryptedFlagOperation update_enc_flag_op =
-      (current_type == CRYPT_SCHEME_UNENCRYPTED)
-          ? UpdateEncryptedFlagOperation::CLEAR
-          : UpdateEncryptedFlagOperation::SET;
+      UpdateEncryptedFlagOperation update_enc_flag_op =
+          (current_type == CRYPT_SCHEME_UNENCRYPTED)
+              ? UpdateEncryptedFlagOperation::CLEAR
+              : UpdateEncryptedFlagOperation::SET;
 
-  if (DB_SUCCESS != fil_update_encrypted_flag(space->name, update_enc_flag_op,
-                                              &space->stop_new_ops,
-                                              state->thd)) {
-    ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0) ||
-          state->space->stop_new_ops);
-    return (DB_ERROR);
-  }
+      if (DB_SUCCESS != fil_update_encrypted_flag(space->name, update_enc_flag_op,
+                                                  &space->stop_new_ops,
+                                                  state->thd)) {
+        ut_ad(DBUG_EVALUATE_IF("fail_encryption_flag_update_on_t3", 1, 0) ||
+              state->space->stop_new_ops);
+        return (DB_ERROR);
+      }
 
-  fil_lock_shard_by_id(space->id);
-  if (update_enc_flag_op == UpdateEncryptedFlagOperation::SET) {
-    space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
-  } else {
-    ut_ad(update_enc_flag_op == UpdateEncryptedFlagOperation::CLEAR);
-    space->flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
-  }
-  fil_unlock_shard_by_id(space->id);
+      fil_lock_shard_by_id(space->id);
+      if (update_enc_flag_op == UpdateEncryptedFlagOperation::SET) {
+        space->flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+      } else {
+        ut_ad(update_enc_flag_op == UpdateEncryptedFlagOperation::CLEAR);
+        space->flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+      }
+      fil_unlock_shard_by_id(space->id);
+   }
 
   DBUG_EXECUTE_IF("crash_on_t1_flush_after_dd_update",
                   if (strcmp(state->space->name, "test/t1") == 0)

@@ -7528,7 +7528,8 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
   uint key_version = 0;
   uint key_id = FIL_DEFAULT_ENCRYPTION_KEY;
 
-  mutex_enter(&space->crypt_data->mutex);
+  if (space->crypt_data->mutex_lock_needed)
+    mutex_enter(&space->crypt_data->mutex);
 
   iv = space->crypt_data->iv;
   key_id = space->crypt_data->key_id;
@@ -7596,7 +7597,8 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
 
   req_type.encryption_algorithm(Encryption::KEYRING);
 
-  mutex_exit(&space->crypt_data->mutex);
+  if (space->crypt_data->mutex_lock_needed)
+    mutex_exit(&space->crypt_data->mutex);
 }
 
 static void fil_io_set_mk_encryption(IORequest &req_type, fil_space_t *space) {
