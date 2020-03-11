@@ -1520,6 +1520,14 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
   memcpy(current_validation_tag, this->encrypted_validation_tag,
          ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
 
+  // in case we are validating a space for which only a subset of pages is encrypted, we may be in a situation
+  // that there are muliple encryption keys and they do not fully fill the range [min_key_version, max_key_version], since
+  // min_key_version == 0 is a marker that there are some unencrypted pages, without any version. The encryption keys
+  // might be in some range [n, max_key_version], where n > min_key_version and min_key_version = 0. Thus for this situation
+  // (min_key_version = 0) we validate the tag after each decryption. If the tag matches after any decryption it means
+  // we have all the valid keys we need to decrypt space.
+  bool check_tag_for_each_version{this->min_key_version == ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED};
+
   for (uint key_version = max_key_version;
        key_version >= std::max(min_key_version,static_cast<uint>(1));
        --key_version) {
@@ -1538,6 +1546,12 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
 
     memcpy(current_validation_tag, decrypted_validation_tag,
            ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
+
+    if (check_tag_for_each_version &&
+        memcmp(current_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
+               ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0)
+      return true;
+
   }
 
   //TODO: temp assert for tests, we do not anticipate tag validation failures
