@@ -3594,6 +3594,7 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
 
     space_id_t space_id;
     uint32_t flags = 0;
+    bool is_enc_rotating{false};
     const auto &p = dd_tablespace->se_private_data();
     const char *space_name = dd_tablespace->name().c_str();
     const auto se_key_value = dd_space_key_strings;
@@ -3609,6 +3610,12 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
 
     if (p.get(se_key_value[DD_SPACE_FLAGS], &flags)) {
       /* Failed to fetch the tablespace flags. */
+      ++m_n_errors;
+      break;
+    }
+
+    if (p.exists(se_key_value[DD_SPACE_ONLINE_ENCRYPTION]) &&
+        p.get(se_key_value[DD_SPACE_ONLINE_ENCRYPTION], &is_enc_rotating)) {
       ++m_n_errors;
       break;
     }
@@ -3752,7 +3759,7 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
     /* It's safe to pass space_name in tablename charset because
     filename is already in filename charset. */
     dberr_t err =
-        fil_ibd_open(validate, FIL_TYPE_TABLESPACE, space_id, flags, space_name,
+        fil_ibd_open(validate || is_enc_rotating, FIL_TYPE_TABLESPACE, space_id, flags, space_name,
                      nullptr, filename, false, false, keyring_encryption_info);
 
     switch (err) {

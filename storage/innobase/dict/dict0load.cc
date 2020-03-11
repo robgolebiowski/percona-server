@@ -1376,6 +1376,8 @@ std::pair<bool, space_id_t> dict_check_sys_tablespaces(bool validate) {
     opened. */
     char *filepath = dict_get_first_path(space_id);
 
+    // We do not need to validate tablespace for online encryption as encryption
+    // threads do not work in 5.7. Only ENCRYPTION='KEYRING' works.
     Keyring_encryption_info keyring_encryption_info;
     /* Check that the .ibd file exists. */
     dberr_t err = fil_ibd_open(validate, FIL_TYPE_TABLESPACE, space_id,
@@ -1617,6 +1619,8 @@ std::pair<bool, space_id_t> dict_check_sys_tables(bool validate) {
 
     Keyring_encryption_info keyring_encryption_info;
 
+    // We do not need to validate tablespace for online encryption as encryption
+    // threads do not work in 5.7. Only ENCRYPTION='KEYRING' works.
     dberr_t err = fil_ibd_open(validate, FIL_TYPE_TABLESPACE, space_id,
                                fsp_flags, space_name, tbl_name, filepath, true,
                                true, keyring_encryption_info);
