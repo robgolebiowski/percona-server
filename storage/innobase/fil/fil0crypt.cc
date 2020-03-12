@@ -1052,10 +1052,17 @@ byte *fil_parse_write_crypt_data_v3(space_id_t space_id, byte *ptr,
   uint key_id = mach_read_from_4(ptr);
   ptr += 4;
 
-  char uuid[ENCRYPTION_SERVER_UUID_LEN];
+  static uchar uuid_hex[ENCRYPTION_SERVER_UUID_HEX_LEN];
+  memcpy(&uuid_hex, ptr, ENCRYPTION_SERVER_UUID_HEX_LEN);
+
+  ptr += ENCRYPTION_SERVER_UUID_HEX_LEN;
+
+  static char uuid[ENCRYPTION_SERVER_UUID_LEN];
   memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN);
-  memcpy(uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
-  ptr += ENCRYPTION_SERVER_UUID_LEN;
+  hex_to_uuid(uuid_hex, uuid);
+
+  ut_ad(strlen(uuid) > 0);
+  ut_ad(strlen(server_uuid) == 0 || memcmp(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN) == 0);
 
   fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(ptr);
   ptr += 1;
@@ -1536,6 +1543,9 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
 
     ut_print_buf(stderr, local_keys_cache[key_version], 32);
 
+    fprintf(stderr, "before decrypting: ");
+    ut_print_buf(stderr, current_validation_tag, 16);
+
     ut_ad(local_keys_cache[key_version] != nullptr);
     
     if (!decrypt_validation_tag(current_validation_tag, local_keys_cache[key_version],
@@ -1544,14 +1554,16 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
       return false;
     }
 
-    memcpy(current_validation_tag, decrypted_validation_tag,
-           ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
-
     if (check_tag_for_each_version &&
         memcmp(current_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
                ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0)
       return true;
 
+    memcpy(current_validation_tag, decrypted_validation_tag,
+           ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
+
+    fprintf(stderr, "after decrypting: ");
+    ut_print_buf(stderr, current_validation_tag, 16);
   }
 
   //TODO: temp assert for tests, we do not anticipate tag validation failures
@@ -2198,6 +2210,8 @@ bool fil_space_crypt_t::re_encrypt_validation_tag(const uint from_key_version, c
   }
 
   byte re_encrypted_validation_tag[ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE] = {0};
+  byte copy_encrypted_validation_tag[ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE];
+  memcpy(copy_encrypted_validation_tag, encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
 
   for (uint key_version = from_key_version; key_version <= to_key_version;
        ++key_version) {
@@ -2210,13 +2224,23 @@ bool fil_space_crypt_t::re_encrypt_validation_tag(const uint from_key_version, c
 
     ut_print_buf(stderr, local_keys_cache[key_version], 32);
 
-    if (encrypt_validation_tag(encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
+    fprintf(stderr, "before re-encryption:");
+    ut_print_buf(stderr, encrypted_validation_tag, 16);
+
+    if (encrypt_validation_tag(copy_encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
                                local_keys_cache[key_version], re_encrypted_validation_tag) == false) {
       // generate error
       return false;
     }
-    memcpy(re_encrypted_validation_tag, encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
+
+    fprintf(stderr, "after re-encryption:");
+    ut_print_buf(stderr, re_encrypted_validation_tag, 16);
+
+    memcpy(copy_encrypted_validation_tag, re_encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
   }
+
+  // only update encrypted_validation_tag if the whole re-encryption was successful
+  memcpy(encrypted_validation_tag, copy_encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
 
   return true;
 }
@@ -2257,7 +2281,7 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
     bool load_key_failure{false};
     uint org_max_key_version = crypt_data->max_key_version;
 
-    fprintf(stderr, "re-encrypting for space: %s", state->space->name);
+    fprintf(stderr, "re-encrypting for space: %s, %d", state->space->name, state->space->id);
 
     if (crypt_data->load_keys_to_local_cache() == false) {
       load_key_failure = true;
@@ -3260,6 +3284,18 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
   DBUG_EXECUTE_IF("crash_on_t1_flush_after_dd_update",
                   if (strcmp(state->space->name, "test/t1") == 0)
                       DBUG_ABORT(););
+
+  // encrypt encryption_validation_tag with just max_key_version or leave it unencrypted
+  // for unencrypted tablespace
+  // I need crypt_data->mutex taken for this ?
+  if (current_type == CRYPT_SCHEME_UNENCRYPTED) {
+    memcpy(crypt_data->encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
+  } else {
+    ut_ad(crypt_data->local_keys_cache[crypt_data->max_key_version] != nullptr);
+    //TODO: what if encrypt_validation_tag returns error?
+    encrypt_validation_tag(ENCRYPTION_KEYRING_VALIDATION_TAG, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
+                           crypt_data->local_keys_cache[crypt_data->max_key_version], crypt_data->encrypted_validation_tag);
+  }
 
   /* update page 0 */
   mtr_t mtr;
