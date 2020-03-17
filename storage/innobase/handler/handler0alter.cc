@@ -652,9 +652,12 @@ static MY_ATTRIBUTE((warn_unused_result)) bool innobase_need_rebuild(
   Alter_inplace_info::HA_ALTER_FLAGS alter_inplace_flags =
       ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE);
 
-  if (Encryption::none_explicitly_specified(
+  if ((Encryption::none_explicitly_specified(
           ha_alter_info->create_info->explicit_encryption,
-          ha_alter_info->create_info->encrypt_type.str) ||
+          ha_alter_info->create_info->encrypt_type.str)
+       && ( (old_table->s->tablespace == nullptr && !old_table->s->system) ||
+            (old_table->s->tablespace != nullptr &&
+             strcmp(old_table->s->tablespace, dict_sys_t::s_file_per_table_name) == 0))) ||
       (Encryption::is_keyring(ha_alter_info->create_info->encrypt_type.str) &&
        !Encryption::is_keyring(old_table->s->encrypt_type.str)) ||
       ha_alter_info->create_info->encryption_key_id !=
