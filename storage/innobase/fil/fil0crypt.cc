@@ -789,7 +789,8 @@ static fil_space_crypt_t *fil_space_read_crypt_data_v3(
   hex_to_uuid(uuid_hex, uuid);
 
   ut_ad(strlen(uuid) > 0);
-  ut_ad(strlen(server_uuid) == 0 || memcmp(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN) == 0);
+  // no longer valid, for tests which assign uuid to the server, for instance: innodb-missing-key.test
+  //ut_ad(strlen(server_uuid) == 0 || memcmp(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN) == 0);
 
   //boost::uuids::uuid uuid_hex;
   //memcpy(&uuid_hex, page + offset + bytes_read, ENCRYPTION_SERVER_UUID_HEX_LEN);
@@ -1565,10 +1566,6 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
     fprintf(stderr, "after decrypting: ");
     ut_print_buf(stderr, current_validation_tag, 16);
   }
-
-  //TODO: temp assert for tests, we do not anticipate tag validation failures
-  ut_ad(memcmp(current_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
-               ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0);
 
   return memcmp(current_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
                 ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0;

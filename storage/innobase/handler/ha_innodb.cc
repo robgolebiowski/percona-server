@@ -15519,7 +15519,7 @@ int ha_innobase::truncate_impl(const char *name, TABLE *form,
     return HA_ERR_NO_SUCH_TABLE;
   } else if (!innodb_table->is_readable()) {
     return innodb_table->keyring_encryption_info.page0_has_crypt_data == true
-               ? HA_ERR_DECRYPTION_FAILED
+               ? HA_ERR_ENCRYPTION_KEY_MISSING
                : HA_ERR_TABLESPACE_MISSING;
   }
 
