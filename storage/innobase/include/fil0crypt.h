@@ -156,6 +156,12 @@ struct fil_space_rotate_state_t {
 #ifndef UNIV_INNOCHECKSUM
 
 enum Crypt_key_operation { FETCH_KEY, FETCH_OR_GENERATE_KEY };
+enum class Validation_key_verions_result {
+  MISSING_KEY_VERSIONS,
+  CORRUPTED_OR_WRONG_KEY_VERSIONS,
+  SUCCESS
+};
+
 
 struct fil_space_crypt_t {
  public:
@@ -307,7 +313,7 @@ struct fil_space_crypt_t {
 
   byte encrypted_validation_tag[MY_AES_BLOCK_SIZE];
 
-  bool validate_encryption_key_versions();
+  Validation_key_verions_result validate_encryption_key_versions();
   bool re_encrypt_validation_tag(const uint from_key_version, const uint to_key_version);
 
 private:

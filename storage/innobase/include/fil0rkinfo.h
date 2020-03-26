@@ -3,6 +3,7 @@
 
 //#ifndef UNIV_INNOCHECKSUM
 
+//TODO: change it to enum
 #define CRYPT_SCHEME_UNENCRYPTED 0
 #define CRYPT_SCHEME_1 1
 

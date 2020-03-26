@@ -65,7 +65,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define ENCRYPTION_MASTER_KEY_NAME_MAX_LEN 100
 
 #ifdef UNIV_DEBUG
-static int number_of_t1_pages_rotated = 0;
+static int number_of_t1_pages_rotated{0};
+// we set it to 100 first - so the space would be considered to
+// rotation, later we change it to different value - depends on
+// how many pages we do wait.
+static int number_of_t1_pages_to_rotate{100};
 #endif
 
 /** Mutex for keys */
@@ -202,8 +206,10 @@ static_assert(KERYING_ENCRYPTION_INFO_MAX_SIZE < ENCRYPTION_INFO_MAX_SIZE,
 
 void fil_space_crypt_t::unload_keys_from_local_cache() {
   for (auto item : local_keys_cache) {
-    memset(item.second, 0, ENCRYPTION_KEY_LEN);
-    my_free(item.second);
+    if (item.second != nullptr) {
+      memset(item.second, 0, ENCRYPTION_KEY_LEN);
+      my_free(item.second);
+    }
   }
   local_keys_cache.clear();
 }
@@ -347,16 +353,21 @@ fil_space_crypt_t::fil_space_crypt_t(uint new_min_key_version, uint new_key_id,
   }
 
   if (strlen(new_uuid) == 0) {
+    fprintf(stderr, "constr 1");
     key_found = false;
     min_key_version = ENCRYPTION_KEY_VERSION_INVALID;
     // This was read - because when creating new crypt data - it means that
     // uuid is never empty. type will be overwritten by read function
   } else if (new_encryption == FIL_ENCRYPTION_OFF) {
+    fprintf(stderr, "constr 2");
     type = CRYPT_SCHEME_UNENCRYPTED;
     key_found = false;
     min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
   } else if (Encryption::is_online_encryption_on() == false &&
              new_encryption == FIL_ENCRYPTION_DEFAULT) {
+    fprintf(stderr, "constr 3");
+    if(key_operation == FETCH_OR_GENERATE_KEY)
+      fprintf(stderr, "constr 3 - FETCH_OR_GENERATE_KEY");
     type = CRYPT_SCHEME_UNENCRYPTED;
     min_key_version = ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED;
     key_found =
@@ -366,6 +377,7 @@ fil_space_crypt_t::fil_space_crypt_t(uint new_min_key_version, uint new_key_id,
                       key_id, uuid)
             : Encryption::tablespace_key_exists(key_id, uuid);
   } else {
+    fprintf(stderr, "constr 4");
     type = CRYPT_SCHEME_1;
     // key_found = true; // cheat key_get_latest_version that the key exists -
     // if it does not it will return ENCRYPTION_KEY_VERSION_INVALID
@@ -380,9 +392,15 @@ fil_space_crypt_t::fil_space_crypt_t(uint new_min_key_version, uint new_key_id,
     }
     if (key == nullptr) {
       key_found = false;
+      fprintf(stderr, "key not found");
+      fprintf(stderr, "key_id=%d", key_id);
+      fprintf(stderr, "uuid=%s", uuid);
       min_key_version = ENCRYPTION_KEY_VERSION_INVALID;
     } else {
       key_found = true;
+      fprintf(stderr, "key not found");
+      fprintf(stderr, "key_id=%d", key_id);
+      fprintf(stderr, "uuid=%s", uuid);
       min_key_version = max_key_version = key_version;
       // we are creating new encrypted space, we need to encrypt validation tag
       if (key_operation == FETCH_OR_GENERATE_KEY &&
@@ -1068,8 +1086,14 @@ byte *fil_parse_write_crypt_data_v3(space_id_t space_id, byte *ptr,
   fil_encryption_t encryption = (fil_encryption_t)mach_read_from_1(ptr);
   ptr += 1;
 
+  //TODO: This should be changed to max_key_version
+  Crypt_key_operation key_operation = (type == CRYPT_SCHEME_UNENCRYPTED) 
+                                        ? Crypt_key_operation::FETCH_OR_GENERATE_KEY
+                                        : Crypt_key_operation::FETCH_KEY;
+
   fil_space_crypt_t *crypt_data = fil_space_create_crypt_data(
-      encryption, key_id, uuid, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
+      //encryption, key_id, uuid, Crypt_key_operation::FETCH_OR_GENERATE_KEY);
+      encryption, key_id, uuid, key_operation);
   /* Need to overwrite these as above will initialize fields. */
   DBUG_ASSERT(min_key_version != ENCRYPTION_KEY_VERSION_INVALID);
   crypt_data->min_key_version = min_key_version;
@@ -1512,15 +1536,15 @@ static bool decrypt_validation_tag(const byte *encrypted_validation_tag,
   //return true;
 }
 
-bool fil_space_crypt_t::validate_encryption_key_versions() {
+Validation_key_verions_result fil_space_crypt_t::validate_encryption_key_versions() {
 
   // unencrypted space, thus no keys needed to decrypt
   if (type == CRYPT_SCHEME_UNENCRYPTED)
-    return true;
+    return Validation_key_verions_result::SUCCESS;
 
   if (load_keys_to_local_cache() == false) {
-    ut_ad(false);
-    return false;
+    //ut_ad(false);
+    return Validation_key_verions_result::MISSING_KEY_VERSIONS;
   }
 
   byte decrypted_validation_tag[ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE] = {0};
@@ -1552,13 +1576,13 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
     if (!decrypt_validation_tag(current_validation_tag, local_keys_cache[key_version],
                                 decrypted_validation_tag)) {
       ut_ad(false);
-      return false;
+      return Validation_key_verions_result::CORRUPTED_OR_WRONG_KEY_VERSIONS;
     }
 
     if (check_tag_for_each_version &&
         memcmp(current_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
                ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0)
-      return true;
+      return Validation_key_verions_result::SUCCESS;
 
     memcpy(current_validation_tag, decrypted_validation_tag,
            ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
@@ -1567,8 +1591,12 @@ bool fil_space_crypt_t::validate_encryption_key_versions() {
     ut_print_buf(stderr, current_validation_tag, 16);
   }
 
+  //ut_ad(memcmp(current_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
+                //ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0);
+
   return memcmp(current_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
-                ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0;
+                ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE) == 0 ? Validation_key_verions_result::SUCCESS
+                                                             : Validation_key_verions_result::CORRUPTED_OR_WRONG_KEY_VERSIONS;
 }
 
 /***********************************************************************
@@ -1819,9 +1847,10 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
                                            bool *recheck) {
   fil_space_t *space = state->space;
 
-  DBUG_EXECUTE_IF("rotate_only_first_100_pages_from_t1",
+  DBUG_EXECUTE_IF("rotate_only_first_x_pages_from_t1",
                   if (strcmp(space->name, "test/t1") == 0 &&
-                      number_of_t1_pages_rotated >= 100) return false;);
+                      number_of_t1_pages_rotated >= number_of_t1_pages_to_rotate)
+                    return false;);
 
   /* Make sure that tablespace is normal tablespace */
   if (space->purpose != FIL_TYPE_TABLESPACE &&
@@ -2349,6 +2378,24 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
     }
 
     fil_crypt_write_crypt_data_to_page0(state->space);
+
+    //DBUG_EXECUTE_IF(
+        //"set_number_of_t1_pages_to_rotate_to_100",
+        //if (strcmp(state->space->name, "test/t1") == 0) {
+          //ut_ad(number_of_t1_pages_rotated == 0);
+          //number_of_t1_pages_rotated = 0;
+          //number_of_t1_pages_to_rotate = 100;
+          //static int number_of_enters{0};
+          //++number_of_enters;
+          //ut_ad(number_of_enters == 1);
+    //});
+
+    DBUG_EXECUTE_IF(
+        "set_number_of_t1_pages_to_rotate_to_20",
+        if (strcmp(state->space->name, "test/t1") == 0) {
+          number_of_t1_pages_to_rotate = 20;
+          //ut_ad(false);
+    });
   }
 
   /* count active threads in space */
@@ -2716,11 +2763,9 @@ static void fil_crypt_rotate_pages(const key_state_t *key_state,
     }
 
     DBUG_EXECUTE_IF(
-        "rotate_only_first_100_pages_from_t1",
+        "rotate_only_first_x_pages_from_t1",
         if (strcmp(state->space->name, "test/t1") == 0) {
-          // ib::error() << "rotate_only_first_100_pages_from_t1 is
-          // active" << '\n';
-          if (number_of_t1_pages_rotated >= 100) {
+          if (number_of_t1_pages_rotated >= number_of_t1_pages_to_rotate) {
             state->offset = end;
             return;
           } else
@@ -3361,9 +3406,9 @@ static void fil_crypt_complete_rotate_space(const key_state_t *key_state,
      * can check if we reached this point by checking flushing field - it should
      * be 1 if we are here */
     DBUG_EXECUTE_IF(
-        "rotate_only_first_100_pages_from_t1",
+        "rotate_only_first_x_pages_from_t1",
         if (strcmp(state->space->name, "test/t1") == 0 &&
-            number_of_t1_pages_rotated >= 100) {
+            number_of_t1_pages_rotated >= number_of_t1_pages_to_rotate) {
           crypt_data->rotate_state.flushing = true;
           should_flush = false;
         });

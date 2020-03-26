@@ -8611,8 +8611,9 @@ bool Encryption::get_tablespace_key(uint key_id, const char *uuid,
   Encryption::get_keyring_key(key_name, tablespace_key, key_len);
 
   if (*tablespace_key == NULL) {
-    ib::error() << "Encryption can't find tablespace key, please check"
-                   " the keyring plugin is loaded.";
+    ib::error() << "Encryption can't find tablespace key_id = " << key_id
+                   << ", please check"
+                   << " the keyring plugin is loaded.";
     result = false;
   }
 
