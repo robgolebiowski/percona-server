@@ -326,6 +326,7 @@ struct fil_space_crypt_status_t {
   space_id_t space;                  /*!< tablespace id */
   ulint scheme;                      /*!< encryption scheme */
   uint min_key_version;              /*!< min key version */
+  uint max_key_version;              /*!< max key version */
   uint current_key_version;          /*!< current key version */
   uint keyserver_requests;           /*!< no of key requests to key server */
   uint key_id;                       /*!< current key_id */

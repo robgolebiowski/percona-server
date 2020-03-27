@@ -3822,6 +3822,7 @@ void fil_space_crypt_get_status(const fil_space_t *space,
     status->scheme = crypt_data->type;
     status->keyserver_requests = crypt_data->keyserver_requests;
     status->min_key_version = crypt_data->min_key_version;
+    status->max_key_version = crypt_data->max_key_version;
     status->key_id = crypt_data->key_id;
 
     if (crypt_data->rotate_state.active_threads > 0 ||
