@@ -145,6 +145,7 @@ SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 --echo # Restart the server that have both version 1 and version 2 of key 1. Next, rotate
 --echo # first 20 pages to version 2 of key 1. After this, t1 should have 20 pages encrypted
 --echo # with ver2 of key1, 80 pages encrypted with ver1 of key1 and the rest of the pages unencrypted
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2
 --source include/start_mysqld.inc
 
@@ -193,12 +194,14 @@ SET GLOBAL debug="-d,set_number_of_t1_pages_to_rotate_to_20,rotate_only_first_x_
 
 --echo # Restart server without key 1 and drop t1. Although, key 1 is not available, it should still be possible
 --echo # to drop t1. Log errors to MYSQLD_LOG as we do not expect warnings in the default server log file.
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0 --log-error=$MYSQLD_LOG
 --source include/start_mysqld.inc
 
 DROP TABLE t1;
 
 --echo # Now we will re-create t1 and encrypt it with version 1 of key 1
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1
 --source include/restart_mysqld.inc
 
@@ -209,6 +212,7 @@ commit;
 set autocommit=1;
 
 --echo # Now we will re-encrypt first 100 pages of t1 with ver2 of key 1
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2
 --source include/restart_mysqld.inc
 
@@ -253,6 +257,7 @@ SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 --echo # setup for 4th scenario:
 --echo # 100 pages decrypted, rest of the pages encrypted by version 1 of key 1.
 --echo # First drop and re-create t1 (encrypt by key 1, version 1)
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=ONLINE_TO_KEYRING --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=$MYSQLD_LOG
 --source include/start_mysqld.inc
 
@@ -301,6 +306,7 @@ SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 --echo # encrypted by version 1 of key 1.
 
 --echo # First re-create t1, encrypted with key_id = 1, version 1
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=ONLINE_TO_KEYRING --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=$MYSQLD_LOG
 --source include/start_mysqld.inc
 
@@ -312,6 +318,7 @@ commit;
 set autocommit=1;
 
 --echo # Next, encrypt 100 pages with version 2
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2 --log-error=$MYSQLD_LOG
 --source include/restart_mysqld.inc
 
@@ -379,6 +386,7 @@ SET GLOBAL innodb_encryption_threads = 0;
 # cleanup
 
 --echo # Restart and decrypt all tables
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2
 --source include/start_mysqld.inc
 

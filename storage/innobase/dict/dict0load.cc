@@ -110,7 +110,7 @@ key constraints are loaded into memory.
                                 constraints are loaded.
 @return table, NULL if does not exist; if the table is stored in an
 .ibd file, but the file does not exist, then we set the
-file_unreadable flag TRUE in the table object we return */
+ibd_file_missing flag TRUE in the table object we return */
 static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
                                          dict_err_ignore_t ignore_err,
                                          dict_names_t &fk_tables);
@@ -2097,7 +2097,7 @@ static const char *dict_load_table_low(table_name_t &name, const rec_t *rec,
                                  n_v_col, 0, flags, flags2);
 
   (*table)->id = table_id;
-  (*table)->set_file_readable();
+  (*table)->ibd_file_missing = false;
 
   return (NULL);
 }
@@ -2225,7 +2225,7 @@ a foreign key references columns in this table.
 @param[in]	ignore_err	Error to be ignored when loading
                                 table and its index definition
 @return table, NULL if does not exist; if the table is stored in an
-.ibd file, but the file does not exist, then we set the file_unreadable
+.ibd file, but the file does not exist, then we set the ibd_file_missing
 flag in the table object we return. */
 dict_table_t *dict_load_table(const char *name, bool cached,
                               dict_err_ignore_t ignore_err) {
@@ -2277,7 +2277,7 @@ void dict_load_tablespace(dict_table_t *table, mem_heap_t *heap,
   if (table->flags2 & DICT_TF2_DISCARDED) {
     ib::warn(ER_IB_MSG_204)
         << "Tablespace for table " << table->name << " is set as discarded.";
-    table->set_file_unreadable();
+    table->ibd_file_missing = true;
     return;
   }
 
@@ -2372,7 +2372,7 @@ void dict_load_tablespace(dict_table_t *table, mem_heap_t *heap,
 
   if (err != DB_SUCCESS) {
     /* We failed to find a sensible tablespace file */
-    table->set_file_unreadable();
+    table->ibd_file_missing = true;
   }
 
   table->keyring_encryption_info = keyring_encryption_info;
@@ -2398,7 +2398,7 @@ key constraints are loaded into memory.
                                 constraints are loaded.
 @return table, NULL if does not exist; if the table is stored in an
 .ibd file, but the file does not exist, then we set the
-file_unreadable flag TRUE in the table object we return */
+ibd_file_missing flag TRUE in the table object we return */
 static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
                                          dict_err_ignore_t ignore_err,
                                          dict_names_t &fk_tables) {
@@ -2517,7 +2517,7 @@ static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
   transactions, the tablespace should exist, because DDL operations
   were not allowed while the table is being locked by a transaction. */
   dict_err_ignore_t index_load_err =
-      !(ignore_err & DICT_ERR_IGNORE_RECOVER_LOCK) && table->file_unreadable
+      !(ignore_err & DICT_ERR_IGNORE_RECOVER_LOCK) && table->ibd_file_missing
           ? DICT_ERR_IGNORE_ALL
           : ignore_err;
   err = dict_load_indexes(table, heap, index_load_err);
@@ -2592,7 +2592,7 @@ static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
   of the error condition, since the user may want to dump data from the
   clustered index. However we load the foreign key information only if
   all indexes were loaded. */
-  if (!cached || table->file_unreadable) {
+  if (!cached || table->ibd_file_missing) {
     /* Don't attempt to load the indexes from disk. */
   } else if (err == DB_SUCCESS) {
     err = dict_load_foreigns(table->name.m_name, NULL, true, true, ignore_err,
@@ -2628,7 +2628,7 @@ func_exit:
   mem_heap_free(heap);
 
   ut_ad(!table || ignore_err != DICT_ERR_IGNORE_NONE ||
-        table->file_unreadable || !table->is_corrupted());
+        table->ibd_file_missing || !table->is_corrupted());
 
   if (table && table->fts) {
     /* We do not add fts tables to optimize thread

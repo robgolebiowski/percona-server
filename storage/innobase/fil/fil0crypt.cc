@@ -2512,10 +2512,8 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
   state->crypt_stat.pages_read_from_disk++;
 
   const auto start = ut_time_monotonic_us();
-  dberr_t err;
   block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
-                           Page_fetch::POSSIBLY_FREED, file, line, mtr, false,
-                           &err);
+                           Page_fetch::POSSIBLY_FREED, file, line, mtr, false);
   const auto end = ut_time_monotonic_us();
 
   state->cnt_waited++;

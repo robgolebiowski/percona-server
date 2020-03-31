@@ -2519,7 +2519,7 @@ dberr_t Fil_shard::get_file_size(fil_node_t *file, bool read_only_mode) {
   if (space->crypt_data && space->crypt_data->type == CRYPT_SCHEME_1 &&
       !space->crypt_data->key_found && !recv_recovery_is_on()) {
     ib::error() << "There is no key for tablespace " << space->name;
-    return (DB_IO_DECRYPT_FAIL);
+    return (DB_ERROR);
   }
 
   if (file->size == 0) {
@@ -8254,8 +8254,6 @@ void fil_aio_wait(ulint segment) {
 
   shard->mutex_release();
 
-  const auto space_id = file->space->id;
-
   ut_ad(fil_validate_skip());
 
   /* Do the i/o handling */
@@ -8273,29 +8271,7 @@ void fil_aio_wait(ulint segment) {
       /* async single page writes from the dblwr buffer don't have
       access to the page */
       if (message != nullptr) {
-        buf_page_t *bpage = static_cast<buf_page_t *>(message);
-        if (!bpage) {
-          return;
-        }
-
-        const auto offset = bpage->id.page_no();
-        dberr_t err = buf_page_io_complete(bpage);
-        if (err == DB_SUCCESS) {
-          return;
-        }
-
-        ut_ad(type.is_read());
-        if (recv_recovery_is_on() && !srv_force_recovery) {
-          recv_sys->found_corrupt_fs = true;
-        }
-
-        if (fil_space_t *space = fil_space_acquire_for_io(space_id)) {
-          if (space == file->space) {
-            ib::error() << "Failed to read file '" << file->name
-                        << "' at offset " << offset << ": " << ut_strerr(err);
-          }
-          fil_space_release_for_io(space);
-        }
+        buf_page_io_complete(static_cast<buf_page_t *>(message));
       }
       return;
     case FIL_TYPE_LOG:
@@ -9068,7 +9044,7 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
       Encryption::get_latest_tablespace_key(
           iter.m_crypt_data->key_id, iter.m_crypt_data->uuid,
           &iter.m_encryption_key_version, &iter.m_encryption_key);
-      if (iter.m_encryption_key == NULL) err = DB_IO_DECRYPT_FAIL;
+      if (iter.m_encryption_key == NULL) err = DB_ERROR;
     } else {
       /* Set encryption info. */
       iter.m_encryption_key = table->encryption_key;
@@ -9286,7 +9262,7 @@ dberr_t fil_set_compression(dict_table_t *table, const char *algorithm) {
   COMPRESSION is set by TABLE DDL, not TABLESPACE DDL. There is
   no other technical reason.  Also, do not use it for missing
   tables or tables with compressed row_format. */
-  if (table->file_unreadable ||
+  if (table->ibd_file_missing ||
       !DICT_TF2_FLAG_IS_SET(table, DICT_TF2_USE_FILE_PER_TABLE) ||
       DICT_TF2_FLAG_IS_SET(table, DICT_TF2_TEMPORARY) ||
       page_size_t(table->flags).is_compressed()) {
@@ -11792,20 +11768,6 @@ void fil_space_set_corrupt(space_id_t space_id) {
   auto *const space = shard->get_space_by_id(space_id);
 
   if (space) space->is_corrupt = true;
-
-  shard->mutex_release();
-}
-
-/** Mark space as encrypted
-@param space_id space id */
-void fil_space_set_encrypted(space_id_t space_id) {
-  auto *const shard = fil_system->shard_by_id(space_id);
-
-  shard->mutex_acquire();
-
-  auto *const space = shard->get_space_by_id(space_id);
-
-  if (space) space->is_encrypted = true;
 
   shard->mutex_release();
 }

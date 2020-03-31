@@ -2929,7 +2929,7 @@ static inline dict_table_t *dd_fill_dict_table(const Table *dd_tab,
   }
 
   if (is_discard) {
-    m_table->set_file_unreadable();
+    m_table->ibd_file_missing = true;
     m_table->flags2 |= DICT_TF2_DISCARDED;
   }
 
@@ -3843,7 +3843,7 @@ void dd_load_tablespace(const Table *dd_table, dict_table_t *table,
   if (table->flags2 & DICT_TF2_DISCARDED) {
     ib::warn(ER_IB_MSG_171)
         << "Tablespace for table " << table->name << " is set as discarded.";
-    table->set_file_unreadable();
+    table->ibd_file_missing = true;
     return;
   }
 
@@ -3936,7 +3936,7 @@ void dd_load_tablespace(const Table *dd_table, dict_table_t *table,
 
   } else {
     /* We failed to find a sensible tablespace file */
-    table->set_file_unreadable();
+    table->ibd_file_missing = true;
   }
 
   ut_free(shared_space_name);
