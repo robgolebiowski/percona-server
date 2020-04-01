@@ -26,6 +26,7 @@ if ($validation_condition == 'corrupted_ver_2_of_key_1') {
 
 --echo # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 --echo # it should not be possible to open t1
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$keyring_file --log-error=$MYSQLD_LOG
 --source include/start_mysqld.inc
 

@@ -41,7 +41,7 @@ SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 missing_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # t1 is partially encrypted with ver1 of key 1, now switch to keyring without
@@ -49,7 +49,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 missing_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # t1 is partially encrypted with version 1 of key 1, now switch to keyring
@@ -57,7 +57,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 corrupted_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # setup for 2nd scenario:
@@ -79,7 +79,7 @@ SET GLOBAL debug="-d,set_number_of_t1_pages_to_rotate_to_20,rotate_only_first_x_
 missing_ver_2_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # some pages are encrypted with version 1 of key 1 in t1, now switch to keyring without
@@ -87,14 +87,14 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 missing_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # t1 is encrypted by key 1. It should not be possible to open t1 if this key is missing.
 missing_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # some pages are encrypted with version 1 of key 1, now switch to keyring with version 1 of key 1 corrupted -
@@ -102,7 +102,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 corrupted_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # some pages are encrypted with version 2 of key 1, now switch to keyring with version 2 of key 1 corrupted -
@@ -110,7 +110,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 corrupted_ver_2_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_v2_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_v2_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # setup for 3rd scenario:
@@ -141,7 +141,7 @@ SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 missing_ver_2_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # some pages are encrypted with version 1 of key 1, now switch to keyring without version 1 of key 1 -
@@ -149,14 +149,14 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 missing_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # pages are encrypted with key 1. It should not be possible to open t1 when key 1 is missing.
 missing_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # pages are encrypted with version 1 and version 2 of key 1. It should not be possible to open
@@ -164,7 +164,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 corrupted_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # pages are encrypted with version 1 and version 2 of key 1. It should not be possible to open
@@ -172,7 +172,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 corrupted_ver_2_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_v2_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_v2_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # setup for 4th scenario:
@@ -201,7 +201,7 @@ SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 corrupted_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # t1 is encrypted with version 1 and version 2 of key 1, now switch to keyring without key 1 -
@@ -209,7 +209,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 missing_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # setup for 4th scenario:
@@ -241,7 +241,7 @@ SET GLOBAL innodb_encryption_threads = 0;
 corrupted_ver_2_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_v2_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_v2_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # some pages are encrypted with version 1 of key 1. Now switch to keyring with corrupted
@@ -249,7 +249,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 corrupted_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_v1_corrupted --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # some pages are encrypted with version 1 of key 1. Now switch to keyring without version 1 of key 1 -
@@ -257,7 +257,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 missing_ver_1_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_missing_v1_v2 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # some pages are encrypted with version 2 of key 1. Now switch to keyring without version 2 of key 1 -
@@ -265,7 +265,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 missing_ver_2_of_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # t1 is encrypted by version 1 and version 2 of key 1, now switch to keyring without key 1 -
@@ -273,7 +273,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 missing_key_1
 # t1 is encrypted with ver1 and ver2 of key 1, now switch to keyring without key 1 -
 # it should not be possible to open t1
-# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=keyring_file.so --keyring-file-data=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/std_data/validation_keyrings/keyring_key_0 --log-error=/percona/git/8_0_improve_validation_without_asan_bld/mysql-test/var/log/server.log
+# restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0 --log-error=MYSQLTEST_VARDIR/log/server.log
 SELECT COUNT(*) from t1;
 ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is correct keyring loaded?' from InnoDB
 # Restart and decrypt all tables

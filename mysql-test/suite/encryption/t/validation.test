@@ -145,8 +145,8 @@ SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 --echo # Restart the server that have both version 1 and version 2 of key 1. Next, rotate
 --echo # first 20 pages to version 2 of key 1. After this, t1 should have 20 pages encrypted
 --echo # with ver2 of key1, 80 pages encrypted with ver1 of key1 and the rest of the pages unencrypted
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --let $restart_parameters=restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load="keyring_file=$KEYRING_PLUGIN" --keyring-file-data=$MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN KEYRING_PLUGIN
 --source include/start_mysqld.inc
 
 SET GLOBAL debug="+d,set_number_of_t1_pages_to_rotate_to_20,rotate_only_first_x_pages_from_t1";
