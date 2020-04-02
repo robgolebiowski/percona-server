@@ -543,6 +543,12 @@ dberr_t SysTablespace::read_lsn_and_check_flags(lsn_t *flushed_lsn) {
   for (int retry = 0; retry < 2; ++retry) {
     err = it->validate_first_page(it->m_space_id, flushed_lsn, false).error;
 
+    if (it->m_crypt_data) {
+      fil_space_destroy_crypt_data(&it->m_crypt_data);
+      it->m_crypt_data = nullptr;
+    }
+
+
     if (err != DB_SUCCESS &&
         (retry == 1 || it->restore_from_doublewrite(0) != DB_SUCCESS)) {
       it->close();
@@ -569,6 +575,7 @@ dberr_t SysTablespace::read_lsn_and_check_flags(lsn_t *flushed_lsn) {
   of SDI */
   set_flags(it->flags());
 
+  //fil_space_crypt_t *crypt_data = it->m_crypt_data;
   fil_space_crypt_t *crypt_data =
       fil_space_read_crypt_data(page_size_t(it->m_flags), it->get_first_page());
 

@@ -5785,9 +5785,14 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
   ut_ad(!is_encrypted || df.is_open());
 
   const byte *first_page = df.is_open() ? df.get_first_page() : nullptr;
-  fil_space_crypt_t *crypt_data =
-      first_page ? fil_space_read_crypt_data(page_size_t(flags), first_page)
-                 : nullptr;
+  fil_space_crypt_t *crypt_data{nullptr};
+  if (df.m_crypt_data) {
+    // crypt data was already read by validate_first_page
+    crypt_data = df.m_crypt_data;
+    df.m_crypt_data = nullptr;
+  } else if (first_page) {
+    crypt_data = fil_space_read_crypt_data(page_size_t(flags), first_page);
+  }
 
   keyring_encryption_info.page0_has_crypt_data = crypt_data != nullptr;
   keyring_encryption_info.is_mk_to_keyring_rotation =
@@ -5797,6 +5802,9 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
 
   space = fil_space_create(space_name, space_id, flags, purpose, crypt_data);
 
+  ut_ad(space != nullptr);
+
+  //TODO: I need to delete crypt_data if space == nullptr
   if (space == nullptr) {
     return (DB_ERROR);
   }
@@ -6144,10 +6152,14 @@ fil_load_status Fil_shard::ibd_open_for_recovery(space_id_t space_id,
 #endif /* !UNIV_HOTBACKUP */
 
   const byte *first_page = df.get_first_page();
-  fil_space_crypt_t *crypt_data =
-      first_page
-          ? fil_space_read_crypt_data(page_size_t(df.flags()), first_page)
-          : NULL;
+  fil_space_crypt_t *crypt_data{nullptr};
+  if (df.m_crypt_data) {
+    // crypt data was already read by validate_first_page
+    crypt_data = df.m_crypt_data;
+    df.m_crypt_data = nullptr;
+  } else if (first_page) {
+    crypt_data = fil_space_read_crypt_data(page_size_t(df.flags()), first_page);
+  }
 
   fil_system->mutex_acquire_all();
 
@@ -6155,6 +6167,8 @@ fil_load_status Fil_shard::ibd_open_for_recovery(space_id_t space_id,
                        FIL_TYPE_TABLESPACE, crypt_data);
 
   fil_system->mutex_release_all();
+
+  ut_ad(space != nullptr);
 
   if (space == nullptr) {
     return (FIL_LOAD_INVALID);

@@ -59,6 +59,7 @@ void Datafile::init(const char *name, uint32_t flags) {
   m_flags = flags;
   m_encryption_key = NULL;
   m_encryption_iv = NULL;
+  ut_ad(m_crypt_data == nullptr);
 }
 
 /** Release the resources. */
@@ -80,6 +81,11 @@ void Datafile::shutdown() {
   if (m_encryption_iv != NULL) {
     ut_free(m_encryption_iv);
     m_encryption_iv = NULL;
+  }
+
+  if (m_crypt_data != nullptr) {
+    ut_ad(false);
+    fil_space_destroy_crypt_data(&m_crypt_data);
   }
 }
 
@@ -697,7 +703,14 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
   fil_space_crypt_t *crypt_data =
       fil_space_read_crypt_data(page_size_t(m_flags), m_first_page);
 
+  bool assigned_m_crypt_data{false};
+
   if (crypt_data) {
+    //ut_ad(m_crypt_data == nullptr);
+    if (m_crypt_data == nullptr) {
+      m_crypt_data = crypt_data;
+      assigned_m_crypt_data = true;
+    }
     output.encryption_type = ValidateOutput::KEYRING;
     output.keyring_encryption_info.page0_has_crypt_data = true;
     output.keyring_encryption_info.keyring_encryption_min_key_version =
@@ -782,12 +795,15 @@ Datafile::ValidateOutput Datafile::validate_first_page(space_id_t space_id,
         m_is_valid = false;
         free_first_page();
         fil_space_destroy_crypt_data(&crypt_data);
+        if (assigned_m_crypt_data) {
+          m_crypt_data = nullptr;
+        }
         output.keyring_encryption_info.keyring_encryption_key_is_missing = true;
         output.error = DB_INVALID_ENCRYPTION_META;
         return output;
       }
     }
-    fil_space_destroy_crypt_data(&crypt_data);
+    //fil_space_destroy_crypt_data(&crypt_data);
   }
 #ifndef UNIV_HOTBACKUP
   /* Set encryption operation in progress based on operation type

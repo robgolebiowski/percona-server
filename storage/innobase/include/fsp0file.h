@@ -139,7 +139,8 @@ class Datafile {
         m_file_info(),
         m_encryption_key(),
         m_encryption_iv(),
-        m_encryption_op_in_progress(NONE) {
+        m_encryption_op_in_progress(NONE),
+        m_crypt_data(nullptr) {
     m_name = mem_strdup(file.m_name);
     ut_ad(m_name != nullptr);
 
@@ -195,6 +196,8 @@ class Datafile {
     m_encryption_key = nullptr;
     m_encryption_iv = nullptr;
     m_encryption_op_in_progress = NONE;
+    ut_ad(m_crypt_data == nullptr);
+    m_crypt_data = nullptr;
 
     m_atomic_write = file.m_atomic_write;
 
@@ -523,5 +526,7 @@ class Datafile {
 
   /** Encryption operation in progress */
   encryption_op_type m_encryption_op_in_progress;
+
+  fil_space_crypt_t *m_crypt_data{nullptr};
 };
 #endif /* fsp0file_h */
