@@ -307,7 +307,7 @@ struct fil_space_crypt_t {
   // One starting with magic PSA, the second one starting with PSB and
   // the last onw tih PSC.
   // Here we store which magic we read : 1 - PSA, 2 - PSB, 3 - PSC
-  size_t private_version{2};
+  size_t private_version{3};
 
   char uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 
@@ -621,7 +621,7 @@ return true - fully or partially encrypted with keyring
               encryption v1
        false - is not encrypted, fully or partially with
               keyring encryption v1 */
-bool is_space_keyring_v1_encrypted(fil_space_t *space);
+bool is_space_keyring_pre_v3_encrypted(fil_space_t *space);
 
 /**
 Checks if tablespace is encrypted with KEYRING encryption v1
@@ -631,7 +631,7 @@ return true - fully or partially encrypted with keyring
               encryption v1
        false - is not encrypted, fully or partially with
               keyring encryption v1 */
-bool is_space_keyring_v1_encrypted(space_id_t space_id);
+bool is_space_keyring_pre_v3_encrypted(space_id_t space_id);
 
 #endif /* !UNIV_INNOCHECKSUM */
 

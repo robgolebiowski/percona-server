@@ -1481,7 +1481,7 @@ static bool innobase_get_tablespace_statistics(
     const char *tablespace_name, const char *file_name,
     const dd::Properties &ts_se_private_data, ha_tablespace_statistics *stats);
 
-static bool innobase_is_tablespace_keyring_v1_encrypted(
+static bool innobase_is_tablespace_keyring_pre_v3_encrypted(
     const dd::Tablespace &tablespace, int &error);
 /** Retrieve the tablespace type.
 
@@ -5236,8 +5236,8 @@ static int innodb_init(void *p) {
   innobase_hton->get_tablespace_type_by_name =
       innobase_get_tablespace_type_by_name;
 
-  innobase_hton->is_tablespace_keyring_v1_encrypted =
-      innobase_is_tablespace_keyring_v1_encrypted;
+  innobase_hton->is_tablespace_keyring_pre_v3_encrypted =
+      innobase_is_tablespace_keyring_pre_v3_encrypted;
 
   innobase_hton->is_dict_readonly = innobase_is_dict_readonly;
 
@@ -5591,7 +5591,7 @@ static int innobase_init_files(dict_init_mode_t dict_init_mode,
     This is needed for applying purge and ibuf from 5.7 */
     if (dict_load_tablespaces_for_upgrade()) {
       // there is a keyring v1 encrypted table - fail the upgrade
-      ib::error(ER_UPGRADE_KEYRING_V1_ENCRYPTION);
+      ib::error(ER_UPGRADE_KEYRING_UNSUPPORTED_VERSION_ENCRYPTION);
       return innodb_init_abort();
     }
 
@@ -17866,7 +17866,7 @@ static bool innobase_get_index_column_cardinality(
   return (failure);
 }
 
-static bool innobase_is_tablespace_keyring_v1_encrypted(
+static bool innobase_is_tablespace_keyring_pre_v3_encrypted(
     const dd::Tablespace &tablespace, int &error) {
   error = 0;
   space_id_t id = 0;
@@ -17886,13 +17886,13 @@ static bool innobase_is_tablespace_keyring_v1_encrypted(
   // If page0 was read and it has crypt - we can check if it is encrypted here
   // if crypt_data is null it means that page0 may not have yet been read - we
   // will read it in fil_space_open_if_needed and recheck if crypt_data is null
-  if (space->crypt_data != nullptr) return is_space_keyring_v1_encrypted(space);
+  if (space->crypt_data != nullptr) return is_space_keyring_pre_v3_encrypted(space);
 
   fil_space_open_if_needed(space);
 
   // We do not need to care about mutexes as this function is only called during
   // the upgrade
-  return is_space_keyring_v1_encrypted(space);
+  return is_space_keyring_pre_v3_encrypted(space);
 }
 
 static bool innobase_get_tablespace_type(const dd::Tablespace &space,

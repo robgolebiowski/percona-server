@@ -548,7 +548,6 @@ dberr_t SysTablespace::read_lsn_and_check_flags(lsn_t *flushed_lsn) {
       it->m_crypt_data = nullptr;
     }
 
-
     if (err != DB_SUCCESS &&
         (retry == 1 || it->restore_from_doublewrite(0) != DB_SUCCESS)) {
       it->close();

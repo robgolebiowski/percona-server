@@ -518,16 +518,17 @@ fil_space_crypt_t *fil_space_create_crypt_data(
                                       key_id, uuid, key_operation));
 }
 
-bool is_space_keyring_v1_encrypted(fil_space_t *space) {
+bool is_space_keyring_pre_v3_encrypted(fil_space_t *space) {
   ut_ad(space != nullptr);
   return space->crypt_data != nullptr &&
-         space->crypt_data->private_version == 1 &&
+         (space->crypt_data->private_version == 1 ||
+          space->crypt_data->private_version == 2) && 
          space->crypt_data->type != CRYPT_SCHEME_UNENCRYPTED;
 }
 
-bool is_space_keyring_v1_encrypted(space_id_t space_id) {
+bool is_space_keyring_pre_v3_encrypted(space_id_t space_id) {
   fil_space_t *space = fil_space_get(space_id);
-  return is_space_keyring_v1_encrypted(space);
+  return is_space_keyring_pre_v3_encrypted(space);
 }
 
 /******************************************************************
@@ -1200,6 +1201,7 @@ byte *fil_parse_write_crypt_data_v2(space_id_t space_id, byte *ptr,
   memcpy(crypt_data->encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG,
          ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
   crypt_data->encryption = encryption;
+  crypt_data->private_version = 2;
   memcpy(crypt_data->iv, ptr, CRYPT_SCHEME_1_IV_LEN);
   ptr += CRYPT_SCHEME_1_IV_LEN;
   crypt_data->encryption_rotation =
@@ -1889,11 +1891,12 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
   if (!crypt_data->is_key_found()) {
     // We can end up here in case we try to encrypt tablespace but the key used
     // by this tablespace is no longer in keyring. This can happen when keyring
-    // was changed or crypt_data is in version 1 and key's uuid is empty.
+    // was changed or crypt_data is in version 1 or 2 and key's uuid is empty.
     if (crypt_data->rotate_state.active_threads == 0 &&
         crypt_data->encryption == FIL_ENCRYPTION_DEFAULT) {
       ut_ad(
-          (crypt_data->private_version == 2 || strlen(crypt_data->uuid) == 0) &&
+          (crypt_data->private_version == 1 || crypt_data->private_version == 2 
+           || strlen(crypt_data->uuid) == 0) &&
           is_unenc_to_enc_rotation(*crypt_data));
 
       crypt_data->key_found =
@@ -1914,8 +1917,8 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
       ut_ad(strlen(server_uuid) > 0);
       memcpy(crypt_data->uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
       crypt_data->uuid[ENCRYPTION_SERVER_UUID_LEN] = '\0';
-      // fix private_version - it might have been 1
-      crypt_data->private_version = 2;
+      // fix private_version - it might have been 1 or 2
+      crypt_data->private_version = 3;
     } else {
       mutex_exit(&crypt_data->mutex);
       return false;

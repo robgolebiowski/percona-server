@@ -1362,7 +1362,7 @@ std::pair<bool, space_id_t> dict_check_sys_tablespaces(bool validate) {
 
     // For tables in cache check if they contain crypt_data in page0
     if (fil_space_exists_in_mem(space_id, space_name, false, true, NULL, 0)) {
-      if (is_space_keyring_v1_encrypted(space_id)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         mtr_commit(&mtr);
         return std::make_pair(true, 0);  // will cause upgrade to fail
       }
@@ -1388,7 +1388,7 @@ std::pair<bool, space_id_t> dict_check_sys_tablespaces(bool validate) {
       ib::warn(ER_IB_MSG_191) << "Ignoring tablespace " << id_name_t(space_name)
                               << " because it could not be opened.";
     } else {
-      if (is_space_keyring_v1_encrypted(space_id)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         ut_free(filepath);
         mtr_commit(&mtr);
         return std::make_pair(true, 0);  // will cause upgrade to fail
@@ -1587,7 +1587,7 @@ std::pair<bool, space_id_t> dict_check_sys_tables(bool validate) {
     if (fil_space_exists_in_mem(space_id, space_name, false, true, NULL, 0)) {
       ut_free(table_name.m_name);
       ut_free(space_name_from_dict);
-      if (is_space_keyring_v1_encrypted(space_id)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         mtr_commit(&mtr);
         return std::make_pair(true, 0);  // will cause upgrade to fail
       }
@@ -1629,7 +1629,7 @@ std::pair<bool, space_id_t> dict_check_sys_tables(bool validate) {
       ib::warn(ER_IB_MSG_194) << "Ignoring tablespace " << id_name_t(space_name)
                               << " because it could not be opened.";
     } else {
-      if (is_space_keyring_v1_encrypted(space_id)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         ut_free(table_name.m_name);
         ut_free(space_name_from_dict);
         ut_free(filepath);

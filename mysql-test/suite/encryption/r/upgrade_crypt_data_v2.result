@@ -1,0 +1,19 @@
+# Stop DB server which was created by MTR default
+# Scenario 1st - system table half encrypted by encryption threads. Upgrade failure.
+# Check that the file exists in the working folder.
+# Unzip the zip file.
+# Scenario 2nd - Table encrypted with keyring encryption (ENCRYPTION='KEYRING'). Upgrade failure.
+# Table created with: CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENCRYPTION='KEYRING';
+# Check that the file exists in the working folder.
+# Unzip the zip file.
+# Scenario 3rd - Table half encrypted by encryption threads. Upgrade failure.
+# Table created with: CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255));
+# Check that the file exists in the working folder.
+# Unzip the zip file.
+# Scenario 4th - System tablespace fully encrypted by encryption threads. Upgrade failure.
+# Table created with: CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) in system tablespace;
+# Inserted 30000 rows with word foobar.
+# Check that the file exists in the working folder.
+# Unzip the zip file.
+# Restart the server with default options.
+# restart

@@ -14,7 +14,7 @@ struct Keyring_encryption_info {
   uint keyring_encryption_min_key_version{0};
   uint type{CRYPT_SCHEME_UNENCRYPTED};
   bool is_mk_to_keyring_rotation{false};
-  size_t private_version{2};
+  size_t private_version{3};
 
   bool is_encryption_in_progress() {
     return keyring_encryption_min_key_version == 0 &&
