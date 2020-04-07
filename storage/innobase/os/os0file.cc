@@ -1697,9 +1697,18 @@ void os_file_read_string(FILE *file, char *str, ulint size) {
   }
 }
 
+/** In case we resume Master Key to Keyring re-encryption we need a way of telling
+which pages were already re-encrypted. For Keyring encrypted page during MK => Keyring
+re-encryption we calculate a checksum. In case this checksum matches it means that
+the page is Keyring encrypted, it not it means page is MK encrypted.
+@param[in] type IO context
+@param[in,out] encryption information. Gets m_type set to appropriate encryption
+               either Encryption::KEYRING or ENCRYPTION::AES
+@param[in] page - for which we are determining the encryption
+@param[in] page_size size of the page */
 static void verify_encryption_for_rotation(const IORequest &type,
                                            Encryption &encryption,
-                                           byte *buf, ulint src_len) {
+                                           byte *page, ulint page_size) {
 
   ut_ad(encryption.m_type == Encryption::KEYRING &&
         encryption.m_encryption_rotation == Encryption_rotation::MASTER_KEY_TO_KEYRING);
@@ -1707,20 +1716,20 @@ static void verify_encryption_for_rotation(const IORequest &type,
   bool is_crypt_checksum_correct =
       false;  // For MK encryption is_crypt_checksum_correct stays false
   ulint original_type =
-      static_cast<uint16_t>(mach_read_from_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1));
+      static_cast<uint16_t>(mach_read_from_2(page + FIL_PAGE_ORIGINAL_TYPE_V1));
 
   if (Encryption::can_page_be_keyring_encrypted(original_type)) {
     if (type.is_page_zip_compressed()) {
       byte zip_magic[ENCRYPTION_ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC_LEN];
-      memcpy(zip_magic, buf + FIL_PAGE_ZIP_KEYRING_ENCRYPTION_MAGIC,
+      memcpy(zip_magic, page + FIL_PAGE_ZIP_KEYRING_ENCRYPTION_MAGIC,
              ENCRYPTION_ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC_LEN);
       is_crypt_checksum_correct =
           memcmp(zip_magic, ENCRYPTION_ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC,
                  ENCRYPTION_ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC_LEN) == 0;
     } else {
       is_crypt_checksum_correct = fil_space_verify_crypt_checksum(
-          buf, src_len, type.is_page_zip_compressed(),
-          encryption.is_encrypted_and_compressed(buf));
+          page, page_size, type.is_page_zip_compressed(),
+          encryption.is_encrypted_and_compressed(page));
     }
 
     encryption.m_type =
@@ -1763,7 +1772,7 @@ static bool load_key_needed_for_decryption(const IORequest &type,
 
     if (encryption.m_key_version != key_version_read_from_page) {
       encryption.set_key((*encryption.m_key_versions_cache)[key_version_read_from_page],
-                         ENCRYPTION_KEY_LEN, false);
+                         ENCRYPTION_KEY_LEN);
     }
     encryption.m_key_version = key_version_read_from_page;
   } else {
@@ -1775,67 +1784,11 @@ static bool load_key_needed_for_decryption(const IORequest &type,
     ut_ad(encryption.m_encryption_rotation ==
               Encryption_rotation::MASTER_KEY_TO_KEYRING &&
           encryption.m_tablespace_key != nullptr);
-    encryption.set_key(encryption.m_tablespace_key, ENCRYPTION_KEY_LEN, false);
+    encryption.set_key(encryption.m_tablespace_key, ENCRYPTION_KEY_LEN);
   }
 
   return true;
 }
-
-//static bool load_key_needed_for_decryption(const IORequest &type,
-                                           //Encryption &encryption, byte *buf) {
-  //if (encryption.m_type == Encryption::KEYRING) {
-    //ulint key_version_read_from_page = ENCRYPTION_KEY_VERSION_INVALID;
-    //ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
-    //if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED) {
-      //key_version_read_from_page = mach_read_from_4(buf + FIL_PAGE_DATA + 4);
-    //} else {
-      //ut_ad(page_type == FIL_PAGE_ENCRYPTED);
-      //key_version_read_from_page =
-          //mach_read_from_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION);
-    //}
-
-    //ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID);
-    //ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
-
-    //// in rare cases - when (re-)encryption was aborted there can be pages
-    //// encrypted with different key versions in a given tablespace - retrieve
-    //// needed key here
-
-    //byte *key_read;
-
-    //size_t key_len;
-    //if (Encryption::get_tablespace_key(
-            //encryption.m_key_id, encryption.m_key_id_uuid,
-            //key_version_read_from_page, &key_read, &key_len) == false) {
-      //return false;
-    //}
-
-    //// For test
-    //if (key_version_read_from_page == encryption.m_key_version) {
-      //ut_ad(memcmp(key_read, encryption.m_key, key_len) == 0);
-    //}
-
-    //// TODO: Allocated or not depends on whether key was taken from cache or
-    //// keyring
-    //encryption.set_key(key_read, static_cast<ulint>(key_len), true);
-    //// encryption.m_key = key_read;
-    ///[>*****
-
-    //encryption.m_key_version = key_version_read_from_page;
-  //} else {
-    //ut_ad(encryption.m_type == Encryption::AES);
-    //if (encryption.m_encryption_rotation == Encryption_rotation::NO_ROTATION)
-      //return true;  // we are all set - needed key was alread loaded into
-                    //// encryption module
-
-    //ut_ad(encryption.m_encryption_rotation ==
-              //Encryption_rotation::MASTER_KEY_TO_KEYRING &&
-          //encryption.m_tablespace_key != nullptr);
-    //encryption.set_key(encryption.m_tablespace_key, ENCRYPTION_KEY_LEN, false);
-  //}
-
-  //return true;
-//}
 
 /** Decompress after a read and punch a hole in the file if it was a write
 @param[in]	type		IO context
@@ -8410,7 +8363,6 @@ Encryption::Encryption(const Encryption &other) noexcept
     : m_type(other.m_type),
       m_key(other.m_key),
       m_klen(other.m_klen),
-      m_key_allocated(other.m_key_allocated),
       m_iv(other.m_iv),
       m_tablespace_key(other.m_tablespace_key),
       m_key_version(other.m_key_version),
@@ -8418,27 +8370,12 @@ Encryption::Encryption(const Encryption &other) noexcept
       m_checksum(other.m_checksum),
       m_encryption_rotation(other.m_encryption_rotation),
       m_key_versions_cache(other.m_key_versions_cache) {
-  if (other.m_key_allocated && other.m_key != NULL)
-    m_key = static_cast<byte *>(
-        my_memdup(PSI_NOT_INSTRUMENTED, other.m_key, other.m_klen, MYF(0)));
   memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN + 1);
 }
 
-Encryption::~Encryption() {
-  if (m_key_allocated && m_key != NULL) {
-    my_free(m_key);
-  }
-}
-
-void Encryption::set_key(byte *key, ulint key_len, bool allocated) {
-  //TODO: since now keys are comming from local cache - maybe I can get rid
-  //of allocated?
-  if (m_key_allocated && m_key != NULL) {
-    my_free(m_key);
-  }
+void Encryption::set_key(byte *key, ulint key_len) {
   m_key = key;
   m_klen = key_len;
-  m_key_allocated = allocated;
 }
 
 /** Set the file create umask
@@ -10254,7 +10191,7 @@ bool os_dblwr_encrypt_page(fil_space_t *space, page_t *in_page,
     //m_encryption.m_iv = iv;
   //}
   write_request.encryption_key(space->encryption_key, space->encryption_klen,
-                               false, space->encryption_iv, 0, 0, nullptr,
+                               space->encryption_iv, 0, 0, nullptr,
                                nullptr, nullptr);
   write_request.encryption_algorithm(Encryption::AES);
 
@@ -10304,7 +10241,7 @@ dberr_t os_dblwr_decrypt_page(fil_space_t *space, page_t *page) {
     //m_encryption.m_iv = iv;
   //}
   decrypt_request.encryption_key(space->encryption_key, space->encryption_klen,
-                                 false, space->encryption_iv, 0, 0, nullptr,
+                                 space->encryption_iv, 0, 0, nullptr,
                                  nullptr, nullptr);
 
   decrypt_request.encryption_algorithm(Encryption::AES);

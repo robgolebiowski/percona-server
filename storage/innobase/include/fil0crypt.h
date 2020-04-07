@@ -182,11 +182,6 @@ struct fil_space_crypt_t {
 
     unload_keys_from_local_cache();
 
-    //for (std::list<byte *>::iterator iter = fetched_keys.begin();
-         //iter != fetched_keys.end(); iter++) {
-      //memset_s(*iter, ENCRYPTION_KEY_LEN, 0, ENCRYPTION_KEY_LEN);
-      //my_free(*iter);
-    //}
     rotate_state.destroy_flush_observer();
   }
 
@@ -224,7 +219,11 @@ struct fil_space_crypt_t {
   /** Write crypt data to a page (0)
   @param[in]	space	tablespace
   @param[in,out]	page0	first page of the tablespace
-  @param[in,out]	mtr	mini-transaction */
+  @param[in,out]	mtr	mini-transaction 
+  @param[in]	        a_min_key_verion min key version used in encryption
+  @param[in]            a_max_key_verion max key version used in encryption
+  @param[in]            a_type encryption type
+  @param[in]            current_encryption_rotation - encryption rotation */
   void write_page0(const fil_space_t *space, byte *page0, mtr_t *mtr,
                    uint a_min_key_version, uint a_max_key_version, uint a_type,
                    Encryption_rotation current_encryption_rotation);
@@ -242,26 +241,19 @@ struct fil_space_crypt_t {
 
   void set_iv(const uchar *iv) { memcpy(this->iv, iv, CRYPT_SCHEME_1_IV_LEN); }
 
-  //bool load_needed_keys_into_local_cache();
-  //uchar *get_min_key_version_key();
-  //uchar *get_key_currently_used_for_encryption();
 
   uint min_key_version;         // min key version for this space
   uint max_key_version;         // max key version for this space
   fil_encryption_t encryption;  // Encryption setup
 
-  // key being used for encryption
-  //Cached_key cached_encryption_key;
-  // in normal situation the only key needed to decrypt the tablespace
-  //Cached_key cached_min_key_version_key;
-
   using Key_map = std::map<uint, byte*>;
   Key_map local_keys_cache;
 
+  /** Load needed keys for encryption/decryption to local cache
+  @return true - success, false - failure */
   bool load_keys_to_local_cache();
+  /** Remove keys from local cache */
   void unload_keys_from_local_cache();
-
-  //uchar *get_cached_key(Cached_key &cached_key, uint key_version);
 
   ib_mutex_t
       start_rotate_mutex;  // mutex protecting starting of rotation of the space
@@ -277,8 +269,6 @@ struct fil_space_crypt_t {
   bool key_found;
 
   // false if we are holding a mutex in backgroud thread
-  // TODO:musze to zmienic na lock, bo przeciez nie bede aktualizował
-  // tej funkcji za każdym razem gdy zrobie mutex_enter
   bool mutex_lock_needed{false};
 
   fil_space_rotate_state_t rotate_state;
@@ -296,12 +286,9 @@ struct fil_space_crypt_t {
   // pages and encrypt pages with KEYRING.
   unsigned char iv[CRYPT_SCHEME_1_IV_LEN];
 
-  //uint encrypting_with_key_version;
   unsigned int keyserver_requests;
   unsigned int key_id;
   unsigned int type;
-
-  //std::list<byte *> fetched_keys;  // TODO: temp for test
 
   // Internally we have three versions of crypt_data written to page 0.
   // One starting with magic PSA, the second one starting with PSB and
@@ -311,12 +298,28 @@ struct fil_space_crypt_t {
 
   char uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 
+  // A fix text that we encrypt with range of key versions: from min_key_version
+  // to max_key_version. When we validate that key versions loaded from keyring
+  // are the valid keys to decrypt space, we decrypt the validation tag starting
+  // with max key version till min key version.
   byte encrypted_validation_tag[MY_AES_BLOCK_SIZE];
 
+  /** Validate that encrypted_validation_tag can be decrypted by keys in range
+  [min_key_version, max_key_Version] */
   Validation_key_verions_result validate_encryption_key_versions();
+
+  /** Re encrypt validation tag with key versions from
+  from_key_version to to_key_version
+  @param[in]	        from_key_version - starting version
+  @param[in]	        to_key_version   - ending version
+  @return false - error, true - success */
   bool re_encrypt_validation_tag(const uint from_key_version, const uint to_key_version);
 
 private:
+  /** load copies of keys from keyring to local cache.
+  @param[in]            from_key_version - starting version
+  @param[in]            to_key_version   - ending version
+  @return false - error, true - success */
   bool load_keys_to_local_cache(const uint from_key_version, const uint to_key_version);
 
 };

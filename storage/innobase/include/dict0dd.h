@@ -1235,9 +1235,17 @@ bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table);
 
 bool dd_is_table_in_encrypted_tablespace(const char *name);
 
+/* Sets tablespace's DD online encryption flag.
+@param[in] Thread       THD
+@param[in] space_name   name of the space for which DD encryption flag is to be
+@param[in] *is_space_being_removed - whether space is being removed */
 bool dd_set_online_encryption(THD *thd, const char *space_name,
                               volatile bool *is_space_being_removed);
 
+/* Clear tablespace's DD online encryption flag.
+@param[in] Thread       THD
+@param[in] space_name   name of the space for which DD encryption flag is to be
+@param[in] *is_space_being_removed - whether space is being removed */
 bool dd_clear_online_encryption(THD *thd, const char *space_name,
                                 volatile bool *is_space_being_removed);
 

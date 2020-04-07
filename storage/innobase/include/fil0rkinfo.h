@@ -1,9 +1,6 @@
 #ifndef fil0rkinfo_h
 #define fil0rkinfo_h
 
-//#ifndef UNIV_INNOCHECKSUM
-
-//TODO: change it to enum
 #define CRYPT_SCHEME_UNENCRYPTED 0
 #define CRYPT_SCHEME_1 1
 
@@ -21,7 +18,5 @@ struct Keyring_encryption_info {
            type != CRYPT_SCHEME_UNENCRYPTED;
   }
 };
-
-//#endif // UNIV_INNOCHECKSUM
 
 #endif

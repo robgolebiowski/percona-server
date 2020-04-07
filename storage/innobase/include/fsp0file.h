@@ -196,7 +196,6 @@ class Datafile {
     m_encryption_key = nullptr;
     m_encryption_iv = nullptr;
     m_encryption_op_in_progress = NONE;
-    ut_ad(m_crypt_data == nullptr);
     m_crypt_data = nullptr;
 
     m_atomic_write = file.m_atomic_write;

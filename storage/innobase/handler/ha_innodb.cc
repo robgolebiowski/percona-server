@@ -2249,8 +2249,6 @@ int convert_error_code_to_mysql(dberr_t error, uint32_t flags, THD *thd) {
     case DB_TABLESPACE_NOT_FOUND:
       return (HA_ERR_TABLESPACE_MISSING);
 
-    //case DB_IO_DECRYPT_FAIL:
-      //return (HA_ERR_DECRYPTION_FAILED);
 
     case DB_TOO_BIG_RECORD: {
       /* If prefix is true then a 768-byte prefix is stored
@@ -3594,7 +3592,7 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
 
     space_id_t space_id;
     uint32_t flags = 0;
-    bool is_enc_rotating{false};
+    bool is_enc_in_progress{false};
     const auto &p = dd_tablespace->se_private_data();
     const char *space_name = dd_tablespace->name().c_str();
     const auto se_key_value = dd_space_key_strings;
@@ -3615,7 +3613,7 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
     }
 
     if (p.exists(se_key_value[DD_SPACE_ONLINE_ENCRYPTION]) &&
-        p.get(se_key_value[DD_SPACE_ONLINE_ENCRYPTION], &is_enc_rotating)) {
+        p.get(se_key_value[DD_SPACE_ONLINE_ENCRYPTION], &is_enc_in_progress)) {
       ++m_n_errors;
       break;
     }
@@ -3759,7 +3757,7 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
     /* It's safe to pass space_name in tablename charset because
     filename is already in filename charset. */
     dberr_t err =
-        fil_ibd_open(validate || is_enc_rotating, FIL_TYPE_TABLESPACE, space_id, flags, space_name,
+        fil_ibd_open(validate || is_enc_in_progress, FIL_TYPE_TABLESPACE, space_id, flags, space_name,
                      nullptr, filename, false, false, keyring_encryption_info);
 
     switch (err) {
@@ -20260,14 +20258,7 @@ void ha_innobase::get_auto_increment(
 bool ha_innobase::get_error_message(int error, String *buf) {
   trx_t *trx = check_trx_exists(ha_thd());
 
-  //if (error == HA_ERR_DECRYPTION_FAILED) {
-    //const char *msg =
-        //"Table encrypted but decryption failed. Seems that the encryption key "
-        //"fetched from keyring is "
-        //"not the correct one. Are you using the correct keyring?";
-    //buf->copy(msg, (uint)strlen(msg), system_charset_info);
-  //} else
-    if (error == HA_ERR_ENCRYPTION_KEY_MISSING) {
+  if (error == HA_ERR_ENCRYPTION_KEY_MISSING) {
     const char *msg =
         "Table encrypted but decryption key was not found. "
         "Is correct keyring loaded?";

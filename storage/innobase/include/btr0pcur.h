@@ -195,7 +195,7 @@ struct btr_pcur_t {
   @param[in]	    level		    level to search for (0=leaf).
   @param[in,out]	mtr		      mini-transaction */
   void open_at_side(bool from_left, dict_index_t *index, ulint latch_mode,
-                       bool init_pcur, ulint level, mtr_t *mtr);
+                    bool init_pcur, ulint level, mtr_t *mtr);
 
   /** Opens a persistent cursor at first leaf page (low end). It will not call
   init().

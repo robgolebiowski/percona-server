@@ -6118,14 +6118,14 @@ bool dd_tablespace_update_cache(THD *thd) {
     const dd::Properties &p = t->se_private_data();
     uint32 id;
     uint32 flags = 0;
-    bool is_enc_rotating{false};
+    bool is_enc_in_progress{false};
 
     /* There should be exactly one file name associated
     with each InnoDB tablespace, except innodb_system */
     fail = p.get(dd_space_key_strings[DD_SPACE_ID], &id) ||
            p.get(dd_space_key_strings[DD_SPACE_FLAGS], &flags) ||
            ( p.exists(dd_space_key_strings[DD_SPACE_ONLINE_ENCRYPTION]) &&
-             p.get(dd_space_key_strings[DD_SPACE_ONLINE_ENCRYPTION], &is_enc_rotating) ) ||
+             p.get(dd_space_key_strings[DD_SPACE_ONLINE_ENCRYPTION], &is_enc_in_progress) ) ||
            (t->files().size() != 1 &&
             strcmp(t->name().c_str(), dict_sys_t::s_sys_space_name) != 0);
 
@@ -6179,7 +6179,7 @@ bool dd_tablespace_update_cache(THD *thd) {
       /* It's safe to pass space_name in tablename charset
       because filename is already in filename charset. */
       dberr_t err =
-          fil_ibd_open(is_enc_rotating, purpose, id, flags, space_name, nullptr, filename,
+          fil_ibd_open(is_enc_in_progress, purpose, id, flags, space_name, nullptr, filename,
                        false, false, keyring_encryption_info);
       switch (err) {
         case DB_SUCCESS:

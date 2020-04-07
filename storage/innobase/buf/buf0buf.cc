@@ -3480,7 +3480,6 @@ struct Buf_fetch {
   buf_pool_t *m_buf_pool{};
   rw_lock_t *m_hash_lock{};
   trx_t *const m_trx;  // For InnoDB slow query log extensions
-  dberr_t *m_err;      // For propagating decryption error
 
   friend T;
 };

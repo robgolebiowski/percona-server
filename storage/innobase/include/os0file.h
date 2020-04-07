@@ -378,7 +378,6 @@ struct Encryption {
       : m_type(NONE),
         m_key(nullptr),
         m_klen(0),
-        m_key_allocated(false),
         m_iv(nullptr),
         m_tablespace_key(nullptr),
         m_key_version(0),
@@ -395,7 +394,6 @@ struct Encryption {
       : m_type(type),
         m_key(nullptr),
         m_klen(0),
-        m_key_allocated(false),
         m_iv(nullptr),
         m_tablespace_key(nullptr),
         m_key_version(0),
@@ -427,7 +425,6 @@ struct Encryption {
     std::swap(m_type, other.m_type);
     std::swap(m_key, other.m_key);
     std::swap(m_klen, other.m_klen);
-    std::swap(m_key_allocated, other.m_key_allocated);
     std::swap(m_iv, other.m_iv);
     std::swap(m_tablespace_key, other.m_tablespace_key);
     std::swap(m_key_version, other.m_key_version);
@@ -441,9 +438,7 @@ struct Encryption {
     std::swap(m_key_versions_cache, other.m_key_versions_cache);
   }
 
-  ~Encryption();
-
-  void set_key(byte *key, ulint key_len, bool allocated);
+  void set_key(byte *key, ulint key_len);
 
   /** Check if page is encrypted page or not
   @param[in]	page	page which need to check
@@ -684,9 +679,6 @@ struct Encryption {
   /** Encrypt key length*/
   ulint m_klen;
 
-  /** Encrypt key allocated */
-  bool m_key_allocated;
-
   /** Encrypt initial vector */
   byte *m_iv;
 
@@ -709,7 +701,6 @@ struct Encryption {
 
   Encryption_rotation m_encryption_rotation;
 
-  //TODO:: try fil_space_crypt_t::Key_map;
   std::map<uint, byte*>* m_key_versions_cache;
 
  private:
@@ -954,10 +945,10 @@ class IORequest {
   @param[in] key		The encryption key to use
   @param[in] key_len	length of the encryption key
   @param[in] iv		The encryption iv to use */
-  void encryption_key(byte *key, ulint key_len, bool key_allocated, byte *iv,
+  void encryption_key(byte *key, ulint key_len, byte *iv,
                       uint key_version, uint key_id, byte *tablespace_key,
                       const char *uuid, std::map<uint, byte*> *key_versions_cache) {
-    m_encryption.set_key(key, key_len, key_allocated);
+    m_encryption.set_key(key, key_len);
     m_encryption.m_key_versions_cache = key_versions_cache;
     m_encryption.m_iv = iv;
     m_encryption.m_key_version = key_version;
@@ -998,7 +989,7 @@ class IORequest {
 
   /** Clear all encryption related flags */
   void clear_encrypted() {
-    m_encryption.set_key(nullptr, 0, false);
+    m_encryption.set_key(nullptr, 0);
     m_encryption.m_iv = nullptr;
     m_encryption.m_key_versions_cache = nullptr;
     m_encryption.m_type = Encryption::NONE;

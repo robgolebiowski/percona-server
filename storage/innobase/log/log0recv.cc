@@ -4004,14 +4004,8 @@ void recv_dblwr_t::decrypt_sys_dblwr_pages() {
 
   IORequest decrypt_request;
 
-  //TODO: should not this just use ? void encryption_key(byte *key, ulint key_len, byte *iv) {
-    //m_encryption.m_key = key;
-    //m_encryption.m_klen = key_len;
-    //m_encryption.m_iv = iv;
-  //}
   decrypt_request.encryption_key(space->encryption_key, space->encryption_klen,
-                                 false, space->encryption_iv, 0, 0, nullptr,
-                                 nullptr, nullptr);
+                                 space->encryption_iv);
   decrypt_request.encryption_algorithm(Encryption::AES);
 
   Encryption encryption(decrypt_request.encryption_algorithm());

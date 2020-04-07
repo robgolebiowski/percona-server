@@ -2519,7 +2519,7 @@ dberr_t Fil_shard::get_file_size(fil_node_t *file, bool read_only_mode) {
   if (space->crypt_data && space->crypt_data->type == CRYPT_SCHEME_1 &&
       !space->crypt_data->key_found && !recv_recovery_is_on()) {
     ib::error() << "There is no key for tablespace " << space->name;
-    return (DB_ERROR);
+    return (DB_IO_DECRYPT_FAIL);
   }
 
   if (file->size == 0) {
@@ -5553,12 +5553,8 @@ static dberr_t fil_create_tablespace(
     crypt_data = fil_space_create_crypt_data(mode, keyring_encryption_key_id.id,
                                              server_uuid);
 
-    if (crypt_data->should_encrypt()) {
-      // crypt_data->max_key_version should go to crypt_data_t constructor ?
-      crypt_data->max_key_version =
-          crypt_data->key_get_latest_version();
+    if (crypt_data->should_encrypt())
       crypt_data->load_keys_to_local_cache();
-    }
   }
 
   space = fil_space_create(name, space_id, flags, type, crypt_data, mode);
@@ -5804,8 +5800,9 @@ dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
 
   ut_ad(space != nullptr);
 
-  //TODO: I need to delete crypt_data if space == nullptr
   if (space == nullptr) {
+    if (crypt_data != nullptr)
+      fil_space_destroy_crypt_data(&crypt_data);
     return (DB_ERROR);
   }
 
@@ -7549,8 +7546,6 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
   key_id = space->crypt_data->key_id;
 
   if (req_type.is_write()) {
-    // TODO: I should remove should_encrypt from here as it is srv_default_table_encryption
-    // based and just leave space->crypt_data->max_key_version != 0
     if (space->crypt_data->should_encrypt() &&
         space->crypt_data->max_key_version != 0) {
 
@@ -7559,7 +7554,7 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
 
       ut_ad(space->crypt_data->local_keys_cache[space->crypt_data->max_key_version] != nullptr);
 
-      key = space->crypt_data->local_keys_cache[space->crypt_data->max_key_version]; //get_key_currently_used_for_encryption();
+      key = space->crypt_data->local_keys_cache[space->crypt_data->max_key_version];
       key_version = space->crypt_data->max_key_version;
       key_len = 32;
     } else {
@@ -7586,7 +7581,6 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
     if (space->crypt_data->min_key_version !=
             ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED &&
         space->crypt_data->encryption != FIL_ENCRYPTION_OFF) {
-      //key = space->crypt_data->get_min_key_version_key();
       ut_ad(space->crypt_data->local_keys_cache[space->crypt_data->min_key_version] != nullptr);
       key = space->crypt_data->local_keys_cache[space->crypt_data->min_key_version];
       memcpy(key_min, key, 32);
@@ -7603,7 +7597,7 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
     }
   }
 
-  req_type.encryption_key(key, key_len, false, iv, key_version, key_id,
+  req_type.encryption_key(key, key_len, iv, key_version, key_id,
                           tablespace_key, space->crypt_data->uuid,
                           &space->crypt_data->local_keys_cache);
 
@@ -7623,7 +7617,7 @@ static void fil_io_set_mk_encryption(IORequest &req_type, fil_space_t *space) {
   uint version = space->encryption_redo_key != nullptr
                      ? space->encryption_redo_key->version
                      : space->encryption_key_version;
-  req_type.encryption_key(key, 32, false, space->encryption_iv, version, 0,
+  req_type.encryption_key(key, 32, space->encryption_iv, version, 0,
                           nullptr, space->encryption_redo_key_uuid.get(), nullptr);
 
   req_type.encryption_rotation(Encryption_rotation::NO_ROTATION);
@@ -8846,7 +8840,7 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
       read_request.encryption_key(
           encrypted_with_keyring ? iter.m_crypt_data->tablespace_key
                                  : iter.m_encryption_key,
-          ENCRYPTION_KEY_LEN, false,
+          ENCRYPTION_KEY_LEN,
           encrypted_with_keyring ? iter.m_crypt_data->iv : iter.m_encryption_iv,
           0, iter.m_encryption_key_id,
           encrypted_with_keyring ? iter.m_crypt_data->tablespace_key : nullptr,
@@ -8900,14 +8894,14 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
     if (iter.m_encryption_key != NULL && offset != 0 &&
         iter.m_crypt_data == NULL) {
       write_request.encryption_key(iter.m_encryption_key, ENCRYPTION_KEY_LEN,
-                                   false, iter.m_encryption_iv,
+                                   iter.m_encryption_iv,
                                    iter.m_encryption_key_version,
                                    iter.m_encryption_key_id, nullptr, nullptr,
                                    nullptr);
       write_request.encryption_algorithm(Encryption::AES);
     } else if (offset != 0 && iter.m_crypt_data) {
       write_request.encryption_key(
-          iter.m_encryption_key, ENCRYPTION_KEY_LEN, false,
+          iter.m_encryption_key, ENCRYPTION_KEY_LEN,
           iter.m_encryption_iv, iter.m_encryption_key_version,
           iter.m_crypt_data->key_id, nullptr, iter.m_crypt_data->uuid,
           nullptr);
@@ -9058,7 +9052,7 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
       Encryption::get_latest_tablespace_key(
           iter.m_crypt_data->key_id, iter.m_crypt_data->uuid,
           &iter.m_encryption_key_version, &iter.m_encryption_key);
-      if (iter.m_encryption_key == NULL) err = DB_ERROR;
+      if (iter.m_encryption_key == NULL) err = DB_IO_DECRYPT_FAIL;
     } else {
       /* Set encryption info. */
       iter.m_encryption_key = table->encryption_key;
