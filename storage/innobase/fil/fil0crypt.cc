@@ -346,6 +346,7 @@ fil_space_crypt_t::fil_space_crypt_t(uint new_min_key_version, uint new_key_id,
       if (key_operation == FETCH_OR_GENERATE_KEY &&
           encrypt_validation_tag(ENCRYPTION_KEYRING_VALIDATION_TAG, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
                                  key, encrypted_validation_tag) == false) {
+        ut_ad(false);
         key_found = false;
       }
     }
