@@ -3202,8 +3202,19 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
                   if (strcmp(state->space->name, "test/t1") == 0)
                       DBUG_ABORT(););
 
-  if (current_type == CRYPT_SCHEME_UNENCRYPTED)
+  // encrypt encryption_validation_tag with just max_key_version or leave it unencrypted
+  // for unencrypted tablespace
+  if (current_type == CRYPT_SCHEME_UNENCRYPTED) {
     memcpy(crypt_data->encrypted_validation_tag, ENCRYPTION_KEYRING_VALIDATION_TAG, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE);
+  } else {
+    // we do not need to obtain crypt_data->mutex here, as flushing flag is set - which will stop other threads from
+    // starting rotating this space and since we are flushing - we are the only thread which is currently operating
+    // on this space.
+    ut_ad(crypt_data->rotate_state.active_threads == 1 &&
+          crypt_data->local_keys_cache[crypt_data->max_key_version] != nullptr);
+    encrypt_validation_tag(ENCRYPTION_KEYRING_VALIDATION_TAG, ENCRYPTION_KEYRING_VALIDATION_TAG_SIZE,
+                           crypt_data->local_keys_cache[crypt_data->max_key_version], crypt_data->encrypted_validation_tag);
+  }
 
   /* update page 0 */
   mtr_t mtr;
