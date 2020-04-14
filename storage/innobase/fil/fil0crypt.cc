@@ -1793,11 +1793,16 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
     // We can end up here in case we try to encrypt tablespace but the key used
     // by this tablespace is no longer in keyring. This can happen when keyring
     // was changed or crypt_data is in version 1 or 2 and key's uuid is empty.
+    // Also when tablespace was encrypted, then decrypted and server uuid was changed.
+    // Then the crypt_data uuid will not match the server_uuid. The change of server_uuid
+    // is done in some of the MTR tests (for instance encryption.innodb-missing-key).
     if (crypt_data->rotate_state.active_threads == 0 &&
         crypt_data->encryption == FIL_ENCRYPTION_DEFAULT) {
       ut_ad(
-          (crypt_data->private_version == 1 || crypt_data->private_version == 2 
-           || strlen(crypt_data->uuid) == 0) &&
+          ((crypt_data->private_version == 1 || crypt_data->private_version == 2
+            || strlen(crypt_data->uuid) == 0) ||
+           (crypt_data->private_version == 3 &&
+            memcmp(crypt_data->uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN) != 0)) &&
           is_unenc_to_enc_rotation(*crypt_data));
 
       crypt_data->key_found =
