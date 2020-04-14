@@ -1,5 +1,4 @@
 --source include/big_test.inc
---source include/have_debug.inc
 
 SET default_storage_engine = InnoDB;
 
@@ -55,8 +54,6 @@ INSERT IGNORE INTO `table10_int_autoinc` ( `col_int` ) VALUES ( 6 ), ( 2 ), ( 3 
 --disable_warnings
 --disable_query_log
 
-#SET GLOBAL debug='+d,assert_on_encryption';
-
 let $i = 100;
 while ($i)
 {
@@ -111,19 +108,14 @@ drop table if exists create_or_replace_t, table1_int_autoinc, table0_int_autoinc
 --enable_abort_on_error
 --enable_warnings
 
-SET GLOBAL innodb_encryption_threads = 0;
-
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
-#SET GLOBAL debug='+d,assert_on_encryption';
 SET GLOBAL default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads = 4;
 
 --echo # Wait max 10 min for key encryption threads to decrypt all spaces
-let $cnt=180;
+let $cnt=600;
 while ($cnt)
 {
-    let $success=`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0 OR MAX_KEY_VERSION <> 0`;
+    let $success=`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0`;
     if ($success)
     {
         let $cnt=0;
@@ -142,11 +134,8 @@ if (!$success)
 }
 --echo # Success!
 
-
 SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
 
 # Make sure that all dirty pages are flushed
 

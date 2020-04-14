@@ -6325,7 +6325,7 @@ bool dd_set_encryption_flag(THD *thd, const char *space_name,
     if (dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
                                         &dd_space_flags))
       return true;
-    
+
     dd_space_flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
     dd_space->se_private_data().set(dd_space_key_strings[DD_SPACE_FLAGS],
                                     dd_space_flags);
@@ -6345,7 +6345,7 @@ bool dd_clear_encryption_flag(THD *thd, const char *space_name,
     if (dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
                                         &dd_space_flags))
       return true;
-    
+
     dd_space_flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
     dd_space->se_private_data().set(dd_space_key_strings[DD_SPACE_FLAGS],
                                     dd_space_flags);
