@@ -1314,6 +1314,18 @@ Check if a key needs rotation given a key_state
 static bool fil_crypt_needs_rotation(fil_encryption_t encrypt_mode,
                                      uint key_version, uint latest_key_version,
                                      uint rotate_key_age) {
+
+  DBUG_EXECUTE_IF(
+      "assert_on_encryption",
+      fprintf(stderr, "fil_crypt_needs_rotation: encrypt_mode = %i, key_version = %u, latest_key_version = %u, rotate_key_age = %u\n", 
+                       encrypt_mode, key_version, latest_key_version, rotate_key_age);
+  );
+
+  //fil_crypt_needs_rotation(crypt_data->encryption, kv,
+                                        //key_state->key_version,
+                                        //key_state->rotate_key_age)
+
+
   if (key_version == ENCRYPTION_KEY_VERSION_INVALID) {
     ut_ad(0);
     return false;
@@ -2093,12 +2105,30 @@ static bool fil_crypt_find_space_to_rotate(key_state_t *key_state,
     // if space is marked as encrytped this means some of the pages are
     // encrypted and space should be skipped size must be set - i.e. tablespace
     // has been read
+    //
+    
+    ut_ad(state->space->is_encrypted == false);
+
+
+    //fprintf(stderr, "assert_on_encryption is ON - outside assert");
+
+    //DBUG_EXECUTE_IF(
+        //"assert_on_encryption",
+        //fprintf(stderr, "assert_on_encryption is ON");
+    //);
+
+
     if (!state->space->is_encrypted && !state->space->exclude_from_rotation &&
         fil_crypt_space_needs_rotation(state, key_state, recheck)) {
       ut_ad(key_state->key_id != ENCRYPTION_KEY_VERSION_INVALID);
       /* init state->min_key_version_found before
        * starting on a space */
       state->min_key_version_found = key_state->key_version;
+
+      DBUG_EXECUTE_IF(
+          "assert_on_encryption",
+          fprintf(stderr, "found space to rotate: %s\n", state->space->name);
+      );
 
       return true;
     }
@@ -2471,6 +2501,12 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
     return;
   }
 
+  //fprintf(stderr, "in fil_crypt_rotate_page");
+
+  DBUG_EXECUTE_IF("assert_on_encryption",
+                  fprintf(stderr,
+                          "looking at page: %u, %u\n", space->id, offset););
+
   mtr_t mtr;
   mtr.start();
   mtr.set_log_mode(MTR_LOG_NO_REDO);  // We do not need those pages to be redo
@@ -2486,6 +2522,10 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
   if (buf_block_t *block =
           fil_crypt_get_page_throttle(state, offset, &mtr, &sleeptime_ms)) {
     byte *frame = buf_block_get_frame(block);
+
+    DBUG_EXECUTE_IF("assert_on_encryption",
+                    fprintf(stderr,
+                          "fil_crypt_rotate_page : %u, %u\n step 1", space->id, offset););
 
     // We always assume that page needs to be encrypted with RK when rotating
     // from MK encryption This might not be the case if the rotation was aborted
@@ -2522,6 +2562,11 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
     } else if (fil_crypt_needs_rotation(crypt_data->encryption, kv,
                                         key_state->key_version,
                                         key_state->rotate_key_age)) {
+
+      DBUG_EXECUTE_IF("assert_on_encryption",
+                      fprintf(stderr,
+                              "rotating page: %u, %u\n", space->id, offset););
+
       // mtr.set_named_space(space);
       mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);
 
@@ -2624,6 +2669,8 @@ static void fil_crypt_rotate_pages(const key_state_t *key_state,
       std::min(state->offset + state->batch, state->space->free_limit);
 
   ut_ad(state->space->n_pending_ops > 0);
+
+  ut_ad(state->space->is_encrypted == false);
 
   for (; state->offset < end && !state->space->is_encrypted; state->offset++) {
     /* we can't rotate pages in dblwr buffer as
@@ -3167,6 +3214,9 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
                               ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
                           ? CRYPT_SCHEME_UNENCRYPTED
                           : crypt_data->type;
+
+  fprintf(stderr, "Finished flushing for space %s , min_key_version_found = %u", state->space->name, crypt_data->rotate_state.min_key_version_found);
+
 
   // update DD flags in case we are doing rotation unencrypted => encrypted
   // or encrypted => unnecrypted. For encrypted => encrypted rotation

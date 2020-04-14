@@ -2137,6 +2137,10 @@ static Block *os_file_compress_page(IORequest &type, void *&buf, ulint *n) {
 @return pointer to the encrypted page */
 static Block *os_file_encrypt_page(const IORequest &type, void *&buf,
                                    ulint *n) {
+
+  //DBUG_EXECUTE_IF("assert_on_encryption",
+                  //ut_ad(false););
+
   byte *encrypted_page;
   ulint encrypted_len = *n;
   byte *buf_ptr;
