@@ -12854,7 +12854,7 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
       Encryption::is_keyring(m_create_info->encrypt_type.str);
 
   if (table_is_keyring && !m_allow_file_per_table) {
-    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+    my_printf_error(ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION,
                     "InnoDB: KEYRING requires innodb_file_per_table.", MYF(0));
     return (false);
   }
@@ -12862,7 +12862,7 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
   if (!table_is_keyring &&
       Encryption::is_master_key_encryption(m_create_info->encrypt_type.str) &&
       Encryption::is_online_encryption_on()) {
-    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+    my_printf_error(ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION,
                     "InnoDB: ENCRYPTED='Y' not supported for table because "
                     "online encryption to KEYRING is turned ON.",
                     MYF(0));
@@ -12880,7 +12880,7 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
       const KEY *key = m_form->key_info + i;
       if (key->flags & HA_SPATIAL) {
         my_printf_error(
-            ER_ILLEGAL_HA_CREATE_OPTION,
+            ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION,
             "InnoDB: ENCRYPTED='KEYRING' not supported for table because "
             "it contains spatial index.",
             MYF(0));
@@ -15863,7 +15863,7 @@ static int innodb_create_tablespace(handlerton *hton, THD *thd,
     if (Encryption::is_master_key_encryption(encrypt.c_str()) &&
         explicit_encryption && Encryption::is_online_encryption_on()) {
       my_printf_error(
-          ER_ILLEGAL_HA_CREATE_OPTION,
+          ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION,
           "InnoDB: ENCRYPTED='Y' not supported for tablespace because "
           "online encryption to KEYRING is turned ON.",
           MYF(0));

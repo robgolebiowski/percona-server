@@ -1031,10 +1031,13 @@ static bool fil_crypt_needs_rotation(fil_encryption_t encrypt_mode,
 /** Read page 0 and possible crypt data from there.
 @param[in,out]	space		Tablespace */
 static inline void fil_crypt_read_crypt_data(fil_space_t *space) {
-  if (space->size) {
-    /* The encryption metadata has already been read, or
-    the tablespace is not encrypted and the file has been
-    opened already. */
+  if (space->size != 0) {
+    /* When space->size != 0 it means that page0 of the tablespace has
+    already been read in order to read the size of the space (i.e. number of the
+    pages). When we read page0 - we also read crypt_data information from it - thus
+    if space->size != 0 - it means that crypt_data was already read (if existed).
+    Also we need to read space->size in order to know how many pages we are going
+    to rotate in space. buf_page_get will read space's size if it is not yet read */
     return;
   }
 

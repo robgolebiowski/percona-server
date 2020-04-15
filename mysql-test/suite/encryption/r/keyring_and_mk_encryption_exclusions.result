@@ -12,6 +12,9 @@ SHOW WARNINGS;
 Level	Code	Message
 Warning	1210	Undo log cannot be encrypted with Master Key encryption when online to KEYRING encryption is turned ON.
 Error	1231	Variable 'innodb_undo_log_encrypt' can't be set to the value of 'ON'
+SELECT @@innodb_undo_log_encrypt;
+@@innodb_undo_log_encrypt
+0
 # First create a tablespace ONLINE keyring encrypted and then try to ALTER it
 # to MK encryption (should fail). Next decrypt the table and ALTER it to
 # MK encryption (should be successful).
@@ -20,7 +23,7 @@ include/assert.inc [Make sure ENCRYPTION is set to Y in INFORMATION_SCHEMA.INNOD
 include/assert.inc [Make sure MIN_KEY_VERSION is set to 1 in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION]
 SET GLOBAL default_table_encryption=OFF;
 ALTER TABLESPACE ts0 ENCRYPTION='Y';
-ERROR HY000: Tablespace ts0 is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads.
+ERROR HY000: Tablespace ts0 is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption, first decrypt this tablespace with encryption threads.
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=2;
 # Wait max 10 min for key encryption threads to decrypt all spaces
@@ -56,7 +59,7 @@ ALTER TABLESPACE ts_hang ENCRYPTION='N';
 ERROR HY000: Tablespace ts_hang is encrypted by encryption threads and cannot be explicitly decrypted. Please use default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENECRYPTED to decypt the tablespace.
 # 2. Altering online encrypted tablespace to 'Y'
 ALTER TABLESPACE ts_hang ENCRYPTION='Y';
-ERROR HY000: Tablespace ts_hang is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads.
+ERROR HY000: Tablespace ts_hang is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption, first decrypt this tablespace with encryption threads.
 # We have checked ALTER ENCRYPTION while ONLINE_TO_KEYRING is ON. Next we need to check a following race
 # condition:
 # connection default: requests ALTER general tablespace (call it X) ENCRYPTION=Y while encryption threads are off.

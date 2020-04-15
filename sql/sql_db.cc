@@ -260,13 +260,10 @@ bool mysql_create_db(THD *thd, const char *db, HA_CREATE_INFO *create_info) {
     encrypt_schema = dd::is_encrypted(create_info->encrypt_type);
     if (global_system_variables.default_table_encryption ==
         DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
-      if (encrypt_schema) {
-        my_error(ER_DATABASE_ENCRYPTION_MK_KEYRING_MISMATCH, MYF(0));
-        return true;
-      } else {
-        my_error(ER_DATABASE_ENCRYPTION_N_KEYRING_MISMATCH, MYF(0));
-        return true;
-      }
+      my_error(encrypt_schema ? ER_DATABASE_ENCRYPTION_MK_KEYRING_MISMATCH
+                              : ER_DATABASE_ENCRYPTION_N_KEYRING_MISMATCH,
+               MYF(0));
+      return true;
     }
   } else {
     encrypt_schema =

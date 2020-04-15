@@ -6,16 +6,17 @@ SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 
 --echo # Online encryption to keyring is ON. It should not be possible to create
 --echo # MK encrypted table or MK encrypted general tablespace.
---error ER_ILLEGAL_HA_CREATE_OPTION
+--error ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION
 CREATE TABLE t1 (a varchar(255)) ENGINE=INNODB ENCRYPTION='Y';
 
---error ER_ILLEGAL_HA_CREATE_OPTION
+--error ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION
 CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION='Y' Engine=InnoDB;
 
 --echo # It should not be possible to turn on undo-tablespace-encrypt
 --error ER_WRONG_VALUE_FOR_VAR
 SET GLOBAL innodb_undo_log_encrypt=ON;
 SHOW WARNINGS;
+SELECT @@innodb_undo_log_encrypt;
 
 --echo # First create a tablespace ONLINE keyring encrypted and then try to ALTER it
 --echo # to MK encryption (should fail). Next decrypt the table and ALTER it to

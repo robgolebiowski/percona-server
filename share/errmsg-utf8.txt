@@ -9244,7 +9244,7 @@ ER_EXPLICIT_DECRYPTION_OF_ONLINE_ENCRYPTED_TABLESPACE
   eng "Tablespace %s is encrypted by encryption threads and cannot be explicitly decrypted. Please use default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENECRYPTED to decypt the tablespace."
 
 ER_ONLINE_KEYRING_TO_MK_RE_ENCRYPTION
-  eng "Tablespace %s is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption - first decrypt this tablespace with encryption threads."
+  eng "Tablespace %s is encrypted by encryption threads and cannot be ALTERed to Master Key encryption. In order to encrypt this tablespace with Master Key encryption, first decrypt this tablespace with encryption threads."
 
 ER_DATABASE_ENCRYPTION_MK_KEYRING_MISMATCH
   eng "Database default encryption cannot be set to Y (Master Key encryption) while default_table_encryption is set to ONLINE_TO_KEYRING. It does not make sense to create new Master Key encrypted tables if the intention is to re-encrypt them to KEYRING encryption."
@@ -9254,6 +9254,9 @@ ER_DATABASE_ENCRYPTION_N_KEYRING_MISMATCH
 
 ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING
   eng "Tablespace %s cannot have its ENCRYPTION altered as it is being currently encrypted/decrypted by encryption threads. Please try again later."
+
+ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION
+  eng "Encryption option is not allowed. %s"
 
 #
 # End of Percona Server 8.0 client messages
