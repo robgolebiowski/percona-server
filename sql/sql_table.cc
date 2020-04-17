@@ -8711,12 +8711,14 @@ static bool validate_table_encryption(THD *thd, HA_CREATE_INFO *create_info) {
   bool uses_general_tablespace = false;
   bool uses_encrypted_tablespace = false;
   bool uses_system_tablespace = false;
+  dd::String_type tablespace_encryption_opt;
   dd::Encrypt_result result =
       dd::is_tablespace_encrypted(thd, create_info, &uses_general_tablespace);
   if (result.error) return true;
 
   if (uses_general_tablespace) {
-    uses_encrypted_tablespace = result.value;
+    uses_encrypted_tablespace = result.value.encrypted;
+    tablespace_encryption_opt = result.value.encryption_option;
   } else if (!create_info->tablespace &&
              create_info->db_type->get_tablespace_type_by_name) {
     /*
@@ -8735,8 +8737,25 @@ static bool validate_table_encryption(THD *thd, HA_CREATE_INFO *create_info) {
     if (uses_system_tablespace) {
       dd::Encrypt_result result = dd::is_system_tablespace_encrypted(thd);
       if (result.error) return true;
-      uses_encrypted_tablespace = result.value;
+      uses_encrypted_tablespace = result.value.encrypted;
+      tablespace_encryption_opt = result.value.encryption_option;
     }
+  }
+
+  bool requested_type = dd::is_encrypted(create_info->encrypt_type);
+  dd::String_type table_encryption_opt{create_info->encrypt_type.str, create_info->encrypt_type.length};
+
+  if ((uses_general_tablespace || uses_system_tablespace) && uses_encrypted_tablespace &&
+      table_encryption_opt.empty() == false &&
+      !does_table_and_tablespace_encryption_match(table_encryption_opt, tablespace_encryption_opt)) {
+
+    dd::String_type tablespace_encryption = is_master_key_encrypted(tablespace_encryption_opt) ?
+                                             "MASTER KEY" : tablespace_encryption_opt;
+
+    my_error(ER_INVALID_ENCRYPTION_REQUEST, MYF(0),
+             (table_encryption_opt + " encrypted").c_str(),
+             (tablespace_encryption + " encrypted").c_str()); // I cheat here a bit, bu
+    return true;
   }
 
   /*
@@ -8746,16 +8765,14 @@ static bool validate_table_encryption(THD *thd, HA_CREATE_INFO *create_info) {
     is specified. This table will be created in encrypted tablespace - which we
     aim for and can be rotated to Keyring (given encryption threads are ON).
   */
-  bool requested_type = dd::is_encrypted(create_info->encrypt_type);
-
   if ((uses_general_tablespace || uses_system_tablespace) &&
       ((requested_type != uses_encrypted_tablespace) &&
        (!uses_encrypted_tablespace ||
         global_system_variables.default_table_encryption !=
             DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING))) {
     my_error(ER_INVALID_ENCRYPTION_REQUEST, MYF(0),
-             requested_type ? "'encrypted'" : "'unencrypted'",
-             uses_encrypted_tablespace ? "'encrypted'" : "'unencrypted'");
+             requested_type ? "an 'encrypted'" : "an 'unencrypted'",
+             uses_encrypted_tablespace ? "an 'encrypted'" : "an 'unencrypted'");
     return true;
   }
 
@@ -15030,7 +15047,7 @@ static bool simple_rename_or_index_change(
       if (result.error) {
         return true;
       }
-      is_table_encrypted = result.value;
+      is_table_encrypted = result.value.encrypted;
       // If implicit tablespace, read the encryption clause value.
       if (!is_general_tablespace &&
           table_def->options().exists("encrypt_type")) {
@@ -16526,8 +16543,8 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
   */
   bool invalidate_fk_parents_on_error = false;
 
-  dd::Encrypt_result old_er{false, false};
-  dd::Encrypt_result new_er{false, false};
+  dd::Encrypt_result old_er{false, {false,""}};
+  dd::Encrypt_result new_er{false, {false,""}};
 
   /*
     If we are ALTERing non-temporary table in SE not supporting atomic DDL
@@ -16563,7 +16580,7 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     if (old_er.error) {
       goto err_new_table_cleanup;
     }
-    source_encrytion_type = old_er.value;
+    source_encrytion_type = old_er.value.encrypted;
     if (!source_is_general_tablespace &&
         old_table_def->options().exists("encrypt_type")) {
       dd::String_type et;
@@ -16578,7 +16595,7 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     if (new_er.error) {
       goto err_new_table_cleanup;
     }
-    destination_encrytion_type = new_er.value;
+    destination_encrytion_type = new_er.value.encrypted;
     if (!destination_is_general_tablespace &&
         table_def->options().exists("encrypt_type")) {
       dd::String_type et;

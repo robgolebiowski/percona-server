@@ -8844,7 +8844,7 @@ WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB
   eng "Creating an unencrypted table in a database with default encryption enabled."
 
 ER_INVALID_ENCRYPTION_REQUEST
-  eng "Request to create %s table while using an %s tablespace."
+  eng "Request to create %s table while using %s tablespace."
 
 ER_CANNOT_SET_TABLE_ENCRYPTION
   eng "Table encryption differ from its database default encryption, and user doesn't have enough privilege."

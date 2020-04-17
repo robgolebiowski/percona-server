@@ -155,6 +155,9 @@ include/assert.inc [Make sure ts1 is encrypted]
 ALTER TABLE t1 ENCRYPTION='N';
 include/assert.inc [Make sure t1 is marked as excluded in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION]
 ALTER DATABASE test DEFAULT ENCRYPTION='Y';
+ERROR HY000: Database default encryption cannot be set to Y (Master Key encryption) while default_table_encryption is set to ONLINE_TO_KEYRING. It does not make sense to create new Master Key encrypted tables if the intention is to re-encrypt them to KEYRING encryption.
+SET GLOBAL default_table_encryption=ON;
+ALTER DATABASE test DEFAULT ENCRYPTION='Y';
 SHOW CREATE TABLE t4;
 Table	Create Table
 t4	CREATE TABLE `t4` (

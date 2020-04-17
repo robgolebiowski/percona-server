@@ -2757,7 +2757,7 @@ dberr_t Encryption::set_algorithm(const char *option, Encryption *encryption) {
 
   } else if (innobase_strcasecmp(option, "KEYRING") == 0) {
     encryption->m_type = KEYRING;
-  } else if (innobase_strcasecmp(option, "ONLINE_TO_KEYRING") == 0) {
+  } else if (innobase_strcasecmp(option, "ONLINE_KEYRING") == 0) {
     encryption->m_type = KEYRING;
   } else {
     return (DB_UNSUPPORTED);

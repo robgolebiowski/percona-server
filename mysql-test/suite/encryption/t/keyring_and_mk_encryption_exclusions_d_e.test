@@ -31,7 +31,7 @@ USE test;
 ALTER DATABASE db_1 DEFAULT ENCRYPTION='Y';
 
 --error ER_DATABASE_ENCRYPTION_N_KEYRING_MISMATCH
-CREATE DATABASE db_1 DEFAULT ENCRYPTION='N';
+ALTER DATABASE db_1 DEFAULT ENCRYPTION='N';
 
 USE db_1;
 # Now let's create database with DEFAULT ENCRYPTION='Y' and then change the default_table_encryption to

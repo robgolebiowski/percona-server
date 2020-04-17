@@ -425,11 +425,32 @@ inline bool is_encrypted(const LEX_STRING &type) {
   return is_encrypted(String_type(type.str, type.length));
 }
 
-using Encrypt_result = ResultType<bool>;
+inline bool is_master_key_encrypted(const String_type &type) {
+  return (type.empty() == false &&
+          my_strcasecmp(system_charset_info, type.c_str(), "Y") == 0);
+}
+
+inline bool does_table_and_tablespace_encryption_match(const String_type &table_encryption,
+                                                       const String_type &tablespace_encryption) {
+  DBUG_ASSERT(!table_encryption.empty() && !tablespace_encryption.empty());
+
+  String_type tablespace_enc_to_compare = tablespace_encryption == "ONLINE_KEYRING"
+                                            ? "KEYRING" : tablespace_encryption;
+
+  return my_strcasecmp(system_charset_info, tablespace_enc_to_compare.c_str(),
+                                            table_encryption.c_str()) == 0;
+}
+
+struct TablespaceEncryption {
+  bool encrypted;
+  String_type encryption_option;
+};
+
+using Encrypt_result = ResultType<TablespaceEncryption>;
 Encrypt_result is_tablespace_encrypted(THD *thd, const dd::Table &t,
                                        bool *found_tablespace);
 
-using Encrypt_result = ResultType<bool>;
+using Encrypt_result = ResultType<TablespaceEncryption>;
 Encrypt_result is_tablespace_encrypted(THD *thd, const HA_CREATE_INFO *ci,
                                        bool *found_tablespace);
 

@@ -6312,7 +6312,7 @@ bool dd_set_encryption_flag(THD *thd, const char *space_name,
                             volatile bool *is_space_being_removed) {
   auto update_func = [](uint32_t &dd_space_flags, dd::Tablespace *dd_space) {
     dd_space_flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
-    dd_space->options().set("encryption", "Y");
+    dd_space->options().set("encryption", "ONLINE_KEYRING");
   };
   return dd_update_tablespace_dd_flags(thd, space_name, is_space_being_removed,
                                        update_func);

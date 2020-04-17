@@ -1040,10 +1040,10 @@ SET GLOBAL table_encryption_privilege_check=false;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1138,10 +1138,10 @@ SET GLOBAL table_encryption_privilege_check=false;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1260,10 +1260,10 @@ SET GLOBAL table_encryption_privilege_check=false;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1362,10 +1362,10 @@ SET GLOBAL table_encryption_privilege_check=false;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1461,11 +1461,11 @@ SET GLOBAL table_encryption_privilege_check=true;
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1514,10 +1514,10 @@ SET GLOBAL table_encryption_privilege_check=true;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1614,10 +1614,10 @@ SET GLOBAL table_encryption_privilege_check=true;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1736,10 +1736,10 @@ SET GLOBAL table_encryption_privilege_check=true;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;
@@ -1891,10 +1891,10 @@ SET GLOBAL table_encryption_privilege_check=true;
 # Run ALTER TABLE and check for errors/warnings
 ALTER TABLE db1.t1 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t2 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 ALTER TABLE db1.t3 TABLESPACE=innodb_file_per_table ENCRYPTION='y';
 ALTER TABLE db1.t4 TABLESPACE=innodb_system ENCRYPTION='y';
-ERROR HY000: Request to create 'encrypted' table while using an 'unencrypted' tablespace.
+ERROR HY000: Request to create an 'encrypted' table while using an 'unencrypted' tablespace.
 SET GLOBAL table_encryption_privilege_check=false;
 # Verify the ENCRYPTION clause value.
 SHOW CREATE TABLE db1.t1;

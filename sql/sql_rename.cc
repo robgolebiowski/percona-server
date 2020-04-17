@@ -635,7 +635,7 @@ static bool do_rename(THD *thd, TABLE_LIST *ren_table, const char *new_db,
       if (new_er.error) {
         return true;
       }
-      is_table_encrypted = new_er.value;
+      is_table_encrypted = new_er.value.encrypted;
       if (!is_general_tablespace &&
           from_table->options().exists("encrypt_type")) {
         dd::String_type et;
