@@ -8744,13 +8744,18 @@ static bool validate_table_encryption(THD *thd, HA_CREATE_INFO *create_info) {
 
   bool requested_type = dd::is_encrypted(create_info->encrypt_type);
   dd::String_type table_encryption_opt{create_info->encrypt_type.str, create_info->encrypt_type.length};
+  if (table_encryption_opt.empty() && uses_encrypted_tablespace && dd::is_keyring_encrypted(tablespace_encryption_opt))
+    table_encryption_opt = "ONLINE_KEYRING"; // if tablespace is keyring encrypted - it means that table in it
+                                             // is also keyring encrypted
 
   if ((uses_general_tablespace || uses_system_tablespace) && uses_encrypted_tablespace &&
-      table_encryption_opt.empty() == false &&
+      table_encryption_opt.empty() == false && requested_type &&
       !does_table_and_tablespace_encryption_match(table_encryption_opt, tablespace_encryption_opt)) {
 
     dd::String_type tablespace_encryption = is_master_key_encrypted(tablespace_encryption_opt) ?
                                              "MASTER KEY" : tablespace_encryption_opt;
+
+    //DBUG_ASSERT(my_strcasecmp(system_charset_info, table_encryption_opt.c_str(), "Y") != 0);
 
     my_error(ER_INVALID_ENCRYPTION_REQUEST, MYF(0),
              (table_encryption_opt + " encrypted").c_str(),
@@ -15048,17 +15053,22 @@ static bool simple_rename_or_index_change(
         return true;
       }
       is_table_encrypted = result.value.encrypted;
+      dd::String_type table_encryption_type = result.value.encryption_option;
       // If implicit tablespace, read the encryption clause value.
       if (!is_general_tablespace &&
           table_def->options().exists("encrypt_type")) {
-        dd::String_type et;
-        (void)table_def->options().get("encrypt_type", &et);
-        DBUG_ASSERT(et.empty() == false);
-        is_table_encrypted = is_encrypted(et);
+        (void)table_def->options().get("encrypt_type", &table_encryption_type);
+        DBUG_ASSERT(table_encryption_type.empty() == false);
+        is_table_encrypted = is_encrypted(table_encryption_type);
       }
 
       // If table encryption differ from schema encryption, check privilege.
-      if (new_schema.default_encryption() != is_table_encrypted) {
+      // Currently default_encryption() == true means Master Key encryption.
+      // We use this fact here.
+      if (((new_schema.default_encryption() != is_table_encrypted) ||
+           (new_schema.default_encryption() && is_table_encrypted &&
+            my_strcasecmp(system_charset_info, table_encryption_type.c_str(),
+                          "Y") != 0))) {
         if (opt_table_encryption_privilege_check) {
           if (check_table_encryption_admin_access(thd)) {
             my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
@@ -16581,12 +16591,12 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
       goto err_new_table_cleanup;
     }
     source_encrytion_type = old_er.value.encrypted;
+    dd::String_type source_encryption_option = old_er.value.encryption_option;
     if (!source_is_general_tablespace &&
         old_table_def->options().exists("encrypt_type")) {
-      dd::String_type et;
-      (void)old_table_def->options().get("encrypt_type", &et);
-      DBUG_ASSERT(et.empty() == false);
-      source_encrytion_type = is_encrypted(et);
+      (void)old_table_def->options().get("encrypt_type", &source_encryption_option);
+      DBUG_ASSERT(source_encryption_option.empty() == false);
+      source_encrytion_type = is_encrypted(source_encryption_option);
     }
 
     // Determine destination tablespace type and encryption type.
@@ -16596,6 +16606,7 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
       goto err_new_table_cleanup;
     }
     destination_encrytion_type = new_er.value.encrypted;
+    dd::String_type destination_encryption_option = new_er.value.encryption_option;
     if (!destination_is_general_tablespace &&
         table_def->options().exists("encrypt_type")) {
       dd::String_type et;
@@ -16613,6 +16624,23 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
         !(create_info->used_fields & HA_CREATE_USED_ENCRYPT)) {
       my_error(ER_TARGET_TABLESPACE_UNENCRYPTED, MYF(0));
       goto err_new_table_cleanup;
+    }
+
+    /*
+      Disallow moving a table from Master Key encrypted tablespace to
+      keyring encrypted tablespace (and vice versa) without an explicit
+      ENCRYPTION clause.
+    */
+    DBUG_EXECUTE_IF("do_the_assert", {
+        DBUG_ASSERT(false);
+      });
+
+    if (source_is_general_tablespace && destination_is_general_tablespace &&
+        source_encrytion_type && destination_encrytion_type &&
+        !does_tablespaces_encryptions_match(source_encryption_option,
+                                            destination_encryption_option) &&
+        !(create_info->used_fields & HA_CREATE_USED_ENCRYPT)) {
+      my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
     }
 
     /*
@@ -16637,11 +16665,13 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
 
       if (!show_warning && opt_table_encryption_privilege_check) {
         if (check_table_encryption_admin_access(thd)) {
+          DBUG_ASSERT(false);
           my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
           return true;
         }
       } else if (new_schema->default_encryption() &&
                  !destination_encrytion_type) {
+        DBUG_ASSERT(false);
         push_warning(thd, Sql_condition::SL_WARNING,
                      WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB,
                      ER_THD(thd, WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB));

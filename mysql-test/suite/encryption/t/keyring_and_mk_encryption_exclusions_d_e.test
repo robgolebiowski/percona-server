@@ -108,7 +108,73 @@ CREATE TABLE t1 (a varchar(255));
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'db_5/t1\\']" = 0
 --source include/assert.inc
 
+CREATE USER u1@localhost;
+GRANT CREATE,ALTER,DROP on db_5.* TO u1@localhost;
+GRANT CREATE,ALTER,INSERT on db_4.* TO u1@localhost;
+USE db_5;
+CREATE TABLE t_keyring (a varchar(255)) ENCRYPTION='KEYRING';
+USE db_4;
+CREATE TABLE t_mk (a varchar(255)) ENCRYPTION='Y';
+CREATE TABLESPACE ts_mk ADD DATAFILE 'ts_mk.ibd' ENCRYPTION='Y';
+CREATE TABLE t1_in_ts_mk (a varchar(255)) TABLESPACE=ts_mk ENCRYPTION='Y';
+CREATE TABLE t2_in_ts_mk (a varchar(255)) TABLESPACE=ts_mk ENCRYPTION='Y';
+#CREATE TABLESPACE ts_keyring_db_4 ADD DATAFILE 'ts_keyring_db_4.ibd';
+#CREATE TABLE t1_in_ts_keyring_db_4 (a varchar(255)) TABLESPACE=ts_keyring_db_4;
+USE db_5;
+CREATE TABLESPACE ts_mk_db_5 ADD DATAFILE 'ts_mk_db_5.ibd' ENCRYPTION='Y';
+CREATE TABLE t_mk_in_ts_mk_db_5 (a varchar(255)) TABLESPACE=ts_mk_db_5 ENCRYPTION='Y';
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+CREATE TABLESPACE ts_keyring ADD DATAFILE 'ts_keyring.ibd';
+CREATE TABLE t1_keyring_in_ts_keyring (a varchar(255)) TABLESPACE=ts_keyring;
+CREATE TABLE t2_keyring_in_ts_keyring (a varchar(255)) TABLESPACE=ts_keyring;
+CREATE TABLE t3_keyring_in_ts_keyring (a varchar(255)) TABLESPACE=ts_keyring;
+CREATE TABLESPACE ts_keyring_db_5 ADD DATAFILE 'ts_keyring_db_5.ibd';
+CREATE TABLE t1_in_ts_keyring_db_5 (a varchar(255)) TABLESPACE=ts_keyring_db_5;
+CREATE TABLESPACE ts_encryption_n ADD DATAFILE 'ts_encryption_n.ibd' ENCRYPTION='N';
+SET GLOBAL default_table_encryption=OFF;
 
+SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES
+       WHERE CREATE_OPTIONS LIKE '%ENCRYPTION%';
+
+USE db_4;
+SET GLOBAL table_encryption_privilege_check=true;
+connect (con1, localhost, u1);
+--error ER_CANNOT_SET_TABLE_ENCRYPTION
+ALTER TABLE db_5.t_keyring RENAME db_4.t_keyring;
+--error ER_CANNOT_SET_TABLE_ENCRYPTION
+RENAME TABLE db_5.t_keyring TO db_4.t_keyring;
+# Change encryption type of MK encrypted table in database with
+# default_table_encryption='Y'
+ALTER TABLE db_4.t_mk ENCRYPTION='KEYRING';
+# We should be able to move a table from MK encrypted tablespace
+# into KEYRING encrypted file-per-table tablespace.
+ALTER TABLE db_4.t1_in_ts_mk TABLESPACE=innodb_file_per_table ENCRYPTION='KEYRING';
+# We should be able to move a table from Keyring encrypted tablespace
+# into MK encrypted file-per-table tablespace.
+ALTER TABLE db_5.t1_keyring_in_ts_keyring TABLESPACE=innodb_file_per_table ENCRYPTION='Y';
+# It should also be possible to move to table from Keyring encrypted tablespace to
+# not encrypted file_per_table
+ALTER TABLE db_5.t2_keyring_in_ts_keyring TABLESPACE=innodb_file_per_table ENCRYPTION='N';
+# It should NOT be possible to move to table from Keyring encrypted tablespace to
+# not encrypted general tablespace, even if ENCRYPTION clause is specified (upstream behavior).
+--error ER_TARGET_TABLESPACE_UNENCRYPTED
+ALTER TABLE db_5.t3_keyring_in_ts_keyring TABLESPACE=ts_encryption_n ENCRYPTION='N';
+
+SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES
+       WHERE CREATE_OPTIONS LIKE '%ENCRYPTION%';
+
+#SET GLOBAL debug= '+d,do_the_assert';
+--error ER_INVALID_ENCRYPTION_REQUEST
+ALTER TABLE db_5.t_mk_in_ts_mk_db_5 TABLESPACE=ts_keyring_db_5;
+ALTER TABLE db_5.t_mk_in_ts_mk_db_5 TABLESPACE=ts_keyring_db_5 ENCRYPTION='KEYRING';
+
+ALTER TABLE db_5.t1_in_ts_keyring_db_5 TABLESPACE=ts_mk_db_5;
+
+connection default;
+disconnect con1;
+DROP USER u1@localhost;
+
+SET GLOBAL table_encryption_privilege_check=false;
 # cleanup
 SET GLOBAL default_table_encryption=OFF;
 DROP DATABASE db_1;

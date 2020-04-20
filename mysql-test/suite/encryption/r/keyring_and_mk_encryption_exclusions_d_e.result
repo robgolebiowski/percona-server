@@ -60,6 +60,18 @@ CREATE TABLE t1 (a varchar(255));
 # Make sure db_5/t1 is not included in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION as it is
 # MK encrypted.
 include/assert.inc [Make sure db_5/t1 is not included in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION]
+CREATE USER u1@localhost;
+GRANT CREATE,ALTER,DROP on db_5.* TO u1@localhost;
+GRANT CREATE,INSERT on db_4.* TO u1@localhost;
+USE db_5;
+CREATE TABLE t_keyring (a varchar(255)) ENCRYPTION='KEYRING';
+SET GLOBAL table_encryption_privilege_check=true;
+ALTER TABLE db_5.t_keyring RENAME db_4.t_keyring;
+ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
+RENAME TABLE db_5.t_keyring TO db_4.t_keyring;
+ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
+DROP USER u1@localhost;
+SET GLOBAL table_encryption_privilege_check=false;
 SET GLOBAL default_table_encryption=OFF;
 DROP DATABASE db_1;
 DROP DATABASE db_2;

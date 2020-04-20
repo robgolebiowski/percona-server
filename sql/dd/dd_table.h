@@ -430,15 +430,32 @@ inline bool is_master_key_encrypted(const String_type &type) {
           my_strcasecmp(system_charset_info, type.c_str(), "Y") == 0);
 }
 
+inline bool is_keyring_encrypted(const String_type &type) {
+  return (type.empty() == false &&
+          (my_strcasecmp(system_charset_info, type.c_str(), "KEYRING") == 0 ||
+           my_strcasecmp(system_charset_info, type.c_str(), "ONLINE_KEYRING") == 0));
+}
+
+inline bool does_tablespaces_encryptions_match(const String_type &tablespace1_encryption,
+                                               const String_type &tablespace2_encryption) {
+  DBUG_ASSERT(!tablespace1_encryption.empty() && !tablespace2_encryption.empty());
+
+  return my_strcasecmp(system_charset_info, tablespace1_encryption.c_str(),
+                                            tablespace2_encryption.c_str()) == 0;
+}
+
+// KEYRING and ONLINE_KEYRING are matching encryptions.
 inline bool does_table_and_tablespace_encryption_match(const String_type &table_encryption,
                                                        const String_type &tablespace_encryption) {
   DBUG_ASSERT(!table_encryption.empty() && !tablespace_encryption.empty());
 
   String_type tablespace_enc_to_compare = tablespace_encryption == "ONLINE_KEYRING"
                                             ? "KEYRING" : tablespace_encryption;
+  String_type table_enc_to_compare = table_encryption == "ONLINE_KEYRING"
+                                            ? "KEYRING" : table_encryption;
 
   return my_strcasecmp(system_charset_info, tablespace_enc_to_compare.c_str(),
-                                            table_encryption.c_str()) == 0;
+                                            table_enc_to_compare.c_str()) == 0;
 }
 
 struct TablespaceEncryption {
