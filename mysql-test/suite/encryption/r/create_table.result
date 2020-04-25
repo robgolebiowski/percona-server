@@ -1507,6 +1507,238 @@ REVOKE TABLE_ENCRYPTION_ADMIN ON *.* FROM u1@localhost;
 DROP DATABASE db1;
 SET GLOBAL table_encryption_privilege_check=false;
 DROP TABLESPACE ts_keyring;
-# Cleanup
+# Cleanup server started by MTR
 DROP USER u1@localhost;
 SET GLOBAL debug= '-d,skip_table_encryption_admin_check_for_set';
+# Here we are going to test Master Key encrypted system tablespace.
+# For this we need to bootstap new server, as Master Key encryption
+# is bootstrap only option.
+# Stop the instance which was created by MTR
+# create bootstrap file
+# Bootstrap new instance with encrypted system tablespace
+# Check Encryption header of ibdata1
+# Start the instance with encrypted system tablespace
+# restart: --datadir=MYSQLD_DATADIR1 --innodb-sys-tablespace-encrypt=ON
+# Create user u1 for tests with Master Key encrypted system tablespace.
+CREATE USER u1@localhost;
+GRANT ALL ON db1.* TO u1@localhost;
+GRANT ALL ON test.* TO u1@localhost;
+GRANT CREATE TABLESPACE, PROCESS, SYSTEM_VARIABLES_ADMIN ON *.* TO u1@localhost;
+SET GLOBAL debug= '+d,skip_table_encryption_admin_check_for_set';
+`````````````````````````````````````````````````````````
+# Test CREATE TABLE with TABLESPACE=innodb_system
+# where innodb_system is Master Key encrypted
+`````````````````````````````````````````````````````````
+# Without ENCRYPTION clause
+`````````````````````````````````````````````````````````
+# Fails because we cannot created an unencrypted table in
+# Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 98 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system;
+ERROR HY000: Request to create an 'unencrypted' table while using an 'encrypted' tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+# [CREATE TABLE] Case 99 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system;
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL
+) /*!50100 TABLESPACE `innodb_system` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='Y' */
+SELECT TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME='t1';
+TABLE_NAME	CREATE_OPTIONS
+t1	ENCRYPTION='Y'
+DROP TABLE db1.t1;
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails because we cannot created an unencrypted table in
+# Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 100 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system;
+ERROR HY000: Request to create an 'unencrypted' table while using an 'encrypted' tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+# [CREATE TABLE] Case 101 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system;
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL
+) /*!50100 TABLESPACE `innodb_system` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='Y' */
+SELECT TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME='t1';
+TABLE_NAME	CREATE_OPTIONS
+t1	ENCRYPTION='Y'
+DROP TABLE db1.t1;
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# With ENCRYPTION clause
+# [CREATE TABLE] Case 102 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='y';
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL
+) /*!50100 TABLESPACE `innodb_system` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+SELECT TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME='t1';
+TABLE_NAME	CREATE_OPTIONS
+t1	ENCRYPTION='y'
+DROP TABLE db1.t1;
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails because we cannot created a Keyring encrypted
+# table in Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 103 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='keyring';
+ERROR HY000: Request to create keyring encrypted table while using MASTER KEY encrypted tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails because we cannot created an unencrypted table in
+# Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 104 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='n';
+ERROR HY000: Request to create an 'unencrypted' table while using an 'encrypted' tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+# [CREATE TABLE] Case 105 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='y';
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL
+) /*!50100 TABLESPACE `innodb_system` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+SELECT TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME='t1';
+TABLE_NAME	CREATE_OPTIONS
+t1	ENCRYPTION='y'
+DROP TABLE db1.t1;
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails because we cannot created a Keyring encrypted
+# table in Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 106 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='keyring';
+ERROR HY000: Request to create keyring encrypted table while using MASTER KEY encrypted tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails because we cannot created an unencrypted table in
+# Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 107 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=false;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='n';
+ERROR HY000: Request to create an 'unencrypted' table while using an 'encrypted' tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails as there is mismatch between table and database encryption.
+# [CREATE TABLE] Case 108 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='y';
+ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
+# GRANT user the TABLE_ENCRYPTION_ADMIN
+GRANT TABLE_ENCRYPTION_ADMIN ON *.* TO u1@localhost;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='y';
+# REVOKE TABLE_ENCRYPTION_ADMIN from user.
+REVOKE TABLE_ENCRYPTION_ADMIN ON *.* FROM u1@localhost;
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+# Fails because we cannot created a Keyring encrypted
+# table in Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 109 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='keyring';
+ERROR HY000: Request to create keyring encrypted table while using MASTER KEY encrypted tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails because we cannot created an unencrypted table in
+# Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 110 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='n';
+ERROR HY000: Request to create an 'unencrypted' table while using an 'encrypted' tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+# [CREATE TABLE] Case 111 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='y';
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL
+) /*!50100 TABLESPACE `innodb_system` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+SELECT TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME='t1';
+TABLE_NAME	CREATE_OPTIONS
+t1	ENCRYPTION='y'
+DROP TABLE db1.t1;
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+# Fails because we cannot created a Keyring encrypted
+# table in Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 112 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='keyring';
+ERROR HY000: Request to create keyring encrypted table while using MASTER KEY encrypted tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+`````````````````````````````````````````````````````````
+# Fails because we cannot create an unencrypted table in
+# Master Key encrypted system tablespace.
+# [CREATE TABLE] Case 113 )
+`````````````````````````````````````````````````````````
+CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
+SET GLOBAL table_encryption_privilege_check=true;
+CREATE TABLE db1.t1 (f1 int) TABLESPACE=innodb_system ENCRYPTION='n';
+ERROR HY000: Request to create an 'unencrypted' table while using an 'encrypted' tablespace.
+DROP DATABASE db1;
+SET GLOBAL table_encryption_privilege_check=false;
+# Start default MTR instance
+# restart
