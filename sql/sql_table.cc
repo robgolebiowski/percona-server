@@ -8744,9 +8744,9 @@ static bool validate_table_encryption(THD *thd, HA_CREATE_INFO *create_info) {
 
   bool requested_type = dd::is_encrypted(create_info->encrypt_type);
   dd::String_type table_encryption_opt{create_info->encrypt_type.str, create_info->encrypt_type.length};
-  if (table_encryption_opt.empty() && uses_encrypted_tablespace && dd::is_keyring_encrypted(tablespace_encryption_opt))
-    table_encryption_opt = "ONLINE_KEYRING"; // if tablespace is keyring encrypted - it means that table in it
-                                             // is also keyring encrypted
+  //if (table_encryption_opt.empty() && uses_encrypted_tablespace && dd::is_keyring_encrypted(tablespace_encryption_opt))
+    //table_encryption_opt = "ONLINE_KEYRING"; // if tablespace is keyring encrypted - it means that table in it
+                                             //// is also keyring encrypted
 
   if ((uses_general_tablespace || uses_system_tablespace) && uses_encrypted_tablespace &&
       table_encryption_opt.empty() == false && requested_type &&
@@ -8900,8 +8900,16 @@ bool mysql_create_table_no_lock(THD *thd, const char *db,
       Assume table as encrypted, if user did not explicitly state it and
       we have a schema with default encryption enabled.
      */
-    if (!create_info->encrypt_type.length && schema->default_encryption()) {
-      create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
+    //if (!create_info->encrypt_type.length && schema->default_encryption()) {
+      //create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
+    //}
+
+    if (!create_info->encrypt_type.length) {
+      if (schema->default_encryption())
+        create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
+      else if (global_system_variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING)
+        create_info->encrypt_type = {strmake_root(thd->mem_root, "ONLINE_KEYRING", strlen("ONLINE_KEYRING")), 
+                                                  strlen("ONLINE_KEYRING")};
     }
 
     // Stop if it is invalid encryption clause, when using general tablespace.
@@ -8911,10 +8919,14 @@ bool mysql_create_table_no_lock(THD *thd, const char *db,
     if (create_info->encrypt_type.str || create_info->tablespace) {
       /*
         Check privilege only if request encryption type differ from schema
-        default encryption type.
-       */
+        default encryption type. If schema->default_encryption() == true it means
+        that default encryption for a schema is Master Key encryption (only allowed).
+        We use this fact here.
+      */
       bool request_type = dd::is_encrypted(create_info->encrypt_type);
-      if (schema->default_encryption() != request_type) {
+      if (schema->default_encryption() != request_type ||
+          (schema->default_encryption() && create_info->encrypt_type.length &&
+           !dd::is_master_key_encrypted(create_info->encrypt_type))) {
         if (opt_table_encryption_privilege_check) {
           if (check_table_encryption_admin_access(thd)) {
             my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
@@ -16609,10 +16621,9 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     dd::String_type destination_encryption_option = new_er.value.encryption_option;
     if (!destination_is_general_tablespace &&
         table_def->options().exists("encrypt_type")) {
-      dd::String_type et;
-      (void)table_def->options().get("encrypt_type", &et);
-      DBUG_ASSERT(et.empty() == false);
-      destination_encrytion_type = is_encrypted(et);
+      (void)table_def->options().get("encrypt_type", &destination_encryption_option);
+      DBUG_ASSERT(destination_encryption_option.empty() == false);
+      destination_encrytion_type = is_encrypted(destination_encryption_option);
     }
 
     /*
@@ -16635,13 +16646,16 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
         DBUG_ASSERT(false);
       });
 
-    if (source_is_general_tablespace && destination_is_general_tablespace &&
-        source_encrytion_type && destination_encrytion_type &&
-        !does_tablespaces_encryptions_match(source_encryption_option,
-                                            destination_encryption_option) &&
-        !(create_info->used_fields & HA_CREATE_USED_ENCRYPT)) {
-      my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
-    }
+    //TODO : I think this check can be removed, as it is already checked by
+    //validate_table_encryption
+    //if (source_is_general_tablespace && destination_is_general_tablespace &&
+        //source_encrytion_type && destination_encrytion_type &&
+        //!does_tablespaces_encryptions_match(source_encryption_option,
+                                            //destination_encryption_option) &&
+        //!(create_info->used_fields & HA_CREATE_USED_ENCRYPT)) {
+      //my_error(ER_INVALID_ENCRYPTION_REQUEST, MYF(0));
+      ////my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
+    //}
 
     /*
       Disallow moving encrypted table (using general or file-per-table
@@ -16657,21 +16671,23 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
       Check table encryption privilege, if table encryption type differ
       from schema encryption type.
     */
-    if (new_schema->default_encryption() != destination_encrytion_type) {
+    if (new_schema->default_encryption() != destination_encrytion_type ||
+        (new_schema->default_encryption() &&
+         !dd::is_master_key_encrypted(destination_encryption_option))) {
       // Ingore privilege check and show warning if database is same and
       // table encryption type is not changed.
       bool show_warning = !alter_ctx.is_database_changed() &&
-                          source_encrytion_type == destination_encrytion_type;
+                          source_encrytion_type == destination_encrytion_type &&
+                          dd::does_encryptions_match(source_encryption_option,
+                                                     destination_encryption_option);
 
       if (!show_warning && opt_table_encryption_privilege_check) {
         if (check_table_encryption_admin_access(thd)) {
-          DBUG_ASSERT(false);
           my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
           return true;
         }
       } else if (new_schema->default_encryption() &&
                  !destination_encrytion_type) {
-        DBUG_ASSERT(false);
         push_warning(thd, Sql_condition::SL_WARNING,
                      WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB,
                      ER_THD(thd, WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB));

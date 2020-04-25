@@ -430,11 +430,34 @@ inline bool is_master_key_encrypted(const String_type &type) {
           my_strcasecmp(system_charset_info, type.c_str(), "Y") == 0);
 }
 
+inline bool is_master_key_encrypted(const LEX_STRING &type) {
+  return is_master_key_encrypted(String_type(type.str, type.length));
+}
+
 inline bool is_keyring_encrypted(const String_type &type) {
   return (type.empty() == false &&
           (my_strcasecmp(system_charset_info, type.c_str(), "KEYRING") == 0 ||
            my_strcasecmp(system_charset_info, type.c_str(), "ONLINE_KEYRING") == 0));
 }
+
+// KEYRING and ONLINE_KEYRING are matching encryptions.
+inline bool does_encryptions_match(String_type encryption1,
+                                   String_type encryption2) {
+  //DBUG_ASSERT(!encryption1.empty() && !encryption2.empty());
+  if (encryption1.empty() && encryption2.empty())
+    return true;
+  if (encryption1.empty() || encryption2.empty())
+    return false;
+
+  if (encryption1 == "ONLINE_KEYRING")
+    encryption1 = "KEYRING";
+  if (encryption2 == "ONLINE_KEYRING")
+    encryption2 = "KEYRING";
+
+  return my_strcasecmp(system_charset_info, encryption1.c_str(),
+                                            encryption2.c_str()) == 0;
+}
+// TODO: all below functions should be removed and replaced with this one ^
 
 inline bool does_tablespaces_encryptions_match(const String_type &tablespace1_encryption,
                                                const String_type &tablespace2_encryption) {

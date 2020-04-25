@@ -12853,11 +12853,11 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
   bool table_is_keyring =
       Encryption::is_keyring(m_create_info->encrypt_type.str);
 
-  if (table_is_keyring && !m_allow_file_per_table) {
-    my_printf_error(ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION,
-                    "InnoDB: KEYRING requires innodb_file_per_table.", MYF(0));
-    return (false);
-  }
+  //if (table_is_keyring && !m_allow_file_per_table) {
+    //my_printf_error(ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION,
+                    //"InnoDB: KEYRING requires innodb_file_per_table.", MYF(0));
+    //return (false);
+  //}
 
   if (!table_is_keyring &&
       Encryption::is_master_key_encryption(m_create_info->encrypt_type.str) &&

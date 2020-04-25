@@ -145,9 +145,15 @@ ALTER TABLE db_5.t_keyring RENAME db_4.t_keyring;
 RENAME TABLE db_5.t_keyring TO db_4.t_keyring;
 # Change encryption type of MK encrypted table in database with
 # default_table_encryption='Y'
+--error ER_CANNOT_SET_TABLE_ENCRYPTION
 ALTER TABLE db_4.t_mk ENCRYPTION='KEYRING';
+# Create table with KEYRING encryption in database with DEFAULT ENCRYPTION='Y'
+--error ER_CANNOT_SET_TABLE_ENCRYPTION
+CREATE TABLE db_4.t_keyring2 (a varchar(255)) ENCRYPTION='KEYRING';
 # We should be able to move a table from MK encrypted tablespace
-# into KEYRING encrypted file-per-table tablespace.
+# into KEYRING encrypted file-per-table tablespace - if we have high enough privileges -
+# here we don't (to override DB D_E). Change.
+--error ER_CANNOT_SET_TABLE_ENCRYPTION
 ALTER TABLE db_4.t1_in_ts_mk TABLESPACE=innodb_file_per_table ENCRYPTION='KEYRING';
 # We should be able to move a table from Keyring encrypted tablespace
 # into MK encrypted file-per-table tablespace.
