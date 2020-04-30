@@ -9258,6 +9258,9 @@ ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING
 ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION
   eng "Encryption option is not allowed. %s"
 
+ER_TARGET_TABLESPACE_ENCRYPTION_MISMATCH
+  eng "Source tablespace is %s encrypted but target tablespace is %s encrypted."
+
 #
 # End of Percona Server 8.0 client messages
 #

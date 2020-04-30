@@ -441,30 +441,35 @@ inline bool is_keyring_encrypted(const String_type &type) {
 }
 
 // KEYRING and ONLINE_KEYRING are matching encryptions.
-inline bool does_encryptions_match(String_type encryption1,
-                                   String_type encryption2) {
-  //DBUG_ASSERT(!encryption1.empty() && !encryption2.empty());
-  if (encryption1.empty() && encryption2.empty())
-    return true;
-  if (encryption1.empty() || encryption2.empty())
-    return false;
+//inline bool does_encryptions_match(String_type encryption1,
+                                   //String_type encryption2) {
+  ////DBUG_ASSERT(!encryption1.empty() && !encryption2.empty());
+  //if (encryption1.empty() && encryption2.empty())
+    //return true;
+  //if (encryption1.empty() || encryption2.empty())
+    //return false;
 
-  if (encryption1 == "ONLINE_KEYRING")
-    encryption1 = "KEYRING";
-  if (encryption2 == "ONLINE_KEYRING")
-    encryption2 = "KEYRING";
+  //if (encryption1 == "ONLINE_KEYRING")
+    //encryption1 = "KEYRING";
+  //if (encryption2 == "ONLINE_KEYRING")
+    //encryption2 = "KEYRING";
 
-  return my_strcasecmp(system_charset_info, encryption1.c_str(),
-                                            encryption2.c_str()) == 0;
-}
+  //return my_strcasecmp(system_charset_info, encryption1.c_str(),
+                                            //encryption2.c_str()) == 0;
+//}
 // TODO: all below functions should be removed and replaced with this one ^
 
 inline bool does_tablespaces_encryptions_match(const String_type &tablespace1_encryption,
                                                const String_type &tablespace2_encryption) {
   DBUG_ASSERT(!tablespace1_encryption.empty() && !tablespace2_encryption.empty());
 
-  return my_strcasecmp(system_charset_info, tablespace1_encryption.c_str(),
-                                            tablespace2_encryption.c_str()) == 0;
+  String_type tablespace1_enc_to_compare = tablespace1_encryption == "ONLINE_KEYRING"
+                                            ? "KEYRING" : tablespace1_encryption;
+  String_type tablespace2_enc_to_compare = tablespace2_encryption == "ONLINE_KEYRING"
+                                            ? "KEYRING" : tablespace2_encryption;
+
+  return my_strcasecmp(system_charset_info, tablespace1_enc_to_compare.c_str(),
+                                            tablespace2_enc_to_compare.c_str()) == 0;
 }
 
 // KEYRING and ONLINE_KEYRING are matching encryptions.

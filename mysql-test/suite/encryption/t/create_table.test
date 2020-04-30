@@ -98,9 +98,10 @@ connect (con1, localhost, u1);
 --let expected_error=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./create_table.inc
 --echo `````````````````````````````````````````````````````````
---echo # Fails as there is mismatch between table and database encryption.
+--echo # Passes as we allow encrypted tables when database_encryption='y'
+--echo # It should not matter whether it is Master Key or Keyring encrypted.
 --let table_encryption='keyring'
---let expected_error=ER_CANNOT_SET_TABLE_ENCRYPTION
+--let expected_error=0
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
@@ -125,7 +126,8 @@ SET GLOBAL innodb_file_per_table = OFF;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot created an encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
@@ -135,7 +137,8 @@ SET GLOBAL innodb_file_per_table = OFF;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot created an encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
@@ -148,13 +151,14 @@ SET GLOBAL innodb_file_per_table = OFF;
 --let privilege_check=false
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot created a encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='n'
 --let table_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a KEYRING encrypted table
+--echo # Fails because we cannot created a encrypted table
 --echo # in not encrypted system tablespace.
 --let table_encryption='keyring'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
@@ -165,7 +169,8 @@ SET GLOBAL innodb_file_per_table = OFF;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot create an encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='y'
 --let table_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
@@ -176,7 +181,8 @@ SET GLOBAL innodb_file_per_table = OFF;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created KEYRING encrypted table in not encrypted system tablespace.
+--echo # Fails because we cannot create an ncrypted table in
+--echo # not encrypted system tablespace.
 --let table_encryption='keyring'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
@@ -184,14 +190,15 @@ SET GLOBAL innodb_file_per_table = OFF;
 --let privilege_check=true
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot create an encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='n'
 --let table_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a KEYRING encrypted table
+--echo # Fails because we cannot created an encrypted table
 --echo # in not encrypted system tablespace.
 --let table_encryption='keyring'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
@@ -202,14 +209,15 @@ SET GLOBAL innodb_file_per_table = OFF;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot created a encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='y'
 --let table_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a KEYRING encrypted table
+--echo # Fails because we cannot create an encrypted table
 --echo # in not encrypted system tablespace.
 --let table_encryption='keyring'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
@@ -289,9 +297,7 @@ SET GLOBAL innodb_file_per_table = ON;
 --let expected_error=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./create_table.inc
 --let table_encryption='keyring'
---echo `````````````````````````````````````````````````````````
---echo # Fails as there is mismatch between table and database encryption.
---let expected_error=ER_CANNOT_SET_TABLE_ENCRYPTION
+--let expected_error=0
 --source ./create_table.inc
 
 
@@ -342,7 +348,7 @@ SET GLOBAL innodb_file_per_table = ON;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a KEYRING encrypted table in
+--echo # Fails because we cannot create an encrypted table in
 --echo # not encrypted system tablespace.
 --let table_encryption='keyring'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
@@ -353,14 +359,15 @@ SET GLOBAL innodb_file_per_table = ON;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot created an encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='y'
 --let table_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a KEYRING encrypted table in
+--echo # Fails because we cannot create an encrypted table in
 --echo # not encrypted system tablespace.
 --let database_encryption='y'
 --let table_encryption='keyring'
@@ -392,14 +399,15 @@ SET GLOBAL innodb_file_per_table = ON;
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a encrypted table in system tablespace.
+--echo # Fails because we cannot created an encrypted table in
+--echo # not encrypted system tablespace.
 --let database_encryption='y'
 --let table_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot creat KEYRING encrypted table in
+--echo # Fails because we cannot create an encrypted table in
 --echo # not encrypted system tablespace.
 --let table_encryption='keyring'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
@@ -474,7 +482,7 @@ SET GLOBAL default_table_encryption=OFF;
 --let privilege_check=false
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a Master Key encrypted
+--echo # Fails because we cannot create a Master Key encrypted
 --echo # table in Keyring encrypted system tablespace.
 --let database_encryption='n'
 --let table_encryption='y'
@@ -516,7 +524,7 @@ SET GLOBAL default_table_encryption=OFF;
 
 --let database_encryption='n'
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a Master Key encrypted
+--echo # Fails because we cannot create a Master Key encrypted
 --echo # table in Keyring encrypted system tablespace.
 --let table_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
@@ -526,7 +534,7 @@ SET GLOBAL default_table_encryption=OFF;
 --let expected_error=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./create_table.inc
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created an unencrypted table in
+--echo # Fails because we cannot create an unencrypted table in
 --echo # KEYRING encrypted system tablespace.
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --let table_encryption='n'
@@ -540,9 +548,8 @@ SET GLOBAL default_table_encryption=OFF;
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
 
---echo # Fails as there is mismatch between table and database encryption.
+--let expected_error=0
 --let table_encryption='keyring'
---let expected_error=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
@@ -687,8 +694,7 @@ DROP TABLESPACE ts2;
 --let expected_error=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./create_table.inc
 
---echo `````````````````````````````````````````````````````````
---echo # Fails as there is mismatch between table and database encryption.
+--let expected_error=0
 --let table_encryption='keyring'
 --let tablespace_name=ts_keyring
 --source ./create_table.inc
@@ -789,14 +795,14 @@ connect (con1, localhost, u1);
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a Keyring encrypted
+--echo # Fails because we cannot create a Keyring encrypted
 --echo # table in Master Key encrypted system tablespace.
 --let table_encryption='keyring'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created an unencrypted table in
+--echo # Fails because we cannot create an unencrypted table in
 --echo # Master Key encrypted system tablespace.
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --let table_encryption='n'
@@ -808,7 +814,7 @@ connect (con1, localhost, u1);
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a Keyring encrypted
+--echo # Fails because we cannot create a Keyring encrypted
 --echo # table in Master Key encrypted system tablespace.
 --let database_encryption='y'
 --let table_encryption='keyring'
@@ -816,7 +822,7 @@ connect (con1, localhost, u1);
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created an unencrypted table in
+--echo # Fails because we cannot create an unencrypted table in
 --echo # Master Key encrypted system tablespace.
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --let table_encryption='n'

@@ -8919,14 +8919,10 @@ bool mysql_create_table_no_lock(THD *thd, const char *db,
     if (create_info->encrypt_type.str || create_info->tablespace) {
       /*
         Check privilege only if request encryption type differ from schema
-        default encryption type. If schema->default_encryption() == true it means
-        that default encryption for a schema is Master Key encryption (only allowed).
-        We use this fact here.
-      */
+        default encryption type.
+       */
       bool request_type = dd::is_encrypted(create_info->encrypt_type);
-      if (schema->default_encryption() != request_type ||
-          (schema->default_encryption() && create_info->encrypt_type.length &&
-           !dd::is_master_key_encrypted(create_info->encrypt_type))) {
+      if (schema->default_encryption() != request_type) {
         if (opt_table_encryption_privilege_check) {
           if (check_table_encryption_admin_access(thd)) {
             my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
@@ -16639,23 +16635,34 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
 
     /*
       Disallow moving a table from Master Key encrypted tablespace to
-      keyring encrypted tablespace (and vice versa) without an explicit
-      ENCRYPTION clause.
+      keyring encrypted tablespace (and vice versa)
     */
     DBUG_EXECUTE_IF("do_the_assert", {
         DBUG_ASSERT(false);
       });
 
     //TODO : I think this check can be removed, as it is already checked by
-    //validate_table_encryption
-    //if (source_is_general_tablespace && destination_is_general_tablespace &&
-        //source_encrytion_type && destination_encrytion_type &&
-        //!does_tablespaces_encryptions_match(source_encryption_option,
-                                            //destination_encryption_option) &&
+    //validate_table_encryption - actaully it cannot be removed, as
+    //validate_table_encryption only checks if table encryption matches tablespace
+    //encryption in create statement - like CREATE TABLE t1 TABLESPACE='ts_keyring'
+    //ENCRYPTION='keyring'; <- validate_table_encryption will just check if ts_keyring
+    //is keyring encrypted
+    /*
+      Disallow moving Master Key encrypted table (using general or file-per-table
+      tablespace) to Keyring encrypted general tablespace and vice versa.
+    */
+    if (destination_is_general_tablespace &&
+        source_encrytion_type && destination_encrytion_type &&
+        !does_tablespaces_encryptions_match(source_encryption_option,
+                                            destination_encryption_option)) { //&&
         //!(create_info->used_fields & HA_CREATE_USED_ENCRYPT)) {
-      //my_error(ER_INVALID_ENCRYPTION_REQUEST, MYF(0));
+      if (dd::is_master_key_encrypted(source_encryption_option)) {
+        my_error(ER_TARGET_TABLESPACE_ENCRYPTION_MISMATCH, MYF(0), "Master Key", "Keyring");
+      } else {
+        my_error(ER_TARGET_TABLESPACE_ENCRYPTION_MISMATCH, MYF(0), "Keyring", "Master Key");
+      }
       ////my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
-    //}
+    }
 
     /*
       Disallow moving encrypted table (using general or file-per-table
@@ -16671,15 +16678,11 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
       Check table encryption privilege, if table encryption type differ
       from schema encryption type.
     */
-    if (new_schema->default_encryption() != destination_encrytion_type ||
-        (new_schema->default_encryption() &&
-         !dd::is_master_key_encrypted(destination_encryption_option))) {
+    if (new_schema->default_encryption() != destination_encrytion_type) {
       // Ingore privilege check and show warning if database is same and
       // table encryption type is not changed.
       bool show_warning = !alter_ctx.is_database_changed() &&
-                          source_encrytion_type == destination_encrytion_type &&
-                          dd::does_encryptions_match(source_encryption_option,
-                                                     destination_encryption_option);
+                          source_encrytion_type == destination_encrytion_type;
 
       if (!show_warning && opt_table_encryption_privilege_check) {
         if (check_table_encryption_admin_access(thd)) {
