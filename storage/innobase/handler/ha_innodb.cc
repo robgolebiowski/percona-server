@@ -15987,6 +15987,7 @@ static int innobase_alter_encrypt_tablespace(handlerton *hton, THD *thd,
     return HA_ERR_TABLESPACE_MISSING;
   }
   ut_ad(fsp_flags_is_valid(space->flags));
+  ut_ad(FSP_FLAGS_GET_SHARED(space->flags));
 
   const dd::Properties &oldopts = old_dd_space->options();
   const dd::Properties &newopts = new_dd_space->options();
