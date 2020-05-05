@@ -636,26 +636,21 @@ static bool do_rename(THD *thd, TABLE_LIST *ren_table, const char *new_db,
         return true;
       }
       is_table_encrypted = new_er.value.encrypted;
-      dd::String_type table_encryption_type = new_er.value.encryption_option;
       if (!is_general_tablespace &&
           from_table->options().exists("encrypt_type")) {
-        (void)from_table->options().get("encrypt_type", &table_encryption_type);
-        DBUG_ASSERT(table_encryption_type.empty() == false);
-        is_table_encrypted = is_encrypted(table_encryption_type);
+        dd::String_type et;
+        (void)from_table->options().get("encrypt_type", &et);
+        DBUG_ASSERT(et.empty() == false);
+        is_table_encrypted = is_encrypted(et);
       }
 
       /*
         Check if we are allowed to move the table, if destination schema
         is changed and its default encryption differs from tables
         encryption type.
-        Currently default_encryption() == true means Master Key encryption.
-        We use this fact here.
       */
       if (from_schema->id() != to_schema->id() &&
-          ((to_schema->default_encryption() != is_table_encrypted) ||
-           (to_schema->default_encryption() && is_table_encrypted &&
-            my_strcasecmp(system_charset_info, table_encryption_type.c_str(),
-                          "Y") != 0))) {
+          to_schema->default_encryption() != is_table_encrypted) {
         if (opt_table_encryption_privilege_check) {
           if (check_table_encryption_admin_access(thd)) {
             my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));

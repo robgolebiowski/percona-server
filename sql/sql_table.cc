@@ -15061,22 +15061,17 @@ static bool simple_rename_or_index_change(
         return true;
       }
       is_table_encrypted = result.value.encrypted;
-      dd::String_type table_encryption_type = result.value.encryption_option;
       // If implicit tablespace, read the encryption clause value.
       if (!is_general_tablespace &&
           table_def->options().exists("encrypt_type")) {
-        (void)table_def->options().get("encrypt_type", &table_encryption_type);
-        DBUG_ASSERT(table_encryption_type.empty() == false);
-        is_table_encrypted = is_encrypted(table_encryption_type);
+        dd::String_type et;
+        (void)table_def->options().get("encrypt_type", &et);
+        DBUG_ASSERT(et.empty() == false);
+        is_table_encrypted = is_encrypted(et);
       }
 
       // If table encryption differ from schema encryption, check privilege.
-      // Currently default_encryption() == true means Master Key encryption.
-      // We use this fact here.
-      if (((new_schema.default_encryption() != is_table_encrypted) ||
-           (new_schema.default_encryption() && is_table_encrypted &&
-            my_strcasecmp(system_charset_info, table_encryption_type.c_str(),
-                          "Y") != 0))) {
+      if (new_schema.default_encryption() != is_table_encrypted) {
         if (opt_table_encryption_privilege_check) {
           if (check_table_encryption_admin_access(thd)) {
             my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
