@@ -3,6 +3,12 @@
 --echo #
 --source include/have_debug.inc
 
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+CREATE DATABASE db_no_explicit_case;
+DROP DATABASE db_no_explicit_case;
+SET GLOBAL default_table_encryption=OFF;
+CREATE DATABASE db1 DEFAULT ENCRYPTION='N';
+
 --echo # Pre-define user u1, which is used in different tests below.
 CREATE USER u1@localhost;
 GRANT ALL ON db1.* TO u1@localhost;
@@ -27,6 +33,43 @@ connect (con1, localhost, u1);
 --let use_tablespace=false
 --let expected_error=0
 --let expected_error2=0
+
+
+--let $skip_create_database=true
+
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+
+--echo `````````````````````````````````````````````````````````
+--echo # CREATE TABLE without ENCRYPTION clause
+
+--let explicit_encryption_clause=false
+
+--let privilege_check=false
+#--let database_encryption='n'
+--source ./create_table.inc
+
+select * from INFORMATION_SCHEMA.INNODB_TABLESPACES;
+
+--die
+
+
+--let privilege_check=true
+#--let database_encryption='n'
+--source ./create_table.inc
+
+
+--let database_encryption='y'
+--source ./create_table.inc
+
+--let privilege_check=true
+--let database_encryption='n'
+--source ./create_table.inc
+--let database_encryption='y'
+--source ./create_table.inc
+
+--let $skip_create_database=false
+
+--die
 
 --echo `````````````````````````````````````````````````````````
 --echo # Test CREATE TABLE on DATABASE with ENCRYPTION 'y/n'
@@ -460,14 +503,14 @@ SET GLOBAL default_table_encryption=OFF;
 --let expected_error=0
 --let privilege_check=true
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created an unencrypted table in
+--echo # Fails because we cannot create an unencrypted table in
 --echo # KEYRING encrypted system tablespace.
 --let database_encryption='n'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST
 --source ./create_table.inc
 
 --echo `````````````````````````````````````````````````````````
---echo # Fails because we cannot created a Master Key encrypted
+--echo # Fails because we cannot create a Master Key encrypted
 --echo # table in Keyring encrypted system tablespace.
 --let database_encryption='y'
 --let expected_error=ER_INVALID_ENCRYPTION_REQUEST

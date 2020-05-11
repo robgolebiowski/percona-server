@@ -8896,21 +8896,53 @@ bool mysql_create_table_no_lock(THD *thd, const char *db,
 
   // Determine table encryption type, and check if user is allowed to create.
   if (!(create_info->options & HA_LEX_CREATE_TMP_TABLE)) {
+    bool is_online_encryption_on{global_system_variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING};
+
     /*
       Assume table as encrypted, if user did not explicitly state it and
       we have a schema with default encryption enabled.
      */
-    //if (!create_info->encrypt_type.length && schema->default_encryption()) {
-      //create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
-    //}
+    if (!create_info->encrypt_type.length && schema->default_encryption()
+        && !is_online_encryption_on) {
+      create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
+    }
+
+    bool is_file_per_table{false};
+
+    if (!create_info->tablespace &&
+        create_info->db_type->get_tablespace_type_by_name) {
+      /*
+        No tablespace is explicitly specified. InnoDB can either use
+        file-per-table or general tablespace based on 'innodb_file_per_table'
+        setting, so ask SE about it.
+       */
+      Tablespace_type tt;
+      if (create_info->db_type->get_tablespace_type_by_name(
+              create_info->tablespace, &tt)) {
+        return true;
+      }
+
+      if (tt == Tablespace_type::SPACE_TYPE_IMPLICIT) {
+        is_file_per_table = true;
+      }
+    }
+
 
     if (!create_info->encrypt_type.length) {
-      if (schema->default_encryption())
+      if (schema->default_encryption() && !is_online_encryption_on)
         create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
-      else if (global_system_variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING)
+      else if (is_online_encryption_on && is_file_per_table)
         create_info->encrypt_type = {strmake_root(thd->mem_root, "ONLINE_KEYRING", strlen("ONLINE_KEYRING")), 
                                                   strlen("ONLINE_KEYRING")};
     }
+
+    //if (!create_info->encrypt_type.length) {
+      //if (schema->default_encryption())
+        //create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
+      //else if (global_system_variables.default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING)
+        //create_info->encrypt_type = {strmake_root(thd->mem_root, "ONLINE_KEYRING", strlen("ONLINE_KEYRING")), 
+                                                  //strlen("ONLINE_KEYRING")};
+    //}
 
     // Stop if it is invalid encryption clause, when using general tablespace.
     if (validate_table_encryption(thd, create_info)) return true;
@@ -8922,7 +8954,9 @@ bool mysql_create_table_no_lock(THD *thd, const char *db,
         default encryption type.
        */
       bool request_type = dd::is_encrypted(create_info->encrypt_type);
-      if (schema->default_encryption() != request_type) {
+      // skip the check if online encryption is on
+      if (is_online_encryption_on == false &&
+          schema->default_encryption() != request_type) {
         if (opt_table_encryption_privilege_check) {
           if (check_table_encryption_admin_access(thd)) {
             my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
@@ -15055,23 +15089,25 @@ static bool simple_rename_or_index_change(
     if (alter_ctx->is_database_changed()) {
       bool is_general_tablespace{false};
       bool is_table_encrypted{false};
+      dd::String_type encryption_option;
       dd::Encrypt_result result =
           dd::is_tablespace_encrypted(thd, *table_def, &is_general_tablespace);
       if (result.error) {
         return true;
       }
       is_table_encrypted = result.value.encrypted;
+      encryption_option = result.value.encryption_option;
       // If implicit tablespace, read the encryption clause value.
       if (!is_general_tablespace &&
           table_def->options().exists("encrypt_type")) {
-        dd::String_type et;
-        (void)table_def->options().get("encrypt_type", &et);
-        DBUG_ASSERT(et.empty() == false);
-        is_table_encrypted = is_encrypted(et);
+        (void)table_def->options().get("encrypt_type", &encryption_option);
+        DBUG_ASSERT(encryption_option.empty() == false);
+        is_table_encrypted = is_encrypted(encryption_option);
       }
 
       // If table encryption differ from schema encryption, check privilege.
-      if (new_schema.default_encryption() != is_table_encrypted) {
+      if (new_schema.default_encryption() != is_table_encrypted &&
+          encryption_option != "ONLINE_KEYRING") {
         if (opt_table_encryption_privilege_check) {
           if (check_table_encryption_admin_access(thd)) {
             my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
@@ -16673,7 +16709,8 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
       Check table encryption privilege, if table encryption type differ
       from schema encryption type.
     */
-    if (new_schema->default_encryption() != destination_encrytion_type) {
+    if (new_schema->default_encryption() != destination_encrytion_type &&
+        source_encryption_option != "ONLINE_KEYRING") {
       // Ingore privilege check and show warning if database is same and
       // table encryption type is not changed.
       bool show_warning = !alter_ctx.is_database_changed() &&
