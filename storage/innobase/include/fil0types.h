@@ -83,21 +83,21 @@ pages, we store the compressed page control information in these 8 bytes. */
 FIL_PAGE_FILE_FLUSH_LSN are broken down as follows: */
 
 /** Control information version format (u8) */
-constexpr ulint FIL_PAGE_VERSION = FIL_PAGE_FILE_FLUSH_LSN;
+constexpr ulint FIL_PAGE_VERSION = FIL_PAGE_FILE_FLUSH_LSN; //26
 
 /** Compression algorithm (u8) */
-constexpr ulint FIL_PAGE_ALGORITHM_V1 = FIL_PAGE_VERSION + 1;
+constexpr ulint FIL_PAGE_ALGORITHM_V1 = FIL_PAGE_VERSION + 1; //27
 
 /** Original page type (u16) */
-constexpr ulint FIL_PAGE_ORIGINAL_TYPE_V1 = FIL_PAGE_ALGORITHM_V1 + 1;
+constexpr ulint FIL_PAGE_ORIGINAL_TYPE_V1 = FIL_PAGE_ALGORITHM_V1 + 1; //28
 
 /** Original data size in bytes (u16)*/
-constexpr ulint FIL_PAGE_ORIGINAL_SIZE_V1 = FIL_PAGE_ORIGINAL_TYPE_V1 + 2;
+constexpr ulint FIL_PAGE_ORIGINAL_SIZE_V1 = FIL_PAGE_ORIGINAL_TYPE_V1 + 2; //30
 
 /** Size after compression (u16) */
-constexpr ulint FIL_PAGE_COMPRESS_SIZE_V1 = FIL_PAGE_ORIGINAL_SIZE_V1 + 2;
+constexpr ulint FIL_PAGE_COMPRESS_SIZE_V1 = FIL_PAGE_ORIGINAL_SIZE_V1 + 2; //32
 
-constexpr ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_ORIGINAL_SIZE_V1;
+constexpr ulint FIL_PAGE_ENCRYPTION_KEY_VERSION = FIL_PAGE_ORIGINAL_SIZE_V1; //30
 
 constexpr ulint FIL_PAGE_ZIP_KEYRING_ENCRYPTION_MAGIC = FIL_PAGE_VERSION;
 

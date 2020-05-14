@@ -185,6 +185,8 @@ struct fil_space_crypt_t {
     rotate_state.destroy_flush_observer();
   }
 
+  bool encrypting{false};
+
   /** Get latest key version from encryption plugin
   @retval key_version or
   @retval ENCRYPTION_KEY_VERSION_INVALID if used key_id

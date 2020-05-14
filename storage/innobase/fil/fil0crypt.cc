@@ -2287,6 +2287,7 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
     /* no need to rotate beyond current max
      * if space extends, it will be encrypted with newer version */
 
+    ut_ad(state->space->size > 0);
     crypt_data->rotate_state.max_offset = state->space->size;
     crypt_data->rotate_state.end_lsn = 0;
     crypt_data->rotate_state.min_key_version_found = key_state->key_version;
@@ -2297,10 +2298,17 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
         !crypt_data->is_encryption_disabled() &&
         key_state->key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED) {
       /* this is rotation unencrypted => encrypted */
+      crypt_data->encrypting = true;
       crypt_data->type = CRYPT_SCHEME_1;
+    } else {
+      crypt_data->encrypting = false;
     }
 
+    crypt_data->rotate_state.flushing = true;
+    mutex_exit(&crypt_data->mutex);
     fil_crypt_write_crypt_data_to_page0(state->space);
+    mutex_enter(&crypt_data->mutex);
+    crypt_data->rotate_state.flushing = false;
 
     DBUG_EXECUTE_IF(
         "set_number_of_t1_pages_to_rotate_to_20",
@@ -2543,6 +2551,13 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
                       Encryption_rotation::MASTER_KEY_TO_KEYRING
                   ? ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED
                   : mach_read_from_4(frame + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+
+    DBUG_EXECUTE_IF(
+        "assert_on_encryption",
+        fprintf(stderr, "encryption info: encrypt_mode = %i, key_version = %u, latest_key_version = %u, rotate_key_age = %u\n", 
+                         crypt_data->encryption, kv, key_state->key_version, key_state->rotate_key_age);
+    );
+
 
     if (space->is_stopping()) {
       /* The tablespace is closing (in DROP TABLE or
@@ -3248,6 +3263,9 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
       }
       fil_unlock_shard_by_id(space->id);
    }
+
+  ut_ad(crypt_data->encrypting == false || crypt_data->rotate_state.min_key_version_found != 0);
+
 
   DBUG_EXECUTE_IF("crash_on_t1_flush_after_dd_update",
                   if (strcmp(state->space->name, "test/t1") == 0)
