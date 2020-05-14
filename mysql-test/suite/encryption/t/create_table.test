@@ -4,10 +4,11 @@
 --source include/have_debug.inc
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-CREATE DATABASE db_no_explicit_case;
-DROP DATABASE db_no_explicit_case;
+#CREATE DATABASE db_no_explicit_case;
+#DROP DATABASE db_no_explicit_case;
+#CREATE DATABASE db1;
 SET GLOBAL default_table_encryption=OFF;
-CREATE DATABASE db1 DEFAULT ENCRYPTION='N';
+#CREATE DATABASE db1 DEFAULT ENCRYPTION='N';
 
 --echo # Pre-define user u1, which is used in different tests below.
 CREATE USER u1@localhost;
@@ -35,6 +36,10 @@ connect (con1, localhost, u1);
 --let expected_error2=0
 
 
+--echo # We will create db1 database outside create_table.inc, so
+--echo # to be sure that database is created while default_table_encryption
+--echo # is equal to ONLINE_TO_KEYRING. The DEFAULT ENCRYPTION "inherited"
+--echo # from default_table_encryption should be 'N'.
 --let $skip_create_database=true
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
@@ -44,20 +49,21 @@ SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 
 --let explicit_encryption_clause=false
 
+CREATE DATABASE db1;
+SHOW CREATE DATABASE db1;
 --let privilege_check=false
-#--let database_encryption='n'
 --source ./create_table.inc
 
-select * from INFORMATION_SCHEMA.INNODB_TABLESPACES;
-
---die
-
-
+CREATE DATABASE db1;
+SHOW CREATE DATABASE db1;
 --let privilege_check=true
-#--let database_encryption='n'
 --source ./create_table.inc
 
+--let $skip_create_database=false
+SET GLOBAL default_table_encryption=OFF;
 
+--let database_encryption='n'
+--source ./create_table.inc
 --let database_encryption='y'
 --source ./create_table.inc
 
@@ -67,9 +73,6 @@ select * from INFORMATION_SCHEMA.INNODB_TABLESPACES;
 --let database_encryption='y'
 --source ./create_table.inc
 
---let $skip_create_database=false
-
---die
 
 --echo `````````````````````````````````````````````````````````
 --echo # Test CREATE TABLE on DATABASE with ENCRYPTION 'y/n'

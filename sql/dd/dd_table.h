@@ -434,10 +434,15 @@ inline bool is_master_key_encrypted(const LEX_STRING &type) {
   return is_master_key_encrypted(String_type(type.str, type.length));
 }
 
+inline bool is_online_keyring_encrypted(const String_type &type) {
+  return type.empty() == false &&
+         my_strcasecmp(system_charset_info, type.c_str(), "ONLINE_KEYRING") == 0;
+}
+
 inline bool is_keyring_encrypted(const String_type &type) {
   return (type.empty() == false &&
           (my_strcasecmp(system_charset_info, type.c_str(), "KEYRING") == 0 ||
-           my_strcasecmp(system_charset_info, type.c_str(), "ONLINE_KEYRING") == 0));
+           is_online_keyring_encrypted(type)));
 }
 
 // KEYRING and ONLINE_KEYRING are matching encryptions.

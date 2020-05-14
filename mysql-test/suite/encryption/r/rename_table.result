@@ -1150,8 +1150,11 @@ DROP DATABASE sch1;
 DROP DATABASE sch2;
 DROP TABLESPACE ts1;
 `````````````````````````````````````````````````````````
-# We expect failure when the table encryption does not match
-# with default database encryption.
+# Tables inside keyring online encrypted tablespaces can
+# can be moved between databases with default encryption
+# enabled and databases with default encryption disabled.
+# We expect failure only for file per table tablespaces
+# which are encrypted with ENCRYPTION="KEYRING" clause.
 # [RENAME TABLE ... TO ...] Case 17 )
 `````````````````````````````````````````````````````````
 CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
@@ -1184,7 +1187,6 @@ RENAME TABLE db2.fpt1 TO db1.fpt1_renamed;
 # Rename table using general tablespace from db encryption='y'
 # to db with encryption='n' and viceversa
 RENAME TABLE db1.ts1 TO db2.ts1_rename;
-ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
 RENAME TABLE db2.ts1 TO db1.ts1_rename;
 # 17.3.
 # Rename table (using file-per-table/general tablespace)
@@ -1199,12 +1201,12 @@ Tables_in_db1
 fpt1
 fpt1_renamed
 fpt2
-ts1
 ts1_rename
 ts2
 SHOW TABLES IN db2;
 Tables_in_db2
 fpt2
+ts1_rename
 ts2
 SHOW TABLES IN sch1;
 Tables_in_sch1

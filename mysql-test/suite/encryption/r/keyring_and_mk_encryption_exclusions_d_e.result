@@ -16,12 +16,6 @@ CREATE DATABASE db_2 DEFAULT ENCRYPTION='Y';
 ERROR HY000: Database default encryption cannot be set to Y (Master Key encryption) while default_table_encryption is set to ONLINE_TO_KEYRING. It does not make sense to create new Master Key encrypted tables if the intention is to re-encrypt them to KEYRING encryption.
 CREATE DATABASE db_2 DEFAULT ENCRYPTION='N';
 ERROR HY000: Database default encryption cannot be set to N (explicitly request for tables in database to be unencrypted) while default_table_encryption is set to ONLINE_TO_KEYRING. If you want to exclude table from being encrypted by encryption threads you can still do it while creating table. For that you need to explicitly specify ENCRYPTION='N' while creating a table.
-USE test;
-ALTER DATABASE db_1 DEFAULT ENCRYPTION='Y';
-ERROR HY000: Database default encryption cannot be set to Y (Master Key encryption) while default_table_encryption is set to ONLINE_TO_KEYRING. It does not make sense to create new Master Key encrypted tables if the intention is to re-encrypt them to KEYRING encryption.
-ALTER DATABASE db_1 DEFAULT ENCRYPTION='N';
-ERROR HY000: Database default encryption cannot be set to N (explicitly request for tables in database to be unencrypted) while default_table_encryption is set to ONLINE_TO_KEYRING. If you want to exclude table from being encrypted by encryption threads you can still do it while creating table. For that you need to explicitly specify ENCRYPTION='N' while creating a table.
-USE db_1;
 SET SESSION default_table_encryption=ON;
 CREATE DATABASE db_2;
 SHOW CREATE DATABASE db_2;
@@ -30,7 +24,7 @@ db_2	CREATE DATABASE `db_2` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8m
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 USE db_2;
 CREATE TABLE t1 (a varchar(255));
-ERROR HY000: InnoDB: ENCRYPTED='Y' not supported for table because online encryption to KEYRING is turned ON.
+DROP TABLE t1;
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 CREATE TABLE t1 (a varchar(255));
 CREATE DATABASE db_3 DEFAULT ENCRYPTION='N';
@@ -60,18 +54,6 @@ CREATE TABLE t1 (a varchar(255));
 # Make sure db_5/t1 is not included in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION as it is
 # MK encrypted.
 include/assert.inc [Make sure db_5/t1 is not included in INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION]
-CREATE USER u1@localhost;
-GRANT CREATE,ALTER,DROP on db_5.* TO u1@localhost;
-GRANT CREATE,INSERT on db_4.* TO u1@localhost;
-USE db_5;
-CREATE TABLE t_keyring (a varchar(255)) ENCRYPTION='KEYRING';
-SET GLOBAL table_encryption_privilege_check=true;
-ALTER TABLE db_5.t_keyring RENAME db_4.t_keyring;
-ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
-RENAME TABLE db_5.t_keyring TO db_4.t_keyring;
-ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
-DROP USER u1@localhost;
-SET GLOBAL table_encryption_privilege_check=false;
 SET GLOBAL default_table_encryption=OFF;
 DROP DATABASE db_1;
 DROP DATABASE db_2;
