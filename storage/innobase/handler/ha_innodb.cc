@@ -4373,7 +4373,7 @@ void innobase_fix_default_table_encryption(ulong encryption_option) {
   }
 }
 
-bool innobase_check_mk_and_keyring_encrypt_exclusion_for_online_enc(THD *thd) {
+bool innobase_check_mk_keyring_exclusions(THD *thd) {
   if (srv_undo_log_encrypt == true) {
     push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
                         "Online encryption to KEYRING cannot be turned ON"
@@ -5281,8 +5281,8 @@ static int innodb_init(void *p) {
   innobase_hton->fix_default_table_encryption =
       innobase_fix_default_table_encryption;
 
-  innobase_hton->check_mk_and_keyring_encrypt_exclusion_for_online_enc =
-      innobase_check_mk_and_keyring_encrypt_exclusion_for_online_enc;
+  innobase_hton->check_mk_keyring_exclusions =
+      innobase_check_mk_keyring_exclusions;
 
   innobase_hton->post_ddl = innobase_post_ddl;
 

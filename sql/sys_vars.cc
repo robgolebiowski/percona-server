@@ -7124,7 +7124,7 @@ static bool check_set_default_table_encryption_exclusions(THD *thd,
     if ((plugin = ha_resolve_by_name(nullptr, &innodb_engine, false))) {
       handlerton *hton = plugin_data<handlerton *>(plugin);
       is_online_enc_disallowed =
-          hton->check_mk_and_keyring_encrypt_exclusion_for_online_enc(thd);
+          hton->check_mk_keyring_exclusions(thd);
       plugin_unlock(nullptr, plugin);
     }
 
