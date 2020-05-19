@@ -26,8 +26,9 @@ include/assert.inc [Make sure t1 is unencrypted]
 # (that's the default value for rotate_only_first_x_page_from_t1).
 SET GLOBAL debug="+d,rotate_only_first_x_pages_from_t1";
 # Start rotation unnencrypted => encrypted (tables do not have crypt data stored in page 0)
-SET GLOBAL innodb_encryption_threads = 4;
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads = 4;
 # Wait max 10 min for key encryption threads to encrypt all spaces
 # Table t1 should have min_key_version = 0 assigned and ROTATIONG_OR_FLUSHING=1 <= this means that only 100 pages
 # have been rotatted.
@@ -68,6 +69,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 # with ver2 of key1, 80 pages encrypted with ver1 of key1 and the rest of the pages unencrypted
 # restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2
 SET GLOBAL debug="+d,set_number_of_t1_pages_to_rotate_to_20,rotate_only_first_x_pages_from_t1";
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 SET GLOBAL innodb_encryption_rotate_key_age=1;
 SET GLOBAL innodb_encryption_threads=4;
@@ -130,6 +132,7 @@ set autocommit=1;
 # Now we will re-encrypt first 100 pages of t1 with ver2 of key 1
 # restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2
 SET GLOBAL debug="+d,rotate_only_first_x_pages_from_t1";
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 SET GLOBAL innodb_encryption_rotate_key_age=1;
 SET GLOBAL innodb_encryption_threads=4;
@@ -187,6 +190,7 @@ commit;
 set autocommit=1;
 # Now decrypt first 100 pages of t1
 SET GLOBAL debug="+d,rotate_only_first_x_pages_from_t1";
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=4;
 # Table t1 should have ROTATIONG_OR_FLUSHING set to 1 and max_key_version set to 1<= this means that only 100 pages
@@ -226,13 +230,16 @@ set autocommit=1;
 # Next, encrypt 100 pages with version 2
 # restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2 --log-error=MYSQLTEST_VARDIR/log/server.log
 SET GLOBAL debug="+d,rotate_only_first_x_pages_from_t1";
-SET GLOBAL innodb_encryption_threads = 4;
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads = 4;
 # Table t1 should have min_key_version = 1, max_key_version = 2 assigned and ROTATIONG_OR_FLUSHING=1 <= this
 # means that only 100 pages have been rotatted.
 # Now, we will decrypt first 20 pages
 SET GLOBAL debug="+d,set_number_of_t1_pages_to_rotate_to_20,rotate_only_first_x_pages_from_t1";
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads = 4;
 # Table t1 should have min_key_version = 1 assigned and ROTATIONG_OR_FLUSHING=1 <= this means that only 20 pages
 # have been rotatted.
 SET GLOBAL innodb_encryption_threads = 0;
@@ -280,6 +287,7 @@ ERROR HY000: Got error 501 'Table encrypted but decryption key was not found. Is
 # restart:--default-table-encryption=OFF --innodb-encryption-threads=0 --early-plugin-load=keyring_file=KEYRING_PLUGIN --keyring-file-data=MYSQLTEST_VARDIR/std_data/validation_keyrings/keyring_key_0_key_1_ver_1_ver2
 DROP TABLE t1;
 DROP PROCEDURE innodb_insert_proc;
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=4;
 SET GLOBAL innodb_encryption_threads=0;
