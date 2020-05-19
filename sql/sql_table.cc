@@ -8748,8 +8748,13 @@ static bool validate_table_encryption(THD *thd, HA_CREATE_INFO *create_info) {
     //table_encryption_opt = "ONLINE_KEYRING"; // if tablespace is keyring encrypted - it means that table in it
                                              //// is also keyring encrypted
 
+  // Print this error only for keyring and master key encrypted tables. For other encryption options relay on upstream's
+  // error handling.
   if ((uses_general_tablespace || uses_system_tablespace) && uses_encrypted_tablespace &&
-      table_encryption_opt.empty() == false && requested_type &&
+      //table_encryption_opt.empty() == false && requested_type &&
+      table_encryption_opt.empty() == false && 
+      (is_keyring_encrypted(table_encryption_opt) || is_master_key_encrypted(table_encryption_opt))
+      && requested_type &&
       !does_table_and_tablespace_encryption_match(table_encryption_opt, tablespace_encryption_opt)) {
 
     dd::String_type tablespace_encryption = is_master_key_encrypted(tablespace_encryption_opt) ?
@@ -16710,7 +16715,11 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
       from schema encryption type.
     */
     if (new_schema->default_encryption() != destination_encrytion_type &&
-        source_encryption_option != "ONLINE_KEYRING") {
+        //source_encryption_option != "ONLINE_KEYRING") {
+        (source_encryption_option != "ONLINE_KEYRING" ||
+         destination_encryption_option != "ONLINE_KEYRING")) {
+        //!(source_encryption_option == "ONLINE_KEYRING" &&
+          //destination_encryption_option == "ONLINE_KEYRING")) {
       // Ingore privilege check and show warning if database is same and
       // table encryption type is not changed.
       bool show_warning = !alter_ctx.is_database_changed() &&

@@ -1797,7 +1797,10 @@ DROP DATABASE sch2;
 DROP TABLESPACE ts1;
 `````````````````````````````````````````````````````````
 # We expect failure when the table encryption does not match
-# with default database encryption.
+# with default database encryption. However, since table in
+# keyring encrypted tablespace was encrypted with ONLINE_TO_KEYRING
+# it should be possible to move it, since it ignores
+# TABLE_ADMIN_ENCRYPTION privileges.
 # [ALTER TABLE ... RENAME ...] Case 26 )
 `````````````````````````````````````````````````````````
 CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
@@ -1830,7 +1833,6 @@ ALTER TABLE db2.fpt1 RENAME db1.fpt1_renamed ,MODIFY f1 CHAR(30);
 # Rename table using general tablespace from db encryption='y'
 # to db with encryption='n' and viceversa
 ALTER TABLE db1.ts1 RENAME db2.ts1_rename ,MODIFY f1 CHAR(30);
-ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
 ALTER TABLE db2.ts1 RENAME db1.ts1_rename ,MODIFY f1 CHAR(30);
 # 26.3.
 # Rename table (using file-per-table/general tablespace)
@@ -1845,12 +1847,12 @@ Tables_in_db1
 fpt1
 fpt1_renamed
 fpt2
-ts1
 ts1_rename
 ts2
 SHOW TABLES IN db2;
 Tables_in_db2
 fpt2
+ts1_rename
 ts2
 SHOW TABLES IN sch1;
 Tables_in_sch1
@@ -2441,7 +2443,10 @@ DROP DATABASE sch2;
 DROP TABLESPACE ts1;
 `````````````````````````````````````````````````````````
 # We expect failure when the table encryption does not match
-# with default database encryption.
+# with default database encryption. However, since table in
+# keyring encrypted tablespace was encrypted with ONLINE_TO_KEYRING
+# it should be possible to move it, since it ignores
+# TABLE_ADMIN_ENCRYPTION privileges.
 # [ALTER TABLE ... RENAME ...] Case 35 )
 `````````````````````````````````````````````````````````
 CREATE DATABASE db1 DEFAULT ENCRYPTION='y';
@@ -2474,7 +2479,6 @@ ALTER TABLE db2.fpt1 RENAME db1.fpt1_renamed ,ADD f2 CHAR(30);
 # Rename table using general tablespace from db encryption='y'
 # to db with encryption='n' and viceversa
 ALTER TABLE db1.ts1 RENAME db2.ts1_rename ,ADD f2 CHAR(30);
-ERROR HY000: Table encryption differ from its database default encryption, and user doesn't have enough privilege.
 ALTER TABLE db2.ts1 RENAME db1.ts1_rename ,ADD f2 CHAR(30);
 # 35.3.
 # Rename table (using file-per-table/general tablespace)
@@ -2489,12 +2493,12 @@ Tables_in_db1
 fpt1
 fpt1_renamed
 fpt2
-ts1
 ts1_rename
 ts2
 SHOW TABLES IN db2;
 Tables_in_db2
 fpt2
+ts1_rename
 ts2
 SHOW TABLES IN sch1;
 Tables_in_sch1

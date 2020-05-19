@@ -267,6 +267,9 @@ eval INSERT INTO dd_check_table(t)
   )
   ORDER BY foreign_key_id, ordinal_position;
 
+select * from dd_check_table;
+--die
+
 # Create checksums for each row.
 UPDATE dd_check_table SET row_hash = SHA2(t, 256);
 

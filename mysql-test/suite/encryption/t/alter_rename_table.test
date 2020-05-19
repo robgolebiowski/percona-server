@@ -199,10 +199,13 @@ connect (con1, localhost, u1);
 
 --echo `````````````````````````````````````````````````````````
 --echo # We expect failure when the table encryption does not match
---echo # with default database encryption.
+--echo # with default database encryption. However, since table in
+--echo # keyring encrypted tablespace was encrypted with ONLINE_TO_KEYRING
+--echo # it should be possible to move it, since it ignores
+--echo # TABLE_ADMIN_ENCRYPTION privileges.
 --let table_encryption='keyring'
 --let expected_error1=ER_CANNOT_SET_TABLE_ENCRYPTION
---let expected_error3=ER_CANNOT_SET_TABLE_ENCRYPTION
+#--let expected_error3=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./alter_rename_table.inc
 
 --let has_grant=true
@@ -255,10 +258,14 @@ connect (con1, localhost, u1);
 
 --echo `````````````````````````````````````````````````````````
 --echo # We expect failure when the table encryption does not match
---echo # with default database encryption.
+--echo # with default database encryption. However, since table in
+--echo # keyring encrypted tablespace was encrypted with ONLINE_TO_KEYRING
+--echo # it should be possible to move it, since it ignores
+--echo # TABLE_ADMIN_ENCRYPTION privileges.
+
 --let table_encryption='keyring'
 --let expected_error1=ER_CANNOT_SET_TABLE_ENCRYPTION
---let expected_error3=ER_CANNOT_SET_TABLE_ENCRYPTION
+#--let expected_error3=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./alter_rename_table.inc
 
 --let has_grant=true
