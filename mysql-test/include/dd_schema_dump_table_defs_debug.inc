@@ -6,9 +6,6 @@
 --source include/have_debug.inc
 SET debug = '+d,skip_dd_table_access_check';
 
-#SELECT * from mysql.dd_properties;
-#--die
-
 --echo ########################################################################
 --echo # The actual DD version stored on disk.
 --echo ########################################################################

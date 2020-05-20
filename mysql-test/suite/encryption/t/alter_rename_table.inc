@@ -27,7 +27,9 @@ if ($alter_tablespace_name == 'ts1')
   {
   # Keyring encryption and ONLINE_KEYRING encryption match, i.e.
   # you can create a keyring encrypted table in ONLINE_KEYRING
-  # encrypted tablespace.
+  # encrypted tablespace. Currently we only support ONLINE_KEYRING
+  # encrypted tablespace. It is not possible to create a KEYRING
+  # encrypted tablespace with ENCRYPTION='Keyring'.
   SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
   eval CREATE TABLESPACE $alter_tablespace_name ADD DATAFILE 'ts1.ibd';
   SET GLOBAL default_table_encryption=OFF;

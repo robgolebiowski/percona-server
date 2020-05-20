@@ -205,7 +205,6 @@ connect (con1, localhost, u1);
 --echo # TABLE_ADMIN_ENCRYPTION privileges.
 --let table_encryption='keyring'
 --let expected_error1=ER_CANNOT_SET_TABLE_ENCRYPTION
-#--let expected_error3=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./alter_rename_table.inc
 
 --let has_grant=true
@@ -265,7 +264,6 @@ connect (con1, localhost, u1);
 
 --let table_encryption='keyring'
 --let expected_error1=ER_CANNOT_SET_TABLE_ENCRYPTION
-#--let expected_error3=ER_CANNOT_SET_TABLE_ENCRYPTION
 --source ./alter_rename_table.inc
 
 --let has_grant=true

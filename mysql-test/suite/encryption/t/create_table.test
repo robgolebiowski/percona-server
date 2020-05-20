@@ -4,11 +4,7 @@
 --source include/have_debug.inc
 
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-#CREATE DATABASE db_no_explicit_case;
-#DROP DATABASE db_no_explicit_case;
-#CREATE DATABASE db1;
 SET GLOBAL default_table_encryption=OFF;
-#CREATE DATABASE db1 DEFAULT ENCRYPTION='N';
 
 --echo # Pre-define user u1, which is used in different tests below.
 CREATE USER u1@localhost;

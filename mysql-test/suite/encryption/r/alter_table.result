@@ -2325,7 +2325,7 @@ t4	ENCRYPTION='y'
 DROP DATABASE db1;
 DROP TABLESPACE tsA;
 `````````````````````````````````````````````````````````
-# Creating an keyring encrypted table is rejected in
+# Creating a keyring encrypted table is rejected in
 # not encrypted system tablespace
 # [ALTER TABLE] Case 44 )
 `````````````````````````````````````````````````````````
@@ -2376,7 +2376,7 @@ t4	ENCRYPTION='y'
 DROP DATABASE db1;
 DROP TABLESPACE tsA;
 `````````````````````````````````````````````````````````
-# Creating an keyring encrypted table is rejected in
+# Creating a keyring encrypted table is rejected in
 # not encrypted system tablespace
 # [ALTER TABLE] Case 45 )
 `````````````````````````````````````````````````````````
@@ -3288,7 +3288,7 @@ t4	ENCRYPTION='y'
 DROP DATABASE db1;
 DROP TABLESPACE tsA;
 `````````````````````````````````````````````````````````
-# Creating a encrypted table is rejected in
+# Creating an encrypted table is rejected in
 # not encrypted system tablespace
 # [ALTER TABLE] Case 62 )
 `````````````````````````````````````````````````````````
@@ -3498,7 +3498,7 @@ DROP DATABASE db1;
 DROP TABLESPACE tsA;
 `````````````````````````````````````````````````````````
 # Creating a keyring encrypted table is rejected
-# in not encryptec system tablespace
+# in not encrypted system tablespace
 # [ALTER TABLE] Case 66 )
 `````````````````````````````````````````````````````````
 CREATE DATABASE db1 DEFAULT ENCRYPTION='n';
@@ -4318,7 +4318,7 @@ t4	ENCRYPTION='keyring'
 DROP DATABASE db1;
 DROP TABLESPACE tsA;
 `````````````````````````````````````````````````````````
-# Creating a encrypted table is rejected in not encrypted
+# Creating an encrypted table is rejected in not encrypted
 # system tablespace.
 # [ALTER TABLE] Case 81 )
 `````````````````````````````````````````````````````````
@@ -4375,7 +4375,7 @@ REVOKE TABLE_ENCRYPTION_ADMIN ON *.* FROM u1@localhost;
 DROP DATABASE db1;
 DROP TABLESPACE tsA;
 `````````````````````````````````````````````````````````
-# Creating a encrypted table is rejected in not encrypted
+# Creating an encrypted table is rejected in not encrypted
 # system tablespace.
 # [ALTER TABLE] Case 82 )
 `````````````````````````````````````````````````````````
@@ -6115,7 +6115,7 @@ REVOKE TABLE_ENCRYPTION_ADMIN ON *.* FROM u1@localhost;
 DROP DATABASE db1;
 DROP TABLESPACE tsA;
 `````````````````````````````````````````````````````````
-# Request to create keyring encrypted table to unencrypted
+# Request to create a keyring encrypted table to unencrypted
 # database is rejected.
 # [ALTER TABLE] Case 115 )
 `````````````````````````````````````````````````````````

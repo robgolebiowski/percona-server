@@ -218,11 +218,6 @@ void my_error(int nr, myf MyFlags, ...) {
   DBUG_TRACE;
   DBUG_PRINT("my", ("nr: %d  MyFlags: %d  errno: %d", nr, MyFlags, errno));
 
-
-  DBUG_EXECUTE_IF("trigger_assert", {DBUG_ASSERT(nr != 3826);});
-
-  //DBUG_ASSERT(nr != 3826);
-
   if (!(format = my_get_err_msg(nr)))
     (void)snprintf(ebuff, sizeof(ebuff), "Unknown error %d", nr);
   else {
