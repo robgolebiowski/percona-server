@@ -9922,6 +9922,15 @@ dberr_t Encryption::decrypt_log(const IORequest &type, byte *src, ulint src_len,
   return (DB_SUCCESS);
 }
 
+dberr_t Encryption::decrypt_keyring_sys_dbwr_page(const IORequest &type, byte *src, ulint src_len,
+                                                  ulint dst_len) {
+
+  if (!load_key_needed_for_decryption(type, *this, src))
+    return DB_IO_DECRYPT_FAIL;
+
+  return decrypt(type, src, src_len, nullptr, dst_len); 
+} 
+
 /** Decrypt the page data contents. Page type must be FIL_PAGE_ENCRYPTED,
 if not then the source contents are left unchanged and DB_SUCCESS is returned.
 @param[in]	type		IORequest

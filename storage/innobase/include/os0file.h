@@ -667,6 +667,13 @@ struct Encryption {
   dberr_t decrypt(const IORequest &type, byte *src, ulint src_len, byte *dst,
                   ulint dst_len) MY_ATTRIBUTE((warn_unused_result));
 
+  /** Decrypt the keyring encrypted double write buffer page. Page type must be
+  FIL_PAGE_ENCRYPTED, FIL_PAGE_COMPRESSED_AND_ENCRYPTED,
+  FIL_PAGE_ENCRYPTED_RTREE. It does necessary loading of a key version that encrypted
+  given page. */
+  dberr_t decrypt_keyring_sys_dbwr_page(const IORequest &type, byte *src, ulint src_len,
+                                        ulint dst_len) MY_ATTRIBUTE((warn_unused_result));
+
   /** Check if keyring plugin loaded. */
   MY_NODISCARD static bool check_keyring();
 

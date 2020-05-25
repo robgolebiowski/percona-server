@@ -438,6 +438,12 @@ struct recv_dblwr_t {
   tablespace objects are loaded. */
   void decrypt_sys_dblwr_pages();
 
+  /** Decrypt double write buffer pages if system tablespace is keyring
+  encrypted. This function process only pages from sys_pages list.
+  Other pages from parallel doublewrite buffer will be decrypted after
+  tablespace objects are loaded. */
+  void decrypt_keyring_sys_dblwr_pages();
+
   // Disable copying
   recv_dblwr_t(const recv_dblwr_t &) = delete;
   recv_dblwr_t &operator=(const recv_dblwr_t &) = delete;

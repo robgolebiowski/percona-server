@@ -583,9 +583,8 @@ dberr_t SysTablespace::read_lsn_and_check_flags(lsn_t *flushed_lsn) {
         crypt_data->min_key_version;
     keyring_encryption_info.type = crypt_data->type;
     keyring_encryption_info.private_version = crypt_data->private_version;
-    fil_space_destroy_crypt_data(&crypt_data);
-    if (it->m_crypt_data != nullptr)
-      it->m_crypt_data = nullptr;
+    ut_ad(it->m_crypt_data == nullptr);
+    it->m_crypt_data = crypt_data;
   }
 
   it->close();
@@ -910,7 +909,11 @@ dberr_t SysTablespace::open_or_create(bool is_temp, bool create_new_db,
       tablespace in the tablespace manager. */
       space = fil_space_create(
           name(), space_id(), flags(),
-          is_temp ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE, nullptr);
+          is_temp ? FIL_TYPE_TEMPORARY : FIL_TYPE_TABLESPACE, it->m_crypt_data);
+
+      if (space != nullptr && it->m_crypt_data != nullptr)
+        it->m_crypt_data = nullptr; // now sys space is responsible for cleaning
+                                    // the crypt_data
     }
 
     ut_ad(fil_validate());

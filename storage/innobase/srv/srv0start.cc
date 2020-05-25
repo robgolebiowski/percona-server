@@ -2053,6 +2053,19 @@ static dberr_t srv_sys_enable_encryption(bool create_new_db) {
     }
   }
 
+  if (space->crypt_data != nullptr && space->crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
+
+    ut_ad(srv_sys_space.keyring_encryption_info.page0_has_crypt_data);
+    err = fil_set_encryption(
+        space->id,
+        Encryption::KEYRING, nullptr, space->crypt_data->iv);
+
+    recv_sys->dblwr.decrypt_keyring_sys_dblwr_pages();
+
+    ut_ad(err == DB_SUCCESS);
+  }
+
+
   return (err);
 }
 

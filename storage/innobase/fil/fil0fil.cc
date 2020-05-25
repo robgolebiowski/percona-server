@@ -7528,8 +7528,7 @@ static bool set_min_key_version;
 static byte key_min[32];
 
 inline void fil_io_set_keyring_encryption(IORequest &req_type,
-                                          fil_space_t *space,
-                                          const page_id_t &page_id) {
+                                          fil_space_t *space) {
   ut_ad(space->crypt_data != NULL);
 
   byte *key = NULL;
@@ -7566,6 +7565,7 @@ inline void fil_io_set_keyring_encryption(IORequest &req_type,
   }
 
   if (req_type.is_read()) {
+    //TODO: chyba powinnienem to zmienić na assert ? że potrzebne klucze są już załadowane ?
     if (space->crypt_data->local_keys_cache.size() == 0)
       space->crypt_data->load_keys_to_local_cache();
 
@@ -7720,7 +7720,7 @@ void fil_io_set_encryption(IORequest &req_type, const page_id_t &page_id,
           return;
         } else {
           ut_ad(space->crypt_data != nullptr);
-          fil_io_set_keyring_encryption(req_type, space, page_id);
+          fil_io_set_keyring_encryption(req_type, space);
           req_type.encryption_algorithm(space->encryption_type);
           return;
         }

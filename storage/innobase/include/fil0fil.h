@@ -1806,6 +1806,12 @@ Compression::Type fil_get_compression(space_id_t space_id)
 void fil_io_set_encryption(IORequest &req_type, const page_id_t &page_id,
                            fil_space_t *space);
 
+/** Set keyring encryption.
+@param[in,out]	req_type	IO request
+@param[in,out]	space		Tablespace instance */
+void fil_io_set_keyring_encryption(IORequest &req_type,
+                                   fil_space_t *space);
+
 /** Set the encryption type for the tablespace
 @param[in] space_id		Space ID of tablespace for which to set
 @param[in] algorithm		Encryption algorithm
