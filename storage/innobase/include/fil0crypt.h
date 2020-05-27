@@ -254,6 +254,13 @@ struct fil_space_crypt_t {
   /** Load needed keys for encryption/decryption to local cache
   @return true - success, false - failure */
   bool load_keys_to_local_cache();
+
+  /** load copies of keys from keyring to local cache.
+  @param[in]            from_key_version - starting version
+  @param[in]            to_key_version   - ending version
+  @return false - error, true - success */
+  bool load_keys_to_local_cache(const uint from_key_version, const uint to_key_version);
+
   /** Remove keys from local cache */
   void unload_keys_from_local_cache();
 
@@ -316,14 +323,6 @@ struct fil_space_crypt_t {
   @param[in]	        to_key_version   - ending version
   @return false - error, true - success */
   bool re_encrypt_validation_tag(const uint from_key_version, const uint to_key_version);
-
-private:
-  /** load copies of keys from keyring to local cache.
-  @param[in]            from_key_version - starting version
-  @param[in]            to_key_version   - ending version
-  @return false - error, true - success */
-  bool load_keys_to_local_cache(const uint from_key_version, const uint to_key_version);
-
 };
 
 /** Status info about encryption */

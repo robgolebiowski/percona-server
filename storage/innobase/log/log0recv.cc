@@ -4038,6 +4038,26 @@ void recv_dblwr_t::decrypt_keyring_sys_dblwr_pages() {
 
   Encryption encryption(decrypt_request.encryption_algorithm());
 
+  ulint dblwr_min_key_version{ENCRYPTION_KEY_VERSION_INVALID};
+  ulint dblwr_max_key_version{ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED};
+
+  std::for_each(sys_pages.begin(), sys_pages.end(),
+                [&](byte *page) {
+    if (encryption.is_encrypted_page(page)) {
+      ulint key_version = encryption.read_key_version(page);
+      if (key_version < dblwr_min_key_version)
+        dblwr_min_key_version = key_version;
+      if (key_version > dblwr_max_key_version)
+        dblwr_max_key_version = key_version;
+    }
+  });
+
+  // TODO :load_keys_to_local_cache may return error
+  if (dblwr_min_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && dblwr_min_key_version != ENCRYPTION_KEY_VERSION_INVALID &&
+      dblwr_max_key_version != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED && dblwr_max_key_version != ENCRYPTION_KEY_VERSION_INVALID) {
+    space->crypt_data->load_keys_to_local_cache(dblwr_min_key_version, dblwr_max_key_version);
+  }
+
   std::for_each(sys_pages.begin(), sys_pages.end(),
                 [&](byte *page) {
     if (encryption.is_encrypted_page(page)) {

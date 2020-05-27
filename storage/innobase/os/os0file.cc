@@ -1752,18 +1752,49 @@ static void assing_key_version(byte *buf, Encryption &encryption,
   }
 }
 
+//static bool load_key_from_keyring(Encryption &encryption, ulint key_version) {
+
+  //byte *key_read;
+
+  //size_t key_len;
+  //if (Encryption::get_tablespace_key(
+          //encryption.m_key_id, encryption.m_key_id_uuid,
+          //key_version, &key_read, &key_len) == false) {
+    //return false;
+  //}
+
+  //encryption.set_key(key_read, static_cast<ulint>(key_len), true);
+//}
+
+ulint Encryption::read_key_version(byte *page) {
+
+  ut_ad(page != nullptr);
+  ulint key_version_read_from_page = ENCRYPTION_KEY_VERSION_INVALID;
+  ulint page_type = mach_read_from_2(page + FIL_PAGE_TYPE);
+  if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED) {
+    key_version_read_from_page = mach_read_from_4(page + FIL_PAGE_DATA + 4);
+  } else {
+    ut_ad(page_type == FIL_PAGE_ENCRYPTED);
+    key_version_read_from_page =
+        mach_read_from_4(page + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+  }
+
+  return key_version_read_from_page;
+}
+
 static bool load_key_needed_for_decryption(const IORequest &type,
                                            Encryption &encryption, byte *buf) {
   if (encryption.m_type == Encryption::KEYRING) {
-    ulint key_version_read_from_page = ENCRYPTION_KEY_VERSION_INVALID;
-    ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
-    if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED) {
-      key_version_read_from_page = mach_read_from_4(buf + FIL_PAGE_DATA + 4);
-    } else {
-      ut_ad(page_type == FIL_PAGE_ENCRYPTED);
-      key_version_read_from_page =
-          mach_read_from_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION);
-    }
+    ulint key_version_read_from_page = encryption.read_key_version(buf);
+    //ulint key_version_read_from_page = ENCRYPTION_KEY_VERSION_INVALID;
+    //ulint page_type = mach_read_from_2(buf + FIL_PAGE_TYPE);
+    //if (page_type == FIL_PAGE_COMPRESSED_AND_ENCRYPTED) {
+      //key_version_read_from_page = mach_read_from_4(buf + FIL_PAGE_DATA + 4);
+    //} else {
+      //ut_ad(page_type == FIL_PAGE_ENCRYPTED);
+      //key_version_read_from_page =
+          //mach_read_from_4(buf + FIL_PAGE_ENCRYPTION_KEY_VERSION);
+    //}
 
     ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID);
     ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);

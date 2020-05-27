@@ -677,6 +677,8 @@ struct Encryption {
   /** Check if keyring plugin loaded. */
   MY_NODISCARD static bool check_keyring();
 
+  ulint read_key_version(byte *page);
+
   /** Encrypt type */
   Type m_type;
 
