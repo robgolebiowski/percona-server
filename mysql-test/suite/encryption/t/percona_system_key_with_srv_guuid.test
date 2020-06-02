@@ -5,7 +5,7 @@ CREATE TABLE t2 (a varchar(255)) ENCRYPTION='KEYRING' ENCRYPTION_KEY_ID=1;
 CREATE TABLE t3 (a varchar(255)) ENCRYPTION_KEY_ID=2;
 CREATE TABLE t4 (a varchar(255)) ENCRYPTION_KEY_ID=3;
 
---let keyring_file=$MYSQL_TMP_DIR/mysecret_keyring
+--let keyring_file=$MYSQL_TMP_DIR/percona_system_key_with_srv_guuid_keyring
 --let $server_uuid=`SELECT @@GLOBAL.SERVER_UUID`
 
 --echo # Check that percona_innodb-0 with version 1 and server_uuid exists in keyring

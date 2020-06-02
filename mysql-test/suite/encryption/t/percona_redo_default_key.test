@@ -7,7 +7,7 @@ let $MYSQLD_DATADIR1 = $MYSQL_TMP_DIR/datadir1/data;
 --source include/shutdown_mysqld.inc
 
 --let BOOTSTRAP_SQL=$MYSQL_TMP_DIR/boot.sql
---let KEYRING_FILE_PATH=$MYSQL_TMP_DIR/mysecret_keyring
+--let KEYRING_FILE_PATH=$MYSQL_TMP_DIR/percona_redo_default_key_keyring
 --let KEYRING_DATA="--keyring_file_data=$KEYRING_FILE_PATH"
 --let BOOTSTRAP_LOG=$MYSQL_TMP_DIR/bootstrap.log
 
