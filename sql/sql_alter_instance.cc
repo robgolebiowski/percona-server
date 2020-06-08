@@ -153,20 +153,23 @@ bool Rotate_innodb_master_key::execute() {
   return false;
 }
 
-bool Rotate_innodb_system_key::execute() {
+bool Rotate_percona_system_key::rotate() {
 
-  DBUG_ASSERT(strlen(server_uuid) != 0);
+  size_t key_length{0};
 
-  if (check_security_context() || acquire_backup_locks())
-    return true;
+  if (!is_valid_percona_system_key(system_key_name, &key_length)) {
+    DBUG_ASSERT(false);
+    return false;
+  } 
 
-  size_t key_length = 32;
-
-  //if (!is_valid_percona_system_key(arg->ptr(), &key_length)) return false;
+  DBUG_ASSERT(key_length != 0);
 
   std::ostringstream key_id_with_uuid_ss;
-  key_id_with_uuid_ss << PERCONA_INNODB_KEY_NAME << '-' << system_key_id
-                      << '-' << server_uuid;
+  key_id_with_uuid_ss << system_key_name;
+  if (using_system_key_id)
+    key_id_with_uuid_ss << '-' << system_key_id;
+  key_id_with_uuid_ss << '-' << server_uuid;
+
   std::string key_id_with_uuid = key_id_with_uuid_ss.str();
 
   // It should only be possible to rotate already existing key.
@@ -195,6 +198,35 @@ bool Rotate_innodb_system_key::execute() {
     my_error(ER_MASTER_KEY_ROTATION_NOT_SUPPORTED_BY_SE, MYF(0));
     return true;
   }
+  return false;
+}
+
+bool Rotate_innodb_system_key::execute() {
+
+  DBUG_ASSERT(strlen(server_uuid) != 0);
+
+  if (check_security_context() || acquire_backup_locks())
+    return true;
+
+  if (rotate_percona_system_key.rotate())
+    return true;
+
+  if (log_to_binlog()) {
+    /*
+      Though we failed to write to binlog,
+      there is no way we can undo this operation.
+      So, covert error to a warning and let user
+      know that something went wrong while trying
+      to make entry in binlog.
+    */
+    m_thd->clear_error();
+    m_thd->get_stmt_da()->reset_diagnostics_area();
+
+    push_warning(m_thd, Sql_condition::SL_WARNING,
+                 ER_MASTER_KEY_ROTATION_BINLOG_FAILED,
+                 ER_THD(m_thd, ER_MASTER_KEY_ROTATION_BINLOG_FAILED));
+  }
+
   my_ok(m_thd);
   return false;
 
@@ -261,6 +293,25 @@ bool Rotate_binlog_master_key::execute() {
   if (rpl_encryption.remove_remaining_seqnos_from_keyring()) return true;
 
   if (rpl_encryption.rotate_master_key()) return true;
+
+  my_ok(m_thd);
+  return false;
+}
+
+
+bool Rotate_redo_system_key::execute() {
+  DBUG_TRACE;
+
+  Security_context *sctx = m_thd->security_context();
+  if (!sctx->check_access(SUPER_ACL) &&
+      !sctx->has_global_grant(STRING_WITH_LEN("ENCRYPTION_KEY_ADMIN"))
+           .first) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
+             "SUPER or ENCRYPTION_KEY_ADMIN");
+    return true;
+  }
+
+  if (rotate_percona_system_key.rotate()) return true;
 
   my_ok(m_thd);
   return false;

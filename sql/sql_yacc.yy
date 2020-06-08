@@ -15493,6 +15493,19 @@ alter_instance_action:
             /*$$ = ROTATE_INNODB_SYSTEM_KEY;*/
             /*$$ = ROTATE_INNODB_SYSTEM_KEY, $5;*/
           }
+          | ROTATE_SYM ident_or_text SYSTEM_SYM KEY_SYM
+          {
+            if (is_identifier($2, "REDO"))
+            {
+              $$.alter_instance_action = ROTATE_REDO_SYSTEM_KEY;
+              $$.key_id = 0;
+            }
+            else
+            {
+              YYTHD->syntax_error_at(@2);
+              MYSQL_YYABORT;
+            }
+          }
           | RELOAD ident
           {
             if (is_identifier($2, "TLS"))
