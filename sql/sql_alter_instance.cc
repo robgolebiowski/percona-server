@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "my_inttypes.h"
 #include "my_sys.h" /* my_error */
 #include "mysqld_error.h"
+#include "system_key.h"
 #include "sql/auth/auth_acls.h"
 #include "sql/auth/sql_security_ctx.h"
 #include "sql/derror.h"  /* ER_THD */
@@ -43,6 +44,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "sql/sql_lex.h"
 #include "sql/sql_plugin_ref.h"
 #include "sql/sql_table.h" /* write_to_binlog */
+#include <mysql/service_mysql_keyring.h>
 
 /*
   @brief
@@ -63,6 +65,34 @@ bool Alter_instance::log_to_binlog() {
   return res;
 }
 
+bool Rotate_innodb_key::check_security_context() {
+  Security_context *sctx = m_thd->security_context();
+  if (!sctx->check_access(SUPER_ACL) &&
+      !sctx->has_global_grant(STRING_WITH_LEN("ENCRYPTION_KEY_ADMIN")).first) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
+             "SUPER or ENCRYPTION_KEY_ADMIN");
+    return true;
+  }
+  return false;
+}
+
+
+bool Rotate_innodb_key::acquire_backup_locks() {
+  /*
+    Acquire shared backup lock to block concurrent backup. Acquire exclusive
+    backup lock to block any concurrent DDL. The fact that we acquire both
+    these locks also ensures that concurrent KEY rotation requests are blocked.
+  */
+  if (acquire_exclusive_backup_lock(m_thd, m_thd->variables.lock_wait_timeout,
+                                    true) ||
+      acquire_shared_backup_lock(m_thd, m_thd->variables.lock_wait_timeout)) {
+    // MDL subsystem has to set an error in Diagnostics Area
+    DBUG_ASSERT(m_thd->get_stmt_da()->is_error());
+    return true;
+  }
+  return false;
+}
+
 /*
   @brief
   Executes master key rotation by calling SE api.
@@ -79,13 +109,8 @@ bool Rotate_innodb_master_key::execute() {
   plugin_ref se_plugin;
   handlerton *hton;
 
-  Security_context *sctx = m_thd->security_context();
-  if (!sctx->check_access(SUPER_ACL) &&
-      !sctx->has_global_grant(STRING_WITH_LEN("ENCRYPTION_KEY_ADMIN")).first) {
-    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
-             "SUPER or ENCRYPTION_KEY_ADMIN");
+  if (check_security_context())
     return true;
-  }
 
   if ((se_plugin = ha_resolve_by_name(m_thd, &storage_engine, false))) {
     hton = plugin_data<handlerton *>(se_plugin);
@@ -99,18 +124,8 @@ bool Rotate_innodb_master_key::execute() {
     return true;
   }
 
-  /*
-    Acquire shared backup lock to block concurrent backup. Acquire exclusive
-    backup lock to block any concurrent DDL. The fact that we acquire both
-    these locks also ensures that concurrent KEY rotation requests are blocked.
-  */
-  if (acquire_exclusive_backup_lock(m_thd, m_thd->variables.lock_wait_timeout,
-                                    true) ||
-      acquire_shared_backup_lock(m_thd, m_thd->variables.lock_wait_timeout)) {
-    // MDL subsystem has to set an error in Diagnostics Area
-    DBUG_ASSERT(m_thd->get_stmt_da()->is_error());
+  if (acquire_backup_locks())
     return true;
-  }
 
   if (hton->rotate_encryption_master_key()) {
     /* SE should have raised error */
@@ -136,6 +151,92 @@ bool Rotate_innodb_master_key::execute() {
 
   my_ok(m_thd);
   return false;
+}
+
+bool Rotate_innodb_system_key::execute() {
+
+  DBUG_ASSERT(strlen(server_uuid) != 0);
+
+  if (check_security_context() || acquire_backup_locks())
+    return true;
+
+  size_t key_length = 32;
+
+  //if (!is_valid_percona_system_key(arg->ptr(), &key_length)) return false;
+
+  std::ostringstream key_id_with_uuid_ss;
+  key_id_with_uuid_ss << PERCONA_INNODB_KEY_NAME << '-' << system_key_id
+                      << '-' << server_uuid;
+  std::string key_id_with_uuid = key_id_with_uuid_ss.str();
+
+  // It should only be possible to rotate already existing key.
+  // First check that system key exists.
+  char *key_type = nullptr;
+  size_t key_len;
+  void *key = nullptr;
+  if (my_key_fetch(key_id_with_uuid.c_str(), &key_type, NULL, &key, &key_len) ||
+      nullptr == key) {
+    if (nullptr != key) {
+      my_free(key);
+    }
+    if (nullptr != key_type) {
+      my_free(key_type);
+    }
+    my_error(ER_SYSTEM_KEY_ROTATION_KEY_DOESNT_EXIST, MYF(0), system_key_id);
+    return true;
+  }
+  DBUG_ASSERT(memcmp(key_type, "AES", 3) == 0);
+  my_free(key_type);
+  my_free(key);
+  key = key_type = nullptr;
+
+  // rotate the key
+  if (my_key_generate(key_id_with_uuid.c_str(), "AES", NULL, key_length)) {
+    my_error(ER_MASTER_KEY_ROTATION_NOT_SUPPORTED_BY_SE, MYF(0));
+    return true;
+  }
+  my_ok(m_thd);
+  return false;
+
+  //if ((se_plugin = ha_resolve_by_name(m_thd, &storage_engine, false))) {
+    //hton = plugin_data<handlerton *>(se_plugin);
+  //} else {
+    //my_error(ER_MASTER_KEY_ROTATION_SE_UNAVAILABLE, MYF(0));
+    //return true;
+  //}
+
+  //if (!hton->rotate_encryption_master_key) {
+    //my_error(ER_MASTER_KEY_ROTATION_NOT_SUPPORTED_BY_SE, MYF(0));
+    //return true;
+  //}
+
+  //if (acquire_backup_locks())
+    //return true;
+
+  //if (hton->rotate_encryption_master_key()) {
+    //[> SE should have raised error <]
+    //DBUG_ASSERT(m_thd->get_stmt_da()->is_error());
+    //return true;
+  //}
+
+  //if (log_to_binlog()) {
+    //[>
+      //Though we failed to write to binlog,
+      //there is no way we can undo this operation.
+      //So, covert error to a warning and let user
+      //know that something went wrong while trying
+      //to make entry in binlog.
+    //*/
+    //m_thd->clear_error();
+    //m_thd->get_stmt_da()->reset_diagnostics_area();
+
+    //push_warning(m_thd, Sql_condition::SL_WARNING,
+                 //ER_MASTER_KEY_ROTATION_BINLOG_FAILED,
+                 //ER_THD(m_thd, ER_MASTER_KEY_ROTATION_BINLOG_FAILED));
+  //}
+
+  //my_ok(m_thd);
+  //return false;
 }
 
 bool Rotate_binlog_master_key::execute() {

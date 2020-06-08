@@ -38,13 +38,38 @@ class Alter_instance {
   virtual ~Alter_instance() {}
 };
 
-class Rotate_innodb_master_key : public Alter_instance {
+class Rotate_innodb_key : public Alter_instance {
  public:
-  explicit Rotate_innodb_master_key(THD *thd) : Alter_instance(thd) {}
+  explicit Rotate_innodb_key(THD *thd) : Alter_instance(thd) {}
 
-  bool execute();
+  virtual bool execute() = 0;
+  ~Rotate_innodb_key() {}
+ protected:
+  //virtual bool rotate_innodb_key() = 0;
+  bool check_security_context();
+  bool acquire_backup_locks();
+};
+
+
+class Rotate_innodb_master_key final : public Rotate_innodb_key {
+ public:
+  explicit Rotate_innodb_master_key(THD *thd) : Rotate_innodb_key(thd) {}
+
+  bool execute() override;
   ~Rotate_innodb_master_key() {}
 };
+
+class Rotate_innodb_system_key final : public Rotate_innodb_key {
+ public:
+  explicit Rotate_innodb_system_key(THD *thd, unsigned int system_key_id_arg)
+    : Rotate_innodb_key(thd), system_key_id(system_key_id_arg) {}
+
+  bool execute() override;
+  ~Rotate_innodb_system_key() {}
+ private:
+  unsigned int system_key_id;
+};
+
 
 class Rotate_binlog_master_key : public Alter_instance {
  public:
@@ -59,5 +84,7 @@ class Rotate_binlog_master_key : public Alter_instance {
   bool execute();
   virtual ~Rotate_binlog_master_key() = default;
 };
+
+
 
 #endif /* SQL_ALTER_INSTANCE_INCLUDED */

@@ -1259,6 +1259,7 @@ void warn_about_deprecated_binary(THD *thd)
    Tokens from Percona Server 8.0
 */
 %token<lexer.keyword> EFFECTIVE_SYM
+%token<lexer.keyword> INNODB_SYM                    /* MYSQL */
 %token  SEQUENCE_TABLE_SYM
 
 /*
@@ -14673,6 +14674,7 @@ ident_keywords_unambiguous:
         | INDEX_STATS_SYM
         | INDEXES
         | INITIAL_SIZE_SYM
+        | INNODB_SYM
         | INSERT_METHOD
         | INSTANCE_SYM
         | INVISIBLE_SYM
@@ -15445,7 +15447,7 @@ alter_instance_stmt:
           ALTER INSTANCE_SYM alter_instance_action
           {
             Lex->sql_command= SQLCOM_ALTER_INSTANCE;
-            $$= NEW_PTN PT_alter_instance($3);
+            $$= NEW_PTN PT_alter_instance($3.alter_instance_action, $3.key_id);
           }
 
 alter_instance_action:
@@ -15453,11 +15455,13 @@ alter_instance_action:
           {
             if (is_identifier($2, "INNODB"))
             {
-              $$= ROTATE_INNODB_MASTER_KEY;
+              $$.alter_instance_action = ROTATE_INNODB_MASTER_KEY;
+              $$.key_id = 0;
             }
             else if (is_identifier($2, "BINLOG"))
             {
-              $$= ROTATE_BINLOG_MASTER_KEY;
+              $$.alter_instance_action = ROTATE_BINLOG_MASTER_KEY;
+              $$.key_id = 0;
             }
             else
             {
@@ -15465,11 +15469,36 @@ alter_instance_action:
               MYSQL_YYABORT;
             }
           }
+          | ROTATE_SYM ident_or_text SYSTEM_SYM KEY_SYM ulong_num
+          /*| ROTATE_SYM ident_or_text SYSTEM_SYM KEY_SYM real_ulonglong_num*/
+          /*| ROTATE_SYM INNODB_SYM MASTER_SYM KEY_SYM real_ulong_num*/
+          {
+            if (is_identifier($2, "INNODB"))
+            {
+              if ($5 > UINT_MAX32 - 1)
+              {
+                my_error(ER_SYSTEM_KEY_ROTATION_MAX_KEY_ID_EXCEEDED, MYF(0));
+                MYSQL_YYABORT;
+              }
+              /*$$= {ROTATE_INNODB_SYSTEM_KEY,$5};*/
+              $$.alter_instance_action = ROTATE_INNODB_SYSTEM_KEY;
+              $$.key_id = $5;
+            }
+            else
+            {
+              YYTHD->syntax_error_at(@2);
+              MYSQL_YYABORT;
+            }
+
+            /*$$ = ROTATE_INNODB_SYSTEM_KEY;*/
+            /*$$ = ROTATE_INNODB_SYSTEM_KEY, $5;*/
+          }
           | RELOAD ident
           {
             if (is_identifier($2, "TLS"))
             {
-              $$ = ALTER_INSTANCE_RELOAD_TLS_ROLLBACK_ON_ERROR;
+              $$.alter_instance_action = ALTER_INSTANCE_RELOAD_TLS_ROLLBACK_ON_ERROR;
+              $$.key_id = 0;
             }
             else
             {
@@ -15481,7 +15510,8 @@ alter_instance_action:
           {
             if (is_identifier($2, "TLS"))
             {
-              $$ = ALTER_INSTANCE_RELOAD_TLS;
+              $$.alter_instance_action = ALTER_INSTANCE_RELOAD_TLS;
+              $$.key_id = 0;
             }
             else
             {
