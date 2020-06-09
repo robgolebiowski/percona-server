@@ -1,16 +1,4 @@
-# WL#8821
-# Testing ALTER INSTANCE ROTATE INNODB MASTER KEY with replication
-# and keyring installing/uninstalling scenarios on master/slave.
-
 --source include/master-slave.inc
-call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Function 'keyring_file' already exists");
-call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Couldn't load plugin named 'keyring_file' with soname 'keyring_file.so'.");
-call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Can't generate new master key, please check the keyring plugin is loaded.");
-call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Encryption can't find master key, please check the keyring plugin is loaded.");
-call mtr.add_suppression("Error 'Can't find master key from keyring, please check in the server log if a keyring plugin is loaded and initialized successfully.");
-call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Slave: Can't find master key from keyring, please check in the server log if a keyring plugin is loaded and initialized successfully.");
-call mtr.add_suppression("\\[Error\\] .*MY-\\d+.* Can't generate new master key for tablespace encryption, please check the keyring plugin is loaded.");
-call mtr.add_suppression("The slave coordinator and worker threads are stopped");
 
 --connection master
 --echo [On Master]
@@ -25,128 +13,143 @@ INSERT INTO t0 VALUES(0, "aaaaa");
 INSERT INTO t0 VALUES(1, "bbbbb");
 INSERT INTO t0 VALUES(2, "ccccc");
 CREATE TABLE t1(c1 INT PRIMARY KEY, c2 char(20));
-INSERT INTO t1 VALUES(1, "aaaaa");
+INSERT INTO t1 VALUES(0, "aaaaa");
 INSERT INTO t1 VALUES(1, "bbbbb");
 INSERT INTO t1 VALUES(2, "ccccc");
-CREATE TABLE t2(c1 INT PRIMARY KEY, c2 char(20)) ENCRYPTION_KEY_ID=1
-INSERT INTO t2 VALUES(1, "aaaaa");
+CREATE TABLE t2(c1 INT PRIMARY KEY, c2 char(20)) ENCRYPTION_KEY_ID=1;
+INSERT INTO t2 VALUES(0, "aaaaa");
 INSERT INTO t2 VALUES(1, "bbbbb");
 INSERT INTO t2 VALUES(2, "ccccc");
 
+--echo # Only t1 should be encrypted with key 0 and t2 should be unencrypted
+--echo # and have key 1 assigned.
+--let $assert_text= Table t0 should get encrypted with key 0, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t0\\' AND CURRENT_KEY_ID=0]" = 1
+--source include/assert.inc
+--let $assert_text= Table t2 should be unencrypted, but should have key id 1 assigned
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t2\\' AND CURRENT_KEY_ID=1]" = 0
+--source include/assert.inc
 
-#ALTER INSTANCE ROTATE INNODB SYSTEM KEY 0;
+--echo
+--source include/sync_slave_sql_with_master.inc
+--echo [On Slave]
 
+--echo # Only t1 should be encrypted with key 0 and t2 should be unencrypted
+--echo # and have key 1 assigned.
+--let $assert_text= Table t0 should get encrypted with key 0, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t0\\' AND CURRENT_KEY_ID=0]" = 1
+--source include/assert.inc
+--let $assert_text= Table t2 should be unencrypted, but should have key id 1 assigned
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t2\\' AND CURRENT_KEY_ID=1]" = 0
+--source include/assert.inc
+
+--connection master
+--echo [On Master]
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=4;
 
-CREATE TABLE t2(c1 INT PRIMARY KEY, c2 char(20)) ENCRYPTION_KEY_ID=1;
-INSERT INTO t2 SELECT * FROM t1;
-SELECT COUNT(*) FROM t2;
+--connection slave
+--echo [On Slave]
+SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=4;
 
---echo
---echo # Check for keyring file on master.
---list_files $MYSQL_TMP_DIR/keyring_master/
---echo
+--connection master
+--echo [On Master]
 
+#We do not encrypt temporary tablespace
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
+--echo # Wait max 10 min for key encryption threads to encrypt all spaces
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+--echo # Only t0, t1 should be encrypted with key 0 and t2 should be encrypted
+--echo # with key 1.
+--let $assert_text= Table t0 should get encrypted with key 0, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t0\\' AND CURRENT_KEY_ID=0]" = 1
+--source include/assert.inc
+--let $assert_text= Table t1 should get encrypted with key 0, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t1\\' AND CURRENT_KEY_ID=0]" = 1
+--source include/assert.inc
+--let $assert_text= Table t2 should get encrypted with key 1, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t2\\' AND CURRENT_KEY_ID=1]" = 1
+--source include/assert.inc
+
+--source include/sync_slave_sql_with_master.inc
+--echo [On Slave]
+
+#We do not encrypt temporary tablespace
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
+--echo # Wait max 10 min for key encryption threads to encrypt all spaces
+--let $wait_timeout= 600
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--source include/wait_condition.inc
+
+--echo # Only t0, t1 should be encrypted with key 0 and t2 should be encrypted
+--echo # with key 1.
+--let $assert_text= Table t0 should get encrypted with key 0, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t0\\' AND CURRENT_KEY_ID=0]" = 1
+--source include/assert.inc
+--let $assert_text= Table t1 should get encrypted with key 0, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t1\\' AND CURRENT_KEY_ID=0]" = 1
+--source include/assert.inc
+--let $assert_text= Table t2 should get encrypted with key 1, version 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t2\\' AND CURRENT_KEY_ID=1]" = 1
+--source include/assert.inc
+
+--connection master
+--echo [On Master]
+--echo # Rotate key 0 to version 2.
+ALTER INSTANCE ROTATE INNODB SYSTEM KEY 0;
+
+--echo # Wait max 10 min for key encryption threads to re-encrypt t0 and t1 with version 2 of key 0.
+--let $wait_timeout= 600
+--let $wait_condition=SELECT MIN(MIN_KEY_VERSION) = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID = 0 AND name IN ('test/t0','test/t1')
+--source include/wait_condition.inc
+
+--let $assert_text= Table t2 should stay encrypted with version 1 of key 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t2\\' AND CURRENT_KEY_ID=1]" = 1
+--source include/assert.inc
+
+--source include/sync_slave_sql_with_master.inc
+--echo [On Slave]
+
+--echo # Wait max 10 min for key encryption threads to re-encrypt t0 and t1 with version 2 of key 0.
+--let $wait_timeout= 600
+--let $wait_condition=SELECT MIN(MIN_KEY_VERSION) = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID = 0 AND name IN ('test/t0','test/t1')
+--source include/wait_condition.inc
+
+--let $assert_text= Table t2 should stay encrypted with version 1 of key 1
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t2\\' AND CURRENT_KEY_ID=1]" = 1
+--source include/assert.inc
+
+--connection master
+--echo [On Master]
+--echo # Rotate key 1 to version 2.
 ALTER INSTANCE ROTATE INNODB SYSTEM KEY 1;
 
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
---echo # Check for keyring file on master.
---list_files $MYSQL_TMP_DIR/keyring_master/
---file_exists $MYSQL_TMP_DIR/keyring_master/keyring_master
---echo
-SELECT * FROM t1;
+--echo # Wait max 10 min for key encryption threads to re-encrypt t2 with version 2 of key 1.
+--let $wait_timeout= 600
+--let $wait_condition=SELECT MIN_KEY_VERSION = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID = 1 AND name = 'test/t2'
+--source include/wait_condition.inc
 
 --source include/sync_slave_sql_with_master.inc
 --echo [On Slave]
-
---echo # Check for keyring file on slave.
---list_files $MYSQL_TMP_DIR/keyring_slave/
---file_exists $MYSQL_TMP_DIR/keyring_slave/keyring_slave
-SELECT COUNT(*) FROM t2;
-SELECT * FROM t1;
-
---echo # Check for keyring file on slave.
---list_files $MYSQL_TMP_DIR/keyring_slave/
-
-SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
-
---die
-
---connection master
---echo [On Master]
---echo #
-CREATE TABLE t3(c1 INT PRIMARY KEY, c2 char(20)) ENCRYPTION="Y" ENGINE = InnoDB;
-INSERT INTO t3 VALUES(0, "aaaaa");
-
---echo
---source include/sync_slave_sql_with_master.inc
---echo [On Slave]
-SELECT * FROM t3;
-SELECT COUNT(*) FROM t2;
-SELECT * FROM t1;
---echo # Check for keyring file on slave.
---list_files $MYSQL_TMP_DIR/keyring_slave/
-
-ALTER INSTANCE ROTATE INNODB MASTER KEY;
---echo # Check for keyring file on slave.
---list_files $MYSQL_TMP_DIR/keyring_slave/
---file_exists $MYSQL_TMP_DIR/keyring_slave/keyring_slave
-
-# Uninstalling keyring_file plugin on slave.
-UNINSTALL PLUGIN keyring_file;
---echo # Checking keyring plugin after uninstall.
-query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
-FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_file';
---source include/stop_slave_sql.inc
-
---connection master
---echo [On Master]
-CREATE TABLE t4(c1 INT PRIMARY KEY, c2 char(20)) ENCRYPTION="Y" ENGINE = InnoDB;
-INSERT INTO t4 VALUES(1, "rpltest");
-
---connection slave
---echo [On Slave]
-START SLAVE SQL_THREAD;
---let $slave_sql_errno= convert_error(ER_CANNOT_FIND_KEY_IN_KEYRING)
---source include/wait_for_slave_sql_error.inc
-
---replace_regex /\.dll/.so/
-eval INSTALL PLUGIN keyring_file SONAME '$KEYRING_PLUGIN';
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
-eval SET @@global.keyring_file_data='$MYSQL_TMP_DIR/keyring_slave/keyring_slave';
-query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
-FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_file';
---source include/start_slave_sql.inc
---connection master
---source include/sync_slave_sql_with_master.inc
-SELECT * FROM t4;
-
---connection master
---echo [On Master]
---echo # Uninstalling keyring_file plugin on master.
-UNINSTALL PLUGIN keyring_file;
---echo # Checking keyring plugin after uninstall.
-query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
-FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_file';
-SELECT * FROM t1;
---echo
-# Try to rotate master key when keyring_file plugin uninstalled. 
---error ER_CANNOT_FIND_KEY_IN_KEYRING
-ALTER INSTANCE ROTATE INNODB MASTER KEY;
-
---echo # Installing keyring_file plugin on master.
---replace_regex /\.dll/.so/
-eval INSTALL PLUGIN keyring_file SONAME '$KEYRING_PLUGIN';
+--echo # Wait max 10 min for key encryption threads to re-encrypt t2 with version 2 of key 1.
+--let $wait_timeout= 600
+--let $wait_condition=SELECT MIN_KEY_VERSION = 2 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE CURRENT_KEY_ID = 1 AND name = 'test/t2'
+--source include/wait_condition.inc
 
 --echo # Cleanup
-DROP TABLE t1,t2,t3,t4;
-
---connection slave
-
 --connection master
+--echo [On Master]
+DROP TABLE t0,t1,t2;
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=OFF;
+
 --source include/sync_slave_sql_with_master.inc
+--echo [On Slave]
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=OFF;
+
 --source include/rpl_end.inc
-# End:
-# Restart
---source include/force_restart.inc
