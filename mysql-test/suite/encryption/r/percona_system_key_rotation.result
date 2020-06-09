@@ -2,9 +2,9 @@ CREATE TABLE t0 (a VARCHAR(255)) ENCRYPTION='KEYRING';
 ALTER INSTANCE ROTATE INNODB SYSTEM KEY 10;
 ERROR HY000: InnoDB system key 10 cannot be rotated, because it does not exist.
 ALTER INSTANCE ROTATE INNODB SYSTEM KEY -1;
-ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-1' at line 1
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INNODB SYSTEM KEY -1' at line 1
 ALTER INSTANCE ROTATE INNODB SYSTEM KEY K;
-ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'K' at line 1
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INNODB SYSTEM KEY K' at line 1
 ALTER INSTANCE ROTATE INNODB MASTER KEY 0;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '0' at line 1
 ALTER INSTANCE ROTATE INNODB SYSTEM KEY 4294967294;
