@@ -406,12 +406,7 @@ class Sql_cmd_alter_instance : public Sql_cmd {
       : alter_instance_action(alter_instance_action_arg),
         system_key_id(system_key_id_arg),
         alter_instance(NULL) 
-  {
-   int x = 1;
-   (void)x;
-  
-  }
-
+  {}
 
   virtual bool execute(THD *thd);
   virtual enum_sql_command sql_command_code() const {

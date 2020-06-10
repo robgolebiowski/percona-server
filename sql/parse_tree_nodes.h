@@ -2040,56 +2040,14 @@ class PT_drop_srs final : public Parse_tree_root {
 
   @ingroup ptn_stmt
 */
-
-
-//struct alter_instance_action{
-    //enum alter_instance_action_enum alter_instance_action;
-    //uint key_id;
-//};
-
-
 class PT_alter_instance final : public Parse_tree_root {
   Sql_cmd_alter_instance sql_cmd;
 
  public:
-  //explicit PT_alter_instance(
-      //alter_instance_action alter_instance) 
-    //: sql_cmd(alter_instance.alter_instance_action, alter_instance.key_id)
-  //{ }
-
-  //explicit PT_alter_instance(
-      //std::tuple<enum alter_instance_action_enum, ulong> arg)
-      //: sql_cmd(std::get<0>(arg), std::get<1>(arg)) {
-      ////: sql_cmd(arg.first, arg.second) {
-      
-        //int x = 1;
-        //(void)x;
-      
-      
-      //}
-
-  //explicit PT_alter_instance(
-      //enum alter_instance_action_enum alter_instance_action)
-      //: sql_cmd(alter_instance_action) {
-      
-        //int x = 1;
-        //(void)x;
-      
-      //}
-
-
-
   explicit PT_alter_instance(
       enum alter_instance_action_enum alter_instance_action,
       uint key_id)
-      : sql_cmd(alter_instance_action, key_id) {
-      
-        int x = 1;
-        (void)x;
-      
-      
-      }
-
+      : sql_cmd(alter_instance_action, key_id) {}
 
   Sql_cmd *make_cmd(THD *thd) override;
 };

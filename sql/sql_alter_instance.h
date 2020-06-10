@@ -47,7 +47,6 @@ class Rotate_innodb_key : public Alter_instance {
   virtual bool execute() = 0;
   ~Rotate_innodb_key() {}
  protected:
-  //virtual bool rotate_innodb_key() = 0;
   bool check_security_context();
   bool acquire_backup_locks();
 };

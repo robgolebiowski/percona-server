@@ -396,8 +396,6 @@ union YYSTYPE {
   class Table_ident *table_ident;
   Mem_root_array_YY<Table_ident *> table_ident_list;
   delete_option_enum opt_delete_option;
-  //enum alter_instance_action_enum alter_instance_action;
-  //std::tuple<enum alter_instance_action_enum, ulong> alter_instance_action;
   struct {
     enum alter_instance_action_enum alter_instance_action;
     uint key_id;

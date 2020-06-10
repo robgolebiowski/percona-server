@@ -195,7 +195,7 @@ bool Rotate_percona_system_key::rotate() {
 
   // rotate the key
   if (my_key_generate(key_id_with_uuid.c_str(), "AES", NULL, key_length)) {
-    my_error(ER_MASTER_KEY_ROTATION_NOT_SUPPORTED_BY_SE, MYF(0));
+    my_error(ER_SYSTEM_KEY_ROTATION_CANT_GENERATE_NEW_VERSION, MYF(0), system_key_id);
     return true;
   }
   return false;
@@ -229,46 +229,6 @@ bool Rotate_innodb_system_key::execute() {
 
   my_ok(m_thd);
   return false;
-
-  //if ((se_plugin = ha_resolve_by_name(m_thd, &storage_engine, false))) {
-    //hton = plugin_data<handlerton *>(se_plugin);
-  //} else {
-    //my_error(ER_MASTER_KEY_ROTATION_SE_UNAVAILABLE, MYF(0));
-    //return true;
-  //}
-
-  //if (!hton->rotate_encryption_master_key) {
-    //my_error(ER_MASTER_KEY_ROTATION_NOT_SUPPORTED_BY_SE, MYF(0));
-    //return true;
-  //}
-
-  //if (acquire_backup_locks())
-    //return true;
-
-  //if (hton->rotate_encryption_master_key()) {
-    //[> SE should have raised error <]
-    //DBUG_ASSERT(m_thd->get_stmt_da()->is_error());
-    //return true;
-  //}
-
-  //if (log_to_binlog()) {
-    //[>
-      //Though we failed to write to binlog,
-      //there is no way we can undo this operation.
-      //So, covert error to a warning and let user
-      //know that something went wrong while trying
-      //to make entry in binlog.
-    //*/
-    //m_thd->clear_error();
-    //m_thd->get_stmt_da()->reset_diagnostics_area();
-
-    //push_warning(m_thd, Sql_condition::SL_WARNING,
-                 //ER_MASTER_KEY_ROTATION_BINLOG_FAILED,
-                 //ER_THD(m_thd, ER_MASTER_KEY_ROTATION_BINLOG_FAILED));
-  //}
-
-  //my_ok(m_thd);
-  //return false;
 }
 
 bool Rotate_binlog_master_key::execute() {

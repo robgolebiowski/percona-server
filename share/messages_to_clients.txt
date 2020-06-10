@@ -9367,6 +9367,9 @@ ER_SYSTEM_KEY_ROTATION_KEY_DOESNT_EXIST
 ER_SYSTEM_KEY_ROTATION_MAX_KEY_ID_EXCEEDED
   eng "InnoDB system key cannot have value greater than 4294967294."
 
+ER_SYSTEM_KEY_ROTATION_CANT_GENERATE_NEW_VERSION
+  eng "Cannot generate new version of system key %lu. Keyring reported an error. Please check if keyring is available."
+
 #
 # End of Percona Server 8.0 client messages
 #

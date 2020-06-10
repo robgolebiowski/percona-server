@@ -15470,8 +15470,6 @@ alter_instance_action:
             }
           }
           | ROTATE_SYM ident_or_text SYSTEM_SYM KEY_SYM ulong_num
-          /*| ROTATE_SYM ident_or_text SYSTEM_SYM KEY_SYM real_ulonglong_num*/
-          /*| ROTATE_SYM INNODB_SYM MASTER_SYM KEY_SYM real_ulong_num*/
           {
             if (is_identifier($2, "INNODB"))
             {
@@ -15480,7 +15478,6 @@ alter_instance_action:
                 my_error(ER_SYSTEM_KEY_ROTATION_MAX_KEY_ID_EXCEEDED, MYF(0));
                 MYSQL_YYABORT;
               }
-              /*$$= {ROTATE_INNODB_SYSTEM_KEY,$5};*/
               $$.alter_instance_action = ROTATE_INNODB_SYSTEM_KEY;
               $$.key_id = $5;
             }
@@ -15489,9 +15486,6 @@ alter_instance_action:
               YYTHD->syntax_error_at(@2);
               MYSQL_YYABORT;
             }
-
-            /*$$ = ROTATE_INNODB_SYSTEM_KEY;*/
-            /*$$ = ROTATE_INNODB_SYSTEM_KEY, $5;*/
           }
           | ROTATE_SYM ident_or_text SYSTEM_SYM KEY_SYM
           {
