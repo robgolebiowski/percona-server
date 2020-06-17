@@ -1,23 +1,16 @@
---skip # Test unstable on centos6
+#--skip # Test unstable on centos6
 
-call mtr.add_suppression("\\[Error\\] InnoDB: Encryption can't generate tablespace key");
-call mtr.add_suppression("\\[ERROR\\] Plugin keyring_file reported: 'File .*keyring' not found .*");
+call mtr.add_suppression("\\[InnoDB\\] Encryption can't generate tablespace key");
+call mtr.add_suppression("\\[Server\\] Plugin keyring_file reported: 'File .*keyring' not found .*");
 call mtr.add_suppression("keyring_file initialization failure. Please check if the keyring_file_data points to readable keyring file or keyring file can be created in the specified location. The keyring_file will stay unusable until correct path to the keyring file gets provided");
-call mtr.add_suppression("is encrypted but encryption service or used key_id 0 is not available");
-call mtr.add_suppression("Ignoring tablespace `test/t1` because it could not be opened");
-call mtr.add_suppression("Ignoring tablespace `test/t2` because it could not be opened");
-call mtr.add_suppression("Ignoring tablespace `test/t_mk` because it could not be opened");
-call mtr.add_suppression("Failed to find tablespace for table `test`\.`t1` in the cache");
-call mtr.add_suppression("Failed to find tablespace for table `test`\.`t2` in the cache");
-call mtr.add_suppression("Failed to find tablespace for table `test`\.`t_mk` in the cache");
-call mtr.add_suppression("\\[ERROR\\] Function 'keyring_file' already exists");
-call mtr.add_suppression("\\[Warning\\] Couldn't load plugin named 'keyring_file' with soname 'keyring_file\.so'\.");
-call mtr.add_suppression("\\[ERROR\\] InnoDB: Encryption can't find tablespace key, please check the keyring plugin is loaded\.");
+call mtr.add_suppression("\\[Server\\] Plugin 'keyring_file' init function returned error\.");
+call mtr.add_suppression("\\[InnoDB\\] Tablespace id . in file t_keyring\.ibd is encrypted but keyring or used key_id 0 is not available\.");
 
---let encrypted_tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES`
+
+--let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 --echo # Wait max 10 min for key encryption threads to encrypt all spaces
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = $encrypted_tables_count + 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--let $wait_condition=SELECT COUNT(*) = $tables_count - 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
 
 --echo # Encryption threads turned on, try uninstalling keyring
@@ -32,6 +25,8 @@ SET GLOBAL innodb_encryption_threads=1;
 --echo # Install keyring plugin and turn encryption threads back on
 INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 SET GLOBAL innodb_encryption_threads=4;
+
+CREATE TABLE t_keyring (a varchar(255)) encryption='KEYRING';
 
 CREATE table t_mk (a varchar(255)) engine=innodb;
 
@@ -51,13 +46,18 @@ ALTER TABLE t_mk ENCRYPTION='KEYRING';
 --echo # Decrypt all tables. The restart without keyring plugin functional should work as there should not be
 --echo # any system tables left encrypted with KEYRING
 INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
-SET GLOBAL innodb_encryption_threads=4;
+SET GLOBAL innodb_encryption_threads=0;
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET GLOBAL innodb_encryption_threads=4;
 
---echo # Wait max 10 min for key encryption threads to decrypt all spaces
+--echo # Wait max 10 min for key encryption threads to decrypt all spaces (apart from t_keyring)
 --let $wait_timeout= 600
---let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
+--let $wait_condition=SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 1
 --source include/wait_condition.inc
+
+--let $assert_text= Table t_keyring should stay encrypted
+--let $assert_cond= "[SELECT MIN_KEY_VERSION FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE NAME=\\'test/t_keyring\\']" = 1
+--source include/assert.inc
 
 SET GLOBAL innodb_encryption_threads=0;
 UNINSTALL PLUGIN keyring_file;
@@ -93,7 +93,7 @@ UNINSTALL PLUGIN keyring_file;
 --echo # when keyring is not properly initialized.
 --let ABORT_ON=NOT_FOUND
 --let SEARCH_FILE=$error_log
---let SEARCH_PATTERN=InnoDB: keyring plugin is installed but it seems it was not properly initialized. Cannot enable encryption threads.
+--let SEARCH_PATTERN=InnoDB: cannot enable encryption threads, keyring plugin is not available
 --source include/search_pattern_in_file.inc
 
 --remove_file $error_log
@@ -103,7 +103,6 @@ UNINSTALL PLUGIN keyring_file;
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=/homeless/root/mysecret_keyring $KEYRING_PLUGIN_OPT --default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0 --log-error=$error_log --default-table-encryption=OFF
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 --source include/start_mysqld.inc
-#--source include/restart_mysqld.inc
 
 # Check that keyring_file was not properly intialized by checking error log
 --let ABORT_ON=NOT_FOUND
@@ -120,40 +119,13 @@ ALTER TABLE t2 ENCRYPTION='KEYRING';
 --error ER_ILLEGAL_HA_CREATE_OPTION
 ALTER TABLE t_mk ENCRYPTION='KEYRING';
 
---echo # Set valid keyring file path and try above operations
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
-eval SET @@global.keyring_file_data= '$MYSQL_TMP_DIR/mysecret_keyring';
-
-# Keyring plugin should now be functional
-
-SET GLOBAL innodb_encryption_threads=1;
-CREATE TABLE t1 (a varchar(255)) engine=innodb encryption='KEYRING';
-ALTER TABLE t2 ENCRYPTION='KEYRING';
-ALTER TABLE t_mk ENCRYPTION='KEYRING';
-
-INSERT t2 VALUES (repeat('foobarsecret', 12));
-
-SET GLOBAL innodb_encryption_threads=0;
-UNINSTALL PLUGIN keyring_file;
-
---error ER_ILLEGAL_HA_CREATE_OPTION
-ALTER TABLE t2 ENCRYPTION='N';
-
-INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
-eval SET @@global.keyring_file_data= '$MYSQL_TMP_DIR/mysecret_keyring';
-
 --replace_result $KEYRING_PLUGIN_OPT KEYRING_PLUGIN_OPT
 --let $restart_parameters=restart:--early-plugin-load="keyring_file=$KEYRING_PLUGIN" --loose-keyring_file_data=/homeless/root/mysecret_keyring $KEYRING_PLUGIN_OPT --default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0
 --source include/restart_mysqld.inc
 
 --remove_file $error_log
 
-# keyring file is not functional, try droping t2 encryption
---error ER_GET_ERRMSG
-ALTER TABLE t2 ENCRYPTION='N';
-
-DROP TABLE t1,t2,t_mk;
+DROP TABLE t2,t_mk;
 
 CREATE TABLE t1 (a varchar(255)) engine=innodb;
 INSERT t1 VALUES (repeat('foobarsecret', 12));
@@ -167,18 +139,15 @@ CREATE TABLE t5 (a varchar(255)) engine=innodb;
 INSERT t5 VALUES (repeat('foobarsecret', 12));
 CREATE TABLE t6 (a varchar(255)) engine=innodb;
 INSERT t6 VALUES (repeat('foobarsecret', 12));
---replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+--error ER_UNKNOWN_SYSTEM_VARIABLE
 eval SET @@global.keyring_file_data= '$MYSQL_TMP_DIR/mysecret_keyring';
-SET GLOBAL innodb_encryption_threads=3;
-SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
-CREATE TABLE t7 (a varchar(255)) engine=innodb;
-INSERT t7 VALUES (repeat('foobarsecret', 12));
 
-SET GLOBAL innodb_encryption_threads=0;
-UNINSTALL PLUGIN keyring_file;
+# keyring file is not installed, try droping t_keyring encryption
+--error ER_GET_ERRMSG
+ALTER TABLE t_keyring ENCRYPTION='N';
 
 --let $restart_parameters=restart:--default-table-encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED --innodb-encryption-threads=0
 --source include/restart_mysqld.inc
 
-DROP TABLE t1,t2,t3,t4,t5,t6,t7;
+DROP TABLE t1,t2,t3,t4,t5,t6,t_keyring;
 
