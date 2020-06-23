@@ -4564,7 +4564,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
         binlog_checksum_options == binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
     {
       sql_print_error("BINLOG_ENCRYPTION requires MASTER_VERIFY_CHECKSUM = ON and "
-                      "BINLOG_CHECKSUM to be turned ON.");
+                      "BINLOG_CHECKSUM to be set.");
       unireg_abort(MYSQLD_ABORT_EXIT);
     }
     if (!opt_bin_log)
