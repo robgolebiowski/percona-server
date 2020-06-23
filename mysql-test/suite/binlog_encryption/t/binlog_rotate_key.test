@@ -49,12 +49,28 @@ SET GLOBAL debug="-d,check_consecutive_binlog_key_versions";
 let datadir=`select @@datadir`;
 let filename= master-bin.000002;
 let local=$datadir/$filename;
+let error_log=$MYSQL_TMP_DIR/error_log;
 --error 1
-exec $MYSQL_BINLOG $local --hexdump > /dev/null;
+exec $MYSQL_BINLOG $local --hexdump > $error_log 2>&1;
+
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_PATTERN=No point in reading encrypted binlog - quitting. Start mysqlbinlog with --force-read if you want to attempt to read encrypted binlog without decryption
+--let SEARCH_FILE=$error_log
+--source include/search_pattern_in_file.inc
+
+--remove_file $error_log
+
 let filename= master-bin.000003;
 let local=$datadir/$filename;
 --error 1
-exec $MYSQL_BINLOG $local --hexdump > /dev/null;
+exec $MYSQL_BINLOG $local --hexdump > $error_log 2>&1;
+
+--let ABORT_ON=NOT_FOUND
+--let SEARCH_PATTERN=No point in reading encrypted binlog - quitting. Start mysqlbinlog with --force-read if you want to attempt to read encrypted binlog without decryption
+--let SEARCH_FILE=$error_log
+--source include/search_pattern_in_file.inc
+
+--remove_file $error_log
 
 # Check that each generated binlog can be read by the server by using mysqlbinlog  with --read-from-remote-server
 # option
