@@ -838,7 +838,11 @@ byte *fil_parse_write_crypt_data_v2(space_id_t space_id, byte *ptr,
     crypt_data = fil_space_set_crypt_data(space, crypt_data);
     fil_space_release(space);
   } else {
-    fil_space_destroy_crypt_data(&crypt_data);
+    // crypt_data was created as part of creating a new tablespace
+    if (recv_sys->crypt_datas->count(space_id) > 0) {
+      fil_space_destroy_crypt_data(&(*recv_sys->crypt_datas)[space_id]);
+    }
+    (*recv_sys->crypt_datas)[space_id] = crypt_data;
   }
 
   // We are advancing the ptr pointer while reading crypt_data - make

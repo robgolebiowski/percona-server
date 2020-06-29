@@ -1,0 +1,12 @@
+# Make sure that changes to disk will not get
+# applied and stay only in redo.
+set global innodb_page_cleaner_disabled_debug=on;
+create table t1(a varchar(255)) encryption='N';
+insert t1 values (repeat('foobarsecret', 12));
+create table t2(a varchar(255)) encryption='KEYRING';
+insert t2 values (repeat('tempsecret', 12));
+# Kill and restart
+include/assert.inc [Make sure t1 is included in INFORMATION_SCHEMA tablespace with MIN_KEY_VERSION equal to 0]
+include/assert.inc [Make sure t2 is included in INFORMATION_SCHEMA tablespace with MIN_KEY_VERSION equal to 1]
+#cleanup
+DROP TABLE t1,t2;

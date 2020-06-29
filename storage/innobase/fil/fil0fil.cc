@@ -10447,6 +10447,30 @@ bool Fil_system::open_for_recovery(space_id_t space_id) {
       fil_tablespace_encryption_init(space);
     }
 
+    if (recv_sys->crypt_datas != nullptr &&
+        recv_sys->crypt_datas->count(space_id) > 0) {
+      if (space->crypt_data != nullptr) {
+        fil_space_destroy_crypt_data(&space->crypt_data);
+      }
+      space->crypt_data = (*recv_sys->crypt_datas)[space_id];
+      recv_sys->crypt_datas->erase(space_id);
+
+      dberr_t err = fil_set_encryption(space->id, Encryption::KEYRING, nullptr,
+                                       space->crypt_data->iv);
+      if (space->crypt_data->should_encrypt()) {
+        space->crypt_data->encrypting_with_key_version =
+            space->crypt_data
+                ->key_get_latest_version();  // TODO: Change to max_key_version
+                                             // once PS-5635 gets merged.
+        space->crypt_data->load_needed_keys_into_local_cache();
+      }
+
+      if (err != DB_SUCCESS) {
+        ib::error(ER_IB_MSG_343) << "Can't set encryption information"
+                                 << " for tablespace" << space->name << "!";
+      }
+    }
+
     if (!recv_sys->dblwr->empty()) {
       recv_sys->dblwr->recover(space);
 
@@ -11079,7 +11103,7 @@ byte *fil_tablespace_redo_delete(byte *ptr, const byte *end,
 @param[in]	apply		whether to apply the record
 @return log record end, nullptr if not a complete record */
 byte *fil_tablespace_redo_encryption(byte *ptr, const byte *end,
-                                     space_id_t space_id, bool apply) {
+                                     space_id_t space_id) {
   byte *iv = nullptr;
   byte *key = nullptr;
   bool is_new = false;
@@ -11100,9 +11124,7 @@ byte *fil_tablespace_redo_encryption(byte *ptr, const byte *end,
     space = nullptr;
   }
 
-  if (!apply) {
-    // nothing
-  } else if (space == nullptr) {
+  if (space == nullptr) {
     if (recv_sys->keys == nullptr) {
       recv_sys->keys = UT_NEW_NOKEY(recv_sys_t::Encryption_Keys());
     }
@@ -11156,7 +11178,7 @@ byte *fil_tablespace_redo_encryption(byte *ptr, const byte *end,
     return (nullptr);
   }
 
-  if (apply && !Encryption::decode_encryption_info(key, iv, ptr, true)) {
+  if (!Encryption::decode_encryption_info(key, iv, ptr, true)) {
     recv_sys->found_corrupt_log = true;
 
     ib::warn(ER_IB_MSG_364)
@@ -11169,8 +11191,6 @@ byte *fil_tablespace_redo_encryption(byte *ptr, const byte *end,
   ut_ad(len == Encryption::INFO_SIZE);
 
   ptr += len;
-
-  if (!apply) return (ptr);
 
   if (space == nullptr) {
     if (is_new) {
