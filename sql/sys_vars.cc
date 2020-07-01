@@ -7123,8 +7123,7 @@ static bool check_set_default_table_encryption_exclusions(THD *thd,
     plugin_ref plugin;
     if ((plugin = ha_resolve_by_name(nullptr, &innodb_engine, false))) {
       handlerton *hton = plugin_data<handlerton *>(plugin);
-      is_online_enc_disallowed =
-          hton->check_mk_keyring_exclusions(thd);
+      is_online_enc_disallowed = hton->check_mk_keyring_exclusions(thd);
       plugin_unlock(nullptr, plugin);
     }
 
@@ -7137,6 +7136,24 @@ static bool check_set_default_table_encryption_access(
     sys_var *self MY_ATTRIBUTE((unused)), THD *thd, set_var *var) {
   DBUG_EXECUTE_IF("skip_table_encryption_admin_check_for_set",
                   { return false; });
+
+  longlong previous_val = thd->variables.default_table_encryption;
+  longlong val = (longlong)var->save_result.ulonglong_value;
+
+  if (var->type == OPT_SESSION) {
+    if (val == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING ||
+        val == DEFAULT_TABLE_ENC_ONLINE_FROM_KEYRING_TO_UNENCRYPTED) {
+      my_error(ER_ONLINE_KEYRING_SESSION_SCOPE, MYF(0));
+      return true;
+    }
+    if (val == DEFAULT_TABLE_ENC_ON &&
+        global_system_variables.default_table_encryption ==
+            DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING) {
+      my_error(ER_GLOBAL_AND_SESSION_ENCRYPTION_MISMATCH, MYF(0));
+      return true;
+    }
+  }
+
   if ((var->type == OPT_GLOBAL || var->type == OPT_PERSIST) &&
       is_group_replication_running()) {
     my_message(ER_GROUP_REPLICATION_RUNNING,
@@ -7149,8 +7166,6 @@ static bool check_set_default_table_encryption_access(
   // Should own one of SUPER or both (SYSTEM_VARIABLES_ADMIN and
   // TABLE_ENCRYPTION_ADMIN), unless this is the session option and
   // the value is unchanged.
-  longlong previous_val = thd->variables.default_table_encryption;
-  longlong val = (longlong)var->save_result.ulonglong_value;
   if ((!var->is_global_persist() && val == previous_val) ||
       thd->security_context()->check_access(SUPER_ACL) ||
       (thd->security_context()

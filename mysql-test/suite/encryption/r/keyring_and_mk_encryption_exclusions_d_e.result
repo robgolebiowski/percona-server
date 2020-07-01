@@ -22,6 +22,7 @@ ERROR HY000: Database default encryption cannot be set to Y (Master Key encrypti
 CREATE DATABASE db_1 DEFAULT ENCRYPTION='N';
 ERROR HY000: Database default encryption cannot be set to N (explicitly request for tables in database to be unencrypted) while default_table_encryption is set to ONLINE_TO_KEYRING. If you want to exclude table from being encrypted by encryption threads you can still do it while creating table. For that you need to explicitly specify ENCRYPTION='N' while creating a table.
 USE db_1;
+SET GLOBAL default_table_encryption=OFF;
 SET SESSION default_table_encryption=ON;
 CREATE DATABASE db_2;
 SHOW CREATE DATABASE db_2;

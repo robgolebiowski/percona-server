@@ -9258,6 +9258,12 @@ ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING
 ER_KEYRING_ILLEGAL_ENCRYPTION_OPTION
   eng "Encryption option is not allowed. %s"
 
+ER_ONLINE_KEYRING_SESSION_SCOPE
+  eng "Values ONLINE_TO_KEYRING and ONLINE_FROM_KEYRING_TO_UNECRYPTED can be only assigned to global scope of default_table_encryption. Those values are used by encryption threads, which work on all tablespaces and tables in the server (i.e. they work globally)."
+
+ER_GLOBAL_AND_SESSION_ENCRYPTION_MISMATCH
+  eng "It is not possible to set session scope of default_table_encryption to ON while global scope of default_table_encryption is set to ONLINE_TO_KEYRING."
+
 #
 # End of Percona Server 8.0 client messages
 #

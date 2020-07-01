@@ -34,7 +34,39 @@ SET GLOBAL default_table_encryption = OFF;
 include/assert.inc [Make sure all tables stay decrypted]
 SET GLOBAL default_table_encryption = ON;
 include/assert.inc [Make sure all tables stay decrypted]
+# Make sure that ONLINE_TO_KEYRING cannot be assigned to SESSION scope
+SET SESSION default_table_encryption = ONLINE_TO_KEYRING;
+ERROR HY000: Values ONLINE_TO_KEYRING and ONLINE_FROM_KEYRING_TO_UNECRYPTED can be only assigned to global scope of default_table_encryption. Those values are used by encryption threads, which work on all tablespaces and tables in the server (i.e. they work globally).
+# Make sure that ONLINE_FROM_KEYRING_TO_UNENCRYPTED cannot be assigned to SESSION scope
+SET SESSION default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+ERROR HY000: Values ONLINE_TO_KEYRING and ONLINE_FROM_KEYRING_TO_UNECRYPTED can be only assigned to global scope of default_table_encryption. Those values are used by encryption threads, which work on all tablespaces and tables in the server (i.e. they work globally).
+SET GLOBAL default_table_encryption = ONLINE_TO_KEYRING;
+# Make sure it is not possible to assign default_table_encryption's SESSION scope
+# to ON while GLOBAL scope of default_table_encryption is set to ONLINE_TO_KEYRING
+SET SESSION default_table_encryption = ON;
+ERROR HY000: It is not possible to set session scope of default_table_encryption to ON while global scope of default_table_encryption is set to ONLINE_TO_KEYRING.
+# It should not be possible to create database Master Key encrypted while
+# default_table_encryption is set to ONLINE_TO_KEYRING
+CREATE DATABASE db1 DEFAULT ENCRYPTION='Y';
+ERROR HY000: Database default encryption cannot be set to Y (Master Key encryption) while default_table_encryption is set to ONLINE_TO_KEYRING. It does not make sense to create new Master Key encrypted tables if the intention is to re-encrypt them to KEYRING encryption.
+# It should not be possible to create database with encryption explicitly disabled
+# while default_table_encryption is set to ONLINE_TO_KEYRING
+CREATE DATABASE db3 DEFAULT ENCRYPTION='N';
+ERROR HY000: Database default encryption cannot be set to N (explicitly request for tables in database to be unencrypted) while default_table_encryption is set to ONLINE_TO_KEYRING. If you want to exclude table from being encrypted by encryption threads you can still do it while creating table. For that you need to explicitly specify ENCRYPTION='N' while creating a table.
+# All other combinations of global/session scope of default_table_encryption should
+# be allowed (together with database's DEFAULT ENCRYPTION).
+# 1) global default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED
+SET GLOBAL default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET SESSION default_table_encryption = ON;
+SET SESSION default_table_encryption = OFF;
+CREATE DATABASE db1 DEFAULT ENCRYPTION='Y';
+CREATE DATABASE db2 DEFAULT ENCRYPTION='N';
+# 2) global default_table_encryption = ONLINE_TO_KEYRING
+SET GLOBAL default_table_encryption = ONLINE_TO_KEYRING;
+SET SESSION default_table_encryption = OFF;
+DROP DATABASE db1;
+DROP DATABASE db2;
 DROP TABLES t1,t2,t3,t4;
-SET GLOBAL default_table_encryption = OFF;
 SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption = OFF;
 UNINSTALL PLUGIN keyring_file;

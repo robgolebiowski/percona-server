@@ -37,6 +37,7 @@ USE db_1;
 # Now let's create database with DEFAULT ENCRYPTION='Y' and then change the default_table_encryption to
 # ONLINE_TO_KEYRING
 
+SET GLOBAL default_table_encryption=OFF;
 SET SESSION default_table_encryption=ON;
 CREATE DATABASE db_2;
 SHOW CREATE DATABASE db_2;

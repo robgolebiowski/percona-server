@@ -130,10 +130,48 @@ SET GLOBAL default_table_encryption = ON;
 --let $assert_cond= "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0]" = 0
 --source include/assert.inc
 
+--echo # Make sure that ONLINE_TO_KEYRING cannot be assigned to SESSION scope
+--error ER_ONLINE_KEYRING_SESSION_SCOPE
+SET SESSION default_table_encryption = ONLINE_TO_KEYRING;
+--echo # Make sure that ONLINE_FROM_KEYRING_TO_UNENCRYPTED cannot be assigned to SESSION scope
+--error ER_ONLINE_KEYRING_SESSION_SCOPE
+SET SESSION default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+
+SET GLOBAL default_table_encryption = ONLINE_TO_KEYRING;
+--echo # Make sure it is not possible to assign default_table_encryption's SESSION scope
+--echo # to ON while GLOBAL scope of default_table_encryption is set to ONLINE_TO_KEYRING
+--error ER_GLOBAL_AND_SESSION_ENCRYPTION_MISMATCH
+SET SESSION default_table_encryption = ON;
+
+--echo # It should not be possible to create database Master Key encrypted while
+--echo # default_table_encryption is set to ONLINE_TO_KEYRING
+--error ER_DATABASE_ENCRYPTION_MK_KEYRING_MISMATCH
+CREATE DATABASE db1 DEFAULT ENCRYPTION='Y';
+
+--echo # It should not be possible to create database with encryption explicitly disabled
+--echo # while default_table_encryption is set to ONLINE_TO_KEYRING
+--error ER_DATABASE_ENCRYPTION_N_KEYRING_MISMATCH
+CREATE DATABASE db3 DEFAULT ENCRYPTION='N';
+
+--echo # All other combinations of global/session scope of default_table_encryption should
+--echo # be allowed (together with database's DEFAULT ENCRYPTION).
+--echo # 1) global default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED
+SET GLOBAL default_table_encryption = ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
+SET SESSION default_table_encryption = ON;
+SET SESSION default_table_encryption = OFF;
+CREATE DATABASE db1 DEFAULT ENCRYPTION='Y';
+CREATE DATABASE db2 DEFAULT ENCRYPTION='N';
+
+--echo # 2) global default_table_encryption = ONLINE_TO_KEYRING
+SET GLOBAL default_table_encryption = ONLINE_TO_KEYRING;
+SET SESSION default_table_encryption = OFF;
+
 # cleanup
+DROP DATABASE db1;
+DROP DATABASE db2;
 DROP TABLES t1,t2,t3,t4;
-SET GLOBAL default_table_encryption = OFF;
 SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption = OFF;
 
 UNINSTALL PLUGIN keyring_file;
 --replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
