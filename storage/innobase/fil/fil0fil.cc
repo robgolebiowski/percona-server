@@ -9031,7 +9031,7 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
           nullptr, nullptr);
       write_request.encryption_algorithm(Encryption::AES);
       write_request.encryption_rotation(Encryption_rotation::NO_ROTATION);
-    } else if (offset != 0 && iter.m_crypt_data) {
+    } else if (offset != 0 && iter.m_crypt_data && iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
       ut_ad(iter.m_crypt_data->local_keys_cache[iter.m_crypt_data->max_key_version]
             != nullptr);
       write_request.encryption_key(
@@ -9267,8 +9267,8 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
         fil_space_read_crypt_data(callback.get_page_size(), page);
 
     /* read (optional) crypt data */
-    if (iter.m_crypt_data) {
-        //iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
+    if (iter.m_crypt_data &&
+        iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
       // when importing half encrypted tablespace the encrypted
       // flag will not be set
       ut_ad(DBUG_EVALUATE_IF("importing_half_encrypted", true, false) ||
@@ -9282,7 +9282,47 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
       iter.m_encryption_iv = iter.m_crypt_data->iv;
       //TODO:Tutaj błąd jak nie uda się załadować wersji i prawdopodobnie error message
       //z validation
-      iter.m_crypt_data->load_keys_to_local_cache();
+      
+      //if (crypt_data != nullptr) {
+        if (iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED &&
+            iter.m_crypt_data->private_version == 3) {
+          // for versions 1,2 and encrypted table we will fail the upgrade.
+          Validation_key_verions_result valid_result{
+              iter.m_crypt_data->key_found
+                  ? iter.m_crypt_data->validate_encryption_key_versions()
+                  : Validation_key_verions_result::MISSING_KEY_VERSIONS};
+          if (!iter.m_crypt_data->key_found ||
+              valid_result != Validation_key_verions_result::SUCCESS) {
+            //ut_ad(m_filename != nullptr);
+            err =
+                !iter.m_crypt_data->key_found
+                    ? DB_IO_IMPORT_ENCRYPTION_MISSING_KEY
+                    : (valid_result ==
+                               Validation_key_verions_result::MISSING_KEY_VERSIONS
+                           ? DB_IO_IMPORT_ENCRYPTION_MISSING_KEY_VERSIONS
+                           : DB_IO_IMPORT_ENCRYPTION_CORRUPTED_KEYS);
+            //
+            //
+            //ib::warn(error, table->space, iter.m_filepath, iter.m_crypt_data->key_id);
+            //m_is_valid = false;
+            //free_first_page();
+            //fil_space_destroy_iter.m_crypt_data(&iter.m_crypt_data);
+            //output.keyring_encryption_info.keyring_encryption_key_is_missing = true;
+            //output.error = DB_INVALID_ENCRYPTION_META;
+            //return output;
+            //err = DB_IO_NO_ENCRYPT_TABLESPACE;
+          }
+
+          iter.m_crypt_data->load_keys_to_local_cache();
+        }
+      //fil_space_destroy_crypt_data(&crypt_data);
+    //}
+      
+      
+      
+
+
+
     } else {
       /* Set encryption info. */
       iter.m_encryption_key = table->encryption_key;

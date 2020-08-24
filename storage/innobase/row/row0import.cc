@@ -3653,6 +3653,21 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
     }
   }
 
+  /* If the table is stored in a remote tablespace, we need to
+  determine that filepath from the link file and system tables.
+  Find the space ID in SYS_TABLES since this is an ALTER TABLE. */
+  dd_get_and_save_data_dir_path(table, table_def, true);
+
+  if (DICT_TF_HAS_DATA_DIR(table->flags)) {
+    ut_a(table->data_dir_path != nullptr);
+
+    const auto dir = table->data_dir_path;
+
+    filepath = Fil_path::make(dir, table->name.m_name, IBD, true);
+  } else {
+    filepath = Fil_path::make_ibd_from_table_name(table->name.m_name);
+  }
+
   /* Check if the table column definitions match the contents
   of the config file. */
 
@@ -3733,7 +3748,20 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
           "Encryption attribute in the file does not match the dictionary.");
 
       return (row_import_cleanup(prebuilt, trx, err));
+    } else if (err == DB_IO_IMPORT_ENCRYPTION_MISSING_KEY) {
+      ib_senderrf(
+          trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_IMPORT_TABLESPACE_MISSING_KEY);
+      return (row_import_cleanup(prebuilt, trx, err));
+    } else if (err == DB_IO_IMPORT_ENCRYPTION_MISSING_KEY_VERSIONS) {
+      ib_senderrf(
+          trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_IMPORT_TABLESPACE_ENCRYPTION_MISSING_KEY_VERSIONS);
+      return (row_import_cleanup(prebuilt, trx, err));
+    } else if (err == DB_IO_IMPORT_ENCRYPTION_CORRUPTED_KEYS) {
+      ib_senderrf(
+          trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_IMPORT_TABLESPACE_ENCRYPTION_CORRUPTED_KEYS);
+      return (row_import_cleanup(prebuilt, trx, err));
     }
+    //TODO: Add new error
     return (row_import_error(prebuilt, trx, err));
   }
 
@@ -3758,11 +3786,25 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
   DBUG_EXECUTE_IF("ib_import_reset_space_and_lsn_failure",
                   err = DB_TOO_MANY_CONCURRENT_TRXS;);
 
-  if (err == DB_IO_NO_ENCRYPT_TABLESPACE) {
-    ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_TABLE_SCHEMA_MISMATCH,
-            "Encryption attribute in the file does not match the dictionary.");
+  if (err != DB_SUCCESS) {
+    if (err == DB_IO_NO_ENCRYPT_TABLESPACE) {
+      ib_errf(trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_TABLE_SCHEMA_MISMATCH,
+              "Encryption attribute in the file does not match the dictionary.");
 
-    return (row_import_cleanup(prebuilt, trx, err));
+      return (row_import_cleanup(prebuilt, trx, err));
+    } else if (err == DB_IO_IMPORT_ENCRYPTION_MISSING_KEY) {
+        ib_senderrf(
+            trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_IMPORT_TABLESPACE_MISSING_KEY);
+        return (row_import_cleanup(prebuilt, trx, err));
+    } else if (err == DB_IO_IMPORT_ENCRYPTION_MISSING_KEY_VERSIONS) {
+        ib_senderrf(
+            trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_IMPORT_TABLESPACE_ENCRYPTION_MISSING_KEY_VERSIONS);
+        return (row_import_cleanup(prebuilt, trx, err));
+    } else if (err == DB_IO_IMPORT_ENCRYPTION_CORRUPTED_KEYS) {
+        ib_senderrf(
+            trx->mysql_thd, IB_LOG_LEVEL_ERROR, ER_IMPORT_TABLESPACE_ENCRYPTION_CORRUPTED_KEYS);
+        return (row_import_cleanup(prebuilt, trx, err));
+    }
   }
 
   if (err != DB_SUCCESS) {
@@ -3780,21 +3822,6 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
   if (table->has_instant_cols()) {
     dd_import_instant_add_columns(table, table_def);
-  }
-
-  /* If the table is stored in a remote tablespace, we need to
-  determine that filepath from the link file and system tables.
-  Find the space ID in SYS_TABLES since this is an ALTER TABLE. */
-  dd_get_and_save_data_dir_path(table, table_def, true);
-
-  if (DICT_TF_HAS_DATA_DIR(table->flags)) {
-    ut_a(table->data_dir_path != nullptr);
-
-    const auto dir = table->data_dir_path;
-
-    filepath = Fil_path::make(dir, table->name.m_name, IBD, true);
-  } else {
-    filepath = Fil_path::make_ibd_from_table_name(table->name.m_name);
   }
 
   DBUG_EXECUTE_IF("ib_import_OOM_15", ut_free(filepath); filepath = nullptr;);
