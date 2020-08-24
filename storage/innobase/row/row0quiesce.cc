@@ -365,10 +365,6 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t row_quiesce_write_header(
     std::tuple<bool, bool> keyring_info) {
   byte value[sizeof(ib_uint32_t)];
 
-  fil_space_t *space = fil_space_get(table->space);
-  // The table is read locked so it will not be dropped
-  ut_ad(space != NULL);
-
   /* Write the meta-data version number. */
   auto has_crypt_data = std::get<0>(keyring_info);
   auto is_space_encrypted_flag_set = std::get<1>(keyring_info);
