@@ -855,7 +855,8 @@ void row_quiesce_table_complete(
                            << "'";
 
   if (has_crypt_data) {
-    fil_space_crypt_include_in_rotation(table->space);
+    fil_crypt_readd_space_to_rotation(table->space);
+    //fil_space_crypt_include_in_rotation(table->space);
   } else if (dd_is_table_in_encrypted_tablespace(table)) {
     char cfp_name[OS_FILE_MAX_PATH];
 

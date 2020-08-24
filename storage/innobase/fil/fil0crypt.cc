@@ -1453,7 +1453,7 @@ static void fil_crypt_write_crypt_data_to_page0(fil_space_t *space) {
 }
 
 bool fil_crypt_exclude_tablespace_from_rotation_temporarily(
-    fil_space_t *space) {
+    fil_space_t *space, bool for_export) {
   if (space->exclude_from_rotation) {
     // nothing to do
     return true;
@@ -1481,13 +1481,14 @@ bool fil_crypt_exclude_tablespace_from_rotation_temporarily(
   // exclude it from rotation.
   if (crypt_data->rotate_state.active_threads != 0 ||
       crypt_data->rotate_state.starting || crypt_data->rotate_state.flushing) {
-    my_error(ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
+    if (!for_export)
+      my_error(ER_EXCLUDE_ENCRYPTION_THREADS_RUNNING, MYF(0), space->name);
     return false;
   }
 
   // it is only possible to exclude tablespace that is unencrypted
-  if (crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
-    my_error(ER_EXCLUDE_ENCRYPTION_TABLE_ENCRYPTED, MYF(0), space->name);
+  if (!for_export && crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
+      my_error(ER_EXCLUDE_ENCRYPTION_TABLE_ENCRYPTED, MYF(0), space->name);
     return false;
   }
 
@@ -4026,42 +4027,42 @@ return false - if there are threads running on space
                and thus space cannot be exported
 return true - success
 */
-static bool fil_modify_rotation_list(fil_space_t *space,
-                                     const bool exclude_space) {
-  if (space->crypt_data == nullptr) {
-    // fil_crypt_threads_mutex makes sure that crypt_data will
-    // not be created for this space.
-    mutex_enter(&fil_crypt_threads_mutex);
-    // check if crypt_data is still null
-    if (space->crypt_data == nullptr) {
-      space->exclude_from_rotation = exclude_space;
-    }
-    mutex_exit(&fil_crypt_threads_mutex);
-  }
+//static bool fil_modify_rotation_list(fil_space_t *space,
+                                     //const bool exclude_space) {
+  //if (space->crypt_data == nullptr) {
+    //// fil_crypt_threads_mutex makes sure that crypt_data will
+    //// not be created for this space.
+    //mutex_enter(&fil_crypt_threads_mutex);
+    //// check if crypt_data is still null
+    //if (space->crypt_data == nullptr) {
+      //space->exclude_from_rotation = exclude_space;
+    //}
+    //mutex_exit(&fil_crypt_threads_mutex);
+  //}
 
-  if (space->crypt_data) {
-    mutex_enter(&space->crypt_data->mutex);
-    if (exclude_space && space->crypt_data->rotate_state.active_threads > 0) {
-      mutex_exit(&space->crypt_data->mutex);
-      return false;
-    }
-    ut_ad(space->crypt_data->rotate_state.active_threads == 0);
-    space->exclude_from_rotation = exclude_space;
-    mutex_exit(&space->crypt_data->mutex);
-  }
-  return true;
-}
+  //if (space->crypt_data) {
+    //mutex_enter(&space->crypt_data->mutex);
+    //if (exclude_space && space->crypt_data->rotate_state.active_threads > 0) {
+      //mutex_exit(&space->crypt_data->mutex);
+      //return false;
+    //}
+    //ut_ad(space->crypt_data->rotate_state.active_threads == 0);
+    //space->exclude_from_rotation = exclude_space;
+    //mutex_exit(&space->crypt_data->mutex);
+  //}
+  //return true;
+//}
 
-bool fil_space_crypt_exclude_from_rotation(fil_space_t *space) {
-  return fil_modify_rotation_list(space, true);
-}
+//bool fil_space_crypt_exclude_from_rotation(fil_space_t *space) {
+  //return fil_modify_rotation_list(space, true);
+//}
 
-void fil_space_crypt_include_in_rotation(space_id_t space_id) {
-  fil_space_t *space = fil_space_get(space_id);
-  ut_ad(space != nullptr);
+//void fil_space_crypt_include_in_rotation(space_id_t space_id) {
+  //fil_space_t *space = fil_space_get(space_id);
+  //ut_ad(space != nullptr);
 
-  fil_modify_rotation_list(space, false);
-}
+  //fil_modify_rotation_list(space, false);
+//}
 
 bool fil_space_crypt_prepare_for_export(const space_id_t space_id,
                                         std::tuple<bool, bool> &keyring_info) {
@@ -4071,7 +4072,8 @@ bool fil_space_crypt_prepare_for_export(const space_id_t space_id,
     fil_crypt_read_crypt_data(space);
   }
 
-  if (!fil_space_crypt_exclude_from_rotation(space)) return false;
+  if (!fil_crypt_exclude_tablespace_from_rotation_temporarily(space, true)) return false;
+  //if (!fil_space_crypt_exclude_from_rotation(space)) return false;
 
   std::get<0>(keyring_info) = space->crypt_data != nullptr;
   std::get<1>(keyring_info) = FSP_FLAGS_GET_ENCRYPTION(space->flags);

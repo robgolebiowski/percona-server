@@ -443,7 +443,8 @@ is running, encryption threads should not interfere.
               threads currently operating on it.
         true  success
 */
-bool fil_crypt_exclude_tablespace_from_rotation_temporarily(fil_space_t *space);
+bool fil_crypt_exclude_tablespace_from_rotation_temporarily(fil_space_t *space,
+                                                            bool for_export = false);
 
 /**
 Re-adds temporarily excluded tablespace to rotation threads
@@ -643,13 +644,13 @@ return false - if there are threads running on space
                rotation
 return true - success
 */
-bool fil_space_crypt_exclude_from_rotation(fil_space_t *space);
+//bool fil_space_crypt_exclude_from_rotation(fil_space_t *space);
 
 /**
 Include space in rotation
 @param[in] space_id of spaces to be included in rotation
 */
-void fil_space_crypt_include_in_rotation(const space_id_t space_id);
+//void fil_space_crypt_include_in_rotation(const space_id_t space_id);
 
 /**
 Prepares space for export by:
