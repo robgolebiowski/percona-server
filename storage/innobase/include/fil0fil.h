@@ -1934,6 +1934,8 @@ dberr_t fil_set_encryption(space_id_t space_id, Encryption::Type algorithm,
                            byte *key, byte *iv, bool aquire_mutex = true)
     MY_ATTRIBUTE((warn_unused_result));
 
+dberr_t fil_set_import_keyring(space_id_t space_id);
+
 /** Reset the encryption type for the tablespace
 @param[in] space_id		Space ID of tablespace for which to set
 @return DB_SUCCESS or error code */

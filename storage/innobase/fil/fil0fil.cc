@@ -8887,7 +8887,7 @@ struct Fil_page_iterator {
   /** Encruption iv */
   byte *m_encryption_iv;
 
-  uint m_encryption_key_version;
+  //uint m_encryption_key_version;
   uint m_encryption_key_id;
   fil_space_crypt_t *m_crypt_data; /*!< Crypt data (if encrypted) */
 };
@@ -8968,13 +8968,13 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
     if ((iter.m_encryption_key != NULL || encrypted_with_keyring) &&
         offset != 0) {
       read_request.encryption_key(
-          encrypted_with_keyring ? iter.m_crypt_data->tablespace_key
+          encrypted_with_keyring ? iter.m_crypt_data->local_keys_cache[iter.m_crypt_data->min_key_version]
                                  : iter.m_encryption_key,
           Encryption::KEY_LEN,
           encrypted_with_keyring ? iter.m_crypt_data->iv : iter.m_encryption_iv,
           0, iter.m_encryption_key_id,
           encrypted_with_keyring ? iter.m_crypt_data->tablespace_key : nullptr,
-          encrypted_with_keyring ? iter.m_crypt_data->uuid : nullptr, nullptr);
+          encrypted_with_keyring ? iter.m_crypt_data->uuid : nullptr, &iter.m_crypt_data->local_keys_cache);
 
       read_request.encryption_algorithm(iter.m_crypt_data ? Encryption::KEYRING
                                                           : Encryption::AES);
@@ -9027,16 +9027,22 @@ static dberr_t fil_iterate(const Fil_page_iterator &iter, buf_block_t *block,
         iter.m_crypt_data == NULL) {
       write_request.encryption_key(
           iter.m_encryption_key, Encryption::KEY_LEN, iter.m_encryption_iv,
-          iter.m_encryption_key_version, iter.m_encryption_key_id, nullptr,
+          0, iter.m_encryption_key_id, nullptr,
           nullptr, nullptr);
       write_request.encryption_algorithm(Encryption::AES);
+      write_request.encryption_rotation(Encryption_rotation::NO_ROTATION);
     } else if (offset != 0 && iter.m_crypt_data) {
+      ut_ad(iter.m_crypt_data->local_keys_cache[iter.m_crypt_data->max_key_version]
+            != nullptr);
       write_request.encryption_key(
-          iter.m_encryption_key, Encryption::KEY_LEN, iter.m_encryption_iv,
-          iter.m_encryption_key_version, iter.m_crypt_data->key_id, nullptr,
-          iter.m_crypt_data->uuid, nullptr);
+          iter.m_crypt_data->local_keys_cache[iter.m_crypt_data->max_key_version],
+          Encryption::KEY_LEN,
+          iter.m_crypt_data->iv,
+          iter.m_crypt_data->max_key_version, iter.m_crypt_data->key_id, nullptr,
+          iter.m_crypt_data->uuid, &iter.m_crypt_data->local_keys_cache);
 
       write_request.encryption_algorithm(Encryption::KEYRING);
+      write_request.encryption_rotation(iter.m_crypt_data->encryption_rotation);
 
       if (callback.get_page_size().is_compressed()) {
         write_request.mark_page_zip_compressed();
@@ -9261,24 +9267,27 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
         fil_space_read_crypt_data(callback.get_page_size(), page);
 
     /* read (optional) crypt data */
-    if (iter.m_crypt_data &&
-        iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
+    if (iter.m_crypt_data) {
+        //iter.m_crypt_data->type != CRYPT_SCHEME_UNENCRYPTED) {
       // when importing half encrypted tablespace the encrypted
       // flag will not be set
       ut_ad(DBUG_EVALUATE_IF("importing_half_encrypted", true, false) ||
             FSP_FLAGS_GET_ENCRYPTION(space_flags));
       iter.m_encryption_key_id = iter.m_crypt_data->key_id;
 
-      Encryption::get_latest_tablespace_key(
-          iter.m_crypt_data->key_id, iter.m_crypt_data->uuid,
-          &iter.m_encryption_key_version, &iter.m_encryption_key);
-      if (iter.m_encryption_key == NULL) err = DB_IO_DECRYPT_FAIL;
+      //Encryption::get_latest_tablespace_key(
+          //iter.m_crypt_data->key_id, iter.m_crypt_data->uuid,
+          //&iter.m_encryption_key_version, &iter.m_encryption_key);
+      //if (iter.m_encryption_key == NULL) err = DB_IO_DECRYPT_FAIL;
       iter.m_encryption_iv = iter.m_crypt_data->iv;
+      //TODO:Tutaj błąd jak nie uda się załadować wersji i prawdopodobnie error message
+      //z validation
+      iter.m_crypt_data->load_keys_to_local_cache();
     } else {
       /* Set encryption info. */
       iter.m_encryption_key = table->encryption_key;
       iter.m_encryption_iv = table->encryption_iv;
-      iter.m_encryption_key_version = ~0;  // TODO:Robert:flipping bits so to
+      //iter.m_encryption_key_version = ~0;  // TODO:Robert:flipping bits so to
                                            // make this a marker that tablespace
                                            // key id used
     }
@@ -9291,7 +9300,7 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
                                     " is an encrypted tablespace";
 
         err = DB_IO_NO_ENCRYPT_TABLESPACE;
-      } else {
+      } else if (!iter.m_crypt_data) {
         /* encryption_key must have been populated while reading CFP file. */
         ut_ad(table->encryption_key != nullptr &&
               table->encryption_iv != nullptr);
@@ -9327,7 +9336,6 @@ dberr_t fil_tablespace_iterate(dict_table_t *table, ulint n_io_buffers,
 
     if (iter.m_crypt_data) {
       fil_space_destroy_crypt_data(&iter.m_crypt_data);
-      if (iter.m_encryption_key != NULL) my_free(iter.m_encryption_key);
     }
   }
 
@@ -9551,6 +9559,28 @@ Compression::Type fil_get_compression(space_id_t space_id) {
   fil_space_t *space = fil_space_get(space_id);
 
   return (space == nullptr ? Compression::NONE : space->compression_type);
+}
+
+//TODO:Niepotrzebne
+dberr_t fil_set_import_keyring(space_id_t space_id) {
+
+  auto shard = fil_system->shard_by_id(space_id);
+
+  shard->mutex_acquire();
+
+  fil_space_t *space = shard->get_space_by_id(space_id);
+
+  if (space == nullptr) {
+    shard->mutex_release();
+    return (DB_NOT_FOUND);
+  }
+
+  space->crypt_data->load_keys_to_local_cache();
+  space->encryption_type = Encryption::KEYRING;
+
+  shard->mutex_release();
+
+  return (DB_SUCCESS);
 }
 
 /** Set the encryption type for the tablespace

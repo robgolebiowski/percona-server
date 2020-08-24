@@ -42,6 +42,7 @@ ALTER TABLE t1 IMPORT TABLESPACE;
 --echo # t1 was already imported in Scenario 1.
 
 # decrypt all the tables
+SET GLOBAL innodb_encryption_threads=0;
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=4;
 
@@ -75,7 +76,9 @@ EOF
 ALTER TABLE t1 IMPORT TABLESPACE;
 
 # encrypt all the tables
+SET GLOBAL innodb_encryption_threads=0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=4;
 
 --let $wait_timeout= 600
 --let $wait_condition=SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 1
@@ -96,6 +99,8 @@ UNLOCK TABLES;
 DROP TABLE t1;
 
 --echo # 4) Enable encryption threads with rotation to unencryted, import t1.
+SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=OFF;
 
 CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY, a VARCHAR(255)) ENGINE=InnoDB ENCRYPTION='Y';
 ALTER TABLE t1 DISCARD TABLESPACE;
@@ -105,6 +110,7 @@ ib_restore_tablespaces("test", "t1");
 EOF
 
 # decrypt all the tables
+SET GLOBAL innodb_encryption_threads=0;
 SET GLOBAL default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SET GLOBAL innodb_encryption_threads=4;
 
@@ -141,8 +147,9 @@ ib_restore_tablespaces("test", "t1");
 EOF
 
 # encrypt all the tables
-SET GLOBAL innodb_encryption_threads=4;
+SET GLOBAL innodb_encryption_threads=0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads=4;
 
 ALTER TABLE t1 IMPORT TABLESPACE;
 
@@ -165,5 +172,5 @@ UNLOCK TABLES;
 DROP TABLE t1;
 
 # cleanup
-SET GLOBAL default_table_encryption=OFF;
 SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=OFF;

@@ -237,8 +237,7 @@ Check if a key needs rotation given a key_state
 @return true if key needs rotation, false if not */
 MY_NODISCARD static bool fil_crypt_needs_rotation(
     fil_encryption_t encrypt_mode, uint key_version, uint latest_key_version,
-    uint rotate_key_age, Encryption::Encryption_rotation encryption_rotation,
-    uint type);
+    uint rotate_key_age, uint type);
 
 static bool encrypt_validation_tag(const byte *secret, const size_t secret_size,
                                    const byte *key, byte *encrypted_secret) {
@@ -388,8 +387,7 @@ static inline uint fil_crypt_get_latest_key_version(
   if (crypt_data->is_key_found()) {
     if (fil_crypt_needs_rotation(
             crypt_data->encryption, crypt_data->min_key_version, key_version,
-            srv_fil_crypt_rotate_key_age, crypt_data->encryption_rotation,
-            crypt_data->type)) {
+            srv_fil_crypt_rotate_key_age, crypt_data->type)) {
       /* Below event seen as NULL-pointer at startup
       when new database was created and we create a
       checkpoint. Only seen when debugging. */
@@ -1364,8 +1362,7 @@ Check if a key needs rotation given a key_state
 @return true if key needs rotation, false if not */
 static bool fil_crypt_needs_rotation(
     fil_encryption_t encrypt_mode, uint key_version, uint latest_key_version,
-    uint rotate_key_age, Encryption::Encryption_rotation encryption_rotation,
-    uint type) {
+    uint rotate_key_age, uint type) {
   if (key_version == ENCRYPTION_KEY_VERSION_INVALID) {
     ut_ad(0);
     return false;
@@ -1952,7 +1949,7 @@ static bool fil_crypt_space_needs_rotation(rotate_thread_t *state,
     bool need_key_rotation = fil_crypt_needs_rotation(
         crypt_data->encryption, crypt_data->min_key_version,
         key_state->key_version, key_state->rotate_key_age,
-        crypt_data->encryption_rotation, crypt_data->type);
+        crypt_data->type);
 
     if (need_key_rotation && crypt_data->rotate_state.active_threads != 0 &&
         crypt_data->rotate_state.next_offset >
@@ -2671,7 +2668,6 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
     } else if (fil_crypt_needs_rotation(crypt_data->encryption, kv,
                                         key_state->key_version,
                                         key_state->rotate_key_age,
-                                        crypt_data->encryption_rotation,
                                         crypt_data->type)) {
       // mtr.set_named_space(space);
       mtr.set_flush_observer(crypt_data->rotate_state.flush_observer);
@@ -4050,7 +4046,7 @@ static bool fil_modify_rotation_list(fil_space_t *space,
       return false;
     }
     ut_ad(space->crypt_data->rotate_state.active_threads == 0);
-    space->crypt_data->exclude_from_rotation = exclude_space;
+    space->exclude_from_rotation = exclude_space;
     mutex_exit(&space->crypt_data->mutex);
   }
   return true;

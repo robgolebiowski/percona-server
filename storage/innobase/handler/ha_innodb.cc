@@ -19020,7 +19020,7 @@ int ha_innobase::external_lock(THD *thd, /*!< in: handle to the user thread */
           ib_senderrf(trx->mysql_thd, IB_LOG_LEVEL_ERROR,
                       ER_FLUSH_ENC_THREADS_RUNNING, table->s->table_name.str);
 
-          DBUG_RETURN(HA_ERR_EXPORT_ENC_THREADS_RUNNING);
+          return HA_ERR_EXPORT_ENC_THREADS_RUNNING;
         }
 
         has_crypt_data = std::get<0>(keyring_info);

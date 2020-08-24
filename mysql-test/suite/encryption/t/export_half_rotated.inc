@@ -39,11 +39,12 @@ if (!$is_encrypted)
 --source include/assert.inc
 }
 --echo # We want only first 100 pages to be rotated
-SET GLOBAL debug="+d,rotate_only_first_100_pages_from_t1";
+SET GLOBAL debug="+d,rotate_only_first_x_pages_from_t1";
 
 --echo # Start rotation to online keyring encrypted (tables do not have crypt data stored in page 0)
-SET GLOBAL innodb_encryption_threads = 1;
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads = 1;
 
 --let tables_count=`select count(*) from INFORMATION_SCHEMA.INNODB_TABLESPACES`
 
@@ -63,7 +64,7 @@ SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
 --echo # Disable rotation threads
 SET GLOBAL innodb_encryption_threads = 0;
 --echo # Disable rotation of only first 100 pages
-SET GLOBAL debug="-d,rotate_only_first_100_pages_from_t1";
+SET GLOBAL debug="-d,rotate_only_first_x_pages_from_t1";
 
 --source include/shutdown_mysqld.inc
 
