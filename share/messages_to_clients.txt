@@ -9412,6 +9412,9 @@ ER_SYSTEM_KEY_ROTATION_CANT_GENERATE_NEW_VERSION
 ER_DTE_ENCRYPTION_THREADS_ACTIVE
   eng "In order to change default_table_encryption, disable encryption threads. Please set number of innodb_encryption_threads to 0."
 
+ER_FLUSH_ENC_THREADS_RUNNING
+  eng "Tablespace %s cannot be flushed for export as tablespace is being currently encrypted/decrypted by encryption threads."
+
 #
 # End of Percona Server 8.0 client messages
 #

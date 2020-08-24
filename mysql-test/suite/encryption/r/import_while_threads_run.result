@@ -21,8 +21,9 @@ include/assert.inc [Make sure t2 is not encrypted]
 # We want t1 to hang on starting rotation with one thread active on it.
 SET GLOBAL debug="+d,hang_on_t1_rotation";
 # Start rotation to online keyring encrypted (tables do not have crypt data stored in page 0)
-SET GLOBAL innodb_encryption_threads = 4;
+SET GLOBAL innodb_encryption_threads = 0;
 SET GLOBAL default_table_encryption=ONLINE_TO_KEYRING;
+SET GLOBAL innodb_encryption_threads = 4;
 # All tables should get encrypted. tables_count - 2 because temporary tablespace is not encrypted and t1 will hang
 # on starting rotation with one thread active on it.
 # Table t1 should have min_key_version = 0 assigned and ROTATIONG_OR_FLUSHING=1 <= this means that only 100 pages
@@ -49,6 +50,6 @@ ALTER TABLE t2 IMPORT TABLESPACE;
 include/assert.inc [Make sure t1 is readable]
 include/assert.inc [Make sure t2 is readable]
 DROP TABLE t1,t2;
-SET GLOBAL default_table_encryption=OFF;
 SET GLOBAL innodb_encryption_threads=0;
+SET GLOBAL default_table_encryption=OFF;
 DROP PROCEDURE innodb_insert_proc;
