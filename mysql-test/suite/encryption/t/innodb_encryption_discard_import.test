@@ -279,7 +279,7 @@ SHOW CREATE TABLE t8;
 
 
 --let $assert_text = Make sure all tables, apart from t7, are encrypted
---let $assert_cond = "[SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0]" = 1
+--let $assert_cond = "[SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0]" = 1
 --source include/assert.inc
 
 --list_files $MYSQLD_DATADIR/$DB_NAME
