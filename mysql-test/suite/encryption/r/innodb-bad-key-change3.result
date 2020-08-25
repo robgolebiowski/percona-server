@@ -23,7 +23,7 @@ ALTER TABLE t1 DISCARD TABLESPACE;
 restore: t1 .ibd and .cfg files
 # restart:--keyring-file-data=MYSQLTEST_VARDIR/keys2.txt
 ALTER TABLE t1 IMPORT TABLESPACE;
-ERROR HY000: You are importing tablespace id 1 that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
+ERROR HY000: You are importing table that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (

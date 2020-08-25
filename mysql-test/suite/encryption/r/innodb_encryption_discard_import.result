@@ -382,17 +382,17 @@ restore: t6 .ibd and .cfg files
 restore: t8 .ibd and .cfg files
 # restart:<hidden args>
 ALTER TABLE t1 IMPORT TABLESPACE;
-ERROR HY000: You are importing tablespace id 1 that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
+ERROR HY000: You are importing table that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
 ALTER TABLE t2 IMPORT TABLESPACE;
 Warnings:
 Warning	1814	InnoDB: Tablespace has been discarded for table 't2'
 ALTER TABLE t3 IMPORT TABLESPACE;
-ERROR HY000: You are importing tablespace id 2 that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
+ERROR HY000: You are importing table that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
 ALTER TABLE t4 IMPORT TABLESPACE;
 Warnings:
 Warning	1814	InnoDB: Tablespace has been discarded for table 't4'
 ALTER TABLE t5 IMPORT TABLESPACE;
-ERROR HY000: You are importing tablespace id 4 that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
+ERROR HY000: You are importing table that is encrypted but keyring or used key is not available. Can't continue importing this table. Please provide the correct keyring.
 ALTER TABLE t6 IMPORT TABLESPACE;
 Warnings:
 Warning	1814	InnoDB: Tablespace has been discarded for table 't6'

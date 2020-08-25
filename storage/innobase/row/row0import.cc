@@ -3628,10 +3628,10 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
   /* Read CFP file */
   if (dd_is_table_in_encrypted_tablespace(table)) {
     /* First try to read CFP file here. */
-    err = row_import_read_cfp(table, trx->mysql_thd, cfg);
-    ut_ad(cfg.m_cfp_missing || err == DB_SUCCESS);
+    dberr_t err_cfp = row_import_read_cfp(table, trx->mysql_thd, cfg);
+    ut_ad(cfg.m_cfp_missing || err_cfp == DB_SUCCESS);
 
-    if (err != DB_SUCCESS) {
+    if (err_cfp != DB_SUCCESS) {
       rw_lock_s_unlock_gen(dict_operation_lock, 0);
       return (row_import_error(prebuilt, trx, err));
     }
@@ -3651,21 +3651,6 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
               table->encryption_iv != nullptr);
       }
     }
-  }
-
-  /* If the table is stored in a remote tablespace, we need to
-  determine that filepath from the link file and system tables.
-  Find the space ID in SYS_TABLES since this is an ALTER TABLE. */
-  dd_get_and_save_data_dir_path(table, table_def, true);
-
-  if (DICT_TF_HAS_DATA_DIR(table->flags)) {
-    ut_a(table->data_dir_path != nullptr);
-
-    const auto dir = table->data_dir_path;
-
-    filepath = Fil_path::make(dir, table->name.m_name, IBD, true);
-  } else {
-    filepath = Fil_path::make_ibd_from_table_name(table->name.m_name);
   }
 
   /* Check if the table column definitions match the contents
@@ -3822,6 +3807,21 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
   if (table->has_instant_cols()) {
     dd_import_instant_add_columns(table, table_def);
+  }
+
+  /* If the table is stored in a remote tablespace, we need to
+  determine that filepath from the link file and system tables.
+  Find the space ID in SYS_TABLES since this is an ALTER TABLE. */
+  dd_get_and_save_data_dir_path(table, table_def, true);
+
+  if (DICT_TF_HAS_DATA_DIR(table->flags)) {
+    ut_a(table->data_dir_path != nullptr);
+
+    const auto dir = table->data_dir_path;
+
+    filepath = Fil_path::make(dir, table->name.m_name, IBD, true);
+  } else {
+    filepath = Fil_path::make_ibd_from_table_name(table->name.m_name);
   }
 
   DBUG_EXECUTE_IF("ib_import_OOM_15", ut_free(filepath); filepath = nullptr;);
