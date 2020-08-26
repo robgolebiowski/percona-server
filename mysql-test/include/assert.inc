@@ -79,6 +79,7 @@ if (!$eval_result)
     --echo Assertion debug statement:
     --eval $assert_debug
   }
+  SELECT * FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION;
   --die Test assertion failed in assert.inc
 }
 
